@@ -19,7 +19,7 @@ Source: upstream [Open Knowledge Format SPEC.md, Version 0.2](https://raw.github
 toolkit version. API/storage schema versions and reviewed runtime identities are
 separate contracts, not mechanically bumped with either number. Numbered sections
 in this file describe Loom; explicitly marked upstream sections refer to that source.
-The fork's supported local checkout is `ui-analysis`; no fork publication URL is declared.
+This fork is published as [okf-loom v2](https://github.com/SpatialNexus/okf-loom-v2); `main` is the supported branch.
 
 ## 1. Primary distribution and use model
 
@@ -1019,8 +1019,9 @@ advertise only the retrieval and canonical-context capabilities they can run.
 Its selected detail is reading-first: identity and Open action, connection
 summary, authored body, relationships/why connected, then Lens explanation and
 Graph settings. Each lens answers one
-question with a real algorithm (see `docs/design/graph-lenses.md` for
-the evidence base): Map (deterministic Louvain communities as colour +
+question with a real algorithm (see
+[Why the graph is organised into question-named lenses](/explanation/live_studio_design.md#why-the-graph-is-organised-into-question-named-lenses)
+for the evidence base): Map (deterministic Louvain communities as colour +
 PageRank as size), Themes (strong community grouping + ranked theme
 digest), Flow (dagre layered layout over directed/typed edges, falling
 back to directed breadthfirst), Bridges (betweenness centrality as
@@ -1929,7 +1930,8 @@ The ten quality classifications for this implementation are: `state-ownership` (
 `tests/test_annotations.py`, `tests/test_annotations_v2_backend.py`,
 `tests/test_annotations_v2_http.py`, `tests/test_annotation_projection.py`, and
 `tests/test_annotations_v2_browser.py`. The release-specific visual-evidence gate
-is `docs/screenshots/annotations-v2/`; after capture against the selected final
+is the git-ignored `captures/annotations-v2/` directory, which is never committed
+to the published tree; after capture against the selected final
 serialized tree, its schema-1 `manifest.json` must record the HEAD-verified
 source revision, fully serialized consumed-input inventory, worktree and capture-script
 digests, browser identity, actual per-artifact media/viewport, per-image SHA-256, release-proof
@@ -1943,6 +1945,9 @@ UI handling, not production-server failures; separate HTTP tests prove the real
 server envelopes. Each inventory entry records exact path, regular-file or
 symlink type, tracked boolean, Git mode, content hash, and symlink-target
 semantics; unsupported special files and Git provenance failures fail closed.
+Tracked modes come fail-closed from `git ls-files --stage` (`100644`,
+`100755`, or `120000`); untracked regular files map executable bits to `100755`
+or `100644`, and untracked symlinks use `120000`.
 Capture recovery and publication hold one publication lock. Release publication
 requires atomic directory exchange and fails closed when exchange is unavailable;
 the two-rename recoverable fallback is not release authority. Rollback content
@@ -1951,7 +1956,7 @@ staged bytes, and persisted body/text-quote sentinels are confirmed through
 `/__comments` before no-JS checks. Capture and tests call one production
 validator whose checks also run under `python -O`. These claims do not include Proposal/Diff
 Review or performance work. Ordinary regression tests use temporary source and
-evidence repositories, not the checked-in historical screenshots. Passing those
+evidence repositories, not previously captured screenshots. Passing those
 tests proves validator/publication behavior, not visual release acceptance.
 Recovery preflights every present sibling before mutation, quarantines the pinned
 candidate under the trusted parent before mutation, immediately revalidates its
@@ -2012,7 +2017,7 @@ The required final release screenshot set is exactly `resolved.png`,
 `stale-after-mutation.png`, `selecting.png`, `conflict.png`,
 `save-failure.png`, `focus-visible.png`, `mobile-320.png`,
 `forced-colors.png`, and `no-js.png`, indexed by
-`docs/screenshots/annotations-v2/manifest.json`. The capture workflow in
+`captures/annotations-v2/manifest.json`. The capture workflow in
 `scripts/capture_annotations_v2.py` uses explicit checked failures and semantic
 mobile/forced-colors readiness. The manifest records exact scenario identity,
 image hashes, and actual viewport/media per artifact; independently verifies
@@ -2173,7 +2178,10 @@ python scripts/benchmark_retrieval_relevance.py --verify-report /path/to/recorde
 Supply an independently prepared context; these commands do not repair or
 regenerate evidence. The annotation command retains strict final validation:
 the selected checkout must be clean and attached at the evidence-only commit,
-with exactly one parent equal to the recorded source revision. It verifies the
+with exactly one parent equal to the recorded source revision. Because
+`captures/` is git-ignored, that evidence-only commit is prepared in the
+selected evidence checkout with an explicit `git add -f captures/annotations-v2`;
+it is never part of the published tree. It verifies the
 complete inventory, script, artifact bytes and classifications. Unrelated work
 in another checkout does not invalidate that historical context and cannot be
 promoted by verifying it. The relevance command retains measured-source and

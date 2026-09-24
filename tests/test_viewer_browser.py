@@ -1,4 +1,4 @@
-"""Browser proof on disposable bundles. See README for core/browser lanes.
+"""Browser proof on disposable bundles. See CONTRIBUTING.md for core/browser lanes.
 
 Collection never imports Playwright. Missing optional tooling may skip locally;
 OKF_REQUIRE_BROWSER=1 makes it required. Server or browser startup errors fail.
@@ -540,7 +540,7 @@ def test_doc_refetch_cancellation_is_silent_while_real_failures_stay_reported(
 def test_phase2_concept_anatomy_dom_order(server_url: str, page) -> None:
     """Phase 2 layout-graph + contract-runtime parity.
 
-    Authoritative layout contract (ui-overhaul-plan §3.3 lines 140-154):
+    Authoritative layout contract:
     on wide screens the infobox is a RIGHT RAIL beside the body (not
     vertically stacked above it). This replaces the prior vertical-stacking
     assertion which encoded the wrong contract.
@@ -615,8 +615,8 @@ def test_phase2_mobile_anatomy_320px(server_url: str, page) -> None:
     revealed and the visual order is header -> section disclosure -> infobox
     -> body, with NO horizontal document overflow.
 
-    ui-overhaul-plan §3.3 line 153: the section disclosure sits "below the
-    header band, never above the title".
+    The section disclosure sits below the header band, never above the
+    title.
     """
     page.set_viewport_size({"width": 320, "height": 640})
     page.goto(f"{server_url}/tables/orders", wait_until="domcontentloaded")
@@ -2101,8 +2101,8 @@ def test_spa_hover_and_focus_never_fetch_raw_or_hint_a_popover(
 ) -> None:
     """Phase-1 portable correctness, spa half.
 
-    Link hover/focus previews are a serve-only capability (``/__raw`` is a
-    server route). On the built spa surface the binding used to stay live:
+    Link hover/focus previews are a serve-only capability (``/__raw`` and
+    ``/__data/summary`` are server routes). On the built spa surface the binding used to stay live:
     hovering or keyboard-focusing a root-absolute link fired one or two
     doomed ``/__raw/<id>`` fetches per link and stamped the link with an
     ``aria-describedby`` pointing at a popover that can never open — an
@@ -2131,8 +2131,8 @@ def test_spa_hover_and_focus_never_fetch_raw_or_hint_a_popover(
     link.focus()
     page.wait_for_timeout(400)
 
-    raw = [u for u in requests_seen if "/__raw/" in u]
-    assert not raw, f"spa hover/focus must not fetch /__raw, saw {raw!r}"
+    raw = [u for u in requests_seen if "/__raw/" in u or "/__data/summary" in u]
+    assert not raw, f"spa hover/focus must not fetch a server preview, saw {raw!r}"
     described = page.evaluate(
         """() => [...document.querySelectorAll('main a[aria-describedby]')]
              .map(a => a.getAttribute('aria-describedby'))"""
@@ -2465,7 +2465,7 @@ def test_phase2_link_popover_type_band_and_counts(server_url: str, page) -> None
             return {
                 typeText: type ? type.textContent.trim() : "",
                 hasCounts: !!counts,
-                // SAFETY: popover rebuilt from fetched /__raw via textContent only.
+                // SAFETY: popover rebuilt from the fetched summary via textContent only.
                 unsafe: p.querySelectorAll('img,script,[onerror]').length,
             };
         }"""
@@ -2479,6 +2479,52 @@ def test_phase2_link_popover_type_band_and_counts(server_url: str, page) -> None
         assert "Links" in count_text or "Relations" in count_text, (
             f"popover counts row must label link/relation counts; got {count_text!r}"
         )
+
+
+def test_link_preview_shows_the_target_concepts_title_type_and_counts(server_url: str, page) -> None:
+    """A link preview names the concept it points at, not its id.
+
+    Previews used to read ``/__raw/<id>``, which is the body without
+    frontmatter, so every preview showed the target's id as its title, a
+    generic "concept" type and never a relation count. ``/__data/summary``
+    is the additive identity card they read now; ``/__raw`` is unchanged.
+    """
+    raw = page.request.get(f"{server_url}/__raw/tables/customers")
+    assert raw.ok and not raw.text().startswith("---"), "/__raw stays the body only"
+    card = page.request.get(f"{server_url}/__data/summary?id=tables/orders").json()
+    assert {key: card[key] for key in ("schema", "id", "title", "type", "icon", "links", "relations")} == {
+        "schema": 1, "id": "tables/orders", "title": "Orders", "type": "Table", "icon": "table",
+        "links": 4, "relations": 3,
+    }, card
+    assert card["description"] == "One row per completed customer order."
+    for query, status in (("", 400), ("?id=tables/orders&id=tables/customers", 400),
+                          ("?id=tables/nope", 404), ("?id=../../etc/passwd", 404)):
+        assert page.request.get(f"{server_url}/__data/summary{query}").status == status, query
+
+    page.set_viewport_size({"width": 1280, "height": 800})
+    page.goto(f"{server_url}/tables/orders", wait_until="domcontentloaded")
+    page.locator("h1.okf-page__title").wait_for(state="visible")
+    popover = page.locator("#okf-popover")
+    for href, title, counts in (("/tables/customers", "Customers", "Links 1"),
+                                ("/references/currencies", None, None)):
+        target = href.lstrip("/")
+        expected = page.request.get(f"{server_url}/__data/summary?id={target}").json()
+        assert expected["title"] != target and expected["type"], expected
+        page.locator(f'.okf-page__body a[href="{href}"]').first.hover()
+        expect(popover.locator("h4")).to_have_text(title or expected["title"])
+        expect(popover.locator(".okf-popover__type")).to_have_text(expected["type"])
+        expect(popover.locator(".okf-popover__type svg.okf-type-icon")).to_have_count(1)
+        expect(popover.locator(".okf-popover__body")).to_have_text(expected["description"])
+        if counts:
+            expect(popover.locator(".okf-popover__counts")).to_have_text(counts)
+        page.mouse.move(5, 5)
+        expect(popover).to_be_hidden()
+    # A concept with typed relations reports them in the evidence row.
+    page.goto(f"{server_url}/tables/customers", wait_until="domcontentloaded")
+    page.locator("h1.okf-page__title").wait_for(state="visible")
+    page.locator('.okf-page__body a[href="/tables/orders"]').first.focus()
+    expect(page.locator("#okf-popover h4")).to_have_text("Orders")
+    expect(page.locator("#okf-popover .okf-popover__counts")).to_have_text("Links 4Relations 3")
 
 
 def _popover_title(page) -> str:
@@ -2526,7 +2572,7 @@ def test_phase2_popover_later_hover_wins_over_earlier_pending(server_url: str, p
       window.__holdA = null;
       window.fetch = (url, opts) => {
         const u = String(url);
-        if (u.indexOf('/__raw/') >= 0) {
+        if (u.indexOf('/__data/summary') >= 0) {
           seen++;
           if (seen === 1) {
             // Hold the first hover's fetch.
@@ -2592,7 +2638,7 @@ def test_phase2_popover_hide_while_pending_keeps_it_hidden(server_url: str, page
       const nativeFetch = window.fetch.bind(window);
       window.__releaseHold = null;
       window.fetch = (url, opts) => {
-        if (String(url).indexOf('/__raw/') >= 0 && !window.__releaseHold) {
+        if (String(url).indexOf('/__data/summary') >= 0 && !window.__releaseHold) {
           return new Promise(resolve => {
             window.__releaseHold = () => nativeFetch(url, opts).then(resolve);
           });
@@ -2654,12 +2700,12 @@ def test_phase2_popover_stale_rejected_response_cannot_reopen(server_url: str, p
       window.__releaseStale = null;
       window.fetch = (url, opts) => {
         const u = String(url);
-        if (u.indexOf('/__raw/') >= 0 && !staleHeld) {
+        if (u.indexOf('/__data/summary') >= 0 && !staleHeld) {
           staleHeld = true;
           return new Promise(resolve => {
             window.__releaseStale = () => resolve(new Response(
-              "---\\ntype: StaleType\\ntitle: STALE_TITLE_THAT_MUST_NOT_WIN\\n---\\nbody\\n",
-              {status: 200, headers: {'Content-Type': 'text/plain'}}
+              JSON.stringify({schema: 1, type: 'StaleType', title: 'STALE_TITLE_THAT_MUST_NOT_WIN'}),
+              {status: 200, headers: {'Content-Type': 'application/json'}}
             ));
           });
         }
@@ -2733,25 +2779,22 @@ def test_phase2_popover_release_in_cancel_window_never_shows_a(server_url: str, 
     sibling tests release A only AFTER B has rendered (post-window) or move
     fully off any link (no hover B), so they do not cover this gap."""
     page.set_viewport_size({"width": 1280, "height": 800})
-    # Hold the FIRST /__raw (A) and make its response carry a distinctive STALE
-    # title so any render of A is unambiguously detectable. The body uses REAL
-    # newlines (single backslash-n in this raw string -> JS newline) so
-    # parseFrontmatter actually extracts the title; with literal backslash-n the
-    # "---\\n" prefix never matches and the title silently falls back to the
-    # concept id, masking the bug. Let every subsequent /__raw (B) pass through.
+    # Hold the FIRST summary fetch (A) and make its response carry a
+    # distinctive STALE title so any render of A is unambiguously detectable.
+    # Let every subsequent summary fetch (B) pass through.
     page.add_init_script(r"""(() => {
       const nativeFetch = window.fetch.bind(window);
       let seen = 0;
       window.__holdA = null;
       window.fetch = (url, opts) => {
         const u = String(url);
-        if (u.indexOf('/__raw/') >= 0) {
+        if (u.indexOf('/__data/summary') >= 0) {
           seen++;
           if (seen === 1) {
             return new Promise(resolve => {
               window.__holdA = () => resolve(new Response(
-                "---\ntype: StaleType\ntitle: STALE_A_TITLE_THAT_MUST_NEVER_SHOW\n---\nbody\n",
-                {status: 200, headers: {'Content-Type': 'text/plain'}}
+                JSON.stringify({schema: 1, type: 'StaleType', title: 'STALE_A_TITLE_THAT_MUST_NEVER_SHOW'}),
+                {status: 200, headers: {'Content-Type': 'application/json'}}
               ));
             });
           }
@@ -8142,6 +8185,61 @@ def test_phase4_review_hover_lifecycle_and_action_geometry(server_url: str, page
     page.wait_for_function("id=>window.__okfLoomGraph.interaction.snapshot().hovered===id", arg=ids[1])
     page.evaluate("() => dispatchEvent(new PageTransitionEvent('pagehide'))")
     assert page.evaluate("id=>{const G=window.__okfLoomGraph;return G.interaction.snapshot().selected===id&&G.cy.elements('.okf-hover,.okf-hover-dim').length===0&&document.querySelector('.okf-graph-actions').hidden}", ids[0])
+
+
+# Pan one concept to 150 px inside the canvas's right edge (too close for the
+# selection toolbar to fit on its right), at a spot where the pointer really
+# hits the canvas and no other concept overlaps it.
+_NODE_BESIDE_THE_RIGHT_EDGE_JS = """() => {
+  const cy = window.__okfLoomGraph.cy, c = cy.container(), r = c.getBoundingClientRect();
+  const W = c.clientWidth, H = c.clientHeight;
+  for (const n of cy.nodes(':visible').toArray()) {
+    for (const fy of [0.45, 0.35, 0.55, 0.3, 0.6]) {
+      const p = n.renderedPosition();
+      cy.panBy({x: (W - 150) - p.x, y: H * fy - p.y});
+      const q = n.renderedPosition(), x = r.left + q.x, y = r.top + q.y;
+      const hit = document.elementFromPoint(x, y);
+      const alone = cy.nodes(':visible').filter((m) => {
+        const b = m.renderedBoundingBox();
+        return m.id() !== n.id() && b.x1 <= q.x && q.x <= b.x2 && b.y1 <= q.y && q.y <= b.y2;
+      }).length === 0;
+      if (hit && c.contains(hit) && alone) return {id: n.id(), x, y};
+    }
+  }
+  return null;
+}"""
+
+# The node's own body (the part a click lands on), in page coordinates.
+_NODE_BOX_JS = """(id) => {
+  const cy = window.__okfLoomGraph.cy, n = cy.getElementById(id), p = n.renderedPosition();
+  const rx = n.renderedOuterWidth() / 2, ry = n.renderedOuterHeight() / 2;
+  const r = cy.container().getBoundingClientRect();
+  return {x1: r.left + p.x - rx, y1: r.top + p.y - ry, x2: r.left + p.x + rx, y2: r.top + p.y + ry};
+}"""
+
+
+def test_double_click_opens_a_concept_beside_the_canvas_edge(server_url: str, page) -> None:
+    """The graph's hint is "double-click opens". The first click selects and
+    shows the selection toolbar; beside the canvas's right edge that toolbar
+    used to be clamped back over the concept, so the second click pressed
+    "Explore neighborhood" and the page never opened."""
+    _open_graph(page, server_url)
+    target = page.evaluate(_NODE_BESIDE_THE_RIGHT_EDGE_JS)
+    assert target, "no concept could be placed alone beside the canvas's right edge"
+    page.mouse.move(target["x"], target["y"])
+    page.mouse.click(target["x"], target["y"])
+    bar = page.get_by_role("toolbar", name="Selected concept actions")
+    expect(bar).to_be_visible()
+    page.wait_for_function("id => window.__okfLoomGraph.interaction.snapshot().selected === id", arg=target["id"])
+    box, node = bar.bounding_box(), page.evaluate(_NODE_BOX_JS, target["id"])
+    assert not (box["x"] < node["x2"] and node["x1"] < box["x"] + box["width"]
+                and box["y"] < node["y2"] and node["y1"] < box["y"] + box["height"]), (box, node)
+    canvas = page.locator("#okf-graph").bounding_box()
+    assert canvas["x"] <= box["x"] and box["x"] + box["width"] <= canvas["x"] + canvas["width"] + 1, (box, canvas)
+
+    page.wait_for_timeout(700)  # a fresh gesture, not a continuation of the selecting click
+    page.mouse.dblclick(target["x"], target["y"])
+    page.wait_for_url(re.compile(re.escape("/" + target["id"]) + r"(\.html)?([?#].*)?$"), timeout=10_000)
 
 
 def test_phase4_review_search_pending_escape_and_path_outcomes(server_url: str, page) -> None:

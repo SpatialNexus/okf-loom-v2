@@ -56,7 +56,7 @@ def recorded_evidence(tmp_path_factory):
         command = ("scripts/benchmark_retrieval_relevance.py "
                    f"--baseline-checkout <clean-baseline@{benchmark.BASELINE_REVISION}> "
                    "--current-checkout <current-worktree> "
-                   "--output docs/design/gold-standard-relevance-2026.json")
+                   "--output <report.json>")
         report = benchmark.build_report(before, live, command=command, portable_raw=portable,
                                         provenance=benchmark._source_provenance(checkout))
     finally:

@@ -1009,6 +1009,15 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
 .okf-signal__seg-item input:checked + .okf-lens-choice { background: var(--okf-accent); color: var(--okf-accent-on); }
 .okf-signal__seg-item input:checked + .okf-lens-choice b,
 .okf-signal__seg-item input:checked + .okf-lens-choice small { color: var(--okf-accent-on); opacity: 1; }
+/* The lens preview is a miniature canvas that keeps its own inset surface in
+ * every state, so its ink must not inherit the selected row's accent-on text
+ * colour: that is white on the light inset and near-black on the dark inset
+ * (about 1.1:1 in every family and mode), so the selected picture vanished.
+ * The selected preview draws in the accent at full opacity, which reads on
+ * the inset in all eight family/mode themes and both contrast settings.
+ * Forced colours repaint it in CanvasText. */
+.okf-signal__seg-item input:checked + .okf-lens-choice .okf-lens-preview { color: var(--okf-accent); }
+.okf-signal__seg-item input:checked + .okf-lens-choice .okf-lens-preview line { opacity: 1; }
 
 /* Family-aware graph chrome. Semantic node type/community colours are not
  * touched: these rules frame active lenses, selection, tools, and detail UI. */

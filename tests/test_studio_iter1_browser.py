@@ -3753,6 +3753,83 @@ def test_presence_agent_user_actor_projects_from_get_and_delta(server_url: str, 
     assert page.locator(".okf-presence-ghost").count() == 0
 
 
+def test_graph_collaborator_panel_names_each_collaborator_once(server_url: str, page) -> None:
+    """The graph details pane names every collaborator once, closed or open.
+
+    The disclosure summary is the section heading (the list and its count);
+    the compact line under it previews the first collaborator while the list
+    is closed and steps aside while it is open. Before, the heading repeated
+    the preview, so the server's own agent row read "Agent · idle" twice.
+    """
+    page.emulate_media(reduced_motion="reduce")
+    page.set_viewport_size({"width": 1280, "height": 800})
+    page.add_init_script("try { localStorage.setItem('okfGraphTourDone', '1'); } catch (e) {}")
+    page.goto(f"{server_url}/__graph", wait_until="load")
+    page.wait_for_function(_PRESENCE_CONNECTED)
+    show_graph_canvas(page)
+    summary = page.locator(".okf-collaborators > summary")
+    compact = page.locator(".okf-collaborators__compact")
+    rows = page.locator(".okf-collaborators__list > li:not(.okf-collaborators__empty)")
+
+    def mentions(text: str) -> int:
+        # Rendered text only: a closed list and a hidden preview do not count.
+        return page.evaluate(
+            "(t) => document.querySelector('.okf-collaborator-region').innerText"
+            ".toLowerCase().split(t.toLowerCase()).length - 1",
+            text,
+        )
+
+    # The real server's agent row is the only collaborator.
+    expect(compact).to_have_text(re.compile(r"^Agent · \w+"))
+    expect(compact).to_be_visible()
+    assert mentions("Agent · ") == 1, page.locator(".okf-collaborator-region").inner_text()
+    expect(summary).to_have_text("Collaborators (1)")
+    heading_offset = ("() => document.querySelector('.okf-collaborators > summary').getBoundingClientRect().top"
+                      " - document.querySelector('.okf-collaborator-region').getBoundingClientRect().top")
+    top = page.evaluate(heading_offset)
+
+    # Keyboard opens the list: the row appears once, the preview steps aside,
+    # and the heading does not move under the pointer or focus.
+    summary.focus()
+    page.keyboard.press("Enter")
+    expect(page.locator(".okf-collaborators")).to_have_attribute("open", "")
+    expect(rows).to_have_count(1)
+    expect(rows.first).to_be_visible()
+    expect(compact).to_be_hidden()
+    assert mentions("Agent · ") == 1, page.locator(".okf-collaborator-region").inner_text()
+    assert page.evaluate(heading_offset) == top
+    expect(summary).to_be_focused()
+    page.keyboard.press("Enter")
+    expect(compact).to_be_visible()
+    assert mentions("Agent · ") == 1
+
+    # A browser collaborator joins: the heading counts both, and the viewer
+    # the preview shows is still named once whether the list is open or not.
+    page.evaluate("() => window.okfLoomLive._disconnectForTest()")
+    page.evaluate("""() => {const b=window.okfLoomLive.currentPresenceSnapshot(),n=Date.now()/1000;
+      window.okfLoomLive.emit('presence',{version:2,presence_rev:b.presence_rev+1,online:true,own_session_id:b.own_session_id,records:[
+        {session_id:'agent',kind:'agent',actor:'agent',state:'idle',client_seq:1,updated_at:n,expires_at:n+300},
+        {session_id:'viewer-once',kind:'browser',actor:'browser',state:'watching',label:'Viewer ONCE',client_seq:1,updated_at:n,expires_at:n+15,capability_expires_at:n+60,viewport:{schema:'graph-viewport-v1',x:.2,y:.2}}]});}""")
+    expect(summary).to_have_text("Collaborators (2)")
+    expect(compact).to_have_text("Viewer ONCE · watching · upper left")
+    assert mentions("Viewer ONCE") == 1 and mentions("Agent · ") == 0
+    summary.click()
+    expect(rows).to_have_count(2)
+    expect(compact).to_be_hidden()
+    assert mentions("Viewer ONCE") == 1 and mentions("Agent · ") == 1
+
+    # On a phone the presence bar names the agent on its own line only; the
+    # collaborator line counts browsers and never repeats "Agent".
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.evaluate("""() => {const b=window.okfLoomLive.currentPresenceSnapshot(),n=Date.now()/1000;
+      window.okfLoomLive.emit('presence',{version:2,presence_rev:b.presence_rev+1,online:true,own_session_id:b.own_session_id,records:[
+        {session_id:'agent',kind:'agent',actor:'agent',state:'idle',client_seq:1,updated_at:n,expires_at:n+300}]});}""")
+    bar = page.locator(".okf-mobile-presence")
+    expect(bar).to_be_visible()
+    expect(bar.locator(".okf-mobile-presence__agent")).to_have_text("Agent idle")
+    expect(bar.locator(".okf-mobile-presence__collaborators")).to_have_text("0 collaborators")
+
+
 def test_presence_capability_only_pagehide_does_not_mutate_authority(server_url: str, page) -> None:
     """STATE_OWNERSHIP/API matrix: capability-issued is not browser-row-live.
     A settled initial GET followed by navigation/pagehide without graph pointer
@@ -4005,8 +4082,9 @@ def _assert_shows_only(viewer, other: str | None, own: str, *, region: str | Non
         line = f"{other} · watching · {region}"
         expect(rows).to_have_count(1)
         expect(rows.first).to_have_text(line)
-        expect(viewer.locator(".okf-collaborators__title")).to_have_text(
-            re.compile(rf"^{re.escape(other)} · watching( \(＋\d+\))?$"))
+        # The disclosure heading names the list and its count; the compact
+        # line (not the heading) previews the collaborator.
+        expect(viewer.locator(".okf-collaborators__title")).to_have_text(re.compile(r"^Collaborators \([1-9]\d*\)$"))
         if desktop:
             expect(viewer.locator(".okf-collaborators__compact")).to_have_text(line)
         else:

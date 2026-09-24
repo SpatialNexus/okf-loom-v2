@@ -838,7 +838,7 @@ def verify_report(report: Any, current: Path) -> None:
         expected_command = ("scripts/benchmark_retrieval_relevance.py "
                             f"--baseline-checkout <clean-baseline@{BASELINE_REVISION}> "
                             "--current-checkout <current-worktree> "
-                            "--output docs/design/gold-standard-relevance-2026.json")
+                            "--output <report.json>")
         expected_definitions = {
             "precision_at_3": "Relevant concepts in the first three results divided by three.",
             "mrr": "Reciprocal rank of the first expected concept, or zero when absent.",
@@ -1000,7 +1000,7 @@ def main(argv: list[str] | None = None) -> int:
     command = ("scripts/benchmark_retrieval_relevance.py "
                f"--baseline-checkout <clean-baseline@{BASELINE_REVISION}> "
                "--current-checkout <current-worktree> "
-               "--output docs/design/gold-standard-relevance-2026.json")
+               "--output <report.json>")
     if args.work_dir:
         try:
             work = validate_work_dir(args.work_dir, (baseline, current))

@@ -4,14 +4,26 @@ okf-loom 2.0.0 is an Apache-2.0 open-source repository skill for local OKF 0.2 b
 
 ## Reporting a vulnerability
 
-Please report suspected security issues privately to the repository maintainers before opening a public issue.
-Include the affected commit, commands used, expected impact, and whether the issue requires a malicious bundle, a network-exposed studio, or local filesystem access.
+Please report suspected security issues privately, not in a public issue or
+pull request. Use GitHub's private vulnerability reporting:
+**[Report a vulnerability](https://github.com/SpatialNexus/okf-loom-v2/security/advisories/new)**
+(the **Security** tab of
+[SpatialNexus/okf-loom-v2](https://github.com/SpatialNexus/okf-loom-v2)).
 
-## Supported scope
+Include the affected commit, the commands used, the expected impact, and
+whether the issue requires a malicious bundle, a network-exposed studio, or
+local filesystem access.
 
-This fork's supported local checkout is `ui-analysis`. No fork publication
-or private-reporting URL is declared; use an established private maintainer channel.
-The primary runtime path is repo-local execution with `scripts/okf-loom`; PyPI or package publishing is not part of the supported release process.
+## Supported versions
+
+| Version | Supported |
+| :--- | :--- |
+| 2.0.x (`main`) | Yes |
+| 1.x ([ojamin/okf-loom](https://github.com/ojamin/okf-loom)) | Not by this repository |
+
+Fixes land on `main`. The primary runtime path is repo-local execution with
+`scripts/okf-loom`; PyPI or package publishing is not part of the supported
+release process.
 
 ## Live studio exposure boundary
 
@@ -21,7 +33,8 @@ Using `--public`, a non-loopback `--host`, or `--tunnel` changes the exposure bo
 - Anyone with a reachable studio URL can read public GET surfaces for the served bundle.
 - Local/admin mutating POST routes require the per-session `X-OKF-Token` and Origin/Host allow-list checks.
 - `--tunnel` points Cloudflare at a dedicated, generation-bound public ingress listener; it does not widen the local/admin allow-list.
-- Public tunnel access is read-only by default. The explicit `--allow-tunnel-edit` opt-in gives every URL holder a separate scoped token for comment/content mutations only, never the local admin token.
+- Public tunnel access is read-only by default. The explicit `--allow-tunnel-comment` opt-in lets every URL holder create comments and replies only. The explicit `--allow-tunnel-edit` opt-in gives every URL holder a separate scoped token for comment/content mutations only, never the local admin token.
+- Portable feedback import (`/__feedback-import`) works only in the local, editable Studio and is refused while a tunnel or public ingress is attached. Imported notes are unauthenticated: the name, time and quote they carry are shown as unverified.
 - Use `--no-edit` to disable bundle mutations across the studio when sharing a URL for review.
 - Treat `<bundle>/.okf-loom/session/.token` as secret; session state is intended to stay out of commits.
 

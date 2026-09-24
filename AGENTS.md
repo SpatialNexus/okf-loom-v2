@@ -28,7 +28,7 @@ okf-loom/
 ├── docs-bundle/             # OKF docs bundle
 ├── samples/                 # example bundles
 ├── tests/                   # executable proofs
-└── docs/                    # screenshots, design plans (docs/design/)
+└── docs/media/              # README images and video
 ```
 
 ## Command baseline

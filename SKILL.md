@@ -10,9 +10,10 @@ small resource files and checkout-local scripts referenced below. There is no
 package-publishing workflow to learn; the durable artifact is this git repo
 layout.
 
-This local fork (supported local checkout: `ui-analysis`) runs **okf-loom 2.0.0** and implements
+This is okf-loom v2 ([SpatialNexus/okf-loom-v2](https://github.com/SpatialNexus/okf-loom-v2),
+a fork of ojamin's okf-loom v1). It runs **okf-loom 2.0.0** and implements
 **OKF 0.2**. Product, format, and API schema versions are separate. Use the
-checkout you were given; no fork publication URL is declared.
+checkout you were given.
 
 ## Default behaviours (do these without being asked)
 
@@ -143,12 +144,16 @@ okf-loom/
 │   ├── capture_readme_media.py
 │   ├── capture_viewer_proof.py
 │   ├── capture_signal_controls.py
+│   ├── record_showcase_media.py
 │   └── lint-js.sh
 ├── docs-bundle/             # OKF documentation bundle
 ├── samples/                 # example OKF bundles
 ├── tests/                   # pytest proofs for checkout scripts
-├── docs/                    # README media (docs/media/), screenshots, design plans
+├── docs/media/              # README images and video (repo only; not in the skill archive)
 ├── README.md                # human overview
+├── CHANGELOG.md             # release notes
+├── CONTRIBUTING.md          # developer setup, tests and media
+├── SECURITY.md              # exposure boundary and vulnerability reporting
 ├── AGENTS.md                # thin pointer for agents that read AGENTS first
 └── CLAUDE.md                # thin pointer for agents that read CLAUDE first
 ```
@@ -204,5 +209,3 @@ scripts/okf-loom comment-resolve path/to/bundle <comment-id> --summary "what I d
 For deeper rules, read [`resources/gotchas.md`](resources/gotchas.md).
 For current priorities, read the
 [`maintenance plan`](docs-bundle/explanation/maintenance_plan.md).
-For historical retrieval-tranche rationale and limitations, read
-[`docs/design/gold-standard-2026.md`](docs/design/gold-standard-2026.md).

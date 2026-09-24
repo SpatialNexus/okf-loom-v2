@@ -26,8 +26,9 @@ This repo provides:
 
 The current okf-loom spec is [`docs-bundle/reference/spec.md`](../docs-bundle/reference/spec.md).
 The upstream OKF 0.2 wire-format spec is the interoperability reference;
-okf-loom 2.0.0 is the toolkit version. This git-loadable fork is supported locally
-with `ui-analysis` as the supported local checkout, without a declared fork publication URL.
+okf-loom 2.0.0 is the toolkit version. This git-loadable fork is published as
+[SpatialNexus/okf-loom-v2](https://github.com/SpatialNexus/okf-loom-v2); `main` is
+the supported branch.
 Optional generation, sources, verification, lifecycle, and computation metadata
 are read/validated/displayed; trust is advisory and computation is never executed.
 Legacy bundles remain readable. Use the [migration guide](../docs-bundle/how-to/migrate_spec_version.md)

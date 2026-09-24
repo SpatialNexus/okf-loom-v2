@@ -1,248 +1,251 @@
 <div align="center">
 
-# okf-loom
+# okf-loom v2
 
-**A better agent + human experience for OKF knowledge trees. Serve any
-folder of plain Markdown as a live studio: you read, explore, and drop
-comments on any sentence — your agent picks them up and edits the files.
-The files stay plain Markdown throughout.**
+**Read, explore and comment on a folder of Markdown in a live studio while
+your coding agent does the editing. The files stay plain Markdown
+throughout.**
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](docs-bundle/tutorials/install.md)
 [![Zero runtime deps](https://img.shields.io/badge/runtime%20deps-zero-brightgreen.svg)](docs-bundle/explanation/zero_dependencies.md)
-[![Tests](https://img.shields.io/badge/tests-regression%20suite-blue.svg)](tests/)
-
-**[▶ Upstream demo](https://ojamin.github.io/okf-loom/)** — an upstream static
-build, not publication of this local fork or its current OKF 0.2 behavior.
+[![OKF 0.2](https://img.shields.io/badge/OKF-0.2-blue.svg)](docs-bundle/reference/spec.md)
 
 </div>
 
-![The okf-loom graph view: 30 documentation concepts grouped into six colour-coded themes, with a ranked theme summary panel on the right](docs/media/graph-map.png)
-
 okf-loom is a toolkit and loadable agent skill for
 [Open Knowledge Format (OKF)](https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md)
-trees — knowledge kept as plain Markdown files with YAML frontmatter,
-cross-linked into a graph. It adds the experience layer on top and
-changes nothing underneath:
+bundles: documentation or knowledge kept as plain Markdown files with YAML
+frontmatter, linked into a graph. It validates, searches, renders and edits
+those bundles, and serves them as a live Studio. You read and comment on any
+page or sentence; your agent picks the comments up, edits the files and
+resolves them while the page updates in your browser.
 
-- **Your files stay plain OKF/Markdown — always.** No required database.
-  Canonical authored concept content is
-  one `.md` file with YAML frontmatter, readable on GitHub, greppable, and
-  diffable. Dashboard, search, graph, and Context Pack surfaces are derived
-  views, not additional authored sources of truth. Collaboration uses separate,
-  versioned session state for comments, events, undo, and experimental proposals.
-  Concept writes are atomic; writes routed through Studio are also attributed.
-- **You get a studio, not a file browser.** A rendered wiki (Mermaid,
-  KaTeX, code), an evidence-ranked graph with six lenses, and six search
-  modes — live over your working tree, with zero install.
-- **You and your agent get bounded evidence, not a file dump.** Search returns
-  exact section passages, source lines, citations, and ranking reasons when a
-  result has representable passage content; passage-less graph results remain
-  explicit rather than fabricating evidence.
-  Deterministic Context Packs fit that evidence to an explicit token budget.
-- **Your agent gets a directable work queue.** Select any sentence and
-  drop a note; your agent claims it, edits the files, and resolves it —
-  and the page patches live in your browser while you keep reading.
+It is for people who keep docs or a knowledge base in Markdown and work on it
+with a coding agent: Claude Code, opencode, or any harness that can load a
+skill and run shell commands. There is no database and nothing to install.
+Clone the repository and run `scripts/okf-loom`.
 
-## Quickstart
+okf-loom v2 is maintained by [SpatialNexus](https://github.com/SpatialNexus).
+It is a fork of [okf-loom v1](https://github.com/ojamin/okf-loom) by
+[ojamin](https://github.com/ojamin), who created okf-loom and wrote the v1
+that v2 builds on; see [Credits](#credits).
 
-This git-loadable fork's supported local checkout is `ui-analysis`:
-**okf-loom 2.0.0 implements OKF 0.2**. Use the provided checkout; a fork
-publication URL has not been selected. The upstream demo is attribution, not
-the installation source for this branch.
+## Quick start
 
-For this fork's current maintenance direction and the security/documentation
-cleanup inventory, see the [fork-first maintenance plan](docs-bundle/explanation/maintenance_plan.md).
+You need Python 3.11 or newer and Git.
 
-From the folder you want documented, give your agent one prompt:
+**With your agent.** From the folder you want documented, give your agent one
+prompt:
 
 ```text
-Use the supplied okf-loom checkout (supported branch: ui-analysis) and load
-its SKILL.md. Start the live studio on ./docs (import or bootstrap
-it as an OKF bundle first if it isn't one), give me the URL, then wait
-for my comments and work each one to resolution.
+Clone https://github.com/SpatialNexus/okf-loom-v2 into ./okf-loom and load
+okf-loom/SKILL.md. Start the live studio on ./docs (import or bootstrap it as
+an OKF bundle first if it isn't one), give me the URL, then wait for my
+comments and work each one to resolution.
 ```
 
 Then the whole workflow is:
 
-1. **Agent** serves the studio and blocks on the comment feed.
+1. **Agent** serves the studio and waits for comments.
 2. **You** open the URL and read your docs.
-3. **You** select any sentence and type a note.
-4. **Agent** claims it, edits the Markdown, resolves.
-5. **You** watch the edit patch into the page live — keep reading, keep
-   commenting.
+3. **You** select any sentence, or use **Comment on this page**, and type a
+   note.
+4. **Agent** claims the comment, edits the Markdown and resolves it with a
+   reply.
+5. **You** watch the page update live and keep reading.
 
-Requirements: Python 3.11+, nothing to install. Add `--tunnel` to `serve`
-for a shareable `https://…trycloudflare.com` link (needs `cloudflared`;
-see [Sharing & security](#sharing--security)).
-
-
-
-
-
-https://github.com/user-attachments/assets/76629b4f-ade1-4d60-9ac3-6e3394839282
-
-
-
-
-
-## Tour
-
-### Select text, leave a comment, let your agent do the work
-
-Commenting is the studio's native editing gesture. Select any sentence
-and a *Comment* button appears; the comment is anchored to that exact
-text and lands in a queue your agent consumes:
-
-![The comment composer opened from a text selection, with the selected sentence as the anchor and an instruction typed for the agent](docs/media/comment-composer.png)
-
-While a studio is up, an agent runs the loop from the CLI — no plugins,
-no webhooks:
+**By hand.** Try it on okf-loom's own documentation:
 
 ```bash
-scripts/okf-loom wait docs-bundle                     # blocks until a comment arrives
-scripts/okf-loom comment-claim docs-bundle <id> --summary "what I will do"
-# … edit via attributed, undoable mutators (write-concept, link-add, update…) …
-scripts/okf-loom comment-resolve docs-bundle <id> --summary "what I did"
+git clone https://github.com/SpatialNexus/okf-loom-v2 okf-loom
+cd okf-loom
+scripts/okf-loom validate docs-bundle --strict
+scripts/okf-loom serve docs-bundle        # opens http://127.0.0.1:8787/
 ```
 
-Edits broadcast live to every open tab over SSE — the page patches in
-place, no reload. Comments, Changes (with group-undo) and Agent activity are
-first-class panels in the top bar, and each says in one line what it answers.
-A comment asks for work: it is saved on the bundle, and the agent picks it up
-through the comment loop above (`wait` → `comment-claim` → `comment-resolve`);
-Studio does not start an agent. The composer says whether a comment is pinned
-to exact text or about the whole page.
+`serve` listens only on your own machine. Add `--tunnel` for a shareable
+`https://…trycloudflare.com` link (needs `cloudflared`; the link is read-only
+unless you opt in, see [Sharing and security](#sharing-and-security)).
 
-### A wiki, not a file browser
+## See it in action
 
-Concept pages render a [supported Markdown subset](scripts/okf_loom/viewer/markdown.py), not full GitHub-flavoured
-Markdown compatibility, plus Mermaid
-diagrams, KaTeX math, and syntax-highlighted code. Frontmatter is not a
-grey metadata dump: types become badges, entities become chips, typed
-relations become navigable links, and citations and provenance are laid
-out as a dressed header band.
+### Comment, and your agent does the work
 
-![A concept page rendering Mermaid flowchart and sequence diagrams, with a section outline and quick actions in the sidebar](docs/media/showcase-rendering.png)
+![Screen recording: a sentence on a tutorial page is selected and a comment asking to explain it in plain words is posted; a terminal panel shows the agent's wait, comment-claim, replace-text and comment-resolve commands while the page gains a new sentence in place and the comment card turns from open to claimed to resolved with the agent's reply](docs/media/comment-loop.gif)
 
-The dashboard index shows bundle-level stats and per-area entry points;
-[`docs-bundle/demo/showcase.md`](docs-bundle/demo/showcase.md) is one page
-that exercises every renderer if you want to see the whole palette at once.
+Select a sentence and leave a comment. Your agent's `wait` picks it up, then
+it claims the comment, edits the Markdown (the page updates live) and resolves
+the thread with a reply. [Watch the MP4](docs/media/comment-loop.mp4) (28 s).
 
-Bundle-local media renders inline too: keep screenshots, diagrams, video,
-or PDFs in the bundle (e.g. an `assets/` dir) and `![shot](/path/shot.png)`
-displays in the studio and in every build target — served under the same
-visibility rules as concepts, sandboxed as user content, with `validate`
-flagging any image whose file is missing.
+### Restyle the page from one menu
 
-### Six graph lenses, each answering one question
+![Screen recording: the Appearance menu switches a documentation page to dark mode, through the Swiss, Purple and Coffee theme families, soft contrast and borders, and back to the defaults](docs/media/appearance.gif)
 
-The graph is not a hairball generator. Each lens reshapes layout, colour,
-and ranking to answer one question a reader actually has — **Map** (how
-does this fit together?), **Themes** (what topic areas exist?), **Flow**
-(what depends on what?), **Bridges** (which concepts hold the areas
-together?), **Recent** (what is going stale?), and **Explore neighborhood**
-(what surrounds the selected concept?). The side panel ranks the answers as
-clickable evidence, not just pixels:
+One Appearance menu restyles the page live: dark mode, the Swiss, Purple and
+Coffee families, soft contrast and borders, then back to the defaults.
+[Watch the MP4](docs/media/appearance.mp4) (22 s).
 
-![Animated cycle through the Map, Themes, Flow, Bridges, and Recent graph lenses](docs/media/graph-lenses.gif)
+### Explore the bundle as a graph
 
-### Four theme families, light and dark
+![Screen recording: the bundle graph is shown under the Themes, Bridges and Map lenses from the Explore with lenses panel, hovering a concept shows a preview of it, and a double-click opens its page](docs/media/graph.gif)
 
-Technical is the conservative application default; Coffee remains an optional
-family in advanced Appearance controls. Swiss, Technical,
-Purple, and Coffee each render in light and dark, giving eight token-governed
-themes plus Auto mode that follows the operating-system colour scheme.
-Appearance also offers compact (default) and comfortable interface density
-without changing prose measure or minimum control targets, and interface
-borders start off (flat) until the reader turns them on. The test suite
-enforces that every theme overrides the full token set, and the graph canvas
-follows along:
+The bundle graph under the Themes, Bridges and Map lenses. Hover a concept to
+preview it; double-click to open its page.
+[Watch the MP4](docs/media/graph.mp4) (20 s).
 
-![Animated cycle through the Swiss and Technical themes in light and dark on the showcase page](docs/media/themes.gif)
+### Search and jump
 
-### Search that understands the bundle
+![Screen recording: typing in the header search box lists matching pages as you type and one is opened; hovering a link on that page previews the target's type, title and description; then Ctrl+K opens the command palette and a page is opened from it](docs/media/search.gif)
 
-Six search modes behind one flag — BM25 lexical, fuzzy-semantic, hybrid
-(rank fusion of the two), tag, entity, and relation — share one
-dependency-light retrieval path with no model, embedding service, or database.
-Results show one compact highlighted excerpt when exact passage evidence exists;
-**Evidence and context** expands the complete source passage, `[path.md#Lx-Ly]`
-citation, ranking reasons, and advanced actions. Passage-less graph results say
-that they have graph evidence only and never expose **Copy passage**. Hybrid
-evidence lists only the backends that actually contributed that result. Type,
-tag, entity, and relation filters keep the result set focused. Use **Copy
-passage** for the exact excerpt, **Copy concept context** for one concept, or
-**Build context pack** for a bounded pack across the current Search URL:
+Search as you type in the header, hover a link to preview where it goes, or
+press `Ctrl+K` to open the command palette and jump straight to a page.
+[Watch the MP4](docs/media/search.mp4) (13 s).
 
-![Search results for “studio” showing typed, described results with their bundle paths](docs/media/search.png)
+### Screenshots
 
-Agents should request the same deterministic evidence instead of reading or
-dumping arbitrary files:
+**Studio home.** The bundle's front page: its title and purpose, counts of
+concepts, types and links, and one browsable inventory of every concept.
+
+![Studio home for the okf-loom documentation: the bundle title and description, chips reading 38 concepts, 9 types and 528 links, a New in Annotations v2 panel, and concept type filters above the concept inventory](docs/media/studio-home.png)
+
+**Comments.** Select text and the composer pins the comment to that exact
+passage, or comment on the whole page.
+
+![A documentation page with the Comments panel open beside it: the selected sentence is highlighted on the page, and the New comment composer shows it as the target, says the comment is an exact annotation, and holds a typed request](docs/media/comment-composer.png)
+
+**Rendering.** Mermaid diagrams, KaTeX math and highlighted code render in the
+page. [`docs-bundle/demo/showcase.md`](docs-bundle/demo/showcase.md) uses every
+renderer on one page.
+
+![A concept page rendering a Mermaid flowchart, a Mermaid sequence diagram and a KaTeX display equation, below the Rendered, Source, Split and Focus view controls and a Sections menu](docs/media/showcase-rendering.png)
+
+**Graph, dark mode.** The Bridges lens ranks the concepts that connect the
+bundle's topic areas.
+
+![The graph view in dark mode under the Bridges lens: concept nodes joined by numbered relationship bundles, zoom, fit, fullscreen and reset controls beside the canvas, and a ranked Top bridgers list with CLI command reference first](docs/media/graph-bridges-dark.png)
+
+## What's new in v2
+
+v2 builds on [okf-loom v1.0.0](https://github.com/ojamin/okf-loom). The
+[CHANGELOG](CHANGELOG.md) has the full list, breaking changes and migration
+notes; [What changed in okf-loom v2](docs-bundle/explanation/v2_release_notes.md)
+explains the larger changes.
+
+**OKF 0.2**
+
+- okf-loom 2.0.0 implements OKF 0.2 (v1 implemented OKF 0.1). `type` is still
+  the only required key. The new optional provenance (`generated`,
+  `verified`, `sources`), lifecycle (`status`, `stale_after`) and Attested
+  Computation metadata are validated and shown as advisory badges. Trust is
+  never treated as authorization, and computations are never run.
+- `scripts/okf-loom upgrade` migrates OKF 0.1 bundles conservatively. Preview
+  and check write nothing; `--apply` is explicit, keeps legacy timestamps and
+  authored text, and records who produced existing content only when you name
+  them with `--actor`. See the
+  [migration guide](docs-bundle/how-to/migrate_spec_version.md).
+
+**Live Studio**
+
+- **Comment on this page** adds whole-page comments alongside comments pinned
+  to exact text. Agents can ask a question in the thread with
+  `comment-reply` without resolving it.
+- Edit one block at a time with `update-section` and `replace-text`; both
+  refuse a missing or ambiguous target.
+- `scripts/okf-loom tunnel` shares a running Studio, or stops sharing it,
+  without a restart. Public links are read-only by default; add
+  `--allow-tunnel-comment` for comment-only sharing or `--allow-tunnel-edit`
+  for full edits.
+- Feedback from exports: static and single-file builds can include an offline
+  note composer (`--include-portable-feedback`). Readers download a note, and
+  you import it into your local Studio as a page comment. Exports can also
+  link back to your Studio (**Review in Studio**, set by
+  `viewer.review_base_url`).
+- Experimental proposal review: `scripts/okf-loom proposal` and
+  `serve --enable-proposal-review`, with an opt-in, inspection-only Proposals
+  panel. Direct editing stays the default.
+
+**Anchoring and annotations**
+
+- Exact comments are re-checked against the current text and report their
+  health (resolved, stale, ambiguous or invalid) instead of drifting when
+  the wording changes. **Re-anchor** moves a comment to new wording
+  explicitly.
+- The composer says whether a comment is an exact annotation or a page
+  comment.
+
+**Appearance**
+
+- Four theme families (Technical, the default, plus Swiss, Purple and
+  Coffee), each in light and dark, with Auto following your system setting.
+  They replace v1's five themes.
+- Light themes use softened surfaces rather than paper white, and code
+  blocks stay light in light mode.
+- Soft contrast, interface borders (off by default) and compact (default) or
+  comfortable density.
+
+**Graph**
+
+- The six lenses (Map, Themes, Flow, Bridges, Recent, and Explore
+  neighborhood, which is v1's Focus lens renamed) sit under one
+  **Explore with lenses** panel.
+- **Find in graph** looks concepts up by title, id or tag; the viewport
+  controls gain full screen; and spacing, layout and relationship-label
+  options are grouped under **Graph settings**.
+- Keyboard users can trace the path between two concepts with Shift+Space,
+  and an optional 45-second tour introduces the view.
+- `scripts/okf-loom graph-quality` reports advisory graph-health signals.
+
+**Search and Context Packs**
+
+- Search results show the exact matching passage with a `[path.md#Lx-Ly]`
+  citation and the reasons it ranked, and can be filtered by type, tag,
+  entity or relation.
+- `scripts/okf-loom context` builds deterministic, citation-ready Context
+  Packs within a token budget, with no model and no generated summaries.
+  See the [Context Packs reference](docs-bundle/reference/context_packs.md).
+- Static, SPA and single-file builds run all six search modes and build
+  Context Packs in the browser, from a content-addressed passage corpus.
+- `discover` groups suggestions by how safe they are to apply and supports
+  suppressions.
+
+**Builds and distribution**
+
+- `--assets offline` for `build` and `render` ships verified copies of the
+  renderer and graph libraries with their licences; a single-file offline
+  build works straight from disk.
+- `build --output-policy managed` (static and SPA) records what it wrote and
+  refuses to replace files it did not produce.
+- Images, video and PDFs kept in the bundle are served by the Studio and
+  copied into static and SPA builds, and `validate` warns about missing
+  images.
+- `scripts/build_skill_archive.py` builds the skill zip from a Git commit
+  rather than the working tree; `--verify` checks an existing archive.
+
+## View the docs locally
+
+okf-loom documents itself: [`docs-bundle/`](docs-bundle/) is an OKF bundle.
+v2 has no hosted docs site, so view it one of these ways:
 
 ```bash
-scripts/okf-loom context docs-bundle "current spec" --mode hybrid \
-  --budget-tokens 6000 --neighbors 1 --limit 20 --format markdown
-scripts/okf-loom context docs-bundle --concept reference/spec --format json
+# Live Studio: read, search, explore the graph and comment.
+scripts/okf-loom serve docs-bundle                 # http://127.0.0.1:8787/
+
+# Static site. Its graph and search load data files, so serve it over HTTP.
+scripts/okf-loom build docs-bundle --target static --out /tmp/okf-docs-site
+python3 -m http.server 8000 --directory /tmp/okf-docs-site
+
+# One self-contained HTML file; --assets offline embeds the libraries too.
+scripts/okf-loom render docs-bundle --assets offline --out /tmp/okf-docs.html
 ```
 
-Markdown is the default output and preserves exact excerpts with stable source
-citations; JSON exposes the versioned context-pack contract. Context Packs do
-not synthesize summaries or call a model. See the
-[Context Packs reference](docs-bundle/reference/context_packs.md).
-
-### Take it anywhere
-
-The same bundle renders four ways: the live studio, a **static site**
-(`build --target static` — the [upstream demo](https://ojamin.github.io/okf-loom/)
-illustrates that target; this checkout retains a [Pages workflow](.github/workflows/pages.yml)),
-a **SPA** build, and a **single `viz.html`** (`render`) you can attach to an
-email. Renderer and graph libraries use pinned CDN assets by default, and
-`serve` always does. Add `--assets offline` to `build` or `render` to ship
-byte-verified copies instead: single-file offline output works from
-`file://`, while static graph data and search, and SPA output as a whole,
-still need HTTP serving. Offline output carries each library's licence and
-the third-party notices (see [License](#license)). And because a bundle is
-just Markdown, it still reads fine as plain files on GitHub.
-
-Pages runs only on demand (**Deploy docs to Pages → Run workflow**); it has no
-push trigger, is separate from the test workflows, and does not establish a
-publication destination for this fork.
-
-Live mode uses server-backed retrieval. Static and SPA builds with JavaScript
-load a versioned, content-addressed passage corpus; the single-file viewer
-embeds that corpus, so its output grows with the bundle. Static no-JS pages
-remain browsable and expose canonical concept-only Markdown context, but
-arbitrary search and query-built packs require JavaScript. Live no-JS GET
-search and canonical Context Pack links remain available; SPA and single-file
-views without JavaScript do not provide interactive retrieval.
-This is the approved no-JavaScript contract: honest browse/concept-only
-fallback or an explicit unavailable state. Arbitrary search and query-built
-Context Packs require JavaScript or the live server.
-
-## Built for agents from day one
-
-This repo *is* a loadable skill. [`CLAUDE.md`](CLAUDE.md) (Claude Code),
-[`AGENTS.md`](AGENTS.md) (opencode & friends), and [`SKILL.md`](SKILL.md)
-(skill loaders) route any agent to the same standing contract:
-
-1. **Author docs as OKF concepts** with fully-dressed frontmatter.
-2. **Validate after writing** (`validate`, `discover`).
-3. **Use bounded Context Packs** instead of dumping arbitrary files when an
-   agent needs source-grounded bundle context.
-4. **Serve the studio proactively** whenever a human wants to read or
-   comment.
-5. **Work the comment loop** (`wait` → `comment-claim` → mutators →
-   `comment-resolve`).
-
-So the setup for a team is: clone the repo, tell your agent to work in
-it, open the studio, and start selecting text. The agent authors, links,
-validates, and resolves; you read and direct.
+Because a bundle is just Markdown, it also reads fine as plain files on
+GitHub. Start at [`docs-bundle/index.md`](docs-bundle/index.md).
 
 ## Everything is plain Markdown
 
-A concept is one file. Frontmatter carries the metadata; Markdown links
-are the graph edges. This is the entire storage format:
+A concept is one file. Frontmatter carries the metadata; Markdown links are
+the graph edges:
 
 ```markdown
 ---
@@ -258,19 +261,41 @@ The comment lifecycle is documented in
 [Comment lifecycle](/reference/comment_lifecycle.md).
 ```
 
-`type` is the only always-required key (OKF 0.2). Unknown keys are preserved
-round-trip, hand-authored content is never destroyed, and every write
-okf-loom makes is atomic and marker-safe. The binding contract for all of
-this is [`docs-bundle/reference/spec.md`](docs-bundle/reference/spec.md).
+`type` is the only always-required key. Unknown keys are preserved, authored
+content is never overwritten, and every write okf-loom makes is atomic.
+Dashboards, search, the graph and Context Packs are views derived from those
+files. Comments, activity, undo history and proposals live in a separate
+session folder inside the bundle (`.okf-loom/`), never in your Markdown.
 
-OKF 0.2 adds optional sources, generation/verification, lifecycle, and Attested
-Computation metadata. Trust tiers are advisory, never authorization. Computation
-contracts are read, validated, and displayed — never executed. Legacy timestamps
-and Loom citations remain readable; imports do not fabricate their producers.
-See the [0.2 example](docs-bundle/demo/okf02_computation.md) and
-[conservative migration guide](docs-bundle/how-to/migrate_spec_version.md).
-Preview/check write nothing; applying is explicit, may report partial completion,
-and is atomic per file rather than a bundle-wide transaction.
+The binding contract is the
+[okf-loom specification](docs-bundle/reference/spec.md). The page renderer
+supports a [subset of Markdown](scripts/okf_loom/viewer/markdown.py) rather
+than full GitHub-flavoured Markdown.
+
+## Built for agents
+
+This repository *is* a loadable skill. [`CLAUDE.md`](CLAUDE.md) (Claude
+Code), [`AGENTS.md`](AGENTS.md) (opencode and similar) and
+[`SKILL.md`](SKILL.md) (skill loaders) point any agent at the same standing
+instructions:
+
+1. **Author docs as OKF concepts** with fully dressed frontmatter.
+2. **Validate after writing** (`validate`, `discover`).
+3. **Use bounded Context Packs** instead of dumping whole files when the agent
+   needs source-grounded context.
+4. **Serve the studio** whenever a person wants to read or comment.
+5. **Work the comment loop**: `wait` → `comment-claim` → edit →
+   `comment-resolve`.
+
+```bash
+scripts/okf-loom wait docs-bundle                     # blocks until a comment arrives
+scripts/okf-loom comment-claim docs-bundle <id> --summary "what I will do"
+# … edit with the attributed, undoable commands (write-concept, update-section, …) …
+scripts/okf-loom comment-resolve docs-bundle <id> --summary "what I did"
+```
+
+Studio never starts an agent. Comments are saved on the bundle and wait until
+an agent picks them up.
 
 ## Common commands
 
@@ -278,45 +303,49 @@ and is atomic per file rather than a bundle-wide transaction.
 # Validate and inspect.
 scripts/okf-loom validate docs-bundle --strict
 scripts/okf-loom info docs-bundle
+scripts/okf-loom graph-quality docs-bundle
 
-# Search, build bounded agent context, and discover gaps.
+# Search, build bounded agent context, and find gaps.
 scripts/okf-loom search docs-bundle "current spec" --mode hybrid
 scripts/okf-loom context docs-bundle "current spec" --mode hybrid \
     --budget-tokens 6000 --neighbors 1 --limit 20 --format markdown
 scripts/okf-loom discover docs-bundle --out /tmp/okf-suggestions.json
 
 # Serve live, or build artifacts.
-scripts/okf-loom serve docs-bundle --no-open            # live studio
+scripts/okf-loom serve docs-bundle --no-open
 scripts/okf-loom build docs-bundle --target static --out /tmp/site
-scripts/okf-loom render docs-bundle --out /tmp/viz.html # single file
+scripts/okf-loom render docs-bundle --out /tmp/viz.html
 
 # Author safely (attributed, undoable, broadcast live).
 scripts/okf-loom bootstrap path/to/new-bundle
 scripts/okf-loom write-concept --bundle path/to/bundle --id notes/decision \
-    --type decision --title "Use SQLite" --body "## Context ..."
+    --type decision --title "Use SQLite" --body $'## Context\n\nWe need an embedded database.'
 scripts/okf-loom link-add --bundle path/to/bundle --source tables/orders --target tables/customers
 scripts/okf-loom update-section --bundle path/to/bundle --id notes/decision \
-    --heading "## Context" --body-file /tmp/new-context.md   # swap one block, keep the rest
+    --heading "## Context" --body-file /tmp/new-context.md
+
+# Migrate an OKF 0.1 bundle (preview first; nothing is written).
+scripts/okf-loom upgrade path/to/bundle --preview
 ```
 
-Run `scripts/okf-loom --help` for the full verb list (25+ commands), or
-read the [CLI reference](docs-bundle/reference/cli.md).
+Run `scripts/okf-loom --help` for every command, or read the
+[CLI reference](docs-bundle/reference/cli.md).
 
-## Sharing & security
+## Sharing and security
 
-`serve` binds `127.0.0.1:8787` — loopback-only — by default. `--tunnel`
-creates a public Cloudflare URL through dedicated ingress; public access is
-read-only by default and does not widen local/admin allow-lists. For
-user-authored comments and replies only, use `--allow-tunnel-comment` on
-`serve --tunnel` or `tunnel`. This mutually exclusive alternative grants no
-content edits, comment-row updates, presence, agent, proposal, or admin
-powers. Add `--allow-tunnel-edit` only when every URL holder may receive
-separate, generation-scoped authority for comment/content mutations; it never grants
-local admin or session-control authority. `--public --public-ack` remains the
-separate raw-network-bind choice. Already serving? Attach the same
-read-only-by-default tunnel with `scripts/okf-loom tunnel <bundle>`
-(`--allow-tunnel-edit` is the same dangerous opt-in; `--stop` detaches) — no
-restart needed. Use `--no-edit` to disable bundle mutations across the studio.
+`serve` binds `127.0.0.1:8787`, reachable only from your own machine, by
+default.
+
+- `--tunnel` (on `serve`, or `scripts/okf-loom tunnel <bundle>` for a studio
+  that is already running) creates a public Cloudflare link. Public access is
+  **read-only** by default.
+- `--allow-tunnel-comment` lets anyone with the link post comments and
+  replies, and nothing else.
+- `--allow-tunnel-edit` lets anyone with the link comment and edit content.
+  Use it only when you trust everyone who has the URL.
+- `--no-edit` turns off all changes through the studio.
+- `--public --public-ack` binds to your network instead of loopback.
+
 Details: [SECURITY.md](SECURITY.md) and the
 [HTTP routes reference](docs-bundle/reference/http_routes.md).
 
@@ -331,177 +360,62 @@ Details: [SECURITY.md](SECURITY.md) and the
 | [`resources/validation.md`](resources/validation.md) | Validation profiles and fail-closed behavior |
 | [`resources/advanced-operations.md`](resources/advanced-operations.md) | Search, discovery, build, capabilities |
 | [`resources/studio-agent-loop.md`](resources/studio-agent-loop.md) | Live studio comment loop |
+| [`resources/graph-health.md`](resources/graph-health.md) | Graph usefulness after imports |
 | [`resources/architecture-map.md`](resources/architecture-map.md) | Runtime/source map |
 | [`resources/gotchas.md`](resources/gotchas.md) | Hard rules and traps |
-
-The full documentation lives as an OKF bundle in
-[`docs-bundle/`](docs-bundle/) — okf-loom is documented in okf-loom.
-The [gold-standard 2026 design and release record](docs/design/gold-standard-2026.md)
-captures the capability audit, decisions, proof, performance costs, and
-remaining limitations behind that historical retrieval tranche. The
-[maintenance plan](docs-bundle/explanation/maintenance_plan.md) owns current priorities.
 
 ## Repository layout
 
 ```text
 okf-loom/
-├── SKILL.md                  # primary skill entrypoint for agents
-├── CLAUDE.md / AGENTS.md     # thin pointers that route agents to SKILL.md
+├── SKILL.md                  # skill entrypoint for agents
+├── CLAUDE.md / AGENTS.md     # pointers that route agents to SKILL.md
 ├── README.md                 # this file
+├── CHANGELOG.md              # release notes
+├── CONTRIBUTING.md           # developer setup, tests and media
+├── SECURITY.md               # exposure boundary and reporting
 ├── resources/                # small agent-readable guidance files
 ├── scripts/
-│   ├── okf-loom              # the checked-in helper command
-│   ├── okf_loom/             # checkout-local runtime (stdlib-only)
-│   ├── capture_readme_media.py   # regenerates docs/media/
-│   ├── capture_viewer_proof.py
-│   ├── capture_signal_controls.py
-│   ├── build_skill_archive.py
-│   └── lint-js.sh
+│   ├── okf-loom              # the checked-in command
+│   ├── okf_loom/             # checkout-local runtime (standard library only)
+│   ├── capture_readme_media.py   # regenerates the README screenshots
+│   ├── record_showcase_media.py  # records the README clips
+│   ├── build_skill_archive.py    # builds and verifies the skill zip
+│   └── …                     # capture, benchmark and vendor tools
 ├── docs-bundle/              # okf-loom's own docs, as an OKF bundle
-├── samples/                  # example bundles (demo_bundle, showcase)
-├── docs/                     # screenshots, README media, design notes
+├── samples/                  # example bundles (demo_bundle, empty_bundle, showcase)
+├── docs/media/               # README images and clips
 └── tests/                    # pytest regression suite
 ```
 
-The distribution unit is this git repo layout; `pyproject.toml` exists
-only for pytest/coverage configuration.
+The repository layout is the distribution unit; `pyproject.toml` only holds
+pytest and coverage settings.
 
-## Developer tests
+## Contributing
 
-Runtime use still needs no install. For the developer baseline on Linux, use
-Python **3.11 or 3.12**, Git, and **Node 22.22.1** (Node runs portable retrieval
-parity and JavaScript syntax/logic checks; it is not an npm installation).
-The on-demand **Developer tests** workflow tests both Python versions
-independently of Pages deployment.
+Developer setup, tests, and regenerating the README media are in
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
-```bash
-python3 -m venv .venv
-. .venv/bin/activate
-python -m pip install -r requirements-dev.txt
-export PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
-python -m pytest -q -p no:cacheprovider -m "not browser and not integration"
-```
+## Credits
 
-That is the core invocation: it collects without importing Playwright and runs
-local HTTP, persistence, capture-validator, retrieval and proposal runtime-identity
-proofs. Only real browser tests and optional external upstream-bundle integration
-are deselected; no historical evidence is regenerated. Fixtures that serve shipped
-bundles use disposable copies. Pytest temporary directories may be relocated with
-`TMPDIR=/tmp`. Pinned developer requirements include the active Linux dependency
-closure; the unused package-free `uv.lock` was removed rather than implying a
-Python 3.12 runtime minimum. There is no `uv sync` or editable-install step.
+okf-loom was created by [ojamin](https://github.com/ojamin), who designed and
+built okf-loom v1: the skill layout, the live Studio and its comment loop, the
+graph lenses, six-mode search and the rendered wiki that v2 still stands on.
+ojamin also wrote several features that arrived after v1.0.0 and ship in v2,
+including bundle-local media, `update-section` and `replace-text`,
+`comment-reply`, sharing a running Studio with `tunnel`, graph-health
+reporting and the discovery improvements. Thank you, ojamin, for okf-loom and
+for making it open source.
 
-The focused fallback lane is also part of the **Developer tests** workflow, which
-runs only on demand (**Developer tests → Run workflow**):
-
-```bash
-OKF_LOOM_FORCE_BUILTIN_YAML=1 python -m pytest -q -p no:cacheprovider \
-  tests/test_yaml_fallback.py tests/test_bootstrap_import.py
-scripts/okf-loom validate docs-bundle --strict
-```
-
-For browser work, provision the separate optional tools explicitly:
-
-```bash
-python -m pip install -r requirements-browser.txt
-python -m playwright install --with-deps chromium
-OKF_REQUIRE_BROWSER=1 python -m pytest -q -p no:cacheprovider -m browser \
-  tests/test_document_outline_browser.py tests/test_a11y_reflow_browser.py
-```
-
-That manual lane is available through **Developer tests → Run workflow →
-browser**. Separately, the **Browser smoke** workflow
-(`.github/workflows/browser-smoke.yml`) runs only on demand (**Browser smoke →
-Run workflow**); its automatic pull-request and push triggers are turned off.
-It provisions Chromium the same way with `OKF_REQUIRE_BROWSER=1`, so a missing
-browser fails the job instead of skipping, and runs five short journeys, one
-existing test each, as separately named steps: shell and capability truth;
-search to a document and Back restoring the query; comment, reply, agent
-mutation and resolution; portable feedback import; and document patch with the
-outline lifecycle. A failing step names its journey and its pytest node id,
-which reproduces it locally. Neither lane is a full browser/accessibility or
-release gate; the full browser suite stays manual.
-Other browser-marked modules can be selected explicitly for the affected surface;
-some require CDN access or headed Chrome/browser-owned zoom. Without
-`OKF_REQUIRE_BROWSER=1`, absent Playwright or a missing browser may skip; broken
-imports, browser launch errors, and product startup failures are errors, not
-absence. The shared server fixture includes startup log diagnostics and bounded
-terminate/kill cleanup. `OKF_CHROME` (or `AIC_PLAYWRIGHT_CHROME_PATH`) selects an
-explicit installed executable; a bad configured path fails. Otherwise fixtures
-prefer managed Chromium, then an installed Chrome/Chromium. The legacy explicit
-`OKF_BROWSER_TEST_OPT_OUT=1` remains available but conflicts with required-browser
-mode. Use marker selection for core runs. A test that starts Playwright or
-Chromium through `tests/browser_support.py` without the `browser` marker fails
-with an error naming it; `tests/test_browser_marker_guard.py` proves this
-without starting a browser.
-
-**Browser and accessibility coverage limits.** Automated browser checks run on
-Chromium only, driven by Playwright 1.58.0 (managed Chromium in CI; locally,
-whichever Chromium or Chrome the fixtures select). `tests/test_a11y_reflow_browser.py`
-checks reflow at 200% and 400% with CSS-viewport equivalents (720×450 at DPR 2,
-and 320×256 at DPR 4). These reproduce the layout viewport that WCAG 1.4.10 is
-defined in, but they are not browser-owned zoom. Real page zoom is checked only
-by opt-in proofs in headed Chrome: `OKF_TEST_HEADED_ZOOM=1` runs the
-`HEADED_ZOOM_TESTS` in `tests/test_ui_reflow_nojs_remediation.py` with
-`OKF_CAPTURE_REAL_BROWSER_ZOOM=1`, pressing Ctrl+plus through `xdotool`, so they
-need `DISPLAY` and `xdotool` (see `tests/browser_zoom.py`); they are not part of
-CI. Text-only zoom and custom browser font sizes are not tested. Accessibility
-semantics are checked against Playwright's ARIA snapshot and Chromium's
-accessibility tree. No screen reader has been run (NVDA, JAWS, VoiceOver, Orca or
-TalkBack), so spoken wording, live-region timing and virtual-cursor behaviour are
-unverified. Firefox, Safari/WebKit and mobile browsers are not tested, and no
-automated rule engine such as axe-core is used. Treat these checks as regression
-guards, not a claim of accessibility conformance.
-
-Historical release verification remains an explicit, selected-source operation;
-see [ordinary regression versus release evidence](docs-bundle/reference/spec.md#ordinary-regression-versus-selected-release-evidence).
-Passing core or browser smoke does not promote stored evidence or certify release
-readiness.
-
-## Regenerating media & browser proof
-
-The screenshots and GIFs on this page live in [`docs/media/`](docs/media/)
-and are reproducible from a live studio. Use the developer/browser setup above;
-Pillow is additionally needed only for media/GIF assembly:
-
-```bash
-python -m pip install pillow
-
-PYTHONPATH=scripts python scripts/capture_readme_media.py   # this page's media
-PYTHONPATH=scripts python scripts/capture_viewer_proof.py   # dated spec §17 proofs
-OKF_REQUIRE_BROWSER=1 python -m pytest tests/test_viewer_browser.py -m browser
-```
-
-The capture helpers use the viewer's production readiness owner rather than a
-fixed sleep or canvas-attachment heuristic. One 30-second monotonic budget
-covers navigation, semantic readiness, the paint boundary, and screenshot
-publication. PNG and JPEG outputs are published atomically. Chrome resolution
-is shared across the helpers: `--chrome`, then `OKF_CHROME`, then
-`AIC_PLAYWRIGHT_CHROME_PATH`, known system Chrome paths, the Chrome channel,
-and finally managed Playwright Chromium.
-
-Each capture invocation owns a unique same-directory temporary and only the
-current cross-process destination sequence may replace the destination;
-managed late workers cannot recreate an orphan temp or final artifact. Failed
-or late work preserves the previous artifact. README GIF assembly uses
-invocation-private frame staging and the same verify/close/atomic-replace
-envelope. Capture phases preserve caller-owned one-shot and recurring timers.
-Synchronous Playwright work stays on its owning main thread; off-main calls
-fail before creating workers or artifacts. Partial live/static server startup
-is cleaned up before an error escapes.
-Inherited ignored one-shot and periodic alarms remain ignored without masking
-the capture deadline.
-
-Maintainers can run `python scripts/benchmark_gold_standard.py --help` for the
-separate release benchmark harness. It defaults to 100 and 1,000 concepts;
-sizes above 1,000 require `--large-scales`, static builds require
-`--static-build`, and large static builds require both. These are maintainer
-tools, not `scripts/okf-loom` primary CLI commands.
+v2 is developed by [SpatialNexus](https://github.com/SpatialNexus). The
+original project is at
+[github.com/ojamin/okf-loom](https://github.com/ojamin/okf-loom); its last v1
+release is `v1.0.0`.
 
 ## License
 
-okf-loom is licensed under the Apache License, Version 2.0 — commercial
-and non-commercial use are both allowed. See [LICENSE](LICENSE) and
+okf-loom is licensed under the Apache License, Version 2.0; commercial and
+non-commercial use are both allowed. See [LICENSE](LICENSE) and
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
 `scripts/okf_loom/viewer/vendor/` holds unmodified third-party libraries
@@ -517,5 +431,5 @@ Keep those files, and each library's `LICENSE`, when you redistribute offline
 output or the vendored folder.
 
 okf-loom is compatible with and complementary to the upstream OKF
-specification (also Apache-2.0). This implementation is independent; it
-is not affiliated with or endorsed by Google.
+specification (also Apache-2.0). This implementation is independent; it is
+not affiliated with or endorsed by Google.

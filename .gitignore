@@ -51,10 +51,11 @@ okf-site/
 .playwright-mcp/
 workspace/
 
-# Historical design checkout and stale local proof are reference-only input,
-# never release artifacts.
+# Historical design checkout is reference-only input, never a release artifact.
 /docs/design/incoming-v1-theme/
-/docs/screenshots/r6-frontend-proof/
+
+# Local screenshot/proof output from the capture helpers: never committed.
+/captures/
 
 # OS
 .DS_Store

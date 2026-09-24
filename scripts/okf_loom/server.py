@@ -18,6 +18,7 @@ Routes:
     /__graph                full-page Cytoscape.js graph view
     /__search?q=...         search results page (HTML or JSON if ?format=json)
     /__raw/<concept_id>     raw markdown body
+    /__data/summary?id=...  one concept's title/type/description card JSON
     /__data/graph.json      graph JSON (for external tools / harness embed)
     /__data/content.json    content index JSON
     /__static/<file>        static asset (CSS / JS)
@@ -291,6 +292,7 @@ _PUBLIC_GET_INTERNAL_ROUTES = frozenset({
     "/__graph.html",
     "/__data/graph.json",
     "/__data/content.json",
+    "/__data/summary",
 })
 _PUBLIC_GET_INTERNAL_PREFIXES = ("/__raw/", "/__static/")
 
@@ -2753,6 +2755,8 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
             return self._handle_graph_json()
         if path == "/__data/content.json":
             return self._handle_content_json()
+        if path == "/__data/summary":
+            return self._handle_data_summary(query)
         if path.startswith("/__raw/"):
             return self._handle_raw(path[len("/__raw/"):])
         if path.startswith("/__static/"):
@@ -3225,6 +3229,47 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
                 content_type="text/plain; charset=utf-8",
             )
         self._send_text(200, body, content_type="text/markdown; charset=utf-8")
+
+    def _handle_data_summary(self, query: dict[str, list[str]]) -> None:
+        """One concept's identity card: what a link preview shows, nothing more.
+
+        ``/__raw/<id>`` is deliberately the body only, so a preview built from
+        it cannot know the concept's title or type (it showed the id and a
+        generic type). This read-only projection comes from the same parsed
+        snapshot as the page: title, type, description, the palette's type
+        colour and icon key, and counts of internal body links and typed
+        ``relations`` entries. No body, no rendering.
+        """
+        if set(query) != {"id"} or len(query["id"]) != 1:
+            return self._send_json(400, {"error": "invalid_request"})
+        cid_str = query["id"][0].strip().strip("/")
+        if cid_str.endswith(".md"):
+            cid_str = cid_str[:-3]
+        try:
+            cid = concept_id_from_str(cid_str)
+        except ConceptIdError:
+            return self._send_json(404, {"error": "target_not_found"})
+        bundle, palette, _plugin, _config = self._state_snapshot()
+        concept = bundle.concepts.get(cid)
+        if concept is None:
+            return self._send_json(404, {"error": "target_not_found"})
+        from .viewer.assets import type_color_for, type_icon_key
+        type_name = concept.type
+        relations = concept.frontmatter.get("relations")
+        self._send_json(200, {
+            "schema": 1,
+            "id": concept_id_to_str(cid),
+            "title": concept.title,
+            "type": type_name,
+            "description": concept.description,
+            "type_color": (palette or {}).get(type_name or "", type_color_for(type_name)),
+            "icon": type_icon_key(type_name),
+            "links": sum(1 for link in concept.links(bundle_root=bundle.root) if link.is_internal),
+            "relations": sum(
+                1 for entry in relations
+                if isinstance(entry, dict) and isinstance(entry.get("target"), str) and entry["target"]
+            ) if isinstance(relations, list) else 0,
+        })
 
     def _handle_graph_json(self) -> None:
         bundle, _palette, _plugin, config = self._state_snapshot()

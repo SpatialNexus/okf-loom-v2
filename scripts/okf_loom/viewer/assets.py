@@ -332,7 +332,7 @@ def type_icon_svg(type_name: str | None, *, size: int = 16,
 # appears on index cards, the concept header band, chips, section headers,
 # and graph nodes — uniformly across static/live/single-file targets.
 #
-# Design intent (ui-overhaul-plan §2.1): curated colours are STABLE across
+# Design intent: curated colours are STABLE across
 # bundles ("Dataset" is always blue regardless of what other types co-exist)
 # and SEMANTIC (data→blue, service→green, reference→amber…), unlike the
 # golden-angle ``auto_palette`` whose hue depends on sorted position. Types
@@ -347,8 +347,8 @@ def type_icon_svg(type_name: str | None, *, size: int = 16,
 # weight balance and so :func:`render._chip_fg` (luminance-aware black/white)
 # always yields AA contrast on a chip background.
 #
-# Exactly 8 curated categories (ui-overhaul-plan §2.1: "curated 8-color
-# palette + icon set"). Types whose icon key is NOT in this map fall through
+# Exactly 8 curated categories (a curated 8-colour palette + icon set).
+# Types whose icon key is NOT in this map fall through
 # to the deterministic hash fallback (:func:`type_color_for`) — they still
 # get their correct icon, just a hash-derived colour.
 _CURATED_TYPE_COLORS: dict[str, str] = {
@@ -581,7 +581,7 @@ def resolve_palette(bundle: Bundle) -> dict[str, str]:
 
     1. **Curated semantic colour** (:func:`curated_type_color`) — stable
        across ALL bundles; "Dataset" is always blue regardless of what else
-       co-exists in the type list (ui-overhaul-plan §2.1).
+       co-exists in the type list.
     2. **Hash fallback** (``hsl_color(stable_hue(name))``) — for types the
        curated map doesn't cover. Per-name crc32 hash, deterministic across
        runs/machines; matches the live-mutator fallback render.py uses for

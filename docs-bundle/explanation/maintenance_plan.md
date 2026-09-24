@@ -315,7 +315,7 @@ cross-browser certification, and source-bound release screenshot acceptance are
 not claimed. Selected-commit archive smoke and local fast-forward consolidation
 are delivery operations, not permission to publish.
 
-The local fork implements **loom 2.0.0 / OKF 0.2**.
+This fork (okf-loom v2) implements **loom 2.0.0 / OKF 0.2**.
 The 0.2 backend, conservative migration, and cross-view metadata UI are
 implemented and locally verified. Complete Python 3.11/3.12 core checks and
 focused real live/static/single-file metadata/readiness browser flows pass;
@@ -495,8 +495,9 @@ release-readiness claim.
 
 ### Maintained baseline and scope
 
-- The working baseline is this fork, with `ui-analysis` as its supported local
-  checkout, not a wholesale upstream replacement. Preserve
+- The working baseline is this fork, published as
+  [okf-loom v2](https://github.com/SpatialNexus/okf-loom-v2) with `main` as its
+  supported branch, not a wholesale upstream replacement. Preserve
   the redesign, retrieval, annotations, proposal infrastructure, and user work.
 - Declared product/format versions are loom 2.0.0 / OKF 0.2. Historical
   “Annotations v2” and redesign names are feature labels, not schema declarations.
@@ -807,15 +808,17 @@ truthful limits with a claim of automatic confidentiality.
 
 ## 15. Gold-standard and final-status records compete with current authority
 
-**Classification:** process-only/stale authority; **archive in place and consolidate**.
-`docs/design/gold-standard-2026.md` retains uncommitted-tranche status, repeated
+**Classification:** process-only/stale authority; **retired from the public tree**.
+The gold-standard retrieval record retained uncommitted-tranche status, repeated
 suite totals, fresh-review requirements, a precise informational-finding count,
 and a deferred-proposal roadmap. UI closeout/release matrices and verification
-README files name other current/final candidates. Readers must reconstruct
-chronology before knowing what is actually required. These are valuable dated
-records, not a global readiness verdict. Keep rationale and limits; remove their
-role as current maintenance permission or exact-count gates. This plan owns
-current priorities; current contracts and executable checks own correctness.
+README files named other current/final candidates, so readers had to reconstruct
+chronology before knowing what was actually required. Those records, the UI
+overhaul plan, the desktop UI/UX audit, and committed proof screenshots are no
+longer in the published tree. The still-current graph-lens rationale moved to
+[Why the live studio exists](/explanation/live_studio_design.md#why-the-graph-is-organised-into-question-named-lenses).
+This plan owns current priorities; current contracts and executable checks own
+correctness.
 
 ## 16. Proposal availability is inconsistently described
 
@@ -882,8 +885,9 @@ collaboration has versioned sidecars and the renderer documents a subset.
 SECURITY names upstream develop as supported; clone/demo URLs still identify
 upstream. Say authored content remains Markdown with no required database,
 separate collaboration state, and the supported Markdown subset. Preserve
-upstream attribution. Select the fork publication URL/support branch before
-changing those destinations; do not invent a release identity.
+upstream attribution. For the v2 release the fork is published as
+SpatialNexus/okf-loom-v2 with `main` supported; the README, SECURITY and
+install guide point there and credit the upstream author.
 
 ## 23. Architecture maps omit current owners while routing readers to old records
 
@@ -907,10 +911,12 @@ keep substitution defenses, uncertain-outcome records, and recoverability.
 
 1. Keep the current product spec, focused references, progressive resources,
    task-oriented how-tos, and explicit experimental boundaries.
-2. Archive old design/audit/closeout records **in place first**, with a short
-   historical-scope banner and link to current authority. Preserve original
-   decisions, candid limitations, and append-only log history.
+2. Keep internal design/audit/closeout records out of the published tree. Fold
+   still-true rationale and candid limitations into the matching bundle concept,
+   and preserve append-only log history.
 3. Trace executable consumers before moving or deleting screenshots/JSON/reports.
+   Proof capture output goes to the git-ignored `captures/` directory and is
+   never committed.
    Separate historical verification from current behavior tests, then eliminate
    redundant current-status obligations. Do not manufacture replacement proof
    manifests or a new promotion framework.
@@ -931,9 +937,9 @@ Surface these before making their consequential changes:
 - Retirement or changed enforcement of user-selected constraints, retention,
   or uncertain-state bookkeeping.
 - Release-specific human/zoom evidence acceptance, distinct from maintenance.
-- Dropping Python 3.11, selecting a fork publication destination, computation
-  execution, or new public capabilities. Local support is assigned to the
-  `ui-analysis` checkout; conservative migration is implemented, not pending approval.
+- Dropping Python 3.11, computation execution, or new public capabilities.
+  The fork is published as SpatialNexus/okf-loom-v2 with `main` supported;
+  conservative migration is implemented, not pending approval.
 
 No universal unnecessary-security verdict is warranted. The strongest findings
 concern proof-process coupling and inaccurate documentation. Keep session/Origin/

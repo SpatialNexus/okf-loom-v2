@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import importlib
 import multiprocessing
+import os
 import signal
+import stat
 import subprocess
 import sys
 import threading
 import time
-import types
 from pathlib import Path
 
 import pytest
@@ -422,7 +423,7 @@ def _process_publish(path_text, payload, claimed, proceed, results):
     tmp.unlink(missing_ok=True)
 
 
-@pytest.mark.parametrize("name", ["proof.png", "themes.gif"])
+@pytest.mark.parametrize("name", ["proof.png", "comment-loop.gif"])
 def test_cross_process_newest_claim_fences_late_finisher(tmp_path, name):
     ctx = multiprocessing.get_context("fork")
     out = tmp_path / name
@@ -444,14 +445,55 @@ def test_cross_process_newest_claim_fences_late_finisher(tmp_path, name):
     assert_no_capture_tmp(tmp_path)
 
 
-def test_readme_frame_staging_is_private_per_invocation(tmp_path):
-    with media._frame_staging(tmp_path) as first, media._frame_staging(tmp_path) as second:
-        assert first != second
-        Path(first, "frame.png").write_bytes(b"one")
-        Path(second, "frame.png").write_bytes(b"two")
-        assert Path(first, "frame.png").read_bytes() == b"one"
-        assert Path(second, "frame.png").read_bytes() == b"two"
-    assert not list(tmp_path.glob(".okf-media-frames-*"))
+def test_readme_media_serves_only_git_tracked_bundle_files(tmp_path):
+    """Ignored session state in a working checkout must never reach README media."""
+    repo = tmp_path / "repo"
+    bundle = repo / "docs-bundle"
+    (bundle / "concept").mkdir(parents=True)
+    (bundle / "index.md").write_text("# Index\n")
+    (bundle / "concept" / "a.md").write_text("---\ntype: Explanation\n---\n")
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "add", "docs-bundle"], check=True)
+    (bundle / ".okf-loom").mkdir()
+    (bundle / ".okf-loom" / "comments.jsonl").write_text("{}\n")
+    (bundle / "concept" / "a.md.lock").write_text("")
+
+    snapshot = media._tracked_bundle_snapshot(bundle, tmp_path / "out")
+
+    assert snapshot == tmp_path / "out" / "docs-bundle"
+    copied = sorted(p.relative_to(snapshot).as_posix()
+                    for p in snapshot.rglob("*") if p.is_file())
+    assert copied == ["concept/a.md", "index.md"]
+
+
+def test_readme_stills_publish_nothing_when_the_browser_reported_a_fault(tmp_path, monkeypatch):
+    (tmp_path / "graph-map.png").write_bytes(b"previous")
+
+    def stage_with_fault(_browser, _base, stage, diagnostics):
+        (stage / "graph-map.png").write_bytes(b"new")
+        diagnostics.failures.append("graph-map: console error: boom")
+        return ["graph-map.png"]
+
+    monkeypatch.setattr(media, "_stage_stills", stage_with_fault)
+    with pytest.raises(RuntimeError, match="console error: boom"):
+        media._capture_stills(None, "http://unused", tmp_path, media._BrowserDiagnostics())
+    assert (tmp_path / "graph-map.png").read_bytes() == b"previous"
+    assert not list(tmp_path.glob(".okf-media-stills-*"))
+
+
+def test_readme_stills_publish_the_whole_set_world_readable(tmp_path, monkeypatch):
+    def stage_private(_browser, _base, stage, _diagnostics):
+        for name in ("studio-home.png", "social-preview.png"):
+            (stage / name).write_bytes(name.encode())
+            os.chmod(stage / name, 0o600)
+        return ["studio-home.png", "social-preview.png"]
+
+    monkeypatch.setattr(media, "_stage_stills", stage_private)
+    published = media._capture_stills(None, "http://unused", tmp_path, media._BrowserDiagnostics())
+    assert [p.name for p in published] == ["studio-home.png", "social-preview.png"]
+    assert all(stat.S_IMODE(p.stat().st_mode) == 0o644 for p in published)
+    assert (tmp_path / "social-preview.png").read_bytes() == b"social-preview.png"
+    assert not list(tmp_path.glob(".okf-media-stills-*"))
 
 
 class _FakeProcess:
@@ -488,79 +530,6 @@ def test_static_server_enter_failure_closes_socket_and_thread(monkeypatch, tmp_p
         server.__enter__()
     assert server._server is None
     assert server._thread is None
-
-
-class _FakeImage:
-    def __init__(self, source=None):
-        self.source = source
-        self.format = "GIF"
-
-    def convert(self, _mode):
-        return _FakeImage()
-
-    def quantize(self, **_kwargs):
-        return _FakeImage()
-
-    def save(self, path, **_kwargs):
-        Path(path).write_bytes(b"GIF89a-validated")
-
-    def verify(self):
-        if isinstance(self.source, Path) and not self.source.read_bytes().startswith(b"GIF"):
-            raise ValueError("invalid GIF")
-
-    def close(self):
-        pass
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *_args):
-        self.close()
-
-
-class _FakeImageModule:
-    class Dither:
-        NONE = 0
-
-    @staticmethod
-    def open(source):
-        return _FakeImage(source)
-
-
-def _install_fake_pillow(monkeypatch):
-    monkeypatch.setitem(sys.modules, "PIL", types.SimpleNamespace(Image=_FakeImageModule))
-
-
-def test_gif_assembly_atomically_replaces_and_leaves_no_temp(tmp_path, monkeypatch):
-    _install_fake_pillow(monkeypatch)
-    out = tmp_path / "themes.gif"
-    out.write_bytes(b"old")
-    media._assemble_gif([b"png-one", b"png-two"], out)
-    assert out.read_bytes() == b"GIF89a-validated"
-    assert_no_capture_tmp(tmp_path)
-
-
-def test_gif_publish_failure_preserves_existing_and_cleans_only_temp(tmp_path, monkeypatch):
-    _install_fake_pillow(monkeypatch)
-    out = tmp_path / "themes.gif"
-    out.write_bytes(b"previous-valid-gif")
-    monkeypatch.setattr(media.os, "replace", lambda *_args: (_ for _ in ()).throw(OSError("fs failure")))
-    with pytest.raises(OSError, match="fs failure"):
-        media._assemble_gif([b"png"], out)
-    assert out.read_bytes() == b"previous-valid-gif"
-    assert_no_capture_tmp(tmp_path)
-
-
-def test_gif_encoder_failure_preserves_existing_and_cleans_only_temp(tmp_path, monkeypatch):
-    _install_fake_pillow(monkeypatch)
-    out = tmp_path / "themes.gif"
-    out.write_bytes(b"previous-valid-gif")
-    monkeypatch.setattr(_FakeImage, "save",
-                        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("encoder failure")))
-    with pytest.raises(OSError, match="encoder failure"):
-        media._assemble_gif([b"png"], out)
-    assert out.read_bytes() == b"previous-valid-gif"
-    assert_no_capture_tmp(tmp_path)
 
 
 def test_all_shipped_helpers_route_capture_through_production_consumer():
@@ -631,25 +600,14 @@ def test_chrome_resolution_reports_every_unavailable_attempt(monkeypatch):
     assert "Playwright-managed Chromium (managed chromium)" in message
 
 
-def test_readme_media_uses_canonical_theme_vocabulary_and_no_legacy_write():
-    """Contract parity: capture_readme_media seeds theme.js through its CANONICAL
-    resolved vocabulary (the four family-mode themes) and NEVER writes the
-    legacy ``okf-theme`` key — theme.js is the one allowed state owner and the
-    legacy key is migration-only. Upholds the public/runtime theme contract."""
-    src = (SCRIPTS / "capture_readme_media.py").read_text()
-    # THEMES is exactly the four canonical resolved themes (no retired names).
-    assert set(media.THEMES) == {
-        "technical-light", "swiss-light", "technical-dark", "swiss-dark",
-    }, f"capture_readme_media.THEMES is not canonical: {media.THEMES}"
-    for retired in ("pastel", "sepia", "midnight"):
-        assert retired not in media.THEMES, f"retired legacy name {retired!r} in THEMES"
-    # No direct legacy `okf-theme` key write anywhere in the script (the
-    # canonical -family / -mode keys are the only theme storage it touches).
-    assert "setItem('okf-theme'," not in src, (
-        "capture_readme_media writes the legacy okf-theme key directly "
-        "(must use the canonical okf-theme-family / okf-theme-mode keys)"
-    )
-    # The seed helper emits BOTH canonical keys for a concrete resolved theme.
-    seed = media._theme_seed_script("swiss-dark")
-    assert "localStorage.setItem('okf-theme-family','swiss')" in seed
-    assert "localStorage.setItem('okf-theme-mode','dark')" in seed
+def test_readme_media_scripts_never_write_appearance_storage():
+    """theme.js is the one owner of appearance state. The README media scripts
+    show the shipped defaults (stills) or change appearance through the real
+    menu (showcase clips), so neither may seed the canonical
+    ``okf-theme-family`` / ``okf-theme-mode`` keys nor the legacy ``okf-theme``
+    key that theme.js keeps for migration only."""
+    for name in ("capture_readme_media.py", "record_showcase_media.py"):
+        src = (SCRIPTS / name).read_text()
+        assert "localStorage" not in src, f"{name} touches localStorage"
+        assert "setItem('okf-theme" not in src and 'setItem("okf-theme' not in src, (
+            f"{name} writes appearance storage directly")

@@ -91,6 +91,10 @@ _RELEASE_EXCLUDED_COMPONENTS = frozenset(
     {"incoming-v1-theme", "ui-overhaul-final"}
 )
 _RELEASE_EXCLUDED_ROOT_PATHS = frozenset({".gitignore"})
+# README showcase media (screenshots, GIFs and MP4 clips, about 13 MB) illustrate
+# the repository page; a loaded skill never reads them.  Anchored at the
+# repository root so a nested bundle's own docs/media/ still ships.
+_RELEASE_EXCLUDED_ROOT_DIRS = ("docs/media/",)
 _FIXED_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
 _SCAN_CHUNK_BYTES = 64 * 1024
 _SCAN_OVERLAP_BYTES = 16 * 1024
@@ -196,7 +200,11 @@ def release_inventory(source: Path | str, revision: str = "HEAD") -> tuple[str, 
         if path in seen or not _safe_path(path):
             raise SecretScrubError(f"unsafe or duplicate Git tree path: {path!r}")
         seen.add(path)
-        if path in _RELEASE_EXCLUDED_ROOT_PATHS or is_path_denied(path):
+        if (
+            path in _RELEASE_EXCLUDED_ROOT_PATHS
+            or path.startswith(_RELEASE_EXCLUDED_ROOT_DIRS)
+            or is_path_denied(path)
+        ):
             continue
         if _is_sensitive_artifact_path(path):
             # A filename can itself contain a secret. Give a deterministic local

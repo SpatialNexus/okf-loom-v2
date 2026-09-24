@@ -28,13 +28,16 @@ _EXCLUDED_SEGMENTS: frozenset[str] = frozenset({
     ".pytest_cache", "sessions",
 })
 
-# A capture is produced from one committed source tree and then published by
-# a separate commit containing only the evidence directory.  The manifest is
-# written during the first phase, so its evidence commit cannot be
-# self-referential.  The validator proves the boundary instead: HEAD must be
-# the single evidence commit whose parent is ``source_revision``.
+# A capture is produced from one committed source tree into the git-ignored
+# evidence directory; the published tree never carries the screenshots.  To
+# verify a capture later, a separately prepared evidence checkout records it
+# as one commit containing only the evidence directory (added explicitly,
+# because the directory is ignored).  The manifest is written during the
+# first phase, so its evidence commit cannot be self-referential.  The
+# validator proves the boundary instead: HEAD must be the single evidence
+# commit whose parent is ``source_revision``.
 PROVENANCE_MODEL = "source-vs-evidence-v1"
-EVIDENCE_DIRECTORY = "docs/screenshots/annotations-v2"
+EVIDENCE_DIRECTORY = "captures/annotations-v2"
 EMPTY_WORKTREE_DIGEST = hashlib.sha256(b"").hexdigest()
 
 
@@ -782,7 +785,7 @@ def validate_manifest(manifest: dict[str, Any], root: Path,
 
     Returns a list of error strings (empty if valid).  When *check_files*
     is True, also verifies per-file SHA-256 against the actual files on disk
-    under ``root / "docs" / "screenshots" / "annotations-v2"``.
+    under ``root / EVIDENCE_DIRECTORY``.
 
     ``phase="capture"`` validates a staged manifest against the source tree;
     ``phase="final"`` (the release-authority default) additionally requires
@@ -803,7 +806,7 @@ def validate_manifest(manifest: dict[str, Any], root: Path,
     if not isinstance(manifest, dict):
         return ["manifest is not a JSON object"]
     errors: list[str] = []
-    output = root / "docs" / "screenshots" / "annotations-v2"
+    output = root / EVIDENCE_DIRECTORY
 
     # Schema.
     if manifest.get("schema") != 1:

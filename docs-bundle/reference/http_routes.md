@@ -44,6 +44,7 @@ is owned by `session_authority.py` and Studio; see the
 | GET | `/__search-form` | Read-only native-form adapter: omit empty/inactive filters, then 303 to strict `/__search`. |
 | GET | `/__context` | Read-only deterministic schema-v1 Agent Context Pack as JSON or Markdown. |
 | GET | `/__raw/<concept_id>` | Raw markdown body. |
+| GET | `/__data/summary?id=` | One concept's identity card (title, type, description, type colour/icon, link and relation counts) for link previews. |
 | GET | `/__data/graph.json` | Graph JSON for external tools. |
 | GET | `/__data/content.json` | Full content index JSON. |
 | GET | `/__data/doc?id=` | One concept's rendered data plus canonical annotation source/revision and DOM projection map. |
@@ -227,9 +228,36 @@ See [context_packs.md](/reference/context_packs.md).
 
 ## `/__raw/<concept_id>`
 
-Raw markdown body of one concept (`Content-Type: text/markdown`).
-Used by popover previews and agent copy/paste. Returns 413 if the
+Raw markdown body of one concept (`Content-Type: text/markdown`), without
+its frontmatter. Used for agent copy/paste. Returns 413 if the
 body exceeds `MAX_RAW_RESPONSE_BYTES`.
+
+## `/__data/summary?id=<concept_id>`
+
+One concept's identity card as JSON, read from the same parsed snapshot as
+the page. Link hover/focus previews use it, because `/__raw` carries no
+title or type. It never includes the body and never renders. This route is
+additive; `/__raw` is unchanged.
+
+```json
+{
+  "schema": 1,
+  "id": "tables/orders",
+  "title": "Orders",
+  "type": "Table",
+  "description": "One row per completed customer order.",
+  "type_color": "hsl(265, 50%, 54%)",
+  "icon": "table",
+  "links": 4,
+  "relations": 3
+}
+```
+
+`links` counts internal body links (Markdown and wikilinks); `relations`
+counts typed `relations` frontmatter entries with a target. `type_color` is the
+bundle palette colour for the type, and `icon` is the type icon key. Exactly one
+`id` parameter is accepted: anything else is `400 {"error": "invalid_request"}`,
+and an unknown or invalid id is `404 {"error": "target_not_found"}`.
 
 ## `/__data/graph.json`
 

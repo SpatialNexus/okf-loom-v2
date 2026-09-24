@@ -34,26 +34,35 @@ relations:
     target: /explanation/v2_release_notes.md
 provenance:
   - source: /reference/spec.md
-    note: Canonical current behavior for planning, direct mutation, Studio routes, expected revisions, storage, undo, and trust boundaries.
+    note: Canonical current behavior for planning, direct mutation, Studio routes, expected
+      revisions, storage, undo, and trust boundaries.
   - source: /reference/architecture.md
-    note: Implemented write funnel, activity history, group undo, proposal seam, and Studio architecture.
+    note: Implemented write funnel, activity history, group undo, proposal seam, and
+      Studio architecture.
   - source: /reference/http_routes.md
     note: Implemented /__apply, /__diff, and /__undo request and response behavior.
   - source: /explanation/live_studio_design.md
-    note: Product rationale requiring direct edits to remain the default and proposal review to remain opt-in.
-  - source: ../../docs/design/gold-standard-2026.md
-    note: Roadmap requirement for a versioned proposal, per-operation review, conflict-checked atomic apply, and undo linkage.
+    note: Product rationale requiring direct edits to remain the default and proposal
+      review to remain opt-in.
+  - source: Gold Standard 2026 retrieval-tranche record, prioritized roadmap §2 (retired
+      maintainer record; not in the published tree)
+    note: Roadmap requirement for a versioned proposal, per-operation review, conflict-checked
+      atomic apply, and undo linkage.
 citations:
   - id: current-spec
-    text: "Current okf-loom specification §§7, 10–14, and 17. /reference/spec.md"
+    text: Current okf-loom specification §§7, 10–14, and 17. /reference/spec.md
   - id: studio-architecture
-    text: "Architecture — Studio write funnel, session storage, proposal seam, conflict handling, and group undo. /reference/architecture.md"
+    text: Architecture — Studio write funnel, session storage, proposal seam, conflict
+      handling, and group undo. /reference/architecture.md
   - id: route-contracts
-    text: "HTTP server routes — implemented /__diff, /__apply, and /__undo contracts. /reference/http_routes.md"
+    text: HTTP server routes — implemented /__diff, /__apply, and /__undo contracts.
+      /reference/http_routes.md
   - id: studio-posture
-    text: "Why the live studio exists — transparency plus undo, not a review gate by default. /explanation/live_studio_design.md"
+    text: Why the live studio exists — transparency plus undo, not a review gate by
+      default. /explanation/live_studio_design.md
   - id: roadmap
-    text: "Gold Standard 2026 roadmap §2 — Proposal/diff review. docs/design/gold-standard-2026.md"
+    text: Gold Standard 2026 roadmap §2 — Proposal/diff review (retired maintainer record;
+      not in the published tree).
 ---
 
 # Proposal / Diff Review requirements and decisions
@@ -584,6 +593,6 @@ The normative specification was drafted against all of the following requirement
 - [Comment lifecycle and archive rules](/reference/comment_lifecycle.md) — append-only row, compare-and-swap, WAL, notification, and retention patterns already proven elsewhere in the Studio.
 - [Why the live studio exists](/explanation/live_studio_design.md) — direct-authoring product posture and the boundary against a default review gate.
 - [What changed in okf-loom v2](/explanation/v2_release_notes.md) — current release status and the honest deferral of Proposal / Diff Review.
-- `docs/design/gold-standard-2026.md`, “Prioritized roadmap” §2 — source roadmap outcome for versioned proposals, per-operation review, atomic apply, activity, and undo.
+- Gold Standard 2026 retrieval-tranche record, “Prioritized roadmap” §2 (a retired maintainer record, no longer in the published tree) — source roadmap outcome for versioned proposals, per-operation review, atomic apply, activity, and undo.
 
 Return to [Reference](/reference/index.md).

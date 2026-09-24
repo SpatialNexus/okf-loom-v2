@@ -609,6 +609,142 @@ def test_studio_attention_is_actionable_unread_and_reconnect_honest(page, server
     assert resync["attention"] == "idle" and resync["unread"] == 0, resync
 
 
+_MASTHEAD_GEOMETRY = """() => {
+  const box = selector => document.querySelector(selector).getBoundingClientRect();
+  const shellNode = document.querySelector('.okf-shell');
+  const shell = box('.okf-shell'), brand = box('.okf-shell__brand'), nav = box('.okf-shell__nav');
+  const items = [...document.querySelectorAll('.okf-shell__nav > *')].map(node => node.getBoundingClientRect());
+  return {
+    rail: document.body.classList.contains('okf-panel-rail'),
+    shellWidth: shell.width, shellRight: shell.right, navRight: nav.right,
+    sharesRow: brand.top < nav.bottom && nav.top < brand.bottom,
+    itemRows: new Set(items.map(r => Math.round((r.top + r.bottom) / 16))).size,
+    overflow: shellNode.scrollWidth - shellNode.clientWidth,
+    launcher: box('.okf-studio-launcher').width,
+    searchLeft: box('.okf-shell__search-form').left,
+    graphLeft: box('[data-okf-shell-item="graph"]').left,
+  };
+}"""
+
+
+def _assert_single_row_masthead(geometry: dict) -> None:
+    assert geometry["sharesRow"], geometry
+    assert geometry["itemRows"] == 1, geometry
+    assert geometry["overflow"] <= 0, geometry
+    assert geometry["navRight"] <= geometry["shellRight"] + 0.5, geometry
+
+
+def test_masthead_stays_one_row_beside_the_studio_rail_and_counts_do_not_move_it(
+    page, server_url: str,
+) -> None:
+    """At 1280 the open Comments rail leaves the masthead ~830px while every
+    viewport query still reads desktop; the former viewport guess wrapped it
+    into two rows. The masthead now sizes from its real width, and the
+    launcher keeps one width while unread counts arrive, so the destinations
+    beside it never jump while an agent works."""
+    failures = _install_error_probe(page)
+    page.set_viewport_size({"width": 1280, "height": 800})
+    page.goto(server_url + "/tables/orders")
+    page.wait_for_function("() => window.okfLoomStudio && window.okfLoomStudio.state.eventsReady")
+    launcher = page.locator(".okf-studio-launcher")
+    panel = page.locator("#okf-panel")
+
+    launcher.click()
+    panel.get_by_role("button", name="Comments").click()
+    page.wait_for_function("() => document.body.classList.contains('okf-panel-rail')")
+    rail_idle = page.evaluate(_MASTHEAD_GEOMETRY)
+    assert rail_idle["shellWidth"] < 900, rail_idle
+    _assert_single_row_masthead(rail_idle)
+    # The consolidated label is visual only: the name still reports status.
+    expect(launcher).to_have_accessible_name(re.compile(r"^Studio\s+·\s+Editable$"))
+
+    page.evaluate("window.okfLoomLive.emit('activity',{event_id:'masthead-1',type:'activity',action:'update',ts:new Date().toISOString()})")
+    expect(launcher).to_have_attribute("data-attention", "pending")
+    # The compact pending marker's alternative text keeps the phrase.
+    expect(launcher).to_have_accessible_name(re.compile(r"^Studio\s+·\s+1 change\s+·\s+Needs attention$"))
+    page.evaluate("window.okfLoomLive.emit('activity',{event_id:'masthead-2',type:'activity',action:'update',ts:new Date().toISOString()})")
+    expect(launcher).to_have_accessible_name(re.compile(r"Studio\s+·\s+2 changes"))
+    rail_pending = page.evaluate(_MASTHEAD_GEOMETRY)
+    _assert_single_row_masthead(rail_pending)
+    for key in ("launcher", "searchLeft", "graphLeft"):
+        assert rail_pending[key] == rail_idle[key], (key, rail_idle, rail_pending)
+    _capture_evidence(page, "desktop-1280-rail-masthead-pending.png")
+
+    # Full-width masthead: the status is spelled out, in a reserved slot.
+    page.get_by_role("button", name="Close panel").click()
+    page.wait_for_function("() => !document.body.classList.contains('okf-panel-rail')")
+    full_pending = page.evaluate(_MASTHEAD_GEOMETRY)
+    _assert_single_row_masthead(full_pending)
+    expect(launcher).to_contain_text("2 changes")
+    launcher.click()
+    panel.get_by_role("button", name="Changes").click()
+    expect(launcher).to_have_attribute("data-attention", "idle")
+    page.get_by_role("button", name="Close panel").click()
+    page.wait_for_function("() => !document.body.classList.contains('okf-panel-rail')")
+    full_idle = page.evaluate(_MASTHEAD_GEOMETRY)
+    _assert_single_row_masthead(full_idle)
+    for key in ("launcher", "searchLeft", "graphLeft"):
+        assert full_idle[key] == full_pending[key], (key, full_pending, full_idle)
+    assert failures == []
+
+
+# Records every text the launcher summary ever shows, from the moment Studio
+# creates it, with page timestamps.
+_LAUNCHER_TEXT_RECORDER = """(() => {
+  const log = [];
+  window.__okfLauncherLog = log;
+  const attach = () => {
+    const summary = document.querySelector('.okf-studio-launcher__summary');
+    if (!summary) return false;
+    const record = () => log.push({t: performance.now(), text: summary.textContent});
+    record();
+    new MutationObserver(record).observe(summary, {childList: true, characterData: true, subtree: true});
+    return true;
+  };
+  const pending = new MutationObserver(() => { if (attach()) pending.disconnect(); });
+  pending.observe(document, {childList: true, subtree: true});
+})();"""
+
+
+def test_launcher_does_not_flash_connecting_during_a_healthy_handshake(page, server_url: str) -> None:
+    """Every fresh load used to print "Studio · Connecting…" for the few
+    hundred milliseconds the SSE handshake takes. The launcher now names the
+    session's authority from the start and only reports a connecting or
+    reconnecting stream that outlasts a one-second grace; the in-panel chip
+    stays immediate, and a dead stream is never delayed."""
+    page.add_init_script(_LAUNCHER_TEXT_RECORDER)
+    page.goto(server_url + "/tables/orders")
+    page.wait_for_function("() => window.okfLoomLive && window.okfLoomLive.state === 'online'")
+    page.wait_for_timeout(1200)
+    log = page.evaluate("window.__okfLauncherLog")
+    assert log and log[0]["text"] == " · Editable", log
+    created = log[0]["t"]
+    # Only a stream that is still not up after the grace may be announced.
+    early = [entry for entry in log if "onnecting" in entry["text"] and entry["t"] - created < 950]
+    assert early == [], log
+    assert log[-1]["text"] == " · Editable", log
+
+    # A brief reconnect blip never reaches the launcher ...
+    page.evaluate("window.__okfLauncherLog.length = 0")
+    page.evaluate("""() => { window.okfLoomLive.emit('conn', {state: 'reconnecting'});
+      setTimeout(() => window.okfLoomLive.emit('conn', {state: 'online'}), 150); }""")
+    page.wait_for_timeout(1300)
+    assert all("Reconnecting" not in entry["text"] for entry in page.evaluate("window.__okfLauncherLog"))
+
+    # ... while a sustained one is reported after the grace, not before, and
+    # the Studio home connection chip reports it immediately.
+    launcher = page.locator(".okf-studio-launcher")
+    started = page.evaluate("() => { window.okfLoomLive.emit('conn', {state: 'reconnecting'}); return performance.now(); }")
+    expect(launcher).to_have_accessible_name(re.compile(r"Studio\s+·\s+Reconnecting"))
+    shown = next(entry["t"] for entry in page.evaluate("window.__okfLauncherLog") if "Reconnecting" in entry["text"])
+    assert shown - started >= 950, (started, shown)
+    launcher.click()
+    expect(page.locator("#okf-panel .okf-conn")).to_have_attribute("data-state", "reconnecting")
+    page.evaluate("window.okfLoomLive.emit('conn', {state: 'offline'})")
+    expect(launcher).to_have_attribute("data-attention", "failure")
+    expect(launcher).to_have_accessible_name(re.compile(r"Studio\s+·\s+Offline"))
+
+
 def test_connection_chip_distinguishes_boot_connecting_from_reconnecting(
     page, server_url: str,
 ) -> None:

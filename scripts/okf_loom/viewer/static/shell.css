@@ -223,6 +223,119 @@ html:not([data-okf-js="1"]) #okf-theme { display: none !important; }
    * chrome, so the shared shell layer re-owns it one specificity higher. */
   body.okf-viewer .okf-shell__nav .okf-studio-launcher { min-height: 44px; }
 }
+/* ---- Width-driven desktop tiers -------------------------------------
+ * Above 1100px the viewport no longer tells the masthead how wide it is:
+ * an open Studio rail (body.okf-panel-rail) reserves its measured width as
+ * body padding, so at 1280 the shell is ~825px wide while every viewport
+ * query still reads "desktop". The body is therefore an inline-size query
+ * container (size containment on the inline axis only; no layout
+ * containment, so fixed and sticky descendants such as the Studio panel,
+ * menus and this sticky shell keep the viewport as their containing block)
+ * and the masthead picks its tier from the width it actually has:
+ *   >= 1080px  full single row: the launcher names its status beside
+ *              "Studio" in a reserved slot (bounded, so extreme counts
+ *              cannot push the nav past the edge)
+ *   780-1079px condensed single row: the brand wraps onto at most two
+ *              lines, search narrows, and the launcher consolidates to its
+ *              action label with one fixed-width attention slot
+ *   < 780px    two rows: brand above a wrapping destination row
+ * In both single-row tiers the launcher keeps one width while counts and
+ * idle/pending status change, so the destinations beside it never jump
+ * while an agent works; pending work shows a compact non-colour marker
+ * whose alternative text keeps "Needs attention" in the accessible name.
+ * The <=1100px viewport tiers above are unchanged.
+ * ------------------------------------------------------------------ */
+body.okf-viewer { container: okf-page / inline-size; }
+@media (min-width: 1101px) {
+  .okf-shell { grid-template-columns: minmax(6rem, 1fr) auto; }
+  /* The link is the brand's flex item; letting it shrink is what turns the
+   * existing strong ellipsis on instead of overflowing into the nav. */
+  .okf-shell__brand .okf-brand-link { min-width: 0; overflow: hidden; }
+  .okf-shell__brand .okf-brand-link strong { display: block; }
+  body.okf-viewer .okf-shell .okf-studio-launcher {
+    justify-content: center;
+    /* Holds "Studio · Comment-only", "Studio · 1 comment ●" and
+     * "Studio · Offline · Error" alike; only a multi-kind count such as
+     * "2 comments · 1 change" widens it, up to the summary bound below. */
+    min-width: 11.25rem;
+  }
+  /* The full text stays in the DOM, so the accessible name is never
+   * truncated; the Studio panel it opens repeats every count in full. */
+  body.okf-viewer .okf-shell .okf-studio-launcher__summary {
+    min-width: 0;
+    /* The largest summary that still leaves the brand its 6rem floor at the
+     * narrowest full-tier width (1080px). */
+    max-width: 13rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  body.okf-viewer .okf-shell .okf-studio-launcher[data-attention="pending"]::after {
+    content: "\25CF" / " · Needs attention";
+    font-size: 0.7em;
+    color: var(--okf-accent);
+  }
+  @container okf-page (max-width: 1079.98px) {
+    /* body > shell (0,2,1) also outranks the graph route's desktop header
+     * grid (graph.css, 0,2,0), so every route takes the same tiers. */
+    body.okf-viewer > .okf-shell { grid-template-columns: minmax(4rem, 1fr) auto; gap: var(--okf-space-3); }
+    /* Honest identity instead of a mid-word cut: the name wraps onto a
+     * second line within the single row, and only a very long name clamps. */
+    .okf-shell__brand .okf-brand-link strong {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      white-space: normal;
+      overflow-wrap: break-word;
+      line-height: 1.2;
+    }
+    /* wiki.css floors the topbar search at 200px (0,2,1); the condensed
+     * masthead re-owns it one step higher. */
+    .okf-shell__nav .okf-shell__search-form input[type="search"] {
+      min-width: 6rem;
+      width: clamp(6rem, 13cqw, 10rem);
+    }
+    .okf-shell .okf-appearance-trigger__prefix,
+    .okf-shell .okf-appearance-trigger__family { font-size: var(--okf-text-xs); }
+    body.okf-viewer .okf-shell .okf-studio-launcher {
+      position: relative;
+      /* One slot that holds both "Studio" and "Studio ●", so the frequent
+       * idle <-> pending count changes never move the destinations; only a
+       * genuine failure ("Studio · Error") may widen it. */
+      min-width: 5.5rem;
+    }
+    /* Consolidated to the action label, as at <=640px, but visually hidden
+     * rather than removed: the launcher's accessible name still carries the
+     * full status ("Studio · 2 comments · 1 change"). */
+    body.okf-viewer .okf-shell .okf-studio-launcher__summary {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      max-width: none;
+      margin: -1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+  @container okf-page (max-width: 779.98px) {
+    body.okf-viewer > .okf-shell {
+      grid-template-columns: minmax(0, 1fr);
+      height: auto;
+      padding-block: var(--okf-space-2);
+      gap: var(--okf-space-2);
+    }
+    .okf-shell__brand { width: 100%; min-width: 120px; min-height: 40px; }
+    .okf-shell__nav {
+      width: 100%; min-width: 0; max-width: 100%;
+      justify-content: flex-start; flex-wrap: wrap;
+    }
+  }
+}
+@media (min-width: 1101px) and (forced-colors: active) {
+  body.okf-viewer .okf-shell .okf-studio-launcher[data-attention="pending"]::after { color: CanvasText; }
+}
 /* The viewbar follows the shell in the DOM. Its positioning is owned by
  * studio.css (the bar is only mounted on live concept pages): the bar is
  * sticky, stacked below this measured shell in normal view and at top 0 in

@@ -133,10 +133,10 @@ else (search, context packs, partial edits, graph health) is additive.
 | :--- | :--- | :--- |
 | Comment anchors | First match wins; edits silently move or erase the highlight. | Candidate-set resolver intersects evidence and reports `resolved` / `stale` / `ambiguous` / `invalid` health. See [spec §12.1](/reference/spec.md#121-annotations-v2-contract-normative-implemented). |
 | Moving wording | Highlight jumps to another occurrence or vanishes. | Explicit [Re-anchor](/reference/comment_lifecycle.md) appends a closed-schema-2 row and follows the target to new wording. |
-| Search | Three modes (lexical/tag/entity). | Six modes — lexical, tag, semantic (zero-dep, not embeddings), hybrid (RRF), entity, relation. See [Search modes](/reference/search_modes.md). |
+| Search | Six modes (lexical, semantic, hybrid, tag, entity, relation), ranked per concept without passage evidence. | The same six modes (semantic is zero-dependency, not embeddings; hybrid uses RRF), with the exact matching passage, a line-range citation, and ranking reasons. See [Search modes](/reference/search_modes.md). |
 | Evidence for an agent | Free-form copy/paste. | Deterministic, citation-ready [Agent Context Packs](/reference/context_packs.md) with source coordinates, across CLI, HTTP, and portable builds. |
 | Edits while reviewing | Whole-concept rewrites. | Block-level `update-section` / `replace-text` partial updates, mid-thread `comment-reply`, and undo. |
-| Static / offline viewer | Search "unavailable." | Client-side portable search over a content-addressed corpus; same ranking and evidence as live. |
+| Static / offline viewer | Basic term-frequency search in static builds. | Client-side portable search over a content-addressed corpus; same ranking and evidence as live. |
 
 ## New feature inventory
 
@@ -188,10 +188,11 @@ This section is deliberately precise, because the honest status matters.
   `tests/test_retrieval_context.py` and `tests/test_render.py`.
 - **The final ReviewAll and canonical screenshot regeneration are still pending.**
   As the update log (`log.md`) records, several ReviewAll passes
-  reported **FAIL** and were followed by bounded remediation. Existing
-  screenshot bytes in `docs/screenshots/annotations-v2/` become release
-  proof **only** after they are regenerated against the current tree and
-  accepted by the manifest validator. **No release PASS is claimed here.**
+  reported **FAIL** and were followed by bounded remediation. Screenshots
+  captured into the git-ignored `captures/annotations-v2/` directory become
+  release proof **only** when they are captured against the current tree and
+  accepted by the manifest validator; none are committed to the published
+  tree. **No release PASS is claimed here.**
 - This page exists to close the user-outcome gap — *you could not see what
   changed* — not to declare the release complete.
 

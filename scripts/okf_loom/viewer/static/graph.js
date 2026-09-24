@@ -1035,7 +1035,10 @@
       if (!key || !ICON_PATHS[key]) key = "file";
       if (!ICON_PATHS[key]) return null;
       if (_iconUriCache[key]) return _iconUriCache[key];
-      var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"'
+      // Explicit width/height give the glyph an intrinsic size. Without it,
+      // Chrome drew the image about twice too large on HiDPI canvases
+      // (devicePixelRatio 2) and the node clipped it to its top-left corner.
+      var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"'
         + ' stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
         + ICON_PATHS[key] + '</svg>';
       var uri = "data:image/svg+xml;utf8," + encodeURIComponent(svg);
@@ -3418,7 +3421,8 @@
     // ====================================================================
     // Lens analytics — real algorithms behind each lens.
     // --------------------------------------------------------------------
-    // Research-grounded (see docs/design/graph-lenses.md): communities are
+    // Research-grounded (see docs-bundle/explanation/live_studio_design.md,
+    // "Why the graph is organised into question-named lenses"): communities are
     // the color dimension that reveals structure (Gephi/InfraNodus/Bloom
     // convergence), PageRank finds what matters better than raw degree,
     // betweenness finds the bridgers (Kumu's "top bridgers"), and
@@ -4101,7 +4105,13 @@
     var relationshipSlot=document.getElementById("detail-relationships-slot");if(relationshipSlot)relationshipSlot.appendChild(bundlePanel);
     function validInteractionId(id){return typeof id==="string"&&!!nodeIndex[id];}
     function replaceRecord(target,values){Object.keys(target).forEach(function(key){delete target[key];});Object.keys(values||{}).forEach(function(key){target[key]=values[key];});return target;}
-    function positionActionBar(){var n=interactionState.selected&&cy.getElementById(interactionState.selected);if(!n||!n.length||actionBar.hidden)return;var p=n.renderedPosition(),w=actionBar.offsetWidth,h=actionBar.offsetHeight;actionBar.style.left=Math.max(8,Math.min(container.clientWidth-w-8,p.x+22))+"px";actionBar.style.top=Math.max(8,Math.min(container.clientHeight-h-8,p.y-h/2))+"px";}
+    // The toolbar sits beside the selected node and never over it: the first
+    // click of a double-click selects (and shows this toolbar), and the
+    // second click must still land on the node to open its page. Beside the
+    // canvas's right edge it used to be clamped back over the node, so the
+    // second click pressed "Explore neighborhood" instead. Prefer the right
+    // (the long-standing spot), then the left, then below, then above.
+    function positionActionBar(){var n=interactionState.selected&&cy.getElementById(interactionState.selected);if(!n||!n.length||actionBar.hidden)return;var p=n.renderedPosition(),w=actionBar.offsetWidth,h=actionBar.offsetHeight,W=container.clientWidth,H=container.clientHeight;var off=Math.max(22,Math.max(n.renderedOuterWidth(),n.renderedOuterHeight())/2+8);var left=p.x+off,top=p.y-h/2;if(p.x+off+w>W-8){if(p.x-off-w>=8)left=p.x-off-w;else if(p.y+off+h<=H-8){left=p.x-w/2;top=p.y+off;}else if(p.y-off-h>=8){left=p.x-w/2;top=p.y-off-h;}}actionBar.style.left=Math.max(8,Math.min(W-w-8,left))+"px";actionBar.style.top=Math.max(8,Math.min(H-h-8,top))+"px";}
     cy.on("pan zoom position",positionActionBar);window.addEventListener("resize",function(){syncActionBarOwner();positionActionBar();});
     var graphResizeTimer=null,userViewportInteracted=false;
     ["wheel","pointerdown","touchstart"].forEach(function(name){container.addEventListener(name,function(event){if(event.isTrusted&&(event.target.tagName==="CANVAS"||event.target===canvasProxy))userViewportInteracted=true;},{passive:true});});
@@ -5294,7 +5304,6 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
     collaboratorRegion.setAttribute("aria-label", "Collaborators");
     var collaboratorCompact = document.createElement("p");
     collaboratorCompact.className = "okf-collaborators__compact";
-    collaboratorRegion.appendChild(collaboratorCompact);
     var collaboratorSection = document.createElement("details");
     collaboratorSection.className = "okf-collaborators";
     collaboratorSection.id = "okf-collaborators-detail";
@@ -5307,6 +5316,12 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
     collaboratorSection.appendChild(collaboratorTitle);
     collaboratorSection.appendChild(collaboratorList);
     collaboratorRegion.appendChild(collaboratorSection);
+    // The disclosure summary is the section heading: it names the list and
+    // its count, never a collaborator. The compact line under it previews the
+    // first collaborator while the list is closed and steps aside while it is
+    // open, so no collaborator is named twice and the heading never moves.
+    collaboratorRegion.appendChild(collaboratorCompact);
+    collaboratorSection.addEventListener("toggle", function () { collaboratorCompact.hidden = collaboratorSection.open; });
     var detailPane = document.getElementById("okf-detail");
     if (detailPane && livePresenceHub) detailPane.appendChild(collaboratorRegion);
     var mobilePresenceBar = document.createElement("aside");
@@ -5339,7 +5354,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
       var summaryRow = remote.find(function(row){return row.kind === "browser";}) || remote[0];
       var agentRow = remote.find(function(row){return row.kind === "agent";});
       var browserCount = remote.filter(function(row){return row.kind === "browser";}).length;
-      collaboratorTitle.textContent = summaryRow ? ((summaryRow.kind === "agent" ? "Agent" : (summaryRow.label || "Viewer")) + " · " + (summaryRow.state || "idle") + (remote.length > 1 ? " (＋" + (remote.length - 1) + ")" : "")) : "No other collaborators";
+      collaboratorTitle.textContent = "Collaborators (" + remote.length + ")";
       collaboratorCompact.textContent = "No other collaborators here.";
       function setMobileSummary(agentText, collaboratorText){mobilePresenceText.textContent="";var line1=document.createElement("span");line1.className="okf-mobile-presence__agent";line1.textContent=agentText;var line2=document.createElement("span");line2.className="okf-mobile-presence__collaborators";line2.textContent=collaboratorText;mobilePresenceText.appendChild(line1);mobilePresenceText.appendChild(line2);}
       setMobileSummary("Agent idle", "0 collaborators");
@@ -5370,7 +5385,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
         var name = document.createElement("strong"); name.textContent = label; item.appendChild(name);
         var position = row.kind === "browser" ? ghostPosition(row) : null;
         var region = position ? ((position.y < .34 ? "upper" : position.y > .66 ? "lower" : "center") + " " + (position.x < .34 ? "left" : position.x > .66 ? "right" : "center")).replace("center center","center") : "";
-        if (row === summaryRow) { collaboratorCompact.textContent = label + " · " + (row.state || "idle") + (region ? " · " + region : "") + (row.focus ? " · " + row.focus : ""); setMobileSummary("Agent " + (agentRow ? agentRow.state : "idle") + (agentRow&&agentRow.focus ? " " + agentRow.focus : ""), browserCount + " collaborator" + (browserCount === 1 ? "" : "s") + " · " + label + (region ? " · " + region : "")); }
+        if (row === summaryRow) { collaboratorCompact.textContent = label + " · " + (row.state || "idle") + (region ? " · " + region : "") + (row.focus ? " · " + row.focus : ""); setMobileSummary("Agent " + (agentRow ? agentRow.state : "idle") + (agentRow&&agentRow.focus ? " " + agentRow.focus : ""), browserCount + " collaborator" + (browserCount === 1 ? "" : "s") + (row.kind === "agent" ? "" : " · " + label + (region ? " · " + region : ""))); }
         item.appendChild(document.createTextNode(" · " + (row.state || "idle") + (region ? " · " + region : "") + (row.focus ? " · " + row.focus : "")));
         collaboratorList.appendChild(item);
         if (row.kind !== "browser") return;

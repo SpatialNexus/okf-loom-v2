@@ -1,7 +1,7 @@
 """Capture proof screenshots for the frontend remediation.
 
 Stands up ``okf serve samples/demo_bundle`` (studio on), drives Chrome to the
-key surfaces, and writes PNGs under docs/screenshots/iter1-frontend/.
+key surfaces, and writes PNGs under the git-ignored captures/iter1-frontend/.
 
 Run:  python3 tests/capture_iter1_frontend_proof.py
 """
@@ -19,7 +19,7 @@ from playwright.sync_api import sync_playwright
 
 TK = Path(__file__).resolve().parent.parent
 DEMO = TK / "samples" / "demo_bundle"
-OUT = TK / "docs" / "screenshots" / "iter1-frontend"
+OUT = TK / "captures" / "iter1-frontend"
 OUT.mkdir(parents=True, exist_ok=True)
 
 

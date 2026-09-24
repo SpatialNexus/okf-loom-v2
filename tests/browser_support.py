@@ -27,7 +27,7 @@ def unavailable(reason):
 
 def playwright_api():
     if importlib.util.find_spec("playwright") is None:
-        unavailable("Playwright is not installed; see README developer setup")
+        unavailable("Playwright is not installed; see CONTRIBUTING.md developer tests")
     # A broken installation is an error, not an absent optional dependency.
     return importlib.import_module("playwright.sync_api")
 

@@ -255,6 +255,62 @@ def test_optional_family_graph_palettes_repaint_canvas_and_minimap(
     assert snapshot["capture"]["suspended"] is False, snapshot
 
 
+_SELECTED_LENS_PREVIEW_JS = """() => {
+  const cv = document.createElement('canvas'); cv.width = cv.height = 1;
+  const cx = cv.getContext('2d', {willReadFrequently: true});
+  const rgb = (c) => { cx.clearRect(0, 0, 1, 1); cx.fillStyle = 'rgba(0,0,0,0)'; cx.fillStyle = c;
+    cx.fillRect(0, 0, 1, 1); const d = cx.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2], d[3] / 255]; };
+  const lum = (c) => { const v = c.slice(0, 3).map(x => x / 255)
+    .map(x => x <= .04045 ? x / 12.92 : Math.pow((x + .055) / 1.055, 2.4));
+    return .2126 * v[0] + .7152 * v[1] + .0722 * v[2]; };
+  const ratio = (a, b) => { a = lum(a); b = lum(b); return (Math.max(a, b) + .05) / (Math.min(a, b) + .05); };
+  const over = (fg, alpha, bg) => fg.slice(0, 3).map((v, i) => v * alpha + bg[i] * (1 - alpha));
+  const choice = document.querySelector('.okf-signal__seg-item input:checked + .okf-lens-choice');
+  const svg = choice.querySelector('.okf-lens-preview');
+  const inset = rgb(getComputedStyle(svg).backgroundColor);
+  const lines = [...svg.querySelectorAll('line')].map(l => {
+    const cs = getComputedStyle(l), ink = rgb(cs.stroke);
+    return ratio(over(ink, ink[3] * Number(cs.opacity), inset), inset);
+  });
+  const nodes = [...svg.querySelectorAll('circle:not(.okf-preview-ring)')].map(c => {
+    const cs = getComputedStyle(c), ink = rgb(cs.fill), stroke = rgb(cs.stroke);
+    return Math.max(ratio(ink, inset), ratio(stroke, inset));
+  });
+  return {theme: document.documentElement.dataset.theme, lens: choice.previousElementSibling.value,
+    line: Math.min(...lines), node: Math.min(...nodes),
+    selectedCue: getComputedStyle(choice, '::after').content};
+}"""
+
+
+def test_selected_lens_preview_stays_legible_in_every_family_mode_and_forced_colours(
+    server_url: str, page
+) -> None:
+    """The selected lens keeps its preview picture. It used to draw in the
+    row's accent-on text colour on its own inset surface: white on the light
+    inset, near-black on the dark one, about 1.1:1 in every theme."""
+    _open_graph(page, server_url)
+    page.evaluate("() => { document.querySelector('.okf-signal__lenses').open = true; }")
+    for family in ("technical", "swiss", "purple", "coffee"):
+        for mode in ("light", "dark"):
+            for contrast in ("normal", "soft"):
+                page.evaluate("([t, c]) => { window.OKFLoomTheme.setTheme(t); window.OKFLoomTheme.setContrast(c); }",
+                              [f"{family}-{mode}", contrast])
+                page.wait_for_function(
+                    "([t, c]) => document.documentElement.dataset.theme === t"
+                    " && document.documentElement.dataset.okfContrast === c",
+                    arg=[f"{family}-{mode}", contrast])
+                seen = page.evaluate(_SELECTED_LENS_PREVIEW_JS)
+                # WCAG 1.4.11 asks 3:1 of meaningful graphics; the accent ink
+                # gives at least 4.5:1 on the inset in every theme.
+                assert seen["line"] >= 4.5 and seen["node"] >= 4.5, (contrast, seen)
+
+    page.emulate_media(forced_colors="active")
+    page.wait_for_function("() => matchMedia('(forced-colors: active)').matches")
+    forced = page.evaluate(_SELECTED_LENS_PREVIEW_JS)
+    assert forced["line"] >= 4.5 and forced["node"] >= 4.5, forced
+    assert forced["selectedCue"] == '"Selected"', forced
+
+
 def test_graph_forced_colours_keep_system_palette_across_theme_event(
     server_url: str, page
 ) -> None:

@@ -659,6 +659,183 @@ def test_agent_availability_is_reported_from_evidence_not_from_the_watching_flag
             "button", name="1 resolved comment on this page", exact=True)).to_be_visible()
 
 
+_CARD_IN_RAIL_JS = """(id) => {
+  const rail = document.querySelector('#okf-panel .okf-panel__body').getBoundingClientRect();
+  const card = document.getElementById('comment-' + id).getBoundingClientRect();
+  return {railTop: rail.top, railBottom: rail.bottom, top: card.top, bottom: card.bottom};
+}"""
+
+
+def test_the_comments_rail_keeps_the_whole_resolved_card_in_view_as_the_agent_replies(linked_bundle, page):
+    """A reader parked at the end of the rail watches the last card grow: the
+    agent's claim, then its DONE summary and reply. The live refresh used to
+    restore the old scroll offset, so the finished card ended cut off below
+    the fold of a 720 px tall rail."""
+    page.set_viewport_size({"width": 1280, "height": 720})
+    with live_server(linked_bundle) as base:
+        _studio_ready(page, base + "/sub/one")
+        _comment_here(page, "Please link this to Two")
+        expect(page.locator("body")).to_have_class(re.compile(r"\bokf-panel-rail\b"))
+        row = next(r for r in _rows(page, base) if r["body"] == "Please link this to Two")
+        card = page.locator("#comment-" + row["id"])
+        rail = page.locator("#okf-panel .okf-panel__body")
+        assert rail.evaluate("b => b.scrollHeight - b.clientHeight") > 8, "the rail must scroll"
+
+        # Anywhere above the end, a live refresh keeps the reader's exact place.
+        rail.evaluate("b => { b.scrollTop = 4; }")
+        _okf(linked_bundle, "comment-claim", str(linked_bundle), row["id"], "--summary", "adding the link")
+        expect(card.locator(".okf-comment__state")).to_have_text("claimed by agent")
+        assert rail.evaluate("b => b.scrollTop") == 4
+
+        # At the end, the reader stays at the end while the card grows.
+        rail.evaluate("b => { b.scrollTop = b.scrollHeight; }")
+        _okf(linked_bundle, "comment-resolve", str(linked_bundle), row["id"], "--summary", "done: link added",
+             "--reply", "Linked One to Two in the opening sentence.")
+        expect(card.locator(".okf-comment__state")).to_have_text("resolved")
+        expect(card.locator(".okf-comment__reply")).to_contain_text("Linked One to Two in the opening sentence.")
+        assert rail.evaluate("b => b.scrollHeight - b.clientHeight - b.scrollTop") <= 1
+        box = page.evaluate(_CARD_IN_RAIL_JS, row["id"])
+        assert box["railTop"] <= box["top"] and box["bottom"] <= box["railBottom"], box
+
+
+_TOAST_BESIDE_RAIL_JS = """(id) => {
+  const toast = [...document.querySelectorAll('.okf-toast')].pop().getBoundingClientRect();
+  const panel = document.getElementById('okf-panel').getBoundingClientRect();
+  const card = document.getElementById('comment-' + id);
+  const r = card.getBoundingClientRect();
+  const hit = document.elementFromPoint(r.left + r.width / 2, r.bottom - 6);
+  return {toastLeft: toast.left, toastRight: toast.right, toastBottom: toast.bottom,
+          panelLeft: panel.left, width: innerWidth, height: innerHeight,
+          cardBottomUncovered: !!hit && card.contains(hit)};
+}"""
+
+
+def test_an_agent_change_toast_lands_beside_the_comments_rail_not_on_its_last_card(linked_bundle, page):
+    """The rail is where the reader watches the agent's card. A change toast
+    fixed to the viewport corner used to sit on the rail and cover the bottom
+    of that last card; it now belongs to the reading column beside the rail."""
+    page.set_viewport_size({"width": 1280, "height": 720})
+    with live_server(linked_bundle) as base:
+        _studio_ready(page, base + "/sub/one")
+        _comment_here(page, "Please link this to Two")
+        expect(page.locator("body")).to_have_class(re.compile(r"\bokf-panel-rail\b"))
+        row = next(r for r in _rows(page, base) if r["body"] == "Please link this to Two")
+        card = page.locator("#comment-" + row["id"])
+        page.locator("#okf-panel .okf-panel__body").evaluate("b => { b.scrollTop = b.scrollHeight; }")
+        _okf(linked_bundle, "comment-resolve", str(linked_bundle), row["id"], "--summary", "done: link added",
+             "--reply", "Linked One to Two in the opening sentence.")
+        expect(card.locator(".okf-comment__reply")).to_contain_text("Linked One to Two in the opening sentence.")
+
+        _okf(linked_bundle, "replace-text", "--bundle", str(linked_bundle), "--id", "sub/two",
+             "--old", "Intro.", "--new", "Intro, linked from One.")
+        toast = page.locator(".okf-toast").last
+        expect(toast).to_be_visible(timeout=15_000)
+        box = page.evaluate(_TOAST_BESIDE_RAIL_JS, row["id"])
+        assert box["toastRight"] <= box["panelLeft"] - 8, box
+        assert box["toastLeft"] >= 0 and box["toastBottom"] <= box["height"], box
+        assert box["cardBottomUncovered"], box
+
+
+def test_an_agent_text_edit_toast_names_the_page_in_plain_words(linked_bundle, page):
+    """A text edit used to toast "Docs-agent made a change to Field_notes":
+    the op had no verb and the target was the raw last id segment. The page
+    being read is named by its own title; any other concept by a readable
+    form of its id."""
+    (linked_bundle / "sub" / "field_notes.md").write_text(
+        "---\ntype: Note\ntitle: Notes from the field\n---\n\n# Notes from the field\n\nFirst visit.\n",
+        encoding="utf-8")
+    (linked_bundle / "sub" / "order_lines.md").write_text(
+        "---\ntype: Note\ntitle: What was ordered\n---\n\n# What was ordered\n\nOne line.\n", encoding="utf-8")
+    with live_server(linked_bundle) as base:
+        _studio_ready(page, base + "/sub/field_notes")
+        _okf(linked_bundle, "replace-text", "--bundle", str(linked_bundle), "--id", "sub/field_notes",
+             "--old", "First visit.", "--new", "First visit, written up.", "--actor", "docs-agent")
+        expect(page.locator(".okf-toast").last).to_contain_text(
+            "Docs-agent edited text in Notes from the field", timeout=15_000)
+
+        _okf(linked_bundle, "replace-text", "--bundle", str(linked_bundle), "--id", "sub/order_lines",
+             "--old", "One line.", "--new", "Two lines.", "--actor", "docs-agent")
+        expect(page.locator(".okf-toast", has_text="Order lines")).to_contain_text(
+            "Docs-agent edited text in Order lines", timeout=15_000)
+        for text in page.locator(".okf-toast").all_inner_texts():
+            assert "_" not in text and "made a change" not in text, text
+
+
+LONG_READ = ("---\ntype: Note\ntitle: Long read\n---\n\n# Long read\n\n"
+             + "\n\n".join(f"Paragraph {n} of a long read. " + "Plain words keep the reader here. " * 6
+                          for n in range(1, 40)) + "\n")
+
+_READING_PLACE_JS = """() => {
+  const p = document.querySelectorAll('.okf-page__body p')[3].getBoundingClientRect();
+  const tools = document.querySelector('.okf-document-tools').getBoundingClientRect();
+  const chrome = document.querySelector('.okf-concept-viewbar').getBoundingClientRect();
+  return {scrollY: scrollY, paragraph: p.top, toolsBottom: tools.bottom, toolsHeight: tools.height,
+          chromeBottom: chrome.bottom};
+}"""
+
+
+def _first_comment_from_the_rail(page, base, path, body):
+    """Open the Comments rail on ``path``; return a function that posts ``body``."""
+    _studio_ready(page, base + path)
+    if not page.evaluate("() => document.body.classList.contains('okf-panel-rail')"):
+        page.locator("[data-okf-live-utilities] button", has_text=re.compile(r"^\s*Comments\s*$")).click()
+    expect(page.locator("body")).to_have_class(re.compile(r"\bokf-panel-rail\b"))
+    count = page.get_by_role("group", name="Page feedback").get_by_role(
+        "button", name="1 open comment on this page", exact=True)
+    expect(count).to_be_hidden()
+
+    def post():
+        page.get_by_role("textbox", name="Comment for agent").fill(body)
+        page.get_by_role("button", name="Send", exact=True).click()
+        expect(page.locator("#okf-annotation-status")).to_have_text("Comment posted.")
+        expect(count).to_be_visible()
+    return post
+
+
+_TOOLS_UNDER_CHROME_JS = """(gap) => {
+  const tools = document.querySelector('.okf-document-tools').getBoundingClientRect();
+  const chrome = document.querySelector('.okf-concept-viewbar').getBoundingClientRect();
+  window.scrollBy({top: tools.bottom - (chrome.bottom - gap), behavior: 'instant'});
+}"""
+
+
+def test_the_first_comment_on_a_page_does_not_move_the_text_being_read(linked_bundle, page):
+    """The first comment on a page adds an "open comment" count to the
+    document tools above the body. With the bottom of that strip scrolled up
+    behind the sticky chrome (still inside the viewport, so the browser's own
+    scroll anchor lands in the strip), the paragraph the reader was on used
+    to jump down a row. A strip scrolled clean out of the viewport must not
+    be compensated twice, and a strip the reader can see grows in place."""
+    page.set_viewport_size({"width": 1280, "height": 720})
+    for name in ("long_under", "long_above", "long_top"):
+        (linked_bundle / "sub" / f"{name}.md").write_text(LONG_READ, encoding="utf-8")
+    with live_server(linked_bundle) as base:
+        for path in ("/sub/long_under", "/sub/long_above"):
+            post = _first_comment_from_the_rail(page, base, path, "Is this long read too long?")
+            if path.endswith("under"):
+                page.evaluate(_TOOLS_UNDER_CHROME_JS, 8)
+            else:
+                page.evaluate("() => { const p = document.querySelectorAll('.okf-page__body p')[3];"
+                              " window.scrollBy({top: p.getBoundingClientRect().top - 240, behavior: 'instant'}); }")
+            before = page.evaluate(_READING_PLACE_JS)
+            if path.endswith("under"):
+                assert 0 < before["toolsBottom"] <= before["chromeBottom"], before
+            else:
+                assert before["toolsBottom"] <= 0, before
+            post()
+            after = page.evaluate(_READING_PLACE_JS)
+            assert after["toolsHeight"] > before["toolsHeight"], (path, before, after)
+            assert abs(after["paragraph"] - before["paragraph"]) <= 1, (path, before, after)
+
+        post = _first_comment_from_the_rail(page, base, "/sub/long_top", "Too long?")
+        before = page.evaluate(_READING_PLACE_JS)
+        assert before["scrollY"] == 0 and before["toolsBottom"] > before["chromeBottom"], before
+        post()
+        after = page.evaluate(_READING_PLACE_JS)
+        assert after["toolsHeight"] > before["toolsHeight"], (before, after)
+        assert after["scrollY"] == 0, (before, after)
+
+
 def _events(page, base):
     data = page.request.get(f"{base}/__data/events?limit=500").json()
     return data["events"] if isinstance(data, dict) else data

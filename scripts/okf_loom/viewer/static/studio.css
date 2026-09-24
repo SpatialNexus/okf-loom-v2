@@ -1674,24 +1674,21 @@ body.okf-focus-view .okf-concept-viewbar {
  * as Proposals are wider than 440px); 440px remains the default. */
 body.okf-panel-rail { padding-right: var(--okf-panel-rail-w, 440px); }
 body.okf-panel-rail .okf-panel-overlay { display: none; }
-/* The rail narrows the masthead without changing the viewport, so none of
- * the shell's viewport media queries fire: at 1200 the brand ran under
- * Search. Beside the 440px rail the masthead is in the shell's mid-size range
- * (<= 1100px) whenever the viewport is <= 1540px, so it takes that same
- * established form: brand row above a wrapping destination row. */
-@media (min-width: 641px) and (max-width: 1540px) {
-  body.okf-panel-rail .okf-shell {
-    grid-template-columns: minmax(0, 1fr);
-    height: auto;
-    padding-block: var(--okf-space-2);
-    gap: var(--okf-space-2);
-  }
-  body.okf-panel-rail .okf-shell__brand { width: 100%; min-width: 120px; min-height: 40px; }
-  body.okf-panel-rail .okf-shell__nav {
-    width: 100%; min-width: 0; max-width: 100%;
-    justify-content: flex-start; flex-wrap: wrap;
-  }
+/* Toasts belong to the reading column beside an open rail. Fixed to the
+ * viewport corner they sat on the rail and covered the bottom of its last
+ * card, the one a reader watches the agent claim, edit and resolve. */
+body.okf-panel-rail .okf-toast-region {
+  right: calc(var(--okf-panel-rail-w, 440px) + var(--okf-space-4));
+  max-width: min(420px, calc(100vw - var(--okf-panel-rail-w, 440px) - 2 * var(--okf-space-4)));
 }
+/* The rail narrows the masthead without changing the viewport, so none of
+ * the shell's viewport media queries fire. The masthead therefore sizes
+ * itself from the width it actually has: shell.css makes the body an
+ * inline-size container and picks the full, condensed single-row, or
+ * two-row masthead from that measured width ("Width-driven desktop
+ * tiers"). The former viewport guess here (two rows whenever a rail was open
+ * at <= 1540px) wrapped the header at 1280 even though a condensed single
+ * row fits beside the 440px rail. */
 @media (prefers-reduced-motion: no-preference) {
   html.okf-studio-booted { transition: padding-right 0.18s ease; }
 }

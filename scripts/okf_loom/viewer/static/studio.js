@@ -504,11 +504,22 @@
   const rightGroup = el("div", { class: "okf-studio-home__group" });
   const studioSlot = document.querySelector("[data-okf-studio-capability='available']");
   const studioLauncherLabel = el("span", { class: "okf-studio-launcher__label", text: "Studio" });
-  // Boot truth: nothing is connected yet. The first updateBadges() (from
-  // loadComments) and wireLive's state replay both land before the SSE stream
-  // is ready, so the launcher must not claim "Live" here — it would flash a
-  // capability the page does not have during every fresh load.
-  const studioLauncherSummary = el("span", { class: "okf-studio-launcher__summary", text: " · Connecting…" });
+  // Boot truth: nothing is connected yet, so the launcher never claims
+  // "Live". It names what this session may do (the same authority word
+  // updateBadges() shows once online); a stream that is still not up after
+  // LAUNCHER_CONNECTING_GRACE_MS then says "Connecting" (see updateBadges).
+  // Printing "Connecting…" here made every healthy load flash it for the
+  // few hundred milliseconds the SSE handshake takes.
+  const studioLauncherSummary = el("span", {
+    class: "okf-studio-launcher__summary",
+    text: " · " + (EDIT ? "Editable" : CAN_COMMENT ? "Comment-only" : "Read-only"),
+  });
+  // How long a connecting/reconnecting stream may stay quiet in the launcher.
+  // Healthy handshakes finish well inside it; a stream that is genuinely not
+  // up is announced one second later, and "offline" is never delayed.
+  const LAUNCHER_CONNECTING_GRACE_MS = 1000;
+  let degradedSince = performance.now(); // boot is the first "connecting" stretch
+  let connectingGraceTimer = 0;
   const studioLauncher = el("button", {
     type: "button", class: "okf-studiobtn okf-studio-launcher",
     "aria-expanded": "false", "aria-controls": "okf-panel",
@@ -814,8 +825,33 @@
     pageFeedback = { group, comment, count, note, noun };
     updatePageFeedback();
   }
+  // The count below "Comment on this page" appears, disappears and rewraps as
+  // comments arrive, which changes the height of the document tools above
+  // the body. When the reader has scrolled that strip up behind the sticky
+  // chrome, hold the text they are reading still instead of letting it jump
+  // (the browser's own scroll anchoring picks an anchor inside the hidden
+  // strip, so it does not compensate). A strip the reader can see simply
+  // grows in place.
+  function keepReadingPlace(strip) {
+    const body = document.querySelector(".okf-page__body");
+    if (!strip || !body || !strip.isConnected || !body.isConnected) return () => {};
+    const chrome = document.querySelector(".okf-concept-viewbar") || document.querySelector(".okf-topbar");
+    const occluded = chrome ? Math.max(0, chrome.getBoundingClientRect().bottom) : 0;
+    const hidden = strip.getBoundingClientRect().bottom <= occluded + 1;
+    const bodyTop = body.getBoundingClientRect().top;
+    return () => {
+      if (!hidden || !body.isConnected) return;
+      const moved = body.getBoundingClientRect().top - bodyTop;
+      if (Math.abs(moved) >= 1) window.scrollBy({ top: moved, behavior: "instant" });
+    };
+  }
   function updatePageFeedback() {
     if (!pageFeedback) return;
+    const group = pageFeedback.group;
+    const settle = keepReadingPlace(group.closest(".okf-document-tools") || group);
+    try { renderPageFeedback(); } finally { settle(); }
+  }
+  function renderPageFeedback() {
     const target = defaultCommentTarget();
     pageFeedback.group.hidden = !hasCommentTarget(target);
     if (pageFeedback.group.hidden) return;
@@ -4878,6 +4914,17 @@
     renderCommentsPanel();
   }
 
+  // Identity of the comment data the list last rendered: a row's id, write
+  // token and state. It tells a data refresh (a post, the agent's claim or
+  // resolution) apart from a view change (expand, sort, filters, archive).
+  var _renderedCommentsSignature = null;
+  function commentsRenderSignature(rows) {
+    return (rows || []).map(function (c) {
+      return c ? [c.id, c.row_token || "", c.updated_at || c.ts || "", c.state || "",
+        c.archived ? 1 : 0, c._posting ? 1 : 0].join("\u0001") : "";
+    }).join("\u0002");
+  }
+
     function renderCommentsPanel() {
     if (state.openPanel !== "comments") return;
       var body = panelBodyEl();
@@ -4894,6 +4941,18 @@
       var priorCommentId = priorCard ? priorCard.id.replace(/^comment-/, "") : "";
       var priorFocusKey = priorActive && priorActive.getAttribute ? priorActive.getAttribute("data-focus-key") : "";
       var priorCardIndex = priorCard && priorCard.parentNode ? Array.prototype.indexOf.call(priorCard.parentNode.children, priorCard) : -1;
+      // A reader who scrolled to the end of the list is watching its last
+      // card, and live data grows that card (the agent's claim, then its DONE
+      // summary and reply). Restoring the old absolute offset left the grown
+      // card cut off below the fold, so a data refresh keeps that reader at
+      // the end. Measured before any zone is rebuilt. View changes keep the
+      // exact offset, and so does a reader anywhere above the end.
+      var commentsSignature = commentsRenderSignature(state.comments);
+      var followListEnd = body.scrollTop > 0
+        && body.scrollHeight - body.clientHeight - body.scrollTop <= 2
+        && _renderedCommentsSignature !== null
+        && commentsSignature !== _renderedCommentsSignature;
+      _renderedCommentsSignature = commentsSignature;
 
     // Resolve or create the three persistent zones. On the first render
     // of an open session they don't exist yet; create + append them. On
@@ -4968,7 +5027,7 @@
       // list was rebuilt — a panel replacement destroyed their previous DOM.
       _restoreOwnedInlineDrafts();
     }
-      body.scrollTop = listScroll;
+      body.scrollTop = followListEnd ? body.scrollHeight - body.clientHeight : listScroll;
       // Cancel-race fix: if closeReanchorEditor set pendingFocusCommentId,
       // restore focus to the Re-anchor button by stable comment-id lookup
       // AFTER the list rebuild. This runs synchronously inside
@@ -8976,6 +9035,10 @@
     // connection chip alone uses "Live", meaning connected.
     let summary = EDIT ? "Editable" : CAN_COMMENT ? "Comment-only" : "Read-only";
     let attention = "idle";
+    // A connecting/reconnecting stream that has not yet outlasted the grace
+    // keeps the authority word in the launcher (the in-panel chip and the
+    // Studio home status stay immediate).
+    let inGrace = false;
     if (connection === "online") {
       if (EDIT && (open || acts)) {
         const parts = [];
@@ -8993,13 +9056,21 @@
       // launcher text, and the aria-label all say so truthfully. Only a dead
       // connection ("offline") raises the "· Error" failure projection, so a
       // healthy boot never announces an error and a real outage stays loud.
-      summary = connection === "connecting" ? "Connecting" : "Reconnecting";
+      // A handshake that completes within the grace (every healthy load, a
+      // brief blip) never reaches the launcher at all.
+      const waited = performance.now() - degradedSince;
+      if (waited < LAUNCHER_CONNECTING_GRACE_MS) {
+        inGrace = true;
+        scheduleConnectingGraceCheck(LAUNCHER_CONNECTING_GRACE_MS - waited);
+      } else {
+        summary = connection === "connecting" ? "Connecting" : "Reconnecting";
+      }
     }
     state.connectionSummary = summary;
     // Away from "online" the state word replaces the idle authority word, so
     // it is kept as a prefix, and a comment-only session is not called
     // read-only.
-    const authorityPrefix = !EDIT && connection !== "online"
+    const authorityPrefix = !EDIT && connection !== "online" && !inGrace
       ? (CAN_COMMENT ? "Comment-only · " : "Read-only · ") : "";
     studioLauncherSummary.textContent = summary ? " · " + authorityPrefix + summary : "";
     studioLauncher.dataset.attention = attention;
@@ -9007,6 +9078,13 @@
       const status = connectionStatusText();
       if (studioHomeStatus.textContent !== status) studioHomeStatus.textContent = status;
     }
+  }
+  function scheduleConnectingGraceCheck(delay) {
+    if (connectingGraceTimer) return;
+    connectingGraceTimer = window.setTimeout(() => {
+      connectingGraceTimer = 0;
+      updateBadges();
+    }, Math.max(0, Math.ceil(delay)) + 16);
   }
   function connectionStatusText() {
     const connection = connChip.dataset.state || "connecting";
@@ -10464,6 +10542,13 @@
       : rawState === "offline" ? "offline"
       : rawState === "connecting" ? "connecting"
       : "reconnecting";
+    // The launcher's connecting grace runs from the start of one continuous
+    // non-online, non-failed stretch: boot "connecting" that falls back to
+    // "reconnecting" keeps its original start; online or offline ends it.
+    const wasDegraded = connChip.dataset.state === undefined
+      || connChip.dataset.state === "connecting" || connChip.dataset.state === "reconnecting";
+    const isDegraded = connection === "connecting" || connection === "reconnecting";
+    if (isDegraded && !wasDegraded) degradedSince = performance.now();
     connChip.dataset.state = connection;
     connLabel.textContent = connection === "online" ? "Live"
       : connection === "connecting" ? "Connecting…"
@@ -10705,19 +10790,27 @@
     const actorRaw = (batch[0] && batch[0].actor) || "agent";
     const actor = actorRaw.charAt(0).toUpperCase() + actorRaw.slice(1);
     const titleFor = (id) => {
-      // Best-effort: title-case the last path segment of the concept id so
-      // "tables/orders" → "Orders". The studio does not carry the bundle's
-      // full title map; a CRDT-precise lookup would require an extra round
-      // trip per toast, which is not worth the latency for a notification.
+      // The page being read names itself. Other concepts fall back to a
+      // readable form of the id's last path segment, so "tables/orders" →
+      // "Orders" and "tutorials/live_studio_basics" → "Live studio basics"
+      // (never a raw snake_case token). The studio does not carry the
+      // bundle's full title map; a lookup per toast would cost a round trip,
+      // which is not worth the latency for a notification.
       if (!id || typeof id !== "string") return "";
-      const seg = id.split("/").filter(Boolean).pop() || id;
+      if (id === state.conceptId && isConceptPage()) {
+        const own = $(".okf-page__title");
+        const text = own ? own.textContent.replace(/\s+/g, " ").trim() : "";
+        if (text) return text;
+      }
+      const last = id.split("/").filter(Boolean).pop() || id;
+      const seg = last.replace(/[_-]+/g, " ").trim() || last;
       return seg.charAt(0).toUpperCase() + seg.slice(1);
     };
     if (batch.length === 1) {
       const a = batch[0];
       if (a.summary && !/_/.test(a.summary)) return a.summary;
       const hv = humanVerb(a.action, 1);
-      const tgt = a.ids && a.ids[0] ? (" to " + titleFor(a.ids[0])) : "";
+      const tgt = a.ids && a.ids[0] ? (" " + hv.prep + " " + titleFor(a.ids[0])) : "";
       return actor + " " + hv.phrase + tgt;
     }
     // Multiple: collapse by action verb.
@@ -10739,9 +10832,10 @@
     return actor + " added " + parts.join(", ") + targetText;
   }
   // Map raw op ids to human verb + noun forms. The shape is:
-  //   {phrase: "<past-tense verb>", noun: "<plural noun>", count: N}
+  //   {phrase: "<past-tense verb>", noun: "<plural noun>", prep: "to", count: N}
   // `phrase` is used in the singular case ("Agent added a link"),
-  // `noun` is used in the collapsed multi case ("3 links").
+  // `noun` is used in the collapsed multi case ("3 links"), and `prep`
+  // joins the singular phrase to its target ("edited text in Orders").
   // Unknown ops fall back to "changed"/"changes" so we never surface a
   // raw snake_case token to the user (fit-and-finish rule).
   function humanVerb(action, count) {
@@ -10757,12 +10851,14 @@
       add_tag:            { phrase: "added a tag",      noun: "tags"     },
       append_body_section:{ phrase: "added a section",  noun: "sections" },
       write_concept:      { phrase: "wrote the concept",noun: "writes"   },
+      replace_text:       { phrase: "edited text",      noun: "text edits", prep: "in" },
+      update_section:     { phrase: "updated a section",noun: "section updates", prep: "in" },
       undo_restore:       { phrase: "undid a change",   noun: "undos"    },
       repair:             { phrase: "ran a repair",     noun: "repairs"  },
       auto_repair:        { phrase: "auto-repaired",    noun: "repairs"  },
     };
     const entry = map[action] || { phrase: "made a change", noun: "changes" };
-    return { phrase: entry.phrase, noun: entry.noun, count: count };
+    return { phrase: entry.phrase, noun: entry.noun, prep: entry.prep || "to", count: count };
   }
   function verbLabel(verb, count) {
     // Crude pluralisation good enough for the known action set.

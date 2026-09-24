@@ -2085,8 +2085,8 @@ def test_phase1_adversarial_type_name_escaped_in_card_chip(tmp_path: _Path) -> N
 
 def test_phase1_curated_palette_has_exactly_eight_categories() -> None:
     """P1 #5 (contract-runtime-parity): the curated type colour map MUST
-    have exactly 8 entries (ui-overhaul-plan §2.1: "curated 8-color
-    palette + icon set"). Types outside the 8 fall through to the hash
+    have exactly 8 entries (a curated 8-colour palette + icon set). Types
+    outside the 8 fall through to the hash
     fallback."""
     from okf_loom.viewer import assets
     colours = assets.curated_type_color_map()

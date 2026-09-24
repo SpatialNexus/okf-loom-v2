@@ -12,7 +12,6 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-OUTPUT = ROOT / "docs" / "screenshots" / "annotations-v2"
 
 # Shared provenance inventory and validator — single source of truth.
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -20,9 +19,11 @@ from okf_loom.capture_provenance import (  # noqa: E402
     compute_inventory, compute_inventory_entries, validate_manifest,
     EXPECTED_VIEWPORTS, EXPECTED_MEDIA, SCENARIO_CLASSIFICATIONS,
     _canonical_inventory_bytes, GitProvenanceError,
-    PROVENANCE_MODEL, expected_evidence_paths,
+    PROVENANCE_MODEL, EVIDENCE_DIRECTORY, expected_evidence_paths,
     inventory_serialized_digest,
 )
+
+OUTPUT = ROOT / EVIDENCE_DIRECTORY
 
 def _load_capture_module():
     """Load capture_annotations_v2 as a module for structural/unit tests."""
@@ -1357,13 +1358,16 @@ def _build_clean_staged_fixture(tmp_path):
                  fixture / "scripts" / "capture_annotations_v2.py")
     shutil.copy2(ROOT / "scripts" / "okf_loom" / "capture_provenance.py",
                  fixture / "scripts" / "okf_loom" / "capture_provenance.py")
+    # Like the real checkout, the source tree ignores the capture output.
+    (fixture / ".gitignore").write_text(
+        "/" + EVIDENCE_DIRECTORY.split("/")[0] + "/\n", encoding="utf-8")
     _init_git_repo(fixture)
     subprocess.run(["git", "add", "-A"], cwd=str(fixture), check=True,
                    capture_output=True, timeout=10)
     subprocess.run(["git", "commit", "-qm", "source"], cwd=str(fixture), check=True,
                    capture_output=True, timeout=10)
 
-    out = fixture / "docs" / "screenshots" / "annotations-v2"
+    out = fixture / EVIDENCE_DIRECTORY
     out.mkdir(parents=True)
     png_bytes = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
     mod = _load_capture_module()
@@ -1407,8 +1411,10 @@ def _build_clean_staged_fixture(tmp_path):
     }
     (out / "manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    subprocess.run(["git", "add", "-A"], cwd=str(fixture), check=True,
-                   capture_output=True, timeout=10)
+    # The evidence directory is ignored, so the evidence-only commit adds it
+    # explicitly, exactly as a separately prepared evidence checkout would.
+    subprocess.run(["git", "add", "-f", "--", EVIDENCE_DIRECTORY], cwd=str(fixture),
+                   check=True, capture_output=True, timeout=10)
     subprocess.run(["git", "commit", "-qm", "evidence"], cwd=str(fixture), check=True,
                    capture_output=True, timeout=10)
     return fixture, manifest, out, png_bytes
@@ -1459,7 +1465,7 @@ def test_selected_historical_checkout_survives_unrelated_work_without_promotion(
     result = subprocess.run(command, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     assert "not current-tree acceptance" in result.stdout
-    (selected / "docs/screenshots/annotations-v2/resolved.png").write_bytes(b"tampered")
+    (selected / EVIDENCE_DIRECTORY / "resolved.png").write_bytes(b"tampered")
     result = subprocess.run(command, capture_output=True, text=True)
     assert result.returncode == 1
     assert "resolved.png hash mismatch" in result.stderr
@@ -3182,14 +3188,29 @@ def test_validator_detailed_entries_include_object_sha(tmp_path):
 def test_publication_lock_file_excluded_from_inventory():
     """r6: the .publish-lock file created by _publication_lock must NOT
     appear in the inventory (it's a runtime artifact, not a consumed input).
-    It's in the screenshots directory which is outside the inventory roots."""
+    It sits beside the evidence directory, outside the inventory roots."""
     from okf_loom.capture_provenance import INVENTORY_ROOTS
-    # The lock file lives in docs/screenshots/annotations-v2/ which is
-    # NOT in INVENTORY_ROOTS (scripts, tests, samples/demo_bundle).
+    # The lock file lives beside EVIDENCE_DIRECTORY (under captures/), which
+    # is NOT in INVENTORY_ROOTS (scripts, tests, samples/demo_bundle).
+    lock_parent = EVIDENCE_DIRECTORY.rsplit("/", 1)[0]
     for root in INVENTORY_ROOTS:
-        if "docs" in root or "screenshots" in root:
+        if (lock_parent == root or lock_parent.startswith(root + "/")
+                or root.startswith(lock_parent + "/")):
             raise AssertionError(
-                f"screenshots dir should not be in inventory roots: {INVENTORY_ROOTS}")
+                f"capture output dir should not be in inventory roots: {INVENTORY_ROOTS}")
+
+
+def test_capture_output_is_the_git_ignored_evidence_directory():
+    """Capture writes to the shared evidence directory, which the checkout
+    ignores so proof screenshots never enter the published tree."""
+    if _CAP.OUTPUT != _CAP.ROOT / EVIDENCE_DIRECTORY:
+        raise AssertionError(f"capture OUTPUT drifted: {_CAP.OUTPUT}")
+    checkout = Path(__file__).resolve().parent.parent
+    probe = f"{EVIDENCE_DIRECTORY}/manifest.json"
+    result = subprocess.run(["git", "check-ignore", "-q", "--no-index", probe],
+                            cwd=str(checkout), capture_output=True, timeout=10)
+    if result.returncode != 0:
+        raise AssertionError(f"{probe} is not git-ignored in the checkout")
 
 
 # ---- r6: atomic publish first-run uses no exchange (no prior output) -------

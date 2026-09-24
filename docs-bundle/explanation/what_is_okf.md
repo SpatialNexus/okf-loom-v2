@@ -268,7 +268,7 @@ captured.
   types map onto OKF's `type:` key.
 * [Current okf-loom specification](/reference/spec.md) — the single current
   build-from-docs contract for this repository.
-* [Upstream OKF SPEC](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) —
+* [Upstream OKF SPEC](https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md) —
   the base wire-format reference okf-loom implements.
 * [`/explanation/research.md`](/explanation/research.md) — the comparative
   survey of Obsidian, Quartz, MkDocs, Notion, and the rest that shaped

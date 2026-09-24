@@ -1887,16 +1887,20 @@ def test_failure_matrix_routes_to_typed_fallback_and_success_never_downgrades(
     assert row["runtime"]["honestFallback"] is True
 
 
-@pytest.mark.parametrize("relative", ["", "docs/screenshots", "docs/screenshots/release"])
+@pytest.mark.parametrize("relative", ["", "captures", "captures/release"])
 def test_release_destination_precondition_rejects_repo_or_historical_screenshot_paths(relative: str) -> None:
     destination = ROOT / relative if relative else ROOT
     with pytest.raises(capture.CapturePreconditionError, match="protected release output"):
         capture._validate_release_destination(destination)
 
 
-def test_release_bundle_precondition_rejects_historical_screenshot_inputs() -> None:
-    with pytest.raises(capture.CapturePreconditionError, match="historical bundle inputs"):
-        capture._validate_release_bundle(ROOT / "docs" / "screenshots")
+def test_release_bundle_precondition_rejects_historical_screenshot_inputs(tmp_path: Path) -> None:
+    # captures/ is git-ignored local proof output, so build it in a tmp checkout.
+    root = tmp_path.resolve()
+    (root / "captures" / "release").mkdir(parents=True)
+    for historical in (root / "captures", root / "captures" / "release"):
+        with pytest.raises(capture.CapturePreconditionError, match="historical bundle inputs"):
+            capture._validate_release_bundle(historical, _root=lambda: root)
 
 
 def test_artifact_provenance_binds_revision_tree_inventory_viewport_target_theme_and_assertion(tmp_path: Path) -> None:

@@ -47,12 +47,11 @@ manager) before continuing.
 
 # Step 2: Clone the repository
 
-Use the supplied fork checkout (supported local checkout: `ui-analysis`). If obtaining another
-checkout, use a maintainer-provided repository location; no fork publication URL
-is declared here. The repository itself is the git-loadable skill, not a package:
+Clone okf-loom v2. The repository itself is the git-loadable skill, not a
+package:
 
 ```bash
-git clone <repo-url> okf-loom
+git clone https://github.com/SpatialNexus/okf-loom-v2 okf-loom
 cd okf-loom
 ```
 

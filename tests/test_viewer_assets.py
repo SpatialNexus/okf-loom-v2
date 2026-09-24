@@ -163,7 +163,7 @@ def test_stable_hue_still_exists_for_render_fallback() -> None:
 
 # ---------------------------------------------------------------------------
 # UI overhaul Phase 1 — curated semantic type-colour map + hash fallback
-# (ui-overhaul-plan §2.1: "type = colour + icon, everywhere")
+# (type = colour + icon, everywhere)
 # ---------------------------------------------------------------------------
 
 

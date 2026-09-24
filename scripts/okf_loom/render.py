@@ -5170,8 +5170,7 @@ def _render_governed_keys(
 def _render_entity_chips(
     concept: Concept, *, mode: str = "serve", root_prefix: str = "",
 ) -> str:
-    """Phase 2 (ui-overhaul-plan §3.3): render frontmatter entities as
-    clickable chips in the header band.
+    """Render frontmatter entities as clickable chips in the header band.
 
     Each chip links to the search page with the entity label as the query,
     so a reader can find every concept mentioning the same entity. Both
@@ -5228,9 +5227,8 @@ def _section_index_entry_order(
 
     The directory index at ``<section>/index.md`` declares the section's
     intended reading order via its ``* [label](target)`` entries IN DOCUMENT
-    ORDER. That order is the plan's "index ordering" (ui-overhaul-plan §3.3
-    line 149: "Prev/next-in-section footer nav (cheap, from the index
-    ordering)") — the author curated it, so it is authoritative over any
+    ORDER. That order drives the prev/next-in-section footer navigation —
+    the author curated it, so it is authoritative over any
     lexical / source-path sort.
 
     Each target is resolved against the section prefix (``orders`` in
@@ -5281,9 +5279,8 @@ def _section_index_entry_order(
 
 
 def _render_prevnext(concept: Concept, bundle: Bundle, *, mode: str) -> str:
-    """Phase 2 (ui-overhaul-plan §3.3 line 149): deterministic prev/next
-    sibling navigation within the same directory section, ordered by the
-    AUTHORITATIVE section ``index.md`` when the author declared one.
+    """Deterministic prev/next sibling navigation within the same directory
+    section, ordered by the AUTHORITATIVE section ``index.md`` when the author declared one.
 
     Order precedence:
       1. Section ``index.md`` entries in DOCUMENT ORDER — the author curated
@@ -5366,8 +5363,7 @@ def _render_prevnext(concept: Concept, bundle: Bundle, *, mode: str) -> str:
 
 
 def _render_connections(outgoing_html: str, backlinks_html: str) -> str:
-    """Phase 2 (ui-overhaul-plan §3.3): wrap outgoing/incoming link cards
-    in a connections footer.
+    """Wrap outgoing/incoming link cards in a connections footer.
 
     Each non-empty list becomes a labelled card row. Empty lists produce
     no block at all (so a concept with no backlinks shows only "This

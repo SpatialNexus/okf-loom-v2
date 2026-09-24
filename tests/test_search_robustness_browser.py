@@ -55,6 +55,34 @@ def live_url(tmp_path_factory) -> str:
         yield base
 
 
+# A passage whose Markdown syntax, link targets and hostile inline HTML sit
+# before and around the only occurrence of a unique term, far enough in that
+# the first 140 source characters never reach it.
+MARKDOWN_TERM = "zebrafinch"
+MARKDOWN_CONCEPT = """---
+type: Reference
+title: Ledger conventions
+description: How settled payments reach the ledger.
+---
+
+# Ledger conventions
+
+Every **settled** payment is copied to [the orders table](../tables/orders.md) once the
+nightly reconciliation has compared the processor export with the warehouse
+snapshot, and [checkout](/services/checkout.md "Checkout service") runs
+`ledger-sync --zebrafinch` with *care* and ~~legacy~~ __strict__ rules.
+<img src="/__okf-xss-probe.png" onerror="window.__okfXss = 1"> Keep snake_case_names.
+"""
+
+
+@pytest.fixture(scope="module")
+def markdown_url(tmp_path_factory) -> str:
+    bundle = copy_bundle(DEMO_BUNDLE, tmp_path_factory.mktemp("search-markdown") / "bundle")
+    (bundle / "references" / "ledger_conventions.md").write_text(MARKDOWN_CONCEPT, encoding="utf-8")
+    with live_server(bundle, "--no-watch") as base:
+        yield base
+
+
 @pytest.fixture(scope="module")
 def static_url(tmp_path_factory) -> str:
     root = tmp_path_factory.mktemp("search-robustness-static")
@@ -150,6 +178,40 @@ def test_live_shell_search_form_treats_metacharacters_as_text(live_url: str, pag
     _submit_live_shell(page, FOLLOW_UP)
     expect(page.locator(".okf-search-result").first).to_be_visible()
     expect(page.locator(".okf-shell__search-form input[name='q']")).to_have_value(FOLLOW_UP)
+    _assert_clean(page)
+
+
+def test_live_suggestion_evidence_reads_as_plain_text_around_the_highlighted_match(
+    markdown_url: str, page,
+) -> None:
+    """The suggestion's evidence line shows the passage as a reader sees it.
+
+    The JSON passage excerpt stays the exact Markdown source (citations need
+    it); the dropdown must not print its syntax, must keep the highlighted
+    match in view even when it sits deep in the passage, and must never turn
+    passage HTML into elements.
+    """
+    page.goto(markdown_url + "/")
+    shell = page.locator(".okf-shell__search-form input[name='q']")
+    with page.expect_response(lambda r: "/__search?" in r.url and "format=json" in r.url) as suggested:
+        shell.fill(MARKDOWN_TERM)
+    excerpt = next(item for item in suggested.value.json()
+                   if item["concept_id"] == "references/ledger_conventions")["evidence"]["passage"]["excerpt"]
+    assert "**settled**" in excerpt and "`ledger-sync --zebrafinch`" in excerpt, excerpt  # exact source kept
+
+    option = page.get_by_role("listbox", name="Search suggestions").get_by_role(
+        "option", name=re.compile(r"^Ledger conventions, Reference"))
+    evidence = option.locator(".okf-search-live__evidence")
+    expect(evidence).to_be_visible()
+    text = evidence.inner_text()
+    for syntax in ("**", "](", "`", "~~", "__strict", "<img", "onerror", ".md"):
+        assert syntax not in text, (syntax, text)
+    assert text.startswith("\u2026"), text
+    assert "checkout runs ledger-sync --zebrafinch with care and legacy strict rules." in text, text
+    assert evidence.locator("mark").all_inner_texts() == [MARKDOWN_TERM], text
+    expect(evidence.locator("mark")).to_be_in_viewport()
+    assert page.locator(".okf-search-live img, .okf-search-live script").count() == 0
+    assert page.evaluate("() => window.__okfXss") is None
     _assert_clean(page)
 
 

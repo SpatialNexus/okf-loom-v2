@@ -1229,7 +1229,7 @@ details.okf-frontmatter td code {
 .okf-linklist li:not(.okf-conn):last-child { border-bottom: none; }
 
 /* ---- Prose (markdown body) -------------------------------------------- *
- * UI overhaul Phase 1 (ui-overhaul-plan §3.1): the article is an editorial
+ * The article is an editorial
  * reading lane. Prose text elements — paragraphs, headings, lists,
  * blockquotes — are capped at the ~76ch reading measure (--okf-prose-maxw)
  * for comfortable reading; tables and code blocks ESCAPE to the full
@@ -1301,7 +1301,7 @@ details.okf-frontmatter td code {
   padding-bottom: var(--okf-space-1);
   border-bottom: 1px solid var(--okf-border);
 }
-/* Phase 1 vertical rhythm (ui-overhaul-plan §3.1): section headings get
+/* Vertical rhythm: section headings get
  * deliberate top spacing (≈ --okf-space-6) so sections read as distinct
  * blocks, not flattened into the body flow. Sub-headings stay tighter to
  * their following content. */
@@ -2562,7 +2562,7 @@ details.okf-frontmatter th { background: var(--okf-bg-inset); }
 }
 
 /* ---- Phase 2: concept anatomy ------------------------------------------ *
- * Authoritative layout contract (ui-overhaul-plan §3.3 lines 140-154):
+ * Authoritative layout contract:
  *   - Infobox: RIGHT RAIL on wide screens, collapsible card on mobile.
  *   - Mobile: rails collapse into a sticky "On this page" disclosure pinned
  *     directly below the header band, BEFORE the infobox (never above title).
@@ -2919,7 +2919,7 @@ details.okf-frontmatter th { background: var(--okf-bg-inset); }
 .okf-prevnext__title { font-weight: 600; font-size: var(--okf-text-sm); }
 .okf-prevnext__placeholder { visibility: hidden; border: none; background: none; }
 
-/* ---- Wide screen: infobox right rail (ui-overhaul-plan §3.3) -----------
+/* ---- Wide screen: infobox right rail ----------------------------------
  * At >=1100px the reading region becomes a 2-column grid: body-col on the
  * left (the prose lane), infobox as a sticky right rail. The on-this-page
  * disclosure is hidden (the sidebar sections panel is the desktop rail).
@@ -3801,7 +3801,7 @@ body:has(.okf-graph-loading--error) .okf-cytoscape-fallback-actions { display: f
 .okf-popover .okf-popover__body { margin-top: 6px; color: var(--okf-fg-muted); }
 /* Phase 2 hover polish (plan §3.4): link/relation counts under the
  * description — a compact evidence row (outgoing links + typed relations)
- * derived safely from the fetched raw markdown. Fades the popover into a
+ * counted by the server's /__data/summary card. Fades the popover into a
  * mini concept card rather than raw title text. */
 .okf-popover .okf-popover__counts {
   display: flex; flex-wrap: wrap; gap: var(--okf-space-1) var(--okf-space-2);
@@ -3848,8 +3848,8 @@ body:has(.okf-graph-loading--error) .okf-cytoscape-fallback-actions { display: f
    * to a single column so each link gets the full row width. The on-this-
    * page disclosure is revealed (hidden on desktop) and pinned directly
    * below the header band, BEFORE the infobox, so section navigation
-   * precedes the facts and the body (ui-overhaul-plan §3.3 line 153:
-   * "below the header band, never above the title"). */
+   * precedes the facts and the body (below the header band, never above
+   * the title). */
   .okf-onthispage {
     display: block;
     position: sticky;

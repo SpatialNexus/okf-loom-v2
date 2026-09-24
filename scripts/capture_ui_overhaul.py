@@ -269,15 +269,14 @@ def _release_capture_claim(key: str, claim: int) -> None:
 
 
 def _validate_release_destination(destination: Path, *, _root: Any = _sealed_repository_root) -> Path:
-    """Return a safe absolute destination outside the checkout's evidence tree."""
+    """Return a safe absolute destination outside the checkout (including its ignored captures/)."""
 
     root = _root()
     candidate = Path(destination).expanduser().absolute()
-    protected = root / "docs" / "screenshots"
     resolved = candidate.resolve(strict=False)
     if candidate != resolved:
         raise CapturePreconditionError("release output path must not traverse a symlink")
-    if resolved == root or root in resolved.parents or resolved == protected or protected in resolved.parents:
+    if resolved == root or root in resolved.parents:
         raise CapturePreconditionError(
             "protected release output: choose an explicit artifact directory outside the checkout"
         )
@@ -3072,7 +3071,7 @@ def _validate_release_bundle(bundle: Path, *, _root: Any = _sealed_repository_ro
         raise CapturePreconditionError("capture bundle must resolve inside sealed checkout")
     historical_roots = (
         admitted / "docs" / "design" / "incoming-v1-theme",
-        admitted / "docs" / "screenshots",
+        admitted / "captures",
     )
     if not candidate.is_dir():
         raise CapturePreconditionError(f"capture bundle is not a directory: {candidate}")

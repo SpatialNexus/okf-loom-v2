@@ -6,33 +6,46 @@ this script regenerates the STABLE, hand-picked set of images the README
 links to. Filenames are fixed so the README never needs updating when the
 media is refreshed:
 
-* ``studio-home.png``        — dashboard index, light theme
+* ``studio-home.png``        — dashboard index with the studio connected
 * ``showcase-rendering.png`` — Mermaid/KaTeX section of demo/showcase
-* ``comment-composer.png``   — select-to-comment affordance + composer
-* ``graph-map.png``          — full-page graph, Map lens, light theme
-* ``graph-bridges-dark.png`` — Bridges lens, dark theme
+* ``comment-composer.png``   — an exact-text selection with the composer open
+* ``graph-map.png``          — full-page graph, Map lens, light mode
+* ``graph-bridges-dark.png`` — Bridges lens, dark mode
 * ``search.png``             — live search results
-* ``themes.gif``             — demo/showcase cycling all four resolved themes
-* ``graph-lenses.gif``       — the graph cycling Map→Themes→Flow→Bridges→Recent
+* ``social-preview.png``     — 1280x640 repository card built from the
+                               dark Bridges still and the live design tokens
+
+The animated showcase clips (``comment-loop``, ``appearance``, ``graph`` and
+``search``, each as MP4 + GIF) are recorded by ``record_showcase_media.py``.
 
 Requires Playwright plus a Chromium-family browser::
 
-    python -m pip install playwright pillow   # pillow only for the GIFs
+    python -m pip install playwright
     playwright install chromium               # OR have Google Chrome installed
     PYTHONPATH=scripts python scripts/capture_readme_media.py
 
 Browser resolution order: ``--chrome PATH``, ``OKF_CHROME``,
 ``AIC_PLAYWRIGHT_CHROME_PATH``, known system Chrome paths, the ``chrome``
-channel, then Playwright-managed Chromium.
-Without Pillow the two GIFs are skipped with a warning; the PNGs still
-capture. Stills are DPR-2 for crispness; GIF frames are DPR-1 to keep the
-files README-friendly.
+channel, then Playwright-managed Chromium. Stills are DPR-2 for crispness.
+
+The stills show the product defaults a new reader gets: no appearance
+storage is seeded, so theme.js resolves Technical / Auto / compact / borders
+off, and the browser's ``prefers-color-scheme`` picks light or dark. The
+studio is served from a snapshot of the bundle's git-tracked files, so
+ignored session state in a working checkout (comment history, activity
+logs, lock files) never leaks into the media; ``--in-place`` serves the
+bundle directory as-is instead. Any console error, uncaught page error,
+failed request, or HTTP error response fails the run.
 """
 from __future__ import annotations
 
 import argparse
+import html
 import os
+import re
+import shutil
 import socket
+import string
 import subprocess
 import sys
 import tempfile
@@ -44,6 +57,7 @@ from pathlib import Path
 from capture_viewer_proof import (
     _claim_destination, _publish_if_current, capture_target, launch_chromium,
 )
+from okf_loom import LOOM_VERSION, SPEC_VERSION
 
 __all__ = ["main"]
 
@@ -57,19 +71,18 @@ _SERVER_POLL_INTERVAL = 0.15
 _POLL_HTTP_TIMEOUT = 1.0
 
 STILL_VIEWPORT = {"width": 1440, "height": 900}
-GIF_VIEWPORT = {"width": 1280, "height": 800}
-GIF_FRAME_MS = 1_600
-# Canonical RESOLVED theme vocabulary (the four concrete family-mode themes
-# theme.js is the sole owner of). The retired legacy names (light/dark/pastel/
-# sepia/midnight) are migrated once by theme.js and must not be written by any
-# other consumer — so the capture seeds the canonical okf-theme-family /
-# okf-theme-mode keys theme.js reads at boot, never the legacy okf-theme key.
-THEMES = ("technical-light", "swiss-light", "technical-dark", "swiss-dark")
-LENSES = ("Map", "Themes", "Flow", "Bridges", "Recent")
+# Both Mermaid diagrams and the KaTeX block need ~100px more to share a
+# frame; the capture then trims the height to end above the next section.
+SHOWCASE_VIEWPORT = {"width": 1440, "height": 1000}
+# The comments drawer pushes the page; below 1600px the header wraps.
+COMPOSER_VIEWPORT = {"width": 1600, "height": 1000}
+SOCIAL_VIEWPORT = {"width": 1280, "height": 640}
 
-
-def _frame_staging(out_dir: Path):
-    return tempfile.TemporaryDirectory(prefix=".okf-media-frames-", dir=out_dir)
+COMPOSER_PAGE = "explanation/live_studio_design"
+COMPOSER_SENTENCE = "This essay explains the reasoning behind the live collaborative studio."
+COMPOSER_NOTE = ("Lead with what a reader can do in the studio, then link to the "
+                 "graph-lens rationale.")
+SEARCH_QUERY = "studio"
 
 
 def _log(msg: str) -> None:
@@ -154,35 +167,201 @@ class _LiveServer:
 # ---------------------------------------------------------------------------
 
 
-def _theme_seed_script(theme: str) -> str:
-    """Build the localStorage seed for a concrete resolved theme.
+class _BrowserDiagnostics:
+    """Collect browser-side faults; any entry fails the capture run."""
 
-    ``theme`` is a canonical family-mode name (e.g. ``"swiss-dark"``). The seed
-    writes the canonical ``okf-theme-family`` / ``okf-theme-mode`` keys that
-    theme.js reads at boot — it NEVER writes the legacy ``okf-theme`` key,
-    which theme.js owns as a migration/mirror only (one allowed state owner).
+    def __init__(self) -> None:
+        self.failures: list[str] = []
+
+    def watch(self, page, label: str) -> None:
+        def on_console(msg) -> None:
+            if msg.type == "error":
+                self.failures.append(f"{label}: console error: {msg.text}")
+
+        def on_request_failed(request) -> None:
+            failure = request.failure or ""
+            # Navigating away or closing a context aborts in-flight requests
+            # (notably the studio's event stream); that is not a page fault.
+            if "ERR_ABORTED" in failure:
+                return
+            self.failures.append(
+                f"{label}: request failed: {request.method} {request.url} ({failure})")
+
+        def on_response(response) -> None:
+            if response.status >= 400:
+                self.failures.append(
+                    f"{label}: HTTP {response.status}: {response.request.method} {response.url}")
+
+        page.on("console", on_console)
+        page.on("pageerror", lambda exc: self.failures.append(f"{label}: page error: {exc}"))
+        page.on("requestfailed", on_request_failed)
+        page.on("response", on_response)
+
+    def raise_if_failed(self) -> None:
+        if self.failures:
+            raise RuntimeError("browser reported faults during capture:\n- "
+                               + "\n- ".join(self.failures))
+
+
+def _new_page(browser, *, viewport: dict, dpr: int, color_scheme: str = "light",
+              diagnostics: _BrowserDiagnostics | None = None, label: str = ""):
+    """Context+page for one capture.
+
+    No appearance storage is written, so theme.js (the only owner of that
+    state) resolves the shipped defaults and ``color_scheme`` drives Auto
+    mode. The graph tour needs no pre-dismissal: the live graph only offers
+    it behind an invitation button.
     """
-    family, _, mode = theme.rpartition("-")
-    return (
-        f"localStorage.setItem('okf-theme-family','{family}');"
-        f"localStorage.setItem('okf-theme-mode','{mode}');"
-    )
+    ctx = browser.new_context(viewport=viewport, device_scale_factor=dpr,
+                              color_scheme=color_scheme)
+    page = ctx.new_page()
+    if diagnostics is not None:
+        diagnostics.watch(page, label)
+    return ctx, page
 
 
-def _new_page(browser, *, viewport: dict, dpr: int, theme: str | None = None):
-    """Context+page with the graph tour pre-dismissed and an optional theme."""
-    ctx = browser.new_context(viewport=viewport, device_scale_factor=dpr)
-    boot = "try{localStorage.setItem('okfGraphTourDone','1');"
-    if theme:
-        boot += _theme_seed_script(theme)
-    boot += "}catch(e){}"
-    ctx.add_init_script(boot)
-    return ctx, ctx.new_page()
+_STUDIO_SETTLED_JS = """() => {
+  const summary = document.querySelector('.okf-studio-launcher__summary');
+  return !!summary && /\\w/.test(summary.textContent)
+    && !/Connecting|Reconnecting|Offline/.test(summary.textContent);
+}"""
+
+
+def _settle(page, *, theme: str) -> None:
+    """Wait for the live studio session and confirm the resolved theme.
+
+    The studio launcher paints "Connecting…" until its event stream is up;
+    a capture taken before that shows a transient state, not the product.
+    """
+    page.wait_for_function(_STUDIO_SETTLED_JS, timeout=15_000)
+    resolved = page.evaluate("() => document.documentElement.dataset.theme")
+    if resolved != theme:
+        raise RuntimeError(f"expected resolved theme {theme!r}, got {resolved!r}")
 
 
 def _click_lens(page, lens: str) -> None:
-    """Select a graph lens chip by its accessible name."""
-    page.get_by_role("radio", name=lens).click(timeout=5_000)
+    """Select a graph lens the way a reader does, then verify it took.
+
+    The lens chips live inside the collapsed "Explore with lenses"
+    disclosure, so it is opened first; each radio's accessible name is
+    "<Lens>: <question>".
+    """
+    disclosure = page.locator("details.okf-signal__lenses")
+    if not disclosure.evaluate("d => d.open"):
+        disclosure.locator("summary").click(timeout=5_000)
+    radio = page.get_by_role("radio", name=re.compile(rf"^{re.escape(lens)}:"))
+    page.locator("label.okf-signal__seg-item", has=radio).click(timeout=5_000)
+    if not radio.is_checked():
+        raise RuntimeError(f"graph lens {lens!r} did not become the checked lens")
+    # The new lens re-flows the detail panel under the pointer; park it on
+    # the inert route title so no lens chip is captured mid-hover.
+    title = page.locator(".okf-graph-route-title").bounding_box()
+    if title:
+        page.mouse.move(title["x"] + title["width"] - 4, title["y"] + title["height"] / 2)
+
+
+_SCROLL_UNDER_CHROME_JS = """([selector, pattern, gap]) => {
+  const re = new RegExp(pattern, 'i');
+  const target = [...document.querySelectorAll(selector)].find(x => re.test(x.textContent));
+  if (!target) return false;
+  // The sticky chrome is a stack (site bar, then the concept view bar):
+  // follow wide bars downward while each one starts where the last ends.
+  const chromeBottom = () => {
+    const bars = [...document.querySelectorAll('body *')]
+      .filter(e => ['sticky', 'fixed'].includes(getComputedStyle(e).position))
+      .map(e => e.getBoundingClientRect())
+      .filter(r => r.bottom > 0 && r.width >= innerWidth / 2 && r.height < innerHeight / 3)
+      .sort((a, b) => a.top - b.top);
+    let bottom = 0;
+    for (const r of bars) if (r.top <= bottom + 1) bottom = Math.max(bottom, r.bottom);
+    return bottom;
+  };
+  // Sticky bars only stick once the page has scrolled, so settle twice.
+  for (let pass = 0; pass < 2; pass++)
+    window.scrollBy({top: target.getBoundingClientRect().top - chromeBottom() - gap,
+                     behavior: 'instant'});
+  return true;
+}"""
+
+
+_SELECT_SENTENCE_JS = """(sentence) => {
+  const body = document.querySelector('.okf-page__body');
+  if (!body) return false;
+  const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const src = node.nodeValue;
+    const at = src.replace(/\\s+/g, ' ').indexOf(sentence);
+    if (at < 0) continue;
+    // Map whitespace-normalised offsets back onto the raw text node.
+    const toRaw = target => {
+      let raw = 0, norm = 0, prevSpace = false;
+      while (raw < src.length && norm < target) {
+        const space = /\\s/.test(src[raw]);
+        if (!(space && prevSpace)) norm++;
+        prevSpace = space; raw++;
+      }
+      return raw;
+    };
+    const range = document.createRange();
+    range.setStart(node, toRaw(at));
+    range.setEnd(node, toRaw(at + sentence.length));
+    const box = range.getBoundingClientRect();
+    if (box.top < 0 || box.bottom > innerHeight - 80)
+      window.scrollBy({top: box.top - innerHeight / 3, behavior: 'instant'});
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    return selection.toString().replace(/\\s+/g, ' ').trim() === sentence;
+  }
+  return false;
+}"""
+
+
+# ---------------------------------------------------------------------------
+# Bundle snapshot
+# ---------------------------------------------------------------------------
+
+
+def _tracked_bundle_snapshot(bundle: Path, dest: Path) -> Path | None:
+    """Copy the bundle's git-tracked files (working-tree content) into ``dest``.
+
+    A working checkout accumulates ignored session state beside the concepts
+    — ``.okf-loom/`` comment and activity history, per-route lock files —
+    which the studio faithfully renders as "Recently changed" and agent
+    activity. README media must show what a fresh clone shows, so the capture
+    serves only what git tracks. Returns ``None`` when the bundle is not in a
+    git work tree or git tracks none of it.
+    """
+    try:
+        top = subprocess.run(
+            ["git", "-C", str(bundle), "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        listing = subprocess.run(
+            ["git", "-C", top, "ls-files", "-z", "--", str(bundle)],
+            capture_output=True, check=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    root = Path(top).resolve()
+    try:
+        prefix = bundle.resolve().relative_to(root)
+    except ValueError:
+        return None
+    snapshot = dest / bundle.name
+    copied = 0
+    for raw in listing.split(b"\0"):
+        if not raw:
+            continue
+        rel = Path(os.fsdecode(raw))
+        source = root / rel
+        if not source.is_file():  # tracked, but deleted in the working tree
+            continue
+        target = snapshot / rel.relative_to(prefix)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+        copied += 1
+    return snapshot if copied else None
 
 
 # ---------------------------------------------------------------------------
@@ -190,153 +369,201 @@ def _click_lens(page, lens: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _capture_stills(browser, base: str, out_dir: Path) -> list[Path]:
-    shots: list[Path] = []
+def _stage_stills(browser, base: str, stage: Path,
+                  diagnostics: _BrowserDiagnostics) -> list[str]:
+    """Capture every still into ``stage``; returns the file names in order."""
+    names: list[str] = []
 
     def still(name: str) -> Path:
-        p = out_dir / name
-        shots.append(p)
-        return p
+        names.append(name)
+        return stage / name
 
-    # Dashboard index.
-    ctx, page = _new_page(browser, viewport=STILL_VIEWPORT, dpr=2, theme="technical-light")
-    capture_target(page, f"{base}/", "document", still("studio-home.png"), full_page=False)
+    def page_for(label: str, viewport: dict, color_scheme: str = "light"):
+        return _new_page(browser, viewport=viewport, dpr=2, color_scheme=color_scheme,
+                         diagnostics=diagnostics, label=label)
 
-    # Showcase concept, scrolled to the Mermaid/KaTeX stretch.
-    showcase_url = f"{base}/demo/showcase"
-    def scroll_showcase(p):
-        p.evaluate("""() => {
-            const h = [...document.querySelectorAll('h2,h3')]
-                .find(x => /Diagrams/i.test(x.textContent));
-            if (h) h.scrollIntoView({block: 'start'});
-            window.scrollBy(0, -16);
+    def settled_light(p) -> None:
+        _settle(p, theme="technical-light")
+
+    # Dashboard index, once the studio launcher reports its session.
+    ctx, page = page_for("studio-home", STILL_VIEWPORT)
+    capture_target(page, f"{base}/", "document", still("studio-home.png"),
+                   full_page=False, prepare=settled_light)
+    ctx.close()
+
+    # Showcase concept: the Diagrams heading sits just under the sticky
+    # chrome so the Mermaid diagrams and the KaTeX block share the frame.
+    def frame_showcase(p) -> None:
+        settled_light(p)
+        if not p.evaluate(_SCROLL_UNDER_CHROME_JS, ["h2, h3", r"^\s*Diagrams", 16]):
+            raise RuntimeError("demo/showcase has no Diagrams heading")
+        # End the frame just above the Code section so no heading is sliced.
+        cut = p.evaluate("""() => {
+          const h = [...document.querySelectorAll('h2, h3')]
+            .find(x => /^\\s*Code with syntax/i.test(x.textContent));
+          return h ? Math.floor(h.getBoundingClientRect().top) : null;
         }""")
-    capture_target(page, showcase_url, "document", still("showcase-rendering.png"), full_page=False, prepare=scroll_showcase)
+        if cut and STILL_VIEWPORT["height"] < cut <= SHOWCASE_VIEWPORT["height"] + 40:
+            p.set_viewport_size({"width": SHOWCASE_VIEWPORT["width"],
+                                 "height": min(cut - 4, SHOWCASE_VIEWPORT["height"])})
+    ctx, page = page_for("showcase-rendering", SHOWCASE_VIEWPORT)
+    capture_target(page, f"{base}/demo/showcase", "document", still("showcase-rendering.png"),
+                   full_page=False, prepare=frame_showcase)
+    ctx.close()
 
-    # Select-to-comment: stage a real selection so the affordance appears,
-    # open the composer, and type a representative ask for the agent.
-    def prepare_comment(p):
-        p.evaluate("window.scrollTo(0, 0)")
-        p.evaluate("""() => {
-            const body = document.querySelector('.okf-page__body');
-            const para = body &&
-                [...body.querySelectorAll('p')].find(p => p.textContent.length > 80);
-            if (!para) return;
-            para.scrollIntoView({block: 'center'});
-            const r = document.createRange();
-            r.selectNodeContents(para);
-            const sel = window.getSelection();
-            sel.removeAllRanges();
-            sel.addRange(r);
-        }""")
+    # Select-to-comment: select one exact sentence so the affordance anchors
+    # to it, open the composer, and type a representative ask for the agent.
+    def compose(p) -> None:
+        settled_light(p)
+        if not p.evaluate(_SELECT_SENTENCE_JS, COMPOSER_SENTENCE):
+            raise RuntimeError(f"could not select {COMPOSER_SENTENCE!r} on /{COMPOSER_PAGE}")
         p.click(".okf-comment-afford button", timeout=5_000)
-        p.fill('textarea[aria-label="Comment for agent"]',
-               "Tighten this intro and cross-link it to the graph lenses explanation.")
-    capture_target(page, showcase_url, "document", still("comment-composer.png"), full_page=False, prepare=prepare_comment)
+        p.fill('textarea[aria-label="Comment for agent"]', COMPOSER_NOTE)
+    ctx, page = page_for("comment-composer", COMPOSER_VIEWPORT)
+    capture_target(page, f"{base}/{COMPOSER_PAGE}", "document", still("comment-composer.png"),
+                   full_page=False, prepare=compose)
     ctx.close()
 
-    # Graph: Map lens (light) and Bridges lens (dark).
-    ctx, page = _new_page(browser, viewport=STILL_VIEWPORT, dpr=2, theme="technical-light")
-    capture_target(page, f"{base}/__graph", "graph", still("graph-map.png"), full_page=False)
+    # Graph: Map lens in light mode, Bridges lens in dark mode.
+    ctx, page = page_for("graph-map", STILL_VIEWPORT)
+    capture_target(page, f"{base}/__graph", "graph", still("graph-map.png"),
+                   full_page=False, prepare=settled_light)
     ctx.close()
 
-    ctx, page = _new_page(browser, viewport=STILL_VIEWPORT, dpr=2, theme="technical-dark")
-    graph_url = f"{base}/__graph"
-    capture_target(page, graph_url, "graph", still("graph-bridges-dark.png"), full_page=False,
-                   prepare=lambda p: _click_lens(p, "Bridges"))
+    def bridges(p) -> None:
+        _settle(p, theme="technical-dark")
+        _click_lens(p, "Bridges")
+    ctx, page = page_for("graph-bridges-dark", STILL_VIEWPORT, color_scheme="dark")
+    capture_target(page, f"{base}/__graph", "graph", still("graph-bridges-dark.png"),
+                   full_page=False, prepare=bridges)
     ctx.close()
 
     # Live search.
-    ctx, page = _new_page(browser, viewport=STILL_VIEWPORT, dpr=2, theme="technical-light")
-    capture_target(page, f"{base}/__search?q=studio", "search", still("search.png"), full_page=False)
+    ctx, page = page_for("search", STILL_VIEWPORT)
+    capture_target(page, f"{base}/__search?q={SEARCH_QUERY}", "search", still("search.png"),
+                   full_page=False, prepare=settled_light)
     ctx.close()
 
-    return shots
+    # Repository card, composed from the dark Bridges still.
+    _capture_social_preview(browser, base, stage / "graph-bridges-dark.png",
+                            still("social-preview.png"), diagnostics)
+    return names
 
 
-def _assemble_gif(frames: list, out_path: Path) -> None:
-    """Encode, validate, and atomically publish a looping GIF."""
-    import io
-
-    from PIL import Image
-
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    claim = _claim_destination(out_path)
-    fd, tmp_name = tempfile.mkstemp(
-        prefix=f".{out_path.stem}.", suffix=".capture-tmp.gif", dir=out_path.parent)
-    os.close(fd)
-    tmp = Path(tmp_name)
-    opened = []
-    images = []
-    try:
-        for frame in frames:
-            source = Image.open(io.BytesIO(frame))
-            opened.append(source)
-            converted = source.convert("RGB")
-            images.append(converted.quantize(colors=255, dither=Image.Dither.NONE))
-            converted.close()
-        if not images:
-            raise ValueError("cannot assemble GIF without frames")
-        images[0].save(tmp, save_all=True, append_images=images[1:],
-                       duration=GIF_FRAME_MS, loop=0, optimize=True)
-        with Image.open(tmp) as check:
-            check.verify()
-        if not _publish_if_current(tmp, out_path, claim):
-            raise RuntimeError("A newer GIF assembly owns publication.")
-    finally:
-        for image in images:
-            image.close()
-        for source in opened:
-            source.close()
-        tmp.unlink(missing_ok=True)
-
-
-def _capture_gifs(browser, base: str, out_dir: Path) -> list[Path]:
-    try:
-        import PIL  # noqa: F401
-    except ImportError:
-        _log("WARNING: pillow not installed - skipping themes.gif and "
-             "graph-lenses.gif (python -m pip install pillow)")
-        return []
-
-    shots: list[Path] = []
-
-    # Theme cycle on the showcase page. One context per theme: renderers
-    # (Mermaid/hljs) pick their skin at render time, so a reload per theme
-    # is the honest capture.
-    with _frame_staging(out_dir) as staging:
+def _capture_stills(browser, base: str, out_dir: Path,
+                    diagnostics: _BrowserDiagnostics) -> list[Path]:
+    """Capture the stills as one set: nothing is published unless all pass."""
+    published: list[Path] = []
+    with tempfile.TemporaryDirectory(prefix=".okf-media-stills-", dir=out_dir) as staging:
         stage = Path(staging)
-        frames = []
-        for theme in THEMES:
-            ctx, page = _new_page(browser, viewport=GIF_VIEWPORT, dpr=1, theme=theme)
-            frame_path = stage / f"themes-{theme}.png"
-            capture_target(page, f"{base}/demo/showcase", "document", frame_path, full_page=False)
-            frames.append(frame_path.read_bytes())
-            ctx.close()
-        path = out_dir / "themes.gif"
-        _assemble_gif(frames, path)
-        shots.append(path)
-        _log("themes.gif assembled")
+        names = _stage_stills(browser, base, stage, diagnostics)
+        diagnostics.raise_if_failed()
+        for name in names:
+            destination = out_dir / name
+            # Private capture temporaries are 0600; README media are public.
+            os.chmod(stage / name, 0o644)
+            claim = _claim_destination(destination)
+            if not _publish_if_current(stage / name, destination, claim):
+                raise RuntimeError(f"A newer capture owns {name} publication.")
+            published.append(destination)
+    return published
 
-        # Lens cycle on the graph page (Focus is omitted: it needs a chosen node).
-        frames = []
-        ctx, page = _new_page(browser, viewport=GIF_VIEWPORT, dpr=1, theme="technical-light")
-        graph_url = f"{base}/__graph"
-        frame_path = stage / "graph-map.png"
-        capture_target(page, graph_url, "graph", frame_path, full_page=False)
-        frames.append(frame_path.read_bytes())
-        for lens in LENSES[1:]:
-            frame_path = stage / f"graph-{lens.lower()}.png"
-            capture_target(page, graph_url, "graph", frame_path, full_page=False,
-                           navigate=False, prepare=lambda p, value=lens: _click_lens(p, value))
-            frames.append(frame_path.read_bytes())
+
+# The card is plain HTML over the studio's own stylesheet, so its colours and
+# display face follow the shipped design tokens instead of hand-copied hex.
+_SOCIAL_CARD = string.Template("""<!doctype html>
+<html lang="en" data-theme="technical-dark">
+<head>
+<meta charset="utf-8">
+<title>okf-loom</title>
+<link rel="stylesheet" href="$stylesheet">
+<style>
+  html, body { margin: 0; width: 1280px; height: 640px; overflow: hidden;
+    background: var(--okf-bg); }
+  .card { position: relative; width: 1280px; height: 640px; color: var(--okf-fg); }
+  .card__copy { position: absolute; left: 72px; top: 0; bottom: 0; width: 500px;
+    display: flex; flex-direction: column; justify-content: center; }
+  .card__eyebrow { margin: 0 0 18px; color: var(--okf-fg-muted);
+    font: 600 16px/1.2 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    letter-spacing: 0.04em; }
+  .card__title { margin: 0; font-family: var(--okf-font-display); font-size: 96px;
+    line-height: 1; font-weight: 700; letter-spacing: -0.02em; }
+  .card__rule { width: 132px; height: 6px; margin: 28px 0 30px; border-radius: 3px;
+    background: var(--okf-accent); }
+  .card__lede { margin: 0 0 22px; font-size: 27px; line-height: 1.4;
+    color: var(--okf-fg-muted); }
+  .card__pitch { margin: 0 0 34px; font-size: 27px; line-height: 1.35; font-weight: 700; }
+  .card__cmd { margin: 0; color: var(--okf-accent);
+    font: 500 21px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  .card__shot { position: absolute; margin: 0; left: 612px; top: 56px; width: 668px;
+    height: 528px; overflow: hidden; border: 1px solid var(--okf-border-strong);
+    border-right: 0; border-radius: 12px 0 0 12px; background: var(--okf-bg-elev);
+    box-shadow: 0 28px 64px rgba(0, 0, 0, 0.5); }
+  .card__shot img { display: block; width: 864px; height: 540px; }
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="card__copy">
+    <p class="card__eyebrow">$eyebrow</p>
+    <h1 class="card__title">okf-loom</h1>
+    <div class="card__rule"></div>
+    <p class="card__lede">Plain-Markdown knowledge trees, served as a live studio.</p>
+    <p class="card__pitch">You comment. Your agent edits.<br>Files stay yours.</p>
+    <p class="card__cmd">&#36; scripts/okf-loom serve docs</p>
+  </div>
+  <figure class="card__shot"><img src="$shot" alt=""></figure>
+</main>
+</body>
+</html>
+""")
+
+
+def _stylesheet_href(base: str) -> str:
+    """The wiki.css URL exactly as the live studio links it."""
+    with urllib.request.urlopen(f"{base}/", timeout=5) as resp:
+        page_html = resp.read().decode("utf-8", "replace")
+    match = re.search(r'<link[^>]+href="([^"]*wiki\.css[^"]*)"', page_html)
+    if not match:
+        raise RuntimeError("the live studio index does not link wiki.css")
+    return html.unescape(match.group(1))
+
+
+def _capture_social_preview(browser, base: str, shot: Path, out_path: Path,
+                            diagnostics: _BrowserDiagnostics) -> Path:
+    """Compose the 1280x640 repository card around ``shot``.
+
+    The card and the shot are served on the studio's own origin through
+    request interception, so the production stylesheet resolves normally.
+    """
+    card_url = f"{base}/__readme-media/social-preview"
+    shot_url = f"{base}/__readme-media/{shot.name}"
+    card = _SOCIAL_CARD.substitute(
+        stylesheet=html.escape(_stylesheet_href(base), quote=True),
+        shot=html.escape(shot_url, quote=True),
+        eyebrow=html.escape(f"v{LOOM_VERSION} · implements OKF {SPEC_VERSION}"),
+    )
+    ctx, page = _new_page(browser, viewport=SOCIAL_VIEWPORT, dpr=1, color_scheme="dark",
+                          diagnostics=diagnostics, label="social-preview")
+    try:
+        page.route(card_url, lambda route: route.fulfill(
+            status=200, content_type="text/html; charset=utf-8", body=card))
+        page.route(shot_url, lambda route: route.fulfill(
+            status=200, content_type="image/png", path=str(shot)))
+        page.goto(card_url, wait_until="load", timeout=15_000)
+        page.evaluate("() => document.fonts.ready.then(() => true)")
+        page.wait_for_function("""() => {
+          const img = document.querySelector('.card__shot img');
+          return !!img && img.complete && img.naturalWidth > 0;
+        }""", timeout=10_000)
+        accent = page.evaluate("""() => getComputedStyle(document.documentElement)
+          .getPropertyValue('--okf-accent').trim()""")
+        if not accent:
+            raise RuntimeError("social card did not pick up the studio design tokens")
+        page.screenshot(path=str(out_path), type="png", full_page=False)
+    finally:
         ctx.close()
-        path = out_dir / "graph-lenses.gif"
-        _assemble_gif(frames, path)
-        shots.append(path)
-        _log("graph-lenses.gif assembled")
-
-    return shots
+    return out_path
 
 
 # ---------------------------------------------------------------------------
@@ -371,9 +598,10 @@ def _build_arg_parser() -> argparse.ArgumentParser:
              "AIC_PLAYWRIGHT_CHROME_PATH, system Chrome, managed Chromium)",
     )
     p.add_argument(
-        "--skip-gifs",
+        "--in-place",
         action="store_true",
-        help="capture only the PNG stills",
+        help="serve --bundle as-is, including ignored session state, instead of "
+             "a snapshot of its git-tracked files",
     )
     return p
 
@@ -386,7 +614,7 @@ def main(argv: list[str] | None = None) -> int:
     except ImportError:
         print(
             "ERROR: playwright is not installed.\n"
-            "  python -m pip install playwright pillow\n"
+            "  python -m pip install playwright\n"
             "  playwright install chromium",
             file=sys.stderr,
         )
@@ -403,16 +631,24 @@ def main(argv: list[str] | None = None) -> int:
     _log(f"out_dir={out_dir}")
 
     captured: list[Path] = []
+    diagnostics = _BrowserDiagnostics()
     try:
-        with sync_playwright() as p:
-            browser = launch_chromium(p, args.chrome)
-            try:
-                with _LiveServer(bundle) as base:
-                    captured.extend(_capture_stills(browser, base, out_dir))
-                    if not args.skip_gifs:
-                        captured.extend(_capture_gifs(browser, base, out_dir))
-            finally:
-                browser.close()
+        with tempfile.TemporaryDirectory(prefix="okf-readme-bundle-") as snapshot_root:
+            served = bundle
+            if not args.in_place:
+                snapshot = _tracked_bundle_snapshot(bundle, Path(snapshot_root))
+                if snapshot is None:
+                    _log("bundle has no git-tracked files; serving it in place")
+                else:
+                    served = snapshot
+                    _log("serving a snapshot of the bundle's git-tracked files")
+            with sync_playwright() as p:
+                browser = launch_chromium(p, args.chrome)
+                try:
+                    with _LiveServer(served) as base:
+                        captured.extend(_capture_stills(browser, base, out_dir, diagnostics))
+                finally:
+                    browser.close()
     except (RuntimeError, SystemExit) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1

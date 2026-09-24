@@ -253,6 +253,72 @@ agent loop — `scripts/okf-loom wait` blocks in the foreground, the agent claim
 writes via mutators, resolves — is the same shape whether the studio
 is open or not. See [Direct the agent loop](/tutorials/author_with_agent.md).
 
+# Why the graph is organised into question-named lenses
+
+The graph view once offered presets (Overview, Hubs, Bridges, Relations,
+Types) over a raw layout dropdown. It looked configurable but revealed
+little: colour restated the type schema, Hubs ranked raw degree, and the
+layout picker was a list of algorithm names. The current lens set replaced
+it after a survey of graph tools (Obsidian and its graph plugins, Neo4j
+Bloom, Gephi, Kumu, InfraNodus, Linkurious, yFiles, TheBrain, Roam and
+Logseq) and of the graph-visualisation research literature. These findings
+shaped it:
+
+* **Colour carries computed structure, not the schema.** Gephi's standard
+  workflow, InfraNodus and Bloom converge on the same composite: force
+  layout, community colour and centrality size. Layout proximity is only
+  legible when other channels confirm it (Venturini, Jacomy and Jensen
+  2021). Colouring by type restates what readers already know, so type
+  moved to the node **icon** and colour shows **detected communities**
+  (deterministic Louvain modularity).
+* **Importance is encoded explicitly.** Raw degree finds loud nodes, not
+  important ones, and readers take *position* as importance unless a metric
+  is encoded (McGrath, Blythe and Krackhardt 1997). Map sizes nodes by
+  **PageRank**; Bridges colours and sizes them by **betweenness**.
+* **Group colouring has a cost, so it can be turned off.** Group encodings
+  help cluster tasks but cost about 25% accuracy on plain topology tasks
+  (Saket et al. 2014). The **Colour by theme** toggle in Graph settings
+  switches back to type colours.
+* **Positions are deterministic.** Layouts that move on every load are a
+  common complaint about note graphs, and stable positions matter when
+  readers re-find nodes (Archambault and Purchase 2012–13). Initial
+  positions are seeded from sorted ids, layouts do not randomise, and
+  community detection is order-deterministic.
+* **One non-force layout earns its place: layered flow.** Layered layouts
+  beat radial ones for reading hierarchy, while force layouts can beat
+  layered ones for path-finding (Pohl, Schmitt and Diehl 2009). Flow is
+  therefore the lens for reading direction; shift-click path tracing works
+  in every lens.
+* **Time is a useful channel.** Recent encodes staleness as a static colour
+  ramp, because static encodings beat animation for analysis (Archambault,
+  Purchase and Pinaud 2011).
+* **Answers sit beside the picture.** Every lens shows a clickable ranked
+  summary with a one-line verdict, as Graph-Analysis, InfraNodus and Kumu
+  pair their graphs with ranked answers.
+* **Local exploration is the most-praised mode.** Explore neighborhood keeps
+  the surrounding concepts at full opacity and dims the rest instead of
+  hiding it (Obsidian's local graph, Kumu Focus, TheBrain; Moscovich et al.
+  2009).
+* **Modes are named by the question they answer**, never by the algorithm.
+  Each lens shows its question in the lens bar and in its tooltip.
+
+| Lens | Question it answers | Encoding |
+|---|---|---|
+| Map (default) | How does this knowledge fit together? | force layout; colour = community, size = PageRank, icon = type |
+| Themes | What are the main topic areas, and which barely touch? | strong community grouping; ranked themes with a gap verdict |
+| Flow | What feeds into what? | dagre layered layout (fallback: directed breadthfirst); typed edges with labels |
+| Bridges | Which concepts hold the areas together? | colour and size = betweenness; top bridgers highlighted |
+| Recent | What is fresh, and what is going stale? | recency colour ramp; undated concepts stay neutral |
+| Explore neighborhood | What surrounds the selected concept? | current layout; neighbourhood at full opacity, the rest dimmed |
+
+The same evidence retired the layout dropdown (each lens owns its layout),
+the Types preset (type is always visible as the icon, and the type filter
+works in every lens) and the degree-based Hubs preset (PageRank sizing
+supersedes it). All analytics run in the browser, lazily, and are cached
+until the graph changes. The [spec](/reference/spec.md) owns the exact lens
+contract; [Use the live studio](/tutorials/live_studio_basics.md) shows the
+lenses in use.
+
 # See also
 
 * [Use the live studio](/tutorials/live_studio_basics.md) — bring up

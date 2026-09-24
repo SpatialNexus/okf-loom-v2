@@ -4,7 +4,7 @@
 Stands up ``scripts/okf-loom serve samples/demo_bundle`` on an ephemeral port, drives the
 full-page ``/__graph`` view through several Signal-controls states with
 Playwright (system Chrome via ``AIC_PLAYWRIGHT_CHROME_PATH``), and writes
-PNGs under ``docs/screenshots/graph-signal-controls/``.
+PNGs under the git-ignored ``captures/graph-signal-controls/``.
 
 Run from okf-loom/:  python scripts/capture_signal_controls.py
 """
@@ -24,7 +24,7 @@ from capture_viewer_proof import capture_target, launch_chromium
 
 ROOT = Path(__file__).resolve().parent.parent
 BUNDLE = ROOT / "samples" / "demo_bundle"
-OUT = ROOT / "docs" / "screenshots" / "graph-signal-controls"
+OUT = ROOT / "captures" / "graph-signal-controls"
 OUT.mkdir(parents=True, exist_ok=True)
 
 

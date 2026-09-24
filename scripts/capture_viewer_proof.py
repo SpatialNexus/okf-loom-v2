@@ -10,14 +10,14 @@ Renders the demo bundle BOTH live (``scripts/okf-loom serve``) AND as a static b
   static build has no search backend, so we capture the empty-results
   page that documents the degraded state),
 
-writing them under ``docs/screenshots/<YYYY-MM-DD>-viewer/``.
+writing them under the git-ignored ``captures/<YYYY-MM-DD>-viewer/``.
 
 Requires explicit Playwright browser-proof dependencies + Chromium::
 
     python -m pip install playwright
     playwright install chromium
     python scripts/capture_viewer_proof.py [--bundle samples/demo_bundle] \\
-        [--out-dir docs/screenshots]
+        [--out-dir captures]
 
 Design notes
 ------------
@@ -65,7 +65,7 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = _SCRIPT_DIR.parent
 SCRIPT_PATH = REPO_ROOT / "scripts"
 DEFAULT_BUNDLE = REPO_ROOT / "samples" / "demo_bundle"
-DEFAULT_OUT_DIR = REPO_ROOT / "docs" / "screenshots"
+DEFAULT_OUT_DIR = REPO_ROOT / "captures"  # git-ignored local proof output
 
 # Live-server readiness budget (seconds). The OKF server boots in well
 # under a second; this covers slow runners.
@@ -682,7 +682,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         description=(
             "Capture browser screenshots of the OKF viewer for the demo "
             "bundle, both live (scripts/okf-loom serve) and static (scripts/okf-loom build --target "
-            "static), under docs/screenshots/<date>-viewer/ "
+            "static), under captures/<date>-viewer/ "
             "(current spec §17)."
         ),
     )

@@ -974,6 +974,31 @@ def test_concrete_sensitive_state_and_credentials_are_not_published(tmp_path: Pa
     assert archive_builder.is_path_denied("nested/.git/config")
 
 
+def test_readme_media_stays_in_the_repository_not_the_skill_archive(tmp_path: Path) -> None:
+    """Root docs/media/ (README screenshots, GIFs and clips) is repository-only.
+
+    Other docs, a nested bundle's own docs/media/, and "media" names elsewhere
+    still ship, and the archive still verifies against the same commit.
+    """
+    root = _repo(tmp_path)
+    media = ["docs/media/graph.mp4", "docs/media/graph.gif", "docs/media/stills/graph-map.png"]
+    kept = ["docs/guide.md", "docs/media.md", "samples/demo/docs/media/figure.png", "scripts/media/helper.py"]
+    for path in (*media, *kept):
+        target = root / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(path.encode("utf-8") + b"\n")
+    _git(root, "add", "--", *media, *kept)
+    _git(root, "commit", "-qm", "media fixture")
+    captured = _git(root, "rev-parse", "HEAD")
+    out = tmp_path / "skill.zip"
+    names = archive_builder.build_skill_archive(root, out, revision=captured)
+    assert sorted(names) == sorted(["skill/README.md", "skill/scripts/run", *(f"skill/{path}" for path in kept)])
+    with zipfile.ZipFile(out) as built:
+        assert not [name for name in built.namelist() if name.startswith("skill/docs/media/")]
+        assert built.read("skill/samples/demo/docs/media/figure.png") == b"samples/demo/docs/media/figure.png\n"
+    assert archive_builder.verify_zip(out, source=root, revision=captured) == names
+
+
 @pytest.mark.parametrize("path", [
     "deploy/access-token.json", "private-backup.txt", "credentials.csv",
     "settings/api_key.toml", "secrets", "passwords.db",

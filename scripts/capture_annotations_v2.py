@@ -2,8 +2,8 @@
 """Capture durable current-branch Annotations v2 Studio proof.
 
 The helper owns a temporary bundle/server and waits on semantic DOM predicates;
-it contains no screenshot timing sleeps. Output is intentionally tracked under
-docs/screenshots/annotations-v2.
+it contains no screenshot timing sleeps. Output goes to the git-ignored
+captures/annotations-v2 directory and is never part of the published tree.
 """
 from __future__ import annotations
 
@@ -28,7 +28,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
-OUTPUT = ROOT / "docs" / "screenshots" / "annotations-v2"
+# Must equal ROOT / capture_provenance.EVIDENCE_DIRECTORY (git-ignored).
+OUTPUT = ROOT / "captures" / "annotations-v2"
 
 # Exact expected screenshot artifact set. The capture flow must produce
 # exactly these files. Obsolete filenames (e.g. stale-ambiguous.png) must
@@ -1448,11 +1449,11 @@ def main() -> int:
     )
     args = parser.parse_args()
     if args.verify_checkout is not None:
-        from okf_loom.capture_provenance import validate_manifest
+        from okf_loom.capture_provenance import EVIDENCE_DIRECTORY, validate_manifest
 
         checkout = args.verify_checkout.resolve()
         try:
-            manifest = json.loads((checkout / "docs/screenshots/annotations-v2/manifest.json").read_text())
+            manifest = json.loads((checkout / EVIDENCE_DIRECTORY / "manifest.json").read_text())
             expected = {name: "; ".join(values) for name, values in SCENARIO_ASSERTIONS.items()}
             errors = validate_manifest(manifest, checkout, expected, check_files=True, phase="final")
         except (OSError, ValueError) as exc:

@@ -83,7 +83,8 @@ Viewer overrides are documented in
 [`scripts/okf_loom/viewer/OVERRIDES.md`](../scripts/okf_loom/viewer/OVERRIDES.md).
 
 For release proof, `scripts/capture_viewer_proof.py` waits on the production
-capture-readiness API and publishes PNG/JPEG files atomically. The separate
+capture-readiness API and publishes PNG/JPEG files atomically into the
+git-ignored `captures/` directory; proof screenshots are never committed. The separate
 `scripts/benchmark_gold_standard.py` harness defaults to 100/1,000 concepts;
 pass `--large-scales` for larger inputs and `--static-build` to measure static
 output. Large static work requires both opt-ins. Its compatibility
@@ -91,18 +92,19 @@ output. Large static work requires both opt-ins. Its compatibility
 `semantic_ready: false`; use production capture readiness for semantic graph
 proof.
 
-The relevance harness can independently verify a tracked report without
-regenerating it:
+The relevance harness can independently verify a recorded report without
+regenerating it, against the checkout whose source that report measured:
 
 ```bash
 python scripts/benchmark_retrieval_relevance.py \
-  --current-checkout . \
-  --verify-report docs/design/gold-standard-relevance-2026.json
+  --current-checkout /path/to/recorded-source-checkout \
+  --verify-report /path/to/recorded-report.json
 ```
 
 Verification recomputes the complete selected-checkout measured-source
 manifest/digest, harness and fixture identity, tree/patch identity, aggregate
-metrics, and ordered search/Context parity totals; tampering fails closed.
+metrics, and ordered search/Context parity totals; tampering or source drift
+fails closed. No report is checked in.
 
 ## Commit-bound skill archives
 
@@ -137,6 +139,9 @@ physical bytes must belong to the admitted records: gaps, overlaps, hidden or
 duplicate members, trailing compressed streams, leading/trailing bytes,
 descriptors, comments, extras, encryption and ZIP64 remain rejected.
 An integrity pass does not establish byte reproducibility.
+
+The README media under the root `docs/media/` (screenshots, GIFs and clips) is
+repository-only and never enters the archive; a loaded skill does not read it.
 
 Artifact exclusions and redacted private-key scanning remain in force; integrity
 verification cannot disable content scanning. The scan is heuristic, not proof

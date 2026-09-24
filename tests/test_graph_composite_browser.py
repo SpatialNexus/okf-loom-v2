@@ -5,7 +5,7 @@ import pytest
 
 from browser_support import expect, reveal_control
 
-from test_viewer_browser import page, server_url  # noqa: E402
+from test_viewer_browser import docs_server_url, page, server_url  # noqa: E402
 
 pytestmark = pytest.mark.browser
 
@@ -81,6 +81,59 @@ def test_graph_controls_reflow_without_clipping_at_acceptance_widths(page, serve
     )
     assert geometry["scroll"] <= geometry["client"] + 1, geometry
     assert geometry["toolbar"] > 0, geometry
+
+
+# Reads the painted node layer: for the largest badge-free round nodes, where
+# the white type glyph's bounding box is centred, relative to the node centre
+# and as a fraction of the node radius. Type icons are centred in a 24px
+# viewBox, so a correctly inscribed glyph is centred on its node.
+_GLYPH_OFFSET_JS = """() => {
+  const cy = window.__okfLoomGraph && window.__okfLoomGraph.cy;
+  const canvas = cy && cy.container().querySelector('canvas[data-id="layer2-node"]');
+  if (!canvas || !canvas.clientWidth) return null;
+  const ratio = canvas.width / canvas.clientWidth;
+  const ctx = canvas.getContext('2d', {willReadFrequently: true});
+  const absent = value => !value || value === 'none';
+  const nodes = cy.nodes(':visible').filter(n => n.data('iconUrl') && absent(n.data('commentBadgeUrl'))
+    && absent(n.data('brokenBadgeUrl')) && n.style('shape') === 'ellipse' && n.renderedWidth() >= 36);
+  const glyphs = nodes.sort((a, b) => b.renderedWidth() - a.renderedWidth()).slice(0, 3).map(n => {
+    const p = n.renderedPosition(), radius = n.renderedWidth() / 2 * ratio;
+    const cx = p.x * ratio, cy0 = p.y * ratio, scan = radius * 0.9;
+    const x0 = Math.floor(cx - scan), y0 = Math.floor(cy0 - scan), size = Math.ceil(scan * 2);
+    const px = ctx.getImageData(x0, y0, size, size).data;
+    let white = 0, left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      const dx = x0 + x + 0.5 - cx, dy = y0 + y + 0.5 - cy0, i = (y * size + x) * 4;
+      if (Math.hypot(dx, dy) > scan || px[i] < 200 || px[i + 1] < 200 || px[i + 2] < 200 || px[i + 3] < 200) continue;
+      white++; left = Math.min(left, dx); right = Math.max(right, dx); top = Math.min(top, dy); bottom = Math.max(bottom, dy);
+    }
+    const offset = white ? Math.hypot((left + right) / 2, (top + bottom) / 2) / radius : null;
+    return {id: n.id(), white, offset: offset === null ? null : Math.round(offset * 100) / 100};
+  });
+  return glyphs.length && glyphs.every(g => g.white > 0) ? glyphs : null;
+}"""
+
+
+@pytest.mark.parametrize("scale", [1, 2, 3])
+def test_node_type_glyphs_stay_inscribed_on_high_density_screens(page, docs_server_url: str, scale: int) -> None:
+    """Node type glyphs keep their inscribed size at every devicePixelRatio.
+
+    The glyph is an SVG data URI drawn into the node. Without an intrinsic
+    width/height, Chrome drew it about twice too large at devicePixelRatio 2,
+    so the node clipped it to its top-left corner (a stray corner mark instead
+    of the type icon on every HiDPI screen).
+    """
+    context = page.context.browser.new_context(
+        viewport={"width": 1280, "height": 900}, device_scale_factor=scale)
+    try:
+        hidpi = context.new_page()
+        _open(hidpi, docs_server_url)
+        glyphs = hidpi.wait_for_function(_GLYPH_OFFSET_JS, timeout=15_000).json_value()
+        assert hidpi.evaluate("() => devicePixelRatio") == scale
+        # Measured: ~0.01 when inscribed; ~0.18 for the oversized, clipped glyph.
+        assert all(glyph["offset"] <= 0.08 for glyph in glyphs), glyphs
+    finally:
+        context.close()
 
 
 @pytest.mark.parametrize("media", ["forced", "reduced"])

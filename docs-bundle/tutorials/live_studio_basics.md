@@ -312,42 +312,16 @@ intended text in the rendered document, and save. A concurrent comment or
 document change produces a refresh-and-reselect conflict; an uncertain save
 offers safe retry with the same intent. A resolved card exposes **Jump**.
 
-The required final verification capture set under
-`docs/screenshots/annotations-v2/` is exactly `resolved.png`,
-`stale-after-mutation.png`, `selecting.png`, `conflict.png`,
-`save-failure.png`, `focus-visible.png`, `mobile-320.png`,
-`forced-colors.png`, and `no-js.png`. With JavaScript disabled, only authored concept content
-and one honest fallback notice render (`no-js.png`): comments, stored quote
-text, anchor health, highlights, Jump, and Re-anchor are unavailable.
+With JavaScript disabled, only authored concept content and one honest fallback
+notice render: comments, stored quote text, anchor health, highlights, Jump,
+and Re-anchor are unavailable.
 
-The adjacent schema-1 `manifest.json` must bind every image to a SHA-256 digest
-and fully serialized consumed-file inventory entries (exact path, regular or
-symlink type, Git mode, tracked state, content hash, and symlink-target
-semantics). Tracked modes come fail-closed from `git ls-files --stage` (`100644`,
-`100755`, or `120000`); untracked regular files map executable bits to `100755`
-or `100644`, and untracked symlinks use `120000`. The manifest also binds source
-revision, capture-script digest, browser, each
-artifact's actual viewport and media mode, truthful proof classification, and
-scenario assertions.
-The complete proof directory is built and validated as a sibling, then published
-with a recoverable atomic directory swap; any validation or rename failure
-preserves the prior set. Inventory binds Git mode and exact detailed entries,
-rejects unsupported filesystem objects, and fails closed when Git provenance
-cannot be verified. Real body and text-quote sentinels are persisted and
-confirmed through `/__comments` before no-JS capture. The public
-workflow capture serves a temporary bundle and uses browser controls plus the
-Studio's HTTP APIs to select and post a real comment, confirm canonical comment
-state, mutate canonical Markdown, and observe stale recovery. Conflict and
-save-failure screenshots use deliberate `409 concept_conflict` and `500`
-response injection at the browser HTTP boundary and are classified only as
-injected-envelope UI handling; separate server tests prove production
-envelopes. The no-JS gate searches complete response HTML and DOM text for
-unique persisted comment-body and quote sentinels. Capture generation and tests
-use the same production validator, including the `python -O` gate.
-Existing images or manifest bytes are not current-tree release proof until the
-final tree is recaptured and the manifest validator passes in normal and
-optimized Python. Only that final manifest gate promotes the exact nine-image
-set above to release evidence.
+Maintainers capture release proof of these states with
+`scripts/capture_annotations_v2.py`. It writes the nine-image set and its
+validating `manifest.json` to the git-ignored `captures/annotations-v2/`
+directory, so proof screenshots never enter the published tree. The capture
+set, manifest binding, and release-evidence rules are specified in
+[the Annotations v2 contract](/reference/spec.md#121-annotations-v2-contract-normative-implemented).
 
 You have posted a comment to direct the agent's content work.
 The local Studio also offers **Import feedback note** (under **Feedback

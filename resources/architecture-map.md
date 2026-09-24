@@ -52,9 +52,7 @@ Authoritative documentation:
 - [`docs-bundle/explanation/maintenance_plan.md`](../docs-bundle/explanation/maintenance_plan.md) — current maintenance priorities
 
 The architecture reference's session/proposal ownership section routes to
-current lifecycle and test seams. The
-[gold-standard record](../docs/design/gold-standard-2026.md) is historical
-retrieval rationale, not current maintenance authority.
+current lifecycle and test seams.
 
 Tests in `tests/` are the executable examples for checkout-local behavior.
 

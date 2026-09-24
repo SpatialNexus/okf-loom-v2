@@ -560,18 +560,23 @@
   // innerHTML), so a hostile title/snippet can never inject markup. Matches
   // whole query-term words (>=2 chars) case-insensitively, bounded so a
   // tiny term can't mark tens of thousands of spans in a huge passage.
-  function appendHighlighted(parent, text, query) {
-    if (!text) return;
-    text = String(text);
+  function highlightPattern(query) {
     var terms = (query || "")
       .toLowerCase()
       .split(/[^0-9a-z]+/i)
       .filter(function (t) { return t.length >= 2; })
       .slice(0, 8);
-    if (!terms.length) { parent.appendChild(document.createTextNode(text)); return; }
-    var re = new RegExp("(" + terms.map(function (t) {
+    if (!terms.length) return null;
+    return new RegExp("(" + terms.map(function (t) {
       return t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     }).join("|") + ")", "gi");
+  }
+
+  function appendHighlighted(parent, text, query) {
+    if (!text) return;
+    text = String(text);
+    var re = highlightPattern(query);
+    if (!re) { parent.appendChild(document.createTextNode(text)); return; }
     var last = 0, m;
     while ((m = re.exec(text)) !== null) {
       if (m.index > last) parent.appendChild(document.createTextNode(text.slice(last, m.index)));
@@ -583,6 +588,71 @@
       if (last >= 4000) break; // bound runaway matches on huge passages
     }
     if (last < text.length) parent.appendChild(document.createTextNode(text.slice(last)));
+  }
+
+  // A suggestion's evidence is the passage's EXACT Markdown source span: the
+  // search JSON keeps it verbatim because citations and Context Packs depend
+  // on it. A reader needs the words, not the syntax, so the dropdown reduces
+  // it to what the rendered page shows: links and images collapse to their
+  // label, code ticks, emphasis, heading/list/quote markers, fences, table
+  // pipes and tag-like HTML drop, and backslash escapes resolve. This is
+  // presentation only; safety still comes from appendHighlighted building
+  // text nodes (never innerHTML).
+  var ENTITY_TEXT = { amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", nbsp: " ", mdash: "\u2014", ndash: "\u2013", hellip: "\u2026" };
+  function readableExcerpt(markdown) {
+    var escaped = [];
+    var text = String(markdown || "")
+      .replace(/\\([!-\/:-@\[-`{-~])/g, function (_, ch) { escaped.push(ch); return "\uE000" + (escaped.length - 1) + "\uE001"; })
+      .replace(/^[ \t]{0,3}(?:`{3,}|~{3,})[^\n]*$/gm, " ")
+      .replace(/^[ \t]*\|?[ \t]*:?-{3,}:?[ \t]*(?:\|[ \t]*:?-{3,}:?[ \t]*)*\|?[ \t]*$/gm, " ")
+      .replace(/^[ \t]*\|(.*)\|[ \t]*$/gm, function (_, cells) {
+        return cells.split("|").map(function (c) { return c.trim(); }).filter(Boolean).join(" \u00b7 ");
+      })
+      .replace(/^[ \t]{0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/gm, " ")
+      .replace(/^[ \t]{0,3}(?:>[ \t]?)+/gm, "")
+      .replace(/^[ \t]{0,3}#{1,6}[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/gm, "$1")
+      .replace(/^[ \t]*(?:[-*+]|\d{1,9}[.)])[ \t]+(?:\[[ xX]\][ \t]+)?/gm, "")
+      .replace(/<!--[\s\S]*?-->/g, " ")
+      .replace(/<((?:https?|mailto):[^<>\s]+)>/gi, "$1")
+      .replace(/<\/?[A-Za-z][\w:-]*(?:\s[^<>]*)?\/?>/g, " ")
+      .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+      .replace(/\[([^\]]+)\]\((?:[^()\s]|\([^()\s]*\))*(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)/g, "$1")
+      .replace(/!?\[([^\]]+)\]\[[^\]]*\]/g, "$1")
+      .replace(/\[\^[^\]\s]+\]/g, "")
+      .replace(/(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/g, "$2")
+      .replace(/(\*{1,3}|~~)(?=\S)([\s\S]*?\S)\1/g, "$2")
+      .replace(/(^|[^0-9A-Za-z_])(_{1,3})(?=\S)([\s\S]*?\S)\2(?![0-9A-Za-z_])/g, "$1$3")
+      .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, function (all, name) {
+        if (name.charAt(0) === "#") {
+          var code = name.charAt(1).toLowerCase() === "x" ? parseInt(name.slice(2), 16) : parseInt(name.slice(1), 10);
+          return code > 0 && code < 0x110000 ? String.fromCodePoint(code) : all;
+        }
+        return Object.prototype.hasOwnProperty.call(ENTITY_TEXT, name.toLowerCase()) ? ENTITY_TEXT[name.toLowerCase()] : all;
+      })
+      .replace(/\uE000(\d+)\uE001/g, function (_, i) { return escaped[Number(i)]; });
+    return text.replace(/\s+/g, " ").trim();
+  }
+
+  // Keep the first matched term inside the short evidence line: when the
+  // match sits past the visible budget, start the window a little before it
+  // (on a word boundary) so the highlight is what the reader sees.
+  var EVIDENCE_CHARS = 140;
+  function evidenceWindow(text, query) {
+    if (text.length <= EVIDENCE_CHARS) return text;
+    var start = 0;
+    var re = highlightPattern(query);
+    var m = re && re.exec(text);
+    if (m && m.index + m[0].length > EVIDENCE_CHARS - 16) {
+      start = Math.max(0, m.index - 40);
+      var space = text.indexOf(" ", start);
+      if (space !== -1 && space < m.index) start = space + 1;
+    }
+    var end = Math.min(text.length, start + EVIDENCE_CHARS);
+    if (end < text.length) {
+      var cut = text.lastIndexOf(" ", end);
+      if (cut > start + EVIDENCE_CHARS * 0.6 && (!m || cut >= m.index + m[0].length)) end = cut;
+    }
+    return (start > 0 ? "\u2026" : "") + text.slice(start, end).trim() + (end < text.length ? "\u2026" : "");
   }
 
   function makeOption(container, input, it, query, cidFallback) {
@@ -614,11 +684,11 @@
     sub.textContent = cid;
     opt.appendChild(sub);
     var passage = it.evidence && it.evidence.passage;
-    var evidenceText = (passage && passage.excerpt) || it.description || (it.snippets && it.snippets[0]) || "";
+    var evidenceText = readableExcerpt((passage && passage.excerpt) || it.description || (it.snippets && it.snippets[0]) || "");
     if (evidenceText) {
       var d = document.createElement("div");
       d.className = "okf-search-live__evidence";
-      appendHighlighted(d, String(evidenceText).slice(0, 140), query);
+      appendHighlighted(d, evidenceWindow(evidenceText, query), query);
       opt.appendChild(d);
     }
     opt.addEventListener("pointerenter", function () {
@@ -1336,16 +1406,18 @@
   var popoverSeq = 0;
    function showPopover(target, x, y) {
     var seq = ++popoverSeq;
-    fetch("/__raw/" + target)
-      .then(function (r) { return r.ok ? r.text() : null; })
-      .then(function (raw) {
-        if (raw == null || seq !== popoverSeq) return;
-        // Parse title + description from the frontmatter-ish prefix.
-        var fm = parseFrontmatter(raw);
+    // /__raw/<id> is the body only (no frontmatter), so a preview built from
+    // it showed the id as the title and a generic type. /__data/summary is
+    // the concept's parsed identity card: title, type, description, type
+    // colour/icon and link/relation counts, without the body.
+    fetch("/__data/summary?id=" + encodeURIComponent(target), { headers: { "Accept": "application/json" } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (fm) {
+        if (!fm || typeof fm !== "object" || seq !== popoverSeq) return;
         var p = ensurePopover();
         // SAFE rebuild: clear via textContent and rebuild with createElement
         // only (never innerHTML from fetched/server data). A hostile
-        // /__raw response cannot inject markup or script.
+        // summary response cannot inject markup or script.
         p.textContent = "";
         // Type band: tinted chip in the concept's type colour (deterministic
         // crc32->hue fallback mirrors server stable_hue so the band reads as
@@ -1353,27 +1425,32 @@
         // gated by safeColor before it reaches the inline style.
         var typeEl = document.createElement("span");
         typeEl.className = "okf-popover__type";
-        var typeName = fm.type || "concept";
-        typeEl.textContent = typeName;
-        var tColor = typeColorJs(typeName);
+        var typeName = typeof fm.type === "string" && fm.type ? fm.type : "concept";
+        var typeIcon = makeTypeIconSvg(fm.icon);
+        if (typeIcon) typeEl.appendChild(typeIcon);
+        typeEl.appendChild(document.createTextNode(typeName));
+        var tColor = safeColor(fm.type_color) || typeColorJs(typeName);
         // Only the tint takes the type colour; the name keeps the theme ink
         // (wiki.css), because a mid-tone type colour as text fails 4.5:1.
         if (tColor) {
           typeEl.style.background = "color-mix(in srgb, " + tColor + " 16%, var(--okf-bg-inset))";
         }
         var titleEl = document.createElement("h4");
-        titleEl.textContent = fm.title || target;
+        titleEl.textContent = typeof fm.title === "string" && fm.title ? fm.title : target;
         p.appendChild(typeEl);
         p.appendChild(titleEl);
-        if (fm.description) {
+        if (typeof fm.description === "string" && fm.description) {
           var d = document.createElement("div");
           d.className = "okf-popover__body";
           d.textContent = fm.description;
           p.appendChild(d);
         }
-        // Link/relation counts (plan §3.4): derived safely from the fetched
-        // raw markdown body via regex counts (no injection — counts only).
-        var counts = countRawLinks(raw);
+        // Link/relation counts (plan §3.4): internal body links and typed
+        // `relations` entries, counted by the server (numbers only).
+        var counts = {
+          outgoing: Number.isInteger(fm.links) && fm.links > 0 ? fm.links : 0,
+          relations: Number.isInteger(fm.relations) && fm.relations > 0 ? fm.relations : 0
+        };
         if (counts.outgoing || counts.relations) {
           var row = document.createElement("div");
           row.className = "okf-popover__counts";
@@ -1443,53 +1520,9 @@
     return (crc ^ 0xFFFFFFFF) >>> 0;
   }
 
-  // Count outgoing internal links + typed relations from raw markdown, for
-  // the popover evidence row. Pure counting — no string is rendered, so a
-  // hostile raw body cannot inject anything.
-  function countRawLinks(raw) {
-    var body = raw || "";
-    var fmEnd = 0;
-    if (body.slice(0, 4) === "---\n") {
-      fmEnd = body.indexOf("\n---", 4);
-      fmEnd = fmEnd < 0 ? 0 : fmEnd + 4;
-    }
-    var frontmatter = fmEnd ? body.slice(0, fmEnd) : "";
-    var content = fmEnd ? body.slice(fmEnd) : body;
-    var outgoing = 0;
-    // [[wiki links]] and [text](/internal) and [text](../internal)
-    var wiki = content.match(/\[\[([^\]]+)\]\]/g);
-    if (wiki) outgoing += wiki.length;
-    var md = content.match(/\]\((\/?[A-Za-z0-9_][A-Za-z0-9_.\-\/]*)(?:\s+"[^"]*")?\)/g);
-    if (md) outgoing += md.length;
-    // relations: frontmatter list entries under a relations/entities-ish key.
-    var relations = 0;
-    var relBlock = frontmatter.match(/(?:^|\n)(relations|related|derived_from|depends_on|entities):\s*\n((?:\s*[-*]\s*.+\n?)+)/);
-    if (relBlock && relBlock[2]) {
-      var items = relBlock[2].match(/^\s*[-*]\s+/gm);
-      if (items) relations = items.length;
-    }
-    return { outgoing: outgoing, relations: relations };
-  }
-
   function hidePopover() {
     popoverSeq++; // invalidate any in-flight popover fetch
     if (popover) popover.style.display = "none";
-  }
-
-  function parseFrontmatter(raw) {
-    var out = {};
-    if (raw.slice(0, 4) !== "---\n") return out;
-    var end = raw.indexOf("\n---", 4);
-    if (end < 0) return out;
-    var block = raw.slice(4, end);
-    block.split(/\n/).forEach(function (line) {
-      var m = line.match(/^([A-Za-z_][\w-]*):\s*(.*)$/);
-      if (!m) return;
-      var k = m[1], v = m[2].replace(/^['"]|['"]$/g, "");
-      if (k === "tags") v = v.replace(/^\[|\]$/g, "").split(",").map(function (s) { return s.trim(); });
-      out[k] = v;
-    });
-    return out;
   }
 
   function scheduleShow(target, x, y) {
@@ -1519,7 +1552,7 @@
   // Attach hover AND focus handlers to all internal links (P2-70).
   var hoverBoundLinks = new WeakSet();
   function bindLinkHovers() {
-    // The preview fetches /__raw/<id> — a live-server capability (see
+    // The preview fetches /__data/summary — a live-server capability (see
     // http_routes.md: live search/context is server-backed; static and SPA
     // builds read the portable corpus instead). Binding on static/SPA output
     // requested a 404 on every hover AND focus and pointed aria-describedby
