@@ -222,6 +222,43 @@ explains the larger changes.
 - `scripts/build_skill_archive.py` builds the skill zip from a Git commit
   rather than the working tree; `--verify` checks an existing archive.
 
+## Upgrading from v1
+
+v2 is a drop-in replacement for okf-loom v1.0.0. It lives in its own
+repository, [SpatialNexus/okf-loom-v2](https://github.com/SpatialNexus/okf-loom-v2),
+with the same `scripts/okf-loom` entry point, and no command or flag was
+removed. OKF 0.1 bundles validate unchanged, and v1 Studio session state
+(comments and presence) carries over. What to expect:
+
+- **OKF 0.2 is optional.** `scripts/okf-loom upgrade <bundle>` only previews;
+  the [migration guide](docs-bundle/how-to/migrate_spec_version.md) covers
+  applying it.
+- **Themes.** v1 theme names still load, as aliases: `light` →
+  `technical-light`, `dark` and `midnight` → `technical-dark`, `pastel` and
+  `sepia` → `swiss-light`. Switch to the family names (or `auto`).
+- **Index links.** Your first `index` run rewrites the links in generated
+  index blocks from relative (`orders.md`) to bundle-absolute
+  (`/datasets/orders.md`), a one-time diff. On GitHub a leading `/` resolves
+  from the repository root, so these links only work there for a bundle at
+  the root.
+- **Lock files.** v2 creates lock files inside bundles; add them to your
+  `.gitignore` (`<bundle>/.okf-loom/session/` already ignores itself):
+
+  ```gitignore
+  .okf-loom-bundle.lock
+  *.okf-lock
+  ```
+
+- **`status:` is lifecycle.** Its values are `draft`, `stable` (the default)
+  and `deprecated`; anything else, such as `status: accepted`, warns
+  `concept.bad_status` (failing `validate --strict`). Keep domain states under a key of your own, such as
+  `decision_status:` (unknown keys are preserved).
+- **New defaults.** `write-concept` adds `generated` frontmatter
+  (`--no-defaults` omits it), and tunnel links are read-only unless you add
+  `--allow-tunnel-comment` or `--allow-tunnel-edit`.
+
+The [CHANGELOG](CHANGELOG.md) lists every breaking change and migration note.
+
 ## View the docs locally
 
 okf-loom documents itself: [`docs-bundle/`](docs-bundle/) is an OKF bundle.

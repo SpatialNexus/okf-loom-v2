@@ -434,7 +434,7 @@ the user sees WHAT is being edited, not just that editing happens.
 
 | Flag | Effect |
 |---|---|
-| `--actor ACTOR` | Who is claiming (default `agent`). |
+| `--actor ACTOR` | Who is claiming (default `agent`); recorded as the comment's `claimed_by`. The presence flip shows the agent role for any name other than `user`. |
 | `--summary SUMMARY` | Short agent-authored blurb shown in the collapsed thread preview. |
 | `--no-presence` | Skip the automatic presence flip to `editing`. |
 
@@ -515,7 +515,7 @@ CLI mirror of `POST /__presence`.
 | `--state STATE` | One of `idle`, `watching`, `thinking`, `editing` (default `idle`). |
 | `--focus FOCUS` | Concept id the agent is focused on. |
 | `--message MESSAGE` | Free-text progress line (max 200 chars; longer is truncated) rendered next to the presence chip and in the presence history. Re-post to update it mid-pass (`"linking 3 of 7 tables…"`). |
-| `--actor ACTOR` | Who is setting presence (default `agent`). |
+| `--actor ACTOR` | Presence role: `agent` (default) or `user`. Any other name (e.g. a v1-era `--actor claude`) is shown as the agent. |
 
 Stale presence is auto-recovered: a watcher sweep reverts to `idle`
 after `studio.presence_ttl_seconds` (default `300`).

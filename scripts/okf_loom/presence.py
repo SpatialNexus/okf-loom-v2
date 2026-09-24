@@ -21,7 +21,12 @@ def valid_label(value: Any) -> bool:
                         or 0x2066<=ord(c)<=0x2069 for c in value))
 
 class PresenceUnavailable(RuntimeError): pass
-class PresenceCapacity(RuntimeError): pass
+class PresenceCapacity(RuntimeError):
+    def __init__(self, message: str = "presence capacity reached (too many active or recent Studio sessions); try again shortly") -> None:
+        super().__init__(message)
+
+AGENT_ACTORS = frozenset({"agent","user"})
+AGENT_STATES = frozenset({"idle","watching","editing","thinking"})
 
 
 class PresenceStore:
@@ -67,7 +72,7 @@ class PresenceStore:
         if not self._finite(row.get("updated_at")) or not self._finite(row.get("expires_at")): raise PresenceUnavailable
         if row["kind"] == "agent":
             allowed = common | {"focus","message"}
-            if row.get("actor") not in {"agent","user"} or row.get("state") not in {"idle","watching","editing","thinking"}: raise PresenceUnavailable
+            if row.get("actor") not in AGENT_ACTORS or row.get("state") not in AGENT_STATES: raise PresenceUnavailable
             for key in ("focus","message"):
                 if key in row and not isinstance(row[key], str): raise PresenceUnavailable
             if "focus" in row and not valid_focus(row["focus"]): raise PresenceUnavailable
@@ -103,14 +108,41 @@ class PresenceStore:
         return data
 
     def _load(self, dir_fd: int) -> dict[str, Any]:
+        try: return self._load_authority(dir_fd)
+        except PresenceUnavailable as exc:
+            # Presence is ephemeral, so the operator's safe repair for an
+            # unusable stored authority is always the same reset.
+            cause = exc.__cause__
+            detail = f" ({cause.strerror})" if isinstance(cause, OSError) and cause.strerror else ""
+            raise PresenceUnavailable(
+                f"presence file {self.path} is unreadable or invalid{detail}; presence is "
+                f"ephemeral, so stop the Studio and delete that file to reset it") from exc
+
+    def _load_authority(self, dir_fd: int) -> dict[str, Any]:
         raw = self._read(dir_fd)
         if raw is None: return {"version":2,"presence_rev":0,"records":{},"tombstones":{},"issued":{}}
         if raw.get("version") == 2: return self._validate(raw)
         if set(raw).issubset({"actor","state","focus","message"}) and isinstance(raw.get("actor"),str) and isinstance(raw.get("state"),str):
-            now=self._clock(); row={**raw,"session_id":"agent","kind":"agent","client_seq":0,"updated_at":now,"expires_at":now+self.agent_ttl}
+            now=self._clock(); row={**self._legacy_agent(raw),"session_id":"agent","kind":"agent","client_seq":0,"updated_at":now,"expires_at":now+self.agent_ttl}
             self._validate_row("agent", row)
             return {"version":2,"presence_rev":0,"records":{"agent":row},"tombstones":{},"issued":{}}
         raise PresenceUnavailable
+
+    @staticmethod
+    def _legacy_agent(raw: dict[str, Any]) -> dict[str, Any]:
+        """Normalise a v1 flat ``{actor, state, focus?}`` file into a v2 agent row.
+
+        v1 stored ``--actor`` / ``POST /__presence`` values verbatim, so a
+        custom actor or state is lenient-read rather than rejected: unknown
+        actors become ``agent``, unknown states ``idle``, and an invalid focus
+        or message is dropped. Version-2 authorities stay strictly validated.
+        """
+        agent = {"actor": raw["actor"] if raw["actor"] in AGENT_ACTORS else "agent",
+                 "state": raw["state"] if raw["state"] in AGENT_STATES else "idle"}
+        if valid_focus(raw.get("focus")): agent["focus"] = raw["focus"]
+        message = raw.get("message")
+        if isinstance(message, str) and len(message) <= 201: agent["message"] = message
+        return agent
 
     def _expired_deltas(self, data: dict[str, Any], now: float) -> list[dict[str, Any]]:
         deltas=[]
@@ -157,7 +189,8 @@ class PresenceStore:
             os.fsync(fd); os.close(fd); fd=-1
             os.replace(temp,self.path.name,src_dir_fd=dir_fd,dst_dir_fd=dir_fd)
             os.fsync(dir_fd)
-        except OSError as exc: raise PresenceUnavailable from exc
+        except OSError as exc:
+            raise PresenceUnavailable(f"could not write presence file {self.path} ({exc.strerror or exc})") from exc
         finally:
             if fd>=0: os.close(fd)
             try: os.unlink(temp,dir_fd=dir_fd)
@@ -199,7 +232,13 @@ class PresenceStore:
             else:
                 row=dict(record); row.update(session_id=sid,client_seq=seq,updated_at=now,expires_at=now+(self.agent_ttl if row.get("kind")=="agent" else self.BROWSER_TTL))
                 if row.get("kind") == "browser": row["capability_expires_at"]=capability_expires_at if capability_expires_at is not None else now + 60.0
-                self._validate_row(sid,row); data["records"][sid]=row; data["tombstones"].pop(sid,None); delta={"action":"upsert","record":dict(row)}
+                try: self._validate_row(sid,row)
+                except PresenceUnavailable as exc:
+                    raise PresenceUnavailable(
+                        f"invalid presence update: actor must be one of {sorted(AGENT_ACTORS)}, state one of "
+                        f"{sorted(AGENT_STATES)}, focus a concept id and message at most 200 characters"
+                        if row.get("kind") == "agent" else "invalid presence update") from exc
+                data["records"][sid]=row; data["tombstones"].pop(sid,None); delta={"action":"upsert","record":dict(row)}
             data["presence_rev"]+=1; self._write(data,dir_fd); delta.update(type="presence",presence_version=2,presence_rev=data["presence_rev"]); return self._public(data),True,delta
 
     def mutate_authorized(self,sid:str,generation:str,issued_at:float,expires_at:float,

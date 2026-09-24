@@ -573,6 +573,31 @@ def test_comment_claim_presence_carries_ask(studio_bundle: Path) -> None:
     assert on_disk.get("state") == "editing"
 
 
+def test_comment_claim_with_named_actor_still_flips_presence(studio_bundle: Path) -> None:
+    # A truthful --actor names the claimer on the comment; presence shows the
+    # agent role (it used to fail silently, so the chip never showed editing).
+    studio = Studio.for_bundle(studio_bundle)
+    c = studio.post_comment(concept="a", body="link the tables")
+    rc, _, err = _run_cli(
+        "comment-claim", str(studio_bundle), c["id"],
+        "--actor", "aic/Polaris", "--summary", "linking tables",
+    )
+    assert rc == 0, err
+    on_disk = json.loads(studio.presence_path.read_text(encoding="utf-8"))
+    assert (on_disk.get("actor"), on_disk.get("state"), on_disk.get("focus")) == ("agent", "editing", "a")
+    assert on_disk.get("message") == "linking tables"
+    assert studio.get_comment(c["id"])["claimed_by"] == "aic/Polaris"
+
+
+def test_cli_presence_named_actor_shows_as_agent(studio_bundle: Path) -> None:
+    rc, out, err = _run_cli(
+        "presence", str(studio_bundle), "--state", "editing",
+        "--actor", "claude", "--format", "json",
+    )
+    assert rc == 0, err
+    assert json.loads(out)["actor"] == "agent"
+
+
 # ---------------------------------------------------------------------------
 # HTTP surface: /__comment-update body edit, /__presence message, /__tunnel
 # ---------------------------------------------------------------------------

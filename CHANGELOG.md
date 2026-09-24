@@ -6,6 +6,28 @@ follow [Semantic Versioning](https://semver.org/). The product version
 (okf-loom 2.0.0) is separate from the OKF format version it implements
 (OKF 0.2).
 
+## [Unreleased]
+
+### Fixed
+
+- A v1 `presence.json` in the Studio session no longer stops `serve`. It is
+  normalised to the v2 format (unknown actors become `agent`, unknown states
+  `idle`) instead of being rejected with a bare `error:`.
+- A presence error caused by the stored file now names that file and says to
+  stop the Studio and delete it (presence is ephemeral); a rejected update
+  names the allowed actor and state values.
+- `comment-claim --actor <name>` now flips presence to `editing` as documented.
+  Presence records a role, so it silently failed for any name other than
+  `agent`/`user`; the name stays on the comment as `claimed_by`. `presence
+  --actor <name>` likewise shows a v1-style custom name as the agent.
+
+### Changed
+
+- The v1 theme names are accepted as aliases in `studio.theme` and the
+  viewer `config.json` `theme`: `light` → `technical-light`, `dark` and
+  `midnight` → `technical-dark`, `pastel` and `sepia` → `swiss-light`.
+  Unknown values are still a configuration error.
+
 ## [2.0.0] - 2026-09-24
 
 The first release of okf-loom v2, maintained by SpatialNexus as a fork of
@@ -156,7 +178,8 @@ the features ojamin added after v1.0.0; they are marked *(ojamin)* below.
   `technical-light`, `technical-dark`, `swiss-light`, `swiss-dark`,
   `purple-light`, `purple-dark`, `coffee-light` and `coffee-dark`. The v1
   values `light`, `dark`, `pastel`, `sepia` and `midnight` are rejected as a
-  configuration error.
+  configuration error. (They load again as aliases; see
+  [Unreleased](#unreleased).)
 - **Tunnels are read-only by default.** In v1 the tunnel host was trusted like
   the local Studio, so anyone with the link could comment and apply changes.
   In v2 the tunnel is served by a separate public listener that can only read
@@ -197,5 +220,6 @@ sharing and the skill archive builder. See
 [ojamin/okf-loom](https://github.com/ojamin/okf-loom) for its README and
 history.
 
+[Unreleased]: https://github.com/SpatialNexus/okf-loom-v2
 [2.0.0]: https://github.com/SpatialNexus/okf-loom-v2
 [1.0.0]: https://github.com/ojamin/okf-loom

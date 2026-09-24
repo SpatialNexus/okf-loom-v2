@@ -21,6 +21,10 @@
     directories. Keep them, but verify Git status before publishing: writing an
     ignore file can fail, ignores do not untrack existing files, and forced adds
     can bypass them. These defaults are not a confidentiality guarantee.
+    Bundle lock files are not self-ignored: okf-loom writes
+    `.okf-loom-bundle.lock` at the bundle root and `.<name>.okf-lock` beside
+    written files, so add `.okf-loom-bundle.lock` and `*.okf-lock` to the
+    repository `.gitignore`.
 11. `serve` binds 127.0.0.1:8787 by default and auto-opens a browser
     unless `--no-open`. Going public is an explicit choice:
     `--tunnel` (cloudflared quick tunnel, read-open to link holders) or

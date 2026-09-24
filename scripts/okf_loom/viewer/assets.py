@@ -633,8 +633,9 @@ _DEFAULT_CONFIG: dict[str, Any] = {
 _ALLOWED_LAYOUTS = frozenset({"cose", "concentric", "breadthfirst", "circle", "grid"})
 # The config preference also accepts "auto". The server always paints a
 # concrete theme, while theme.js owns Auto/OS resolution. KEEP IN SYNC with
-# render.py._THEMES / _CONTRASTS and viewer/static/theme.js. Retired legacy
-# names are migrated by theme.js, not accepted here.
+# render.py._THEMES / _CONTRASTS and viewer/static/theme.js. Retired v1 names
+# are mapped to their v2 value by load_config (config._LEGACY_THEME_MIGRATIONS)
+# before this allow-list check.
 _ALLOWED_THEMES = frozenset(
     {
         "auto",
@@ -661,7 +662,8 @@ def load_config(bundle: Bundle) -> dict[str, Any]:
             for Technical, Swiss, Purple, and Coffee — configured preference.
             Python paints a concrete first-paint theme; viewer/static/theme.js
             (the sole owner of theme state) resolves this preference after
-            applying any saved user choice.
+            applying any saved user choice. Retired v1 names (light, dark,
+            pastel, sepia, midnight) load as their v2 equivalent.
         contrast (str): one of "normal" or "soft".
         border (str): one of "on" or "off". Border Off never removes
             non-colour focus, selection, graph-path, error, or status cues.
@@ -676,6 +678,8 @@ def load_config(bundle: Bundle) -> dict[str, Any]:
     malicious config.json cannot inject arbitrary values into template
     contexts (defence against supply-chain XSS via config interpolation).
     """
+    from ..config import _LEGACY_THEME_MIGRATIONS
+
     cfg = dict(_DEFAULT_CONFIG)
     path = bundle.root / _OKF_VIEWER_SUBDIR / "config.json"
     if path.is_file():
@@ -685,6 +689,8 @@ def load_config(bundle: Bundle) -> dict[str, Any]:
                 for k, v in data.items():
                     if k not in _DEFAULT_CONFIG:
                         continue
+                    if k == "theme" and isinstance(v, str):
+                        v = _LEGACY_THEME_MIGRATIONS.get(v, v)  # v1 alias -> v2 value
                     # Validate values against allowed sets (fail-closed).
                     if k == "default_layout" and (
                         not isinstance(v, str) or v not in _ALLOWED_LAYOUTS

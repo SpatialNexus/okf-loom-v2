@@ -1054,7 +1054,7 @@ def cmd_comment_claim(args: argparse.Namespace) -> int:
                 # Carry the ask into the presence line so the user sees WHAT
                 # the agent is editing, not just that it is editing.
                 studio.set_presence(
-                    actor=args.actor, state="editing", focus=concept,
+                    actor=_presence_role(args.actor), state="editing", focus=concept,
                     message=summary or updated.get("request_summary") or None,
                 )
             except Exception:
@@ -1162,6 +1162,18 @@ def cmd_comment_list(args: argparse.Namespace) -> int:
     return 0
 
 
+def _presence_role(actor: str | None) -> str:
+    """Map an ``--actor`` name to the presence role it is shown as.
+
+    Presence records a role (``agent`` or ``user``), not an identity; the
+    claimer's truthful name already lives on the comment (``claimed_by``).
+    Any other name (``aic/Polaris``, a v1-era ``--actor claude``) is the agent.
+    """
+    from .presence import AGENT_ACTORS
+
+    return actor if actor in AGENT_ACTORS else "agent"
+
+
 def cmd_presence(args: argparse.Namespace) -> int:
     """Set agent presence (current spec §12).
 
@@ -1173,7 +1185,7 @@ def cmd_presence(args: argparse.Namespace) -> int:
     studio = Studio.for_configured_bundle(args.bundle)
     studio.ensure_session()
     presence = studio.set_presence(
-        actor=args.actor, state=args.state, focus=args.focus,
+        actor=_presence_role(args.actor), state=args.state, focus=args.focus,
         message=getattr(args, "message", None),
     )
     if args.format == "json":
@@ -2555,7 +2567,10 @@ def build_parser() -> argparse.ArgumentParser:
              "'linking 3 of 7 tables…' — so a long pass reads as progress, "
              "not a static 'editing'.",
     )
-    sp.add_argument("--actor", default="agent")
+    sp.add_argument(
+        "--actor", default="agent",
+        help="Presence role: agent (default) or user; any other name is shown as the agent",
+    )
     sp.add_argument("--format", choices=("text", "json"), default="text")
     sp.set_defaults(func=cmd_presence)
 

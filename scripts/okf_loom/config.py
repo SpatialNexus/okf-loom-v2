@@ -352,10 +352,11 @@ class DiscoverConfig:
 
 _ALLOWED_STUDIO_THEMES: frozenset[str] = frozenset(
     # "auto" = no preference (follow OS via theme.js); the eight concrete
-    # family-mode themes are the only valid painted values. KEEP IN SYNC
+    # family-mode themes are the only canonical/painted values. KEEP IN SYNC
     # with render.py._THEMES and viewer/static/theme.js (THEMES). The retired
-    # legacy concrete names (light/dark/pastel/sepia/midnight) are migrated
-    # in localStorage by theme.js, not accepted as config values.
+    # v1 names (light/dark/pastel/sepia/midnight) are accepted as aliases:
+    # StudioConfig.from_dict maps them through _LEGACY_THEME_MIGRATIONS
+    # before this check, so no consumer ever sees a v1 value.
     {
         "auto",
         "technical-light", "technical-dark",
@@ -364,6 +365,15 @@ _ALLOWED_STUDIO_THEMES: frozenset[str] = frozenset(
         "coffee-light", "coffee-dark",
     }
 )
+# Retired v1 concrete theme name -> v2 family-mode theme. The single table:
+# config load (studio.theme), viewer/assets.py (viewer config.json) and
+# render.py (first paint) all use it; theme.js LEGACY_THEMES mirrors it for
+# saved browser choices, enforced by tests/test_theme_contract.py. "light"
+# (the V2 default look) maps to Technical-light so users keep their visuals.
+_LEGACY_THEME_MIGRATIONS: dict[str, str] = {
+    "light": "technical-light", "dark": "technical-dark",
+    "pastel": "swiss-light", "sepia": "swiss-light", "midnight": "technical-dark",
+}
 
 
 @dataclass(frozen=True)
@@ -405,6 +415,7 @@ class StudioConfig:
     def from_dict(cls, data: dict[str, Any] | None) -> "StudioConfig":
         data = data or {}
         theme = str(data.get("theme", _DEFAULT_STUDIO_THEME))
+        theme = _LEGACY_THEME_MIGRATIONS.get(theme, theme)  # v1 alias -> v2 value
         _validate_enum("studio.theme", theme, _ALLOWED_STUDIO_THEMES)
         raw_hosts = data.get("allowed_hosts", list(_DEFAULT_STUDIO_ALLOWED_HOSTS))
         if isinstance(raw_hosts, str):
@@ -844,4 +855,5 @@ studio:                             # Live collaborative studio (all ON by defau
   max_sse_clients: 32
   allowed_hosts: [127.0.0.1, localhost]   # invisible cross-origin guard (§15)
   theme: auto                       # auto | technical-light | technical-dark | swiss-light | swiss-dark | purple-light | purple-dark | coffee-light | coffee-dark
+                                    # v1 names light/dark/pastel/sepia/midnight still load, mapped to their v2 theme
 """

@@ -30,14 +30,68 @@ def test_v1_migrates_and_two_browsers_merge_without_clobber(tmp_path):
     assert json.loads(studio.presence_path.read_text())["version"] == 2
 
 
-@pytest.mark.parametrize("legacy", [
-    {"actor":"agent","state":"bogus"},
-    {"actor":"agent","state":"editing","focus":"../bad"},
-    {"actor":"agent","state":"editing","message":"x"*202},
+@pytest.mark.parametrize(("legacy", "expected"), [
+    # v1 stored whatever --actor / POST /__presence passed, verbatim.
+    ({"actor":"v1-agent","state":"editing","focus":"datasets/orders"},
+     {"actor":"agent","state":"editing","focus":"datasets/orders"}),
+    ({"actor":"user","state":"reviewing"}, {"actor":"user","state":"idle"}),
+    ({"actor":"agent","state":"editing","focus":"../bad"}, {"actor":"agent","state":"editing"}),
+    ({"actor":"agent","state":"thinking","focus":{"id":"a"},"message":"x"*202},
+     {"actor":"agent","state":"thinking"}),
 ])
-def test_v1_migration_runs_full_agent_validation(tmp_path,legacy):
+def test_v1_flat_presence_is_normalised_instead_of_rejected(tmp_path,legacy,expected):
+    authority,studio=store(tmp_path); studio.presence_path.write_text(json.dumps(legacy))
+    [agent]=authority.snapshot()["records"]
+    assert {k:agent[k] for k in ("actor","state","focus","message") if k in agent}==expected
+    authority.mutate("page-a",1,row("A"))
+    assert json.loads(studio.presence_path.read_text())["records"]["agent"]["actor"]==expected["actor"]
+
+
+@pytest.mark.parametrize("legacy", [
+    {"actor":"agent","state":"idle","extra":True},
+    {"actor":7,"state":"idle"},
+    {"state":"idle"},
+])
+def test_unrecognised_flat_presence_still_fails_closed(tmp_path,legacy):
     authority,studio=store(tmp_path); studio.presence_path.write_text(json.dumps(legacy))
     with pytest.raises(PresenceUnavailable): authority.snapshot()
+
+
+def test_serve_starts_over_v1_custom_actor_presence(tmp_path,monkeypatch):
+    import okf_loom.server as server_module
+    (tmp_path/"note.md").write_text("---\ntype: note\n---\nBody\n")
+    studio=Studio.for_bundle(tmp_path); studio.ensure_session()
+    studio.presence_path.write_text(json.dumps({"actor":"v1-agent","state":"editing","focus":"note"}))
+    class StubServer:
+        def __init__(self,address,_handler): self.server_address=address
+        def serve_forever(self): pass
+        def shutdown(self): pass
+        def server_close(self): pass
+    monkeypatch.setattr(server_module,"ThreadingHTTPServer",StubServer)
+    server_module.run_server(tmp_path,host="127.0.0.1",port=0,watch=False,open_browser=False)
+    disk=json.loads(studio.presence_path.read_text())
+    assert disk["version"]==2 and disk["records"]["agent"]["actor"]=="agent"
+    assert disk["records"]["agent"]["state"]=="idle"
+
+
+def test_invalid_v2_presence_error_names_file_and_reset(tmp_path,capsys):
+    from okf_loom.cli import main
+    studio=Studio.for_bundle(tmp_path); studio.ensure_session()
+    studio.presence_path.write_text(json.dumps({"version":2,"presence_rev":0,"records":{"agent":{}},"tombstones":{},"issued":{}}))
+    with pytest.raises(PresenceUnavailable) as raised: studio.set_presence(state="editing")
+    message=str(raised.value)
+    assert str(studio.presence_path) in message and "stop the Studio" in message and "delete" in message
+    assert main(["presence",str(tmp_path),"--state","editing"])==1
+    err=capsys.readouterr().err
+    assert str(studio.presence_path) in err and "delete" in err
+
+
+def test_rejected_presence_update_does_not_blame_the_file(tmp_path):
+    studio=Studio.for_bundle(tmp_path); studio.ensure_session()
+    with pytest.raises(PresenceUnavailable) as raised: studio.set_presence(actor="v1-agent",state="editing")
+    message=str(raised.value)
+    assert message and "actor" in message and "delete" not in message
+    assert studio.get_presence_snapshot()["records"]==[]
 
 
 def test_concurrent_sessions_merge_under_cross_process_lock(tmp_path):

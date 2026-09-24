@@ -111,12 +111,33 @@ def test_config_and_assets_allowlists_match_theme_js() -> None:
     assert assets._ALLOWED_BORDERS == {"on", "off"}
     assert assets._DEFAULT_CONFIG["contrast"] == "normal"
     assert assets._DEFAULT_CONFIG["border"] == "off"
-    # No retired legacy name is accepted anywhere.
+    # No retired legacy name is a canonical value; loaders map them to one.
     retired = {"light", "dark", "pastel", "sepia", "midnight"}
     assert retired.isdisjoint(config._ALLOWED_STUDIO_THEMES)
     assert retired.isdisjoint(assets._ALLOWED_THEMES)
     # Modes are exactly auto/light/dark.
     assert modes == {"auto", "light", "dark"}
+
+
+def test_v1_theme_names_load_as_v2_aliases_from_the_single_legacy_map(tmp_path: Path) -> None:
+    """v1 studio.theme / viewer config.json values keep working: config load
+    maps them through the one legacy table (render and theme.js mirror it), so
+    consumers only ever see the v2 value. Unknown values still fail closed."""
+    from okf_loom.model import Bundle
+
+    assert render._LEGACY_THEME_MIGRATIONS is config._LEGACY_THEME_MIGRATIONS
+    assert set(config._LEGACY_THEME_MIGRATIONS.values()) <= config._ALLOWED_STUDIO_THEMES
+    for legacy, v2 in config._LEGACY_THEME_MIGRATIONS.items():
+        assert config.StudioConfig.from_dict({"theme": legacy}).theme == v2
+    (tmp_path / "note.md").write_text("---\ntype: note\n---\nBody\n")
+    (tmp_path / config.CONFIG_FILENAME).write_text("studio:\n  theme: midnight\n")
+    assert config.OkfConfig.load(tmp_path).studio.theme == "technical-dark"
+    viewer = tmp_path / ".okf-loom" / "viewer"
+    viewer.mkdir(parents=True)
+    (viewer / "config.json").write_text('{"theme": "pastel"}')
+    assert assets.load_config(Bundle.load(tmp_path))["theme"] == "swiss-light"
+    with pytest.raises(config.OkfConfigError, match="studio.theme: unknown value 'neon'"):
+        config.StudioConfig.from_dict({"theme": "neon"})
 
 
 def test_fresh_visitor_appearance_defaults_agree_everywhere() -> None:
@@ -582,7 +603,8 @@ def test_renderers_consumes_theme_event_without_owning_state() -> None:
 def test_generated_config_documents_only_valid_theme_values() -> None:
     """GAP-2: the values listed in DEFAULT_CONFIG_YAML's studio.theme comment
     are EXACTLY the config-accepted allowlist. A user who copies a documented
-    value must never hit a validation error; no retired legacy name is shown.
+    value must never hit a validation error; no retired legacy name is listed
+    as a value (v1 names are only noted as load-time aliases).
     """
     comment = re.search(r"^\s*theme:.*#\s*(.+)$", config.DEFAULT_CONFIG_YAML, re.MULTILINE)
     assert comment, "DEFAULT_CONFIG_YAML studio.theme comment not found"

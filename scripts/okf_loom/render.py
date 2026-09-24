@@ -54,6 +54,7 @@ from .model import Bundle, Concept
 from .paths import ConceptId, concept_id_from_str, concept_id_to_str
 from .retrieval import bundle_revision
 from .annotations import extract_blocks, concept_content_rev
+from .config import _LEGACY_THEME_MIGRATIONS
 from .studio import (
     CommentSummaryUnavailable,
     CommentSummaryV1,
@@ -2506,13 +2507,9 @@ _THEMES: tuple[str, ...] = (
     "technical-light", "technical-dark", "swiss-light", "swiss-dark",
     "purple-light", "purple-dark", "coffee-light", "coffee-dark",
 )
-# Legacy localStorage["okf-theme"] concrete values → new resolved theme.
-# Mirrors theme.js LEGACY_THEMES; "light" (the V2 default look) maps to
-# Technical-light so existing users keep exactly the visuals they had.
-_LEGACY_THEME_MIGRATIONS: dict[str, str] = {
-    "light": "technical-light", "dark": "technical-dark",
-    "pastel": "swiss-light", "sepia": "swiss-light", "midnight": "technical-dark",
-}
+# Legacy v1 concrete theme values → new resolved theme: _LEGACY_THEME_MIGRATIONS
+# is imported from config.py (the single table, which theme.js LEGACY_THEMES
+# mirrors for localStorage["okf-theme"]).
 # Server-side default when no concrete theme is configured. This is a concrete
 # paint hint only; the configured preference is _DEFAULT_CONFIGURED_THEME and
 # theme.js resolves Technical Auto from the OS before the body can paint.
