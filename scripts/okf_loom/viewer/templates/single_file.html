@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<!--
+  OKF single-file viewer template.
+
+  Placeholder convention (str.replace, NOT string.Template: concept bodies
+  contain literal `$`):
+  __BUNDLE_NAME__    → JSON-encoded string (display name)
+  __BUNDLE_NAME_DISPLAY__ → HTML-escaped display name for the topbar
+  __DATA_ATTRS__     → static-mode and runtime-owned capture metadata
+  __BUNDLE_DATA__    → JSON-encoded object: {name, nodes, edges, bodies,
+                          types, palette, backlinks, external}
+      /*__VIEWER_CSS__*/ → wiki.css + shell.css + graph.css contents (inlined)
+      /*__VIEWER_JS__*/  → graph.js (the full viewer logic, inlined)
+      __INITIAL_THEME__  → resolved theme painted on <html data-theme="…"> —
+                            any Technical/Swiss/Purple/Coffee light/dark theme. theme.js (inlined in
+                          <head>) honours a saved user preference + Auto/OS
+                          at boot; otherwise this concrete first-paint value.
+      __THEME_MODIFIER_ATTRS__ → configured contrast/border + default density
+                          root attributes (same values theme.js resolves for a
+                          visitor with no saved preference; no-JS parity).
+      __INITIAL_LAYOUT__ → "cose" | "concentric" | ...
+      __THEME_CONFIG__   → CSP-safe configured theme/modifier preference JSON;
+                          separate from the concrete first-paint hint.
+
+  CDN scripts are emitted only when config["cdn"] is True.
+-->
+<html lang="en" data-theme="__INITIAL_THEME__"__THEME_MODIFIER_ATTRS__>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230c7373'/%3E%3Cpath d='M8 10h16M8 16h10M8 22h16' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'none'; font-src 'self' https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self'">
+<title>OKF Viewer</title>
+__CDN_SCRIPTS__
+<style>
+/*__VIEWER_CSS__*/
+</style>
+__THEME_CONFIG__
+<script>
+/* theme.js inlined in <head> (before first paint) so data-theme resolves
+ * before the body renders — no FOUC for a stored non-default preference.
+ * The single-file CSP allows 'unsafe-inline' (the whole viewer is inlined). */
+/*__THEME_HEAD_JS__*/
+</script>
+</head>
+<body class="okf-viewer okf-viewer--singlefile" __DATA_ATTRS__>
+<a href="#okf-single-index" class="okf-skip-link">Skip to content</a>
+__APPLICATION_SHELL__
+<div class="okf-graph-tools okf-single-graph-tools okf-js-only" role="search" aria-label="Graph tools">
+  <label><span>Find concepts</span><input id="okf-search" type="search" placeholder="Search title / id / tag" autocomplete="off" aria-label="Search graph concepts"></label>
+  <label><span>Type</span><select id="okf-filter-type" aria-label="Filter by type"><option value="">All types</option></select></label>
+  <label><span>Layout</span><select id="okf-layout" aria-label="Graph layout"><option value="cose">cose (force)</option><option value="concentric">concentric</option><option value="breadthfirst">breadth-first</option><option value="circle">circle</option><option value="grid">grid</option></select></label>
+  <button id="okf-reset" type="button">Reset view</button>
+</div>
+
+<p class="okf-studio-fallback-banner okf-nojs-fallback okf-single-nojs" role="note">JavaScript is off. Concept bodies, the graph view, and embedded Search and Context controls need JavaScript, so they are unavailable in this single-file viewer. The concept list above and the resolved in-bundle relationships below remain readable.</p>
+<p class="okf-studio-fallback-banner okf-static-viewer-note" role="status">Static viewer: live Studio editing and annotations are not included. Embedded Search, Context, and graph controls remain available when JavaScript runs; resolved relationships remain available below.</p>
+<main id="okf-single-index" class="okf-single-index" aria-labelledby="okf-single-index-title" tabindex="-1">
+  <h1 id="okf-single-index-title">__BUNDLE_NAME_DISPLAY__ index</h1>
+  <p>Browse the concepts embedded in this self-contained bundle. Choose Graph for the interactive relationship view.</p>
+  <ol class="okf-single-index__list">__SINGLE_INDEX_CONCEPTS__</ol>
+</main>
+<section id="okf-single-graph-fallback" class="okf-graph-nojs" aria-labelledby="okf-single-nojs-title" tabindex="-1"><h2 id="okf-single-nojs-title">Resolved in-bundle relationships</h2>__GRAPH_THUMBNAIL__<ol>__NOJS_RELATIONSHIPS__</ol></section>
+
+<section id="okf-single-search" class="okf-single-search" aria-labelledby="okf-single-search-title" hidden>
+  <div class="okf-single-search__head">
+    <div><h2 id="okf-single-search-title">Search &amp; context</h2><p>Deterministic portable ranking over embedded evidence. Selected-text packs are unavailable in this self-contained graph; use cited passage, result, or concept context.</p></div>
+    <button type="button" class="okf-btn" data-single-search-close aria-label="Close Search and context">Close</button>
+  </div>
+  <form class="okf-single-search__form" role="search">
+    <label class="okf-field" for="okf-single-query"><span>Search this bundle</span></label>
+    <div class="okf-single-search__query"><input id="okf-single-query" name="q" type="search" maxlength="4096" autocomplete="off"><button type="submit" class="okf-search-submit">Search</button></div>
+    <fieldset class="okf-search-modes"><legend>How should results be matched?</legend>
+      <label class="okf-search-mode"><input type="radio" name="mode" value="hybrid"> <span>Best overall</span></label>
+      <label class="okf-search-mode"><input type="radio" name="mode" value="lexical" checked> <span>Exact wording</span></label>
+      <label class="okf-search-mode"><input type="radio" name="mode" value="semantic"> <span>Similar meaning</span></label>
+      <label class="okf-search-mode"><input type="radio" name="mode" value="tag"> <span>Tagged with</span></label>
+      <label class="okf-search-mode"><input type="radio" name="mode" value="entity"> <span>Mentions entity</span></label>
+      <label class="okf-search-mode"><input type="radio" name="mode" value="relation"> <span>Connected by relation</span></label>
+    </fieldset>
+      <details class="okf-search-filters"><summary>Filters<span data-single-filter-active hidden>,&nbsp;<span data-single-filter-count>0</span>&nbsp;active</span></summary>
+      <div class="okf-search-filter-grid">
+        <label class="okf-field"><span>Type</span><input name="type" list="okf-single-types" maxlength="256"></label>
+        <label class="okf-field"><span>Tag</span><input name="tag" list="okf-single-tags" maxlength="256"></label>
+        <label class="okf-field" data-mode-field="entity"><span>Entity</span><input name="entity" list="okf-single-entities" maxlength="256"></label>
+        <label class="okf-field" data-mode-field="relation"><span>Relation</span><input name="relation" list="okf-single-relations" maxlength="256"></label>
+        <label class="okf-field" data-mode-field="relation"><span>Source concept</span><input name="source" list="okf-single-concepts" maxlength="256"></label>
+        <label class="okf-field" data-mode-field="relation"><span>Target concept</span><input name="target" list="okf-single-concepts" maxlength="256"></label>
+        <label class="okf-field"><span>Result limit</span><input name="limit" type="number" min="1" max="100" value="20"></label>
+      </div>
+      <button type="button" class="okf-btn" data-single-clear-filters>Clear filters</button>
+    </details>
+    <datalist id="okf-single-types"></datalist><datalist id="okf-single-tags"></datalist>
+    <datalist id="okf-single-entities"></datalist><datalist id="okf-single-relations"></datalist><datalist id="okf-single-concepts"></datalist>
+  </form>
+  <p class="okf-single-search__status" data-single-search-status role="status" aria-live="polite">Enter a query, then choose how to match it.</p>
+  <div class="okf-single-search__summary" hidden>
+    <h3 data-single-results-heading>Results</h3>
+    <div class="okf-page-context">
+      <button type="button" class="okf-btn" data-single-page-context>Build context pack</button>
+      <p>Selected cited passages for reuse — not an AI summary.</p>
+      <details><summary>Advanced: budget and related passages</summary><div class="okf-context-options">
+        <label>Token budget <input type="number" data-single-budget min="128" max="50000" value="6000"></label>
+        <label>Neighbors <select data-single-neighbors><option value="0">None</option><option value="1" selected>1 hop</option><option value="2">2 hops</option></select></label>
+      </div></details>
+      <p data-single-context-estimate>Size and truncation are calculated before copy.</p>
+      <button type="button" class="okf-btn" data-single-copy-pack disabled>Copy context pack</button>
+      <section class="okf-context-preview" data-single-context-preview aria-label="Selected cited passages" tabindex="0" hidden></section>
+    </div>
+  </div>
+  <ol class="okf-search-results-list" data-single-results></ol>
+  <div class="okf-copy-fallback" data-single-copy-fallback hidden><label for="okf-single-copy-text">Copy manually</label><textarea id="okf-single-copy-text" readonly rows="8"></textarea><button type="button" class="okf-btn" data-single-select-copy>Select all</button></div>
+  <p class="okf-visually-hidden" data-single-copy-status role="status" aria-live="polite"></p>
+</section>
+
+<main id="okf-main" class="okf-layout" tabindex="-1">
+  <!-- P2-2 (iter-1): top-level heading for document outline parity with
+       graph_page.html. Visually hidden; the detail panel's selected-node
+       title is an <h2> below. -->
+  <h2 class="sr-only">__BUNDLE_NAME_DISPLAY__ graph view</h2>
+  <nav class="okf-graph-skip-links" aria-label="Graph shortcuts">
+    <a class="okf-skip-link" href="#okf-concept-index">Skip graph visualization</a>
+    <a class="okf-skip-link" href="#okf-detail">Jump to graph results and details</a>
+  </nav>
+  <nav class="okf-graph-mobile-nav" aria-label="Graph panes">
+    <button type="button" data-graph-pane="graph" aria-controls="okf-graph" aria-pressed="true">Graph</button>
+    <button type="button" data-graph-pane="concepts" aria-controls="okf-concept-index" aria-pressed="false">Concepts</button>
+    <button type="button" data-graph-pane="details" aria-controls="okf-detail" aria-pressed="false">Details</button>
+  </nav>
+
+  <section id="okf-graph" class="okf-graph" aria-label="Concept graph" tabindex="-1">
+    <!-- P1-4 / P2-2 (iter-1): keyboard-accessible node index (same overlay
+         as graph_page.html). Populated by graph.js buildNodeIndex().
+         P2-4 (iter-2): defaults to COLLAPSED on all screen sizes (matches
+         graph_page.html; prevents the overlay crowding the canvas). -->
+    <details class="okf-node-index" id="okf-concept-index">
+      <summary aria-controls="okf-node-index-list">All concepts <span class="okf-node-index__count" id="okf-node-index-count"></span></summary>
+      <p class="okf-node-index__hint okf-muted">Use arrows to move, Space to select, Shift+Space for a path, and Enter to open.</p>
+      <div class="okf-node-index__list" id="okf-node-index-list"></div>
+    </details>
+  </section>
+
+  <!-- No aria-live here: graph.js mounts its own role="status" region
+       (.okf-signal__status) inside this pane, and a live region nested inside
+       another double-announces. The inner status region is the single owner. -->
+  <aside id="okf-detail" class="okf-detail" aria-label="Details">
+    <div id="detail-empty" class="okf-muted okf-detail__empty">Select a node to see its details.</div>
+    <article id="detail-content" aria-labelledby="detail-title" hidden>
+      <header class="okf-detail__header">
+        <span class="okf-type-chip" id="detail-type"></span>
+        <h2 id="detail-title"></h2>
+          <span class="okf-detail-selected-status okf-visually-hidden"></span>
+        <div class="okf-muted" id="detail-id"></div>
+        <p class="okf-detail__description" id="detail-description"></p>
+        <div class="okf-graph-context-actions" id="okf-graph-context-actions" hidden>
+          <p class="okf-context-scope-note">Source: selected graph concept · Scope: one concept with bounded neighborhood evidence · Estimated size: calculated before copy.</p>
+          <button type="button" class="okf-btn" id="okf-copy-neighbourhood">Copy concept context</button>
+        </div>
+      </header>
+      <details class="okf-graph-document-details"><summary>Document details</summary>
+      <dl class="okf-frontmatter">
+        <dt>Resource</dt><dd id="detail-resource"></dd>
+        <dt>Tags</dt><dd id="detail-tags"></dd>
+      </dl>
+      <!-- P1-3 (iter-1): §7 governed keys, same container as graph_page.html. -->
+      <div class="okf-detail__governed" id="detail-governed" hidden></div>
+      </details>
+      <section class="okf-detail__connection-summary" id="detail-connection-summary" aria-labelledby="detail-connection-summary-title">
+        <h3 id="detail-connection-summary-title">Connections at a glance</h3>
+        <p id="detail-connection-summary-text"></p>
+      </section>
+      <div id="detail-body" class="okf-prose"></div>
+      <div id="detail-relationships-slot"></div>
+      <section id="detail-outgoing" hidden>
+        <h3>Links to</h3>
+        <ul id="outgoing-list" class="okf-linklist"></ul>
+      </section>
+      <section id="detail-backlinks" hidden>
+        <h3>Cited by</h3>
+        <ul id="backlinks-list" class="okf-linklist"></ul>
+      </section>
+      <section id="okf-detail-signals" class="okf-detail__signals" aria-labelledby="okf-detail-signals-title">
+        <h3 id="okf-detail-signals-title" class="okf-detail__signals-head">Why this connects</h3>
+        <dl class="okf-detail__signals-list"></dl>
+      </section>
+    </article>
+    <p id="okf-graph-announcer" class="okf-signal__status" role="status" aria-live="polite" aria-atomic="true"></p>
+    <div id="okf-lens-controls-slot"></div>
+  </aside>
+</main>
+
+<div id="okf-graph-copy-fallback" class="okf-copy-fallback okf-graph-copy-fallback" hidden><label for="okf-graph-copy-text">Copy neighbourhood manually</label><textarea id="okf-graph-copy-text" readonly rows="8"></textarea><button type="button" class="okf-btn" id="okf-graph-copy-select">Select all</button></div>
+<p id="okf-graph-copy-status" class="okf-visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
+
+<script>
+window.BUNDLE_NAME = __BUNDLE_NAME__;
+window.BUNDLE = __BUNDLE_DATA__;
+window.OKF_LOOM_INITIAL_LAYOUT = "__INITIAL_LAYOUT__";
+</script>
+<script>
+/*__VIEWER_JS__*/
+</script>
+<script>
+/* Single-file root parity: graph.js initializes against visible geometry,
+ * then this tiny destination owner presents Index as the default root view.
+ * Native anchors remain honest when JavaScript is unavailable. */
+(function () {
+  var index = document.getElementById("okf-single-index");
+  var graph = document.getElementById("okf-main");
+  var tools = document.querySelector(".okf-single-graph-tools");
+  var skipLink = document.querySelector(".okf-skip-link");
+  var brandLink = document.querySelector('[data-okf-shell-item="bundle"]');
+  var indexLink = document.querySelector('[data-okf-shell-item="index"] a');
+  var graphLink = document.querySelector('[data-okf-shell-item="graph"] a');
+  if (!index || !graph || !skipLink || !brandLink || !indexLink || !graphLink) return;
+  function updateHistory(hash, replace) {
+    var url = new URL(location.href);
+    ["selected", "lens", "focus", "focusDepth", "path", "hidden", "hiddenRelation"].forEach(function (key) {
+      url.searchParams.delete(key);
+    });
+    url.hash = hash;
+    history[replace ? "replaceState" : "pushState"]({}, "", url.pathname + url.search + url.hash);
+  }
+  function focusTarget(target) {
+    if (!target || target.hidden) return;
+    /* A plain container (the concept article) is not focusable on its own,
+     * so focus() was a silent no-op and keyboard focus stayed on <body>. */
+    if (target.tabIndex < 0 && !target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+    target.scrollIntoView({block: "start"});
+    target.focus({preventScroll: true});
+  }
+  function select(destination, focus, historyMode) {
+    var graphSelected = destination !== "index";
+    var conceptSelected = destination === "concept";
+    index.hidden = graphSelected;
+    graph.hidden = !graphSelected;
+    /* The graph is a viewport-bound application workspace; the Index is an
+     * ordinary document. Naming the destination lets CSS release that bound
+     * so every entry stays reachable by wheel, keyboard and touch. */
+    document.body.dataset.okfSingleDestination = destination;
+    if (tools) tools.hidden = !graphSelected;
+    if (graphSelected) {
+      indexLink.removeAttribute("aria-current");
+      graphLink.setAttribute("aria-current", "page");
+    } else {
+      graphLink.removeAttribute("aria-current");
+      indexLink.setAttribute("aria-current", "page");
+    }
+    var primaryTarget = conceptSelected ? "#detail-content" : (graphSelected ? "#okf-main" : "#okf-single-index");
+    skipLink.setAttribute("href", primaryTarget);
+    brandLink.setAttribute("href", primaryTarget);
+    graphLink.setAttribute("href", graphSelected ? "#okf-graph" : "#okf-main");
+    if (historyMode) updateHistory(graphSelected ? "#okf-graph" : "#okf-single-index", historyMode === "replace");
+    if (graphSelected) {
+      window.dispatchEvent(new Event("resize"));
+      if (focus) focusTarget(conceptSelected ? document.getElementById("detail-content") : document.getElementById("okf-graph"));
+    } else if (focus) focusTarget(index);
+  }
+  function clearGraphSelection() {
+    var interaction = window.__okfLoomGraph && window.__okfLoomGraph.interaction;
+    if (interaction && typeof interaction.dispatch === "function") interaction.dispatch({type: "CLEAR", quietUrl: true});
+  }
+  index.addEventListener("click", function (event) {
+    var entry = event.target.closest && event.target.closest("a[data-okf-single-concept]");
+    if (!entry || event.defaultPrevented || event.button !== 0 ||
+        event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    var interaction = window.__okfLoomGraph && window.__okfLoomGraph.interaction;
+    /* Without a running graph the href is still a working deep link. */
+    if (!interaction || typeof interaction.dispatch !== "function") return;
+    event.preventDefault();
+    /* Leave the Index in history so Back returns to the list. */
+    updateHistory("#okf-single-index", true);
+    updateHistory("#detail-content", false);
+    select("concept", false);
+    interaction.dispatch({type: "SELECT", id: entry.getAttribute("data-okf-single-concept"), source: "single-index"});
+    focusTarget(document.getElementById("detail-content"));
+  });
+  function openIndex(event) { event.preventDefault(); clearGraphSelection(); select("index", true, "push"); }
+  indexLink.addEventListener("click", openIndex);
+  brandLink.addEventListener("click", openIndex);
+  graphLink.addEventListener("click", function (event) {
+    event.preventDefault(); clearGraphSelection(); select("graph", true, "push");
+  });
+  window.addEventListener("okf-loom:single-destination", function (event) {
+    if (event.detail && event.detail.destination === "graph") select("graph", false);
+  });
+  window.addEventListener("okf-loom:graph-selection", function (event) {
+    select(event.detail && event.detail.conceptId ? "concept" : "graph", false);
+  });
+  window.addEventListener("popstate", function () {
+    var selected = new URLSearchParams(location.search).has("selected");
+    var graphHash = location.hash === "#okf-graph" || location.hash === "#okf-main" || location.hash === "#okf-single-graph-fallback";
+    select(selected ? "concept" : (graphHash ? "graph" : "index"), false);
+  });
+  var directConcept = new URLSearchParams(location.search).has("selected");
+  var directGraph = location.hash === "#okf-graph" || location.hash === "#okf-main" || location.hash === "#okf-single-graph-fallback";
+  select(directConcept ? "concept" : (directGraph ? "graph" : "index"), false);
+}());
+</script>
+</body>
+</html>

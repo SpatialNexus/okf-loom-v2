@@ -1,0 +1,60 @@
+# AGENTS.md — okf-loom Skill
+
+This repo is a loadable OKF skill checkout. Start with [`SKILL.md`](SKILL.md),
+then load the focused resource file for the task you are doing.
+
+## Required orientation
+
+1. Read [`SKILL.md`](SKILL.md) — especially its **Default behaviours**: author
+   docs as fully-dressed OKF concepts, validate after writing, serve the live
+   studio proactively when the user wants to see or discuss docs
+   (`scripts/okf-loom serve <bundle> --no-open`, add `--tunnel` for a public
+   link), and run the comment loop (`wait` → `comment-claim` → mutators →
+   `comment-resolve`) while a studio is up.
+2. Use `scripts/okf-loom ...` for runtime commands.
+3. Use [`docs-bundle/reference/spec.md`](docs-bundle/reference/spec.md) as the
+   canonical current spec.
+4. Do not reintroduce package publishing as the primary workflow. This git repo
+   skill layout is the artifact.
+
+## What lives where
+
+```text
+okf-loom/
+├── SKILL.md                 # primary loadable skill entrypoint
+├── resources/               # small agent-readable guidance files
+├── scripts/okf-loom         # checked-in helper command
+├── scripts/okf_loom/        # checkout-local runtime package
+├── docs-bundle/             # OKF docs bundle
+├── samples/                 # example bundles
+├── tests/                   # executable proofs
+└── docs/                    # screenshots, design plans (docs/design/)
+```
+
+## Command baseline
+
+```bash
+scripts/okf-loom --help
+scripts/okf-loom validate docs-bundle --strict
+```
+
+No primary runtime install step is required for normal docs validation.
+PyYAML is used when present; otherwise okf-loom uses its conservative built-in YAML fallback.
+
+## Hard rules
+
+- `type` is the only always-required concept frontmatter key in OKF 0.2 (loom 2.0.0).
+- Trust/lifecycle/source/computation families are optional; trust is advisory,
+  never authorization, and computations are metadata only, never executed.
+- Record truthful actors; preserve imports and legacy timestamps without inference.
+- Only literal root `generated: true` owns unmarked whole-body index regeneration;
+  concept provenance mappings never grant ownership.
+- Preserve unknown frontmatter keys and hand-authored content.
+- Consumers tolerate broken links; mutators fail closed on missing targets
+  unless `--allow-forward-reference` is explicit.
+- `index.md` and `log.md` are reserved filenames.
+- Only the bundle-root `index.md` may carry frontmatter.
+- Index regeneration must be marker-safe; log updates are append-only.
+- All writes must stay atomic.
+
+See [`resources/gotchas.md`](resources/gotchas.md) for the longer checklist.

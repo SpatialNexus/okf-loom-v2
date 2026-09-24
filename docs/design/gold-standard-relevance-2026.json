@@ -1,0 +1,3612 @@
+{
+  "aggregate": {
+    "after": {
+      "citation_validity": 1.0,
+      "expected_section_hit_rate": 1.0,
+      "hard_negative_query_rate_at_3": 0.5714285714285714,
+      "mrr": 1.0,
+      "ndcg_at_3": 1.0,
+      "precision_at_3": 0.38095238095238093
+    },
+    "before": {
+      "citation_validity": null,
+      "expected_section_hit_rate": null,
+      "hard_negative_query_rate_at_3": 0.5714285714285714,
+      "mrr": 1.0,
+      "ndcg_at_3": 1.0,
+      "precision_at_3": 0.38095238095238093
+    },
+    "portable_context_parity": {
+      "after": 1.0,
+      "per_query": [
+        {
+          "field_match": true,
+          "id": "lexical-retention",
+          "live_item_ids": [
+            "policies/retention:L14-L14"
+          ],
+          "markdown_byte_match": true,
+          "match": true,
+          "portable_item_ids": [
+            "policies/retention:L14-L14"
+          ]
+        },
+        {
+          "field_match": true,
+          "id": "semantic-identity-typo",
+          "live_item_ids": [
+            "entities/customer-identity:L13-L13",
+            "entities/identity-noise:L10-L10",
+            "policies/retention:L10-L10"
+          ],
+          "markdown_byte_match": true,
+          "match": true,
+          "portable_item_ids": [
+            "entities/customer-identity:L13-L13",
+            "entities/identity-noise:L10-L10",
+            "policies/retention:L10-L10"
+          ]
+        },
+        {
+          "field_match": true,
+          "id": "hybrid-payment",
+          "live_item_ids": [
+            "runbooks/payment-retries:L14-L14",
+            "notes/payment-noise:L10-L10",
+            "policies/retention:L10-L10"
+          ],
+          "markdown_byte_match": true,
+          "match": true,
+          "portable_item_ids": [
+            "runbooks/payment-retries:L14-L14",
+            "notes/payment-noise:L10-L10",
+            "policies/retention:L10-L10"
+          ]
+        },
+        {
+          "field_match": true,
+          "id": "tag-critical-path",
+          "live_item_ids": [
+            "services/checkout:L13-L13",
+            "runbooks/payment-retries:L10-L10"
+          ],
+          "markdown_byte_match": true,
+          "match": true,
+          "portable_item_ids": [
+            "services/checkout:L13-L13",
+            "runbooks/payment-retries:L10-L10"
+          ]
+        },
+        {
+          "field_match": true,
+          "id": "entity-orion-ledger",
+          "live_item_ids": [
+            "systems/ledger:L13-L13"
+          ],
+          "markdown_byte_match": true,
+          "match": true,
+          "portable_item_ids": [
+            "systems/ledger:L13-L13"
+          ]
+        },
+        {
+          "field_match": true,
+          "id": "relation-ledger-dependency",
+          "live_item_ids": [
+            "services/checkout:L13-L13"
+          ],
+          "markdown_byte_match": true,
+          "match": true,
+          "portable_item_ids": [
+            "services/checkout:L13-L13"
+          ]
+        },
+        {
+          "field_match": true,
+          "id": "section-rollback",
+          "live_item_ids": [
+            "runbooks/deploy:L14-L14",
+            "notes/rollback-noise:L10-L10",
+            "runbooks/deploy:L10-L10"
+          ],
+          "markdown_byte_match": true,
+          "match": true,
+          "portable_item_ids": [
+            "runbooks/deploy:L14-L14",
+            "notes/rollback-noise:L10-L10",
+            "runbooks/deploy:L10-L10"
+          ]
+        }
+      ],
+      "semantics": "Complete pack fields (numeric values compared as JSON numbers), ordered item IDs, and canonical Markdown bytes.",
+      "status": "measured"
+    },
+    "portable_live_parity": {
+      "after": 1.0,
+      "before": null,
+      "per_query": [
+        {
+          "contract_match": true,
+          "id": "lexical-retention",
+          "live_order": [
+            "policies/retention",
+            "glossary/quartz"
+          ],
+          "live_top": "policies/retention",
+          "match": true,
+          "portable_order": [
+            "policies/retention",
+            "glossary/quartz"
+          ],
+          "portable_top": "policies/retention"
+        },
+        {
+          "contract_match": true,
+          "id": "semantic-identity-typo",
+          "live_order": [
+            "entities/customer-identity",
+            "entities/identity-noise",
+            "policies/retention"
+          ],
+          "live_top": "entities/customer-identity",
+          "match": true,
+          "portable_order": [
+            "entities/customer-identity",
+            "entities/identity-noise",
+            "policies/retention"
+          ],
+          "portable_top": "entities/customer-identity"
+        },
+        {
+          "contract_match": true,
+          "id": "hybrid-payment",
+          "live_order": [
+            "runbooks/payment-retries",
+            "notes/payment-noise",
+            "policies/retention"
+          ],
+          "live_top": "runbooks/payment-retries",
+          "match": true,
+          "portable_order": [
+            "runbooks/payment-retries",
+            "notes/payment-noise",
+            "policies/retention"
+          ],
+          "portable_top": "runbooks/payment-retries"
+        },
+        {
+          "contract_match": true,
+          "id": "tag-critical-path",
+          "live_order": [
+            "services/checkout",
+            "runbooks/payment-retries"
+          ],
+          "live_top": "services/checkout",
+          "match": true,
+          "portable_order": [
+            "services/checkout",
+            "runbooks/payment-retries"
+          ],
+          "portable_top": "services/checkout"
+        },
+        {
+          "contract_match": true,
+          "id": "entity-orion-ledger",
+          "live_order": [
+            "systems/ledger"
+          ],
+          "live_top": "systems/ledger",
+          "match": true,
+          "portable_order": [
+            "systems/ledger"
+          ],
+          "portable_top": "systems/ledger"
+        },
+        {
+          "contract_match": true,
+          "id": "relation-ledger-dependency",
+          "live_order": [
+            "services/checkout"
+          ],
+          "live_top": "services/checkout",
+          "match": true,
+          "portable_order": [
+            "services/checkout"
+          ],
+          "portable_top": "services/checkout"
+        },
+        {
+          "contract_match": true,
+          "id": "section-rollback",
+          "live_order": [
+            "runbooks/deploy",
+            "notes/rollback-noise"
+          ],
+          "live_top": "runbooks/deploy",
+          "match": true,
+          "portable_order": [
+            "runbooks/deploy",
+            "notes/rollback-noise"
+          ],
+          "portable_top": "runbooks/deploy"
+        }
+      ],
+      "semantics": "Fraction of queries with the same complete ordered top-k concepts in portable JavaScript and live Python retrieval.",
+      "status": "measured"
+    }
+  },
+  "caveats": [
+    "The fixture is synthetic and intentionally small; it is a regression proof, not a production traffic estimate.",
+    "Semantic mode is dependency-free semantic-lite fuzzy matching, not embeddings.",
+    "Baseline section/citation metrics are null when the baseline API cannot emit passage evidence.",
+    "No improvement is inferred from revision labels; each metric must be read independently.",
+    "Portable/live parity is measured only when Node can execute the checked-in portable runtime; otherwise it is null."
+  ],
+  "command": "scripts/benchmark_retrieval_relevance.py --baseline-checkout <clean-baseline@c167909505da9abbac61e2d3889ebf51f4f1d947> --current-checkout <current-worktree> --output docs/design/gold-standard-relevance-2026.json",
+  "fixture": {
+    "concept_count": 12,
+    "queries": [
+      {
+        "citation_expectation": {
+          "path": "policies/retention.md",
+          "required": true
+        },
+        "context": {
+          "budget": 128,
+          "limit": 3,
+          "neighbors": 0
+        },
+        "expected_concepts": [
+          "policies/retention"
+        ],
+        "expected_heading": "Retention Windows",
+        "hard_negatives": [
+          "glossary/quartz"
+        ],
+        "id": "lexical-retention",
+        "intent": "lexical",
+        "mode": "lexical",
+        "options": {},
+        "query": "quartz ninety day retention"
+      },
+      {
+        "citation_expectation": {
+          "path": "entities/customer-identity.md",
+          "required": true
+        },
+        "expected_concepts": [
+          "entities/customer-identity"
+        ],
+        "expected_heading": "Resolution",
+        "hard_negatives": [
+          "entities/identity-noise"
+        ],
+        "id": "semantic-identity-typo",
+        "intent": "semantic",
+        "mode": "semantic",
+        "options": {},
+        "query": "custmer identty resoluton"
+      },
+      {
+        "citation_expectation": {
+          "path": "runbooks/payment-retries.md",
+          "required": true
+        },
+        "expected_concepts": [
+          "runbooks/payment-retries"
+        ],
+        "expected_heading": "Idempotent Retry",
+        "hard_negatives": [
+          "notes/payment-noise"
+        ],
+        "id": "hybrid-payment",
+        "intent": "hybrid",
+        "mode": "hybrid",
+        "options": {},
+        "query": "payment retry idempotency key"
+      },
+      {
+        "citation_expectation": {
+          "path": "services/checkout.md",
+          "required": true
+        },
+        "expected_concepts": [
+          "runbooks/payment-retries",
+          "services/checkout"
+        ],
+        "expected_heading": "Dependencies",
+        "hard_negatives": [
+          "notes/critical-path"
+        ],
+        "id": "tag-critical-path",
+        "intent": "tag",
+        "mode": "tag",
+        "options": {},
+        "query": "critical-path"
+      },
+      {
+        "citation_expectation": {
+          "path": "systems/ledger.md",
+          "required": true
+        },
+        "expected_concepts": [
+          "systems/ledger"
+        ],
+        "expected_heading": "Journal",
+        "hard_negatives": [
+          "systems/orion-noise"
+        ],
+        "id": "entity-orion-ledger",
+        "intent": "entity",
+        "mode": "entity",
+        "options": {},
+        "query": "Orion Ledger"
+      },
+      {
+        "citation_expectation": {
+          "path": "services/checkout.md",
+          "required": true
+        },
+        "expected_concepts": [
+          "services/checkout"
+        ],
+        "expected_heading": "Dependencies",
+        "hard_negatives": [
+          "systems/orion-noise"
+        ],
+        "id": "relation-ledger-dependency",
+        "intent": "relation",
+        "mode": "relation",
+        "options": {
+          "relation": "depends_on",
+          "target": "systems/ledger"
+        },
+        "query": ""
+      },
+      {
+        "citation_expectation": {
+          "path": "runbooks/deploy.md",
+          "required": true
+        },
+        "expected_concepts": [
+          "runbooks/deploy"
+        ],
+        "expected_heading": "Rollback Verification",
+        "hard_negatives": [
+          "notes/rollback-noise"
+        ],
+        "id": "section-rollback",
+        "intent": "section-disambiguation",
+        "mode": "lexical",
+        "options": {},
+        "query": "rollback recovery checksum traffic"
+      }
+    ],
+    "sha256": "da6f2c2691515ce65d9ea20c7470d321413d8abd9820f6879b5b43b2fba9deee"
+  },
+  "metric_definitions": {
+    "citation_validity": "Expected-result citations whose path, physical lines, and excerpt agree with the generated Markdown; null when unavailable.",
+    "expected_section_hit_rate": "Queries whose expected concept has evidence under the expected heading; null when the runtime emits no section evidence.",
+    "hard_negative_query_rate_at_3": "Fraction of queries with a declared distractor in the first three; lower is better.",
+    "mrr": "Reciprocal rank of the first expected concept, or zero when absent.",
+    "ndcg_at_3": "Binary normalized discounted cumulative gain over expected concepts.",
+    "portable_context_parity": "Fraction of queries with equivalent complete Context Pack fields, ordered item IDs, and byte-identical canonical Markdown.",
+    "portable_live_parity": "Fraction of queries with the same complete ordered top-k concepts in checked-in portable JavaScript and live Python retrieval; null when unavailable.",
+    "precision_at_3": "Relevant concepts in the first three results divided by three."
+  },
+  "per_query": {
+    "after": [
+      {
+        "citation_validity": 1.0,
+        "evidence_status": "available",
+        "expected_section_hit": 1.0,
+        "hard_negative_in_top_k": true,
+        "id": "lexical-retention",
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "retrieved": [
+          {
+            "backends": [
+              "lexical"
+            ],
+            "char_end": null,
+            "char_start": null,
+            "citation": "[policies/retention.md#L14-L14]",
+            "citation_valid": true,
+            "concept_id": "policies/retention",
+            "excerpt": "The quartz event ledger has a ninety day retention window.",
+            "heading": "Retention Windows",
+            "line_end": 14,
+            "line_start": 14,
+            "passage_id": "policies/retention:L14-L14",
+            "path": "policies/retention.md",
+            "reasons": [
+              "ranked by lexical"
+            ],
+            "score": 27.470749117630458,
+            "source_backend": "lexical"
+          },
+          {
+            "backends": [
+              "lexical"
+            ],
+            "char_end": null,
+            "char_start": null,
+            "citation": "[glossary/quartz.md#L10-L10]",
+            "citation_valid": true,
+            "concept_id": "glossary/quartz",
+            "excerpt": "Quartz retention window is a phrase used in examples, not a policy.",
+            "heading": "Meaning",
+            "line_end": 10,
+            "line_start": 10,
+            "passage_id": "glossary/quartz:L10-L10",
+            "path": "glossary/quartz.md",
+            "reasons": [
+              "ranked by lexical"
+            ],
+            "score": 18.261848273664164,
+            "source_backend": "lexical"
+          }
+        ]
+      },
+      {
+        "citation_validity": 1.0,
+        "evidence_status": "available",
+        "expected_section_hit": 1.0,
+        "hard_negative_in_top_k": true,
+        "id": "semantic-identity-typo",
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "retrieved": [
+          {
+            "backends": [
+              "semantic-lite"
+            ],
+            "char_end": null,
+            "char_start": null,
+            "citation": "[entities/customer-identity.md#L13-L13]",
+            "citation_valid": true,
+            "concept_id": "entities/customer-identity",
+            "excerpt": "Customer identity resolution joins account aliases into one profile.",
+            "heading": "Resolution",
+            "line_end": 13,
+            "line_start": 13,
+            "passage_id": "entities/customer-identity:L13-L13",
+            "path": "entities/customer-identity.md",
+            "reasons": [
+              "ranked by semantic-lite"
+            ],
+            "score": 0.2522524329815068,
+            "source_backend": "semantic-lite"
+          },
+          {
+            "backends": [
+              "semantic-lite"
+            ],
+            "char_end": null,
+            "char_start": null,
+            "citation": "[entities/identity-noise.md#L10-L10]",
+            "citation_valid": true,
+            "concept_id": "entities/identity-noise",
+            "excerpt": "Discuss customer support and room resolution.",
+            "heading": "Agenda",
+            "line_end": 10,
+            "line_start": 10,
+            "passage_id": "entities/identity-noise:L10-L10",
+            "path": "entities/identity-noise.md",
+            "reasons": [
+              "ranked by semantic-lite"
+            ],
+            "score": 0.1682488998706747,
+            "source_backend": "semantic-lite"
+          },
+          {
+            "backends": [
+              "semantic-lite"
+            ],
+            "char_end": null,
+            "char_start": null,
+            "citation": "[policies/retention.md#L10-L10]",
+            "citation_valid": true,
+            "concept_id": "policies/retention",
+            "excerpt": "Quartz archives are mentioned here, but no duration is defined.",
+            "heading": "Scope",
+            "line_end": 10,
+            "line_start": 10,
+            "passage_id": "policies/retention:L10-L10",
+            "path": "policies/retention.md",
+            "reasons": [
+              "ranked by semantic-lite"
+            ],
+            "score": 0.0771960462129504,
+            "source_backend": "semantic-lite"
+          }
+        ]
+      },
+      {
+        "citation_validity": 1.0,
+        "evidence_status": "available",
+        "expected_section_hit": 1.0,
+        "hard_negative_in_top_k": true,
+        "id": "hybrid-payment",
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "retrieved": [
+          {
+            "backends": [
+              "lexical",
+              "semantic-lite"
+            ],
+            "char_end": null,
+            "char_start": null,
+            "citation": "[runbooks/payment-retries.md#L14-L14]",
+            "citation_valid": true,
+            "concept_id": "runbooks/payment-retries",
+            "excerpt": "Use the payment idempotency key before retrying a timed out charge.",
+            "heading": "Idempotent Retry",
+            "line_end": 14,
+            "line_start": 14,
+            "passage_id": "runbooks/payment-retries:L14-L14",
+            "path": "runbooks/payment-retries.md",
+            "reasons": [
+              "ranked by lexical",
+              "ranked by semantic-lite"
+            ],
+            "score": 0.03278688524590164,
+            "source_backend": "hybrid"
+          },
+          {
+            "backends": [
+              "lexical",
+              "semantic-lite"
+            ],
+            "char_end": null,
+            "char_start": null,
+            "citation": "[notes/payment-noise.md#L10-L10]",
+            "citation_valid": true,
+            "concept_id": "notes/payment-noise",
+            "excerpt": "Payment retry idempotency is listed here without operational guidance.",
+            "heading": "Ideas",
+            "line_end": 10,
+            "line_start": 10,
+            "passage_id": "notes/payment-noise:L10-L10",
+            "path": "notes/payment-noise.md",
+            "reasons": [
+              "ranked by lexical",
+              "ranked by semantic-lite"
+            ],
+            "score": 0.03225806451612903,
+            "source_backend": "hybrid"
+          },
+          {
+            "backends": [
+              "semantic-lite"
+            ],
+            "char_end": null,
+            "char_start": null,
+            "citation": "[policies/retention.md#L10-L10]",
+            "citation_valid": true,
+            "concept_id": "policies/retention",
+            "excerpt": "Quartz archives are mentioned here, but no duration is defined.",
+            "heading": "Scope",
+            "line_end": 10,
+            "line_start": 10,
+            "passage_id": "policies/retention:L10-L10",
+            "path": "policies/retention.md",
+            "reasons": [
+              "ranked by semantic-lite"
+            ],
+            "score": 0.015873015873015872,
+            "source_backend": "hybrid"
+          }
+        ]
+      },
+      {
+        "citation_validity": 1.0,
+        "evidence_status": "available",
+        "expected_section_hit": 1.0,
+        "hard_negative_in_top_k": false,
+        "id": "tag-critical-path",
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "precision_at_k": 0.6666666666666666,
+        "retrieved": [
+          {
+            "backends": [
+              "tag"
+            ],
+            "char_end": null,
+            "char_start": null,
+            "citation": "[services/checkout.md#L13-L13]",
+            "citation_valid": true,
+            "concept_id": "services/checkout",
+            "excerpt": "Checkout writes completed charges to the ledger.",
+            "heading": "Dependencies",
+            "line_end": 13,
+            "line_start": 13,
+            "passage_id": "services/checkout:L13-L13",
+            "path": "services/checkout.md",
+            "reasons": [
+              "ranked by tag"
+            ],
+            "score": 1.0,
+            "source_backend": "tag"
+          },
+          {
+            "backends": [
+              "tag"
+            ],
+            "char_end": null,
+            "char_start": null,
+            "citation": "[runbooks/payment-retries.md#L10-L10]",
+            "citation_valid": true,
+            "concept_id": "runbooks/payment-retries",
+            "excerpt": "Repeated gateway failures can create duplicate payment attempts.",
+            "heading": "Symptoms",
+            "line_end": 10,
+            "line_start": 10,
+            "passage_id": "runbooks/payment-retries:L10-L10",
+            "path": "runbooks/payment-retries.md",
+            "reasons": [
+              "ranked by tag"
+            ],
+            "score": 1.0,
+            "source_backend": "tag"
+          }
+        ]
+      },
+      {
+        "citation_validity": 1.0,
+        "evidence_status": "available",
+        "expected_section_hit": 1.0,
+        "hard_negative_in_top_k": false,
+        "id": "entity-orion-ledger",
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "retrieved": [
+          {
+            "backends": [
+              "entity"
+            ],
+            "char_end": null,
+            "char_start": null,
+            "citation": "[systems/ledger.md#L13-L13]",
+            "citation_valid": true,
+            "concept_id": "systems/ledger",
+            "excerpt": "Orion Ledger records settled charge entries.",
+            "heading": "Journal",
+            "line_end": 13,
+            "line_start": 13,
+            "passage_id": "systems/ledger:L13-L13",
+            "path": "systems/ledger.md",
+            "reasons": [
+              "ranked by entity"
+            ],
+            "score": 3.0,
+            "source_backend": "entity"
+          }
+        ]
+      },
+      {
+        "citation_validity": 1.0,
+        "evidence_status": "available",
+        "expected_section_hit": 1.0,
+        "hard_negative_in_top_k": false,
+        "id": "relation-ledger-dependency",
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "retrieved": [
+          {
+            "backends": [
+              "relation"
+            ],
+            "char_end": null,
+            "char_start": null,
+            "citation": "[services/checkout.md#L13-L13]",
+            "citation_valid": true,
+            "concept_id": "services/checkout",
+            "excerpt": "Checkout writes completed charges to the ledger.",
+            "heading": "Dependencies",
+            "line_end": 13,
+            "line_start": 13,
+            "passage_id": "services/checkout:L13-L13",
+            "path": "services/checkout.md",
+            "reasons": [
+              "ranked by relation"
+            ],
+            "score": 1.0,
+            "source_backend": "relation"
+          }
+        ]
+      },
+      {
+        "citation_validity": 1.0,
+        "evidence_status": "available",
+        "expected_section_hit": 1.0,
+        "hard_negative_in_top_k": true,
+        "id": "section-rollback",
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "retrieved": [
+          {
+            "backends": [
+              "lexical"
+            ],
+            "char_end": null,
+            "char_start": null,
+            "citation": "[runbooks/deploy.md#L14-L14]",
+            "citation_valid": true,
+            "concept_id": "runbooks/deploy",
+            "excerpt": "During rollback, compare the recovery checksum before restoring traffic.",
+            "heading": "Rollback Verification",
+            "line_end": 14,
+            "line_start": 14,
+            "passage_id": "runbooks/deploy:L14-L14",
+            "path": "runbooks/deploy.md",
+            "reasons": [
+              "ranked by lexical"
+            ],
+            "score": 28.062307990129998,
+            "source_backend": "lexical"
+          },
+          {
+            "backends": [
+              "lexical"
+            ],
+            "char_end": null,
+            "char_start": null,
+            "citation": "[notes/rollback-noise.md#L10-L10]",
+            "citation_valid": true,
+            "concept_id": "notes/rollback-noise",
+            "excerpt": "Rollback checksum verification was proposed but never approved.",
+            "heading": "Draft",
+            "line_end": 10,
+            "line_start": 10,
+            "passage_id": "notes/rollback-noise:L10-L10",
+            "path": "notes/rollback-noise.md",
+            "reasons": [
+              "ranked by lexical"
+            ],
+            "score": 13.569576886718318,
+            "source_backend": "lexical"
+          }
+        ]
+      }
+    ],
+    "before": [
+      {
+        "citation_validity": null,
+        "evidence_status": "unavailable",
+        "expected_section_hit": null,
+        "hard_negative_in_top_k": true,
+        "id": "lexical-retention",
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "retrieved": [
+          {
+            "backends": [],
+            "char_end": null,
+            "char_start": null,
+            "citation": null,
+            "citation_valid": null,
+            "concept_id": "policies/retention",
+            "excerpt": null,
+            "heading": null,
+            "line_end": null,
+            "line_start": null,
+            "passage_id": null,
+            "path": null,
+            "reasons": [],
+            "score": 27.470749117630458,
+            "source_backend": "lexical"
+          },
+          {
+            "backends": [],
+            "char_end": null,
+            "char_start": null,
+            "citation": null,
+            "citation_valid": null,
+            "concept_id": "glossary/quartz",
+            "excerpt": null,
+            "heading": null,
+            "line_end": null,
+            "line_start": null,
+            "passage_id": null,
+            "path": null,
+            "reasons": [],
+            "score": 18.261848273664164,
+            "source_backend": "lexical"
+          }
+        ]
+      },
+      {
+        "citation_validity": null,
+        "evidence_status": "unavailable",
+        "expected_section_hit": null,
+        "hard_negative_in_top_k": true,
+        "id": "semantic-identity-typo",
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "retrieved": [
+          {
+            "backends": [],
+            "char_end": null,
+            "char_start": null,
+            "citation": null,
+            "citation_valid": null,
+            "concept_id": "entities/customer-identity",
+            "excerpt": null,
+            "heading": null,
+            "line_end": null,
+            "line_start": null,
+            "passage_id": null,
+            "path": null,
+            "reasons": [],
+            "score": 0.2522524329815068,
+            "source_backend": "semantic-lite"
+          },
+          {
+            "backends": [],
+            "char_end": null,
+            "char_start": null,
+            "citation": null,
+            "citation_valid": null,
+            "concept_id": "entities/identity-noise",
+            "excerpt": null,
+            "heading": null,
+            "line_end": null,
+            "line_start": null,
+            "passage_id": null,
+            "path": null,
+            "reasons": [],
+            "score": 0.1682488998706747,
+            "source_backend": "semantic-lite"
+          },
+          {
+            "backends": [],
+            "char_end": null,
+            "char_start": null,
+            "citation": null,
+            "citation_valid": null,
+            "concept_id": "policies/retention",
+            "excerpt": null,
+            "heading": null,
+            "line_end": null,
+            "line_start": null,
+            "passage_id": null,
+            "path": null,
+            "reasons": [],
+            "score": 0.0771960462129504,
+            "source_backend": "semantic-lite"
+          }
+        ]
+      },
+      {
+        "citation_validity": null,
+        "evidence_status": "unavailable",
+        "expected_section_hit": null,
+        "hard_negative_in_top_k": true,
+        "id": "hybrid-payment",
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "retrieved": [
+          {
+            "backends": [],
+            "char_end": null,
+            "char_start": null,
+            "citation": null,
+            "citation_valid": null,
+            "concept_id": "runbooks/payment-retries",
+            "excerpt": null,
+            "heading": null,
+            "line_end": null,
+            "line_start": null,
+            "passage_id": null,
+            "path": null,
+            "reasons": [],
+            "score": 0.03278688524590164,
+            "source_backend": "hybrid"
+          },
+          {
+            "backends": [],
+            "char_end": null,
+            "char_start": null,
+            "citation": null,
+            "citation_valid": null,
+            "concept_id": "notes/payment-noise",
+            "excerpt": null,
+            "heading": null,
+            "line_end": null,
+            "line_start": null,
+            "passage_id": null,
+            "path": null,
+            "reasons": [],
+            "score": 0.03225806451612903,
+            "source_backend": "hybrid"
+          },
+          {
+            "backends": [],
+            "char_end": null,
+            "char_start": null,
+            "citation": null,
+            "citation_valid": null,
+            "concept_id": "policies/retention",
+            "excerpt": null,
+            "heading": null,
+            "line_end": null,
+            "line_start": null,
+            "passage_id": null,
+            "path": null,
+            "reasons": [],
+            "score": 0.015873015873015872,
+            "source_backend": "hybrid"
+          }
+        ]
+      },
+      {
+        "citation_validity": null,
+        "evidence_status": "unavailable",
+        "expected_section_hit": null,
+        "hard_negative_in_top_k": false,
+        "id": "tag-critical-path",
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "precision_at_k": 0.6666666666666666,
+        "retrieved": [
+          {
+            "backends": [],
+            "char_end": null,
+            "char_start": null,
+            "citation": null,
+            "citation_valid": null,
+            "concept_id": "services/checkout",
+            "excerpt": null,
+            "heading": null,
+            "line_end": null,
+            "line_start": null,
+            "passage_id": null,
+            "path": null,
+            "reasons": [],
+            "score": 1.0,
+            "source_backend": "tag"
+          },
+          {
+            "backends": [],
+            "char_end": null,
+            "char_start": null,
+            "citation": null,
+            "citation_valid": null,
+            "concept_id": "runbooks/payment-retries",
+            "excerpt": null,
+            "heading": null,
+            "line_end": null,
+            "line_start": null,
+            "passage_id": null,
+            "path": null,
+            "reasons": [],
+            "score": 1.0,
+            "source_backend": "tag"
+          }
+        ]
+      },
+      {
+        "citation_validity": null,
+        "evidence_status": "unavailable",
+        "expected_section_hit": null,
+        "hard_negative_in_top_k": false,
+        "id": "entity-orion-ledger",
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "retrieved": [
+          {
+            "backends": [],
+            "char_end": null,
+            "char_start": null,
+            "citation": null,
+            "citation_valid": null,
+            "concept_id": "systems/ledger",
+            "excerpt": null,
+            "heading": null,
+            "line_end": null,
+            "line_start": null,
+            "passage_id": null,
+            "path": null,
+            "reasons": [],
+            "score": 3.0,
+            "source_backend": "entity"
+          }
+        ]
+      },
+      {
+        "citation_validity": null,
+        "evidence_status": "unavailable",
+        "expected_section_hit": null,
+        "hard_negative_in_top_k": false,
+        "id": "relation-ledger-dependency",
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "retrieved": [
+          {
+            "backends": [],
+            "char_end": null,
+            "char_start": null,
+            "citation": null,
+            "citation_valid": null,
+            "concept_id": "services/checkout",
+            "excerpt": null,
+            "heading": null,
+            "line_end": null,
+            "line_start": null,
+            "passage_id": null,
+            "path": null,
+            "reasons": [],
+            "score": 1.0,
+            "source_backend": "relation"
+          }
+        ]
+      },
+      {
+        "citation_validity": null,
+        "evidence_status": "unavailable",
+        "expected_section_hit": null,
+        "hard_negative_in_top_k": true,
+        "id": "section-rollback",
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "retrieved": [
+          {
+            "backends": [],
+            "char_end": null,
+            "char_start": null,
+            "citation": null,
+            "citation_valid": null,
+            "concept_id": "runbooks/deploy",
+            "excerpt": null,
+            "heading": null,
+            "line_end": null,
+            "line_start": null,
+            "passage_id": null,
+            "path": null,
+            "reasons": [],
+            "score": 28.062307990129998,
+            "source_backend": "lexical"
+          },
+          {
+            "backends": [],
+            "char_end": null,
+            "char_start": null,
+            "citation": null,
+            "citation_valid": null,
+            "concept_id": "notes/rollback-noise",
+            "excerpt": null,
+            "heading": null,
+            "line_end": null,
+            "line_start": null,
+            "passage_id": null,
+            "path": null,
+            "reasons": [],
+            "score": 13.569576886718318,
+            "source_backend": "lexical"
+          }
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "fixture_sha256": "da6f2c2691515ce65d9ea20c7470d321413d8abd9820f6879b5b43b2fba9deee",
+    "harness_sha256": "94817333807c49de1128f3fca9079cd6d1f17025c6574bf27514c06ee42c180b",
+    "head_revision": "8f332ff43a43db5294c4eef9b5c9c7b35826c69b",
+    "head_tree": "385d8924f244ef4054ffc577a3cf249194f2fb15",
+    "measured_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "release_content_sha256": "eb44d3da41da572802d57861febf5061cc4b5662bdb037b42537f0fd8871b031",
+    "source_manifest": {
+      "algorithm": "sha256(path\\0sha256\\n)",
+      "files": {
+        "scripts/benchmark_retrieval_relevance.py": "94817333807c49de1128f3fca9079cd6d1f17025c6574bf27514c06ee42c180b",
+        "scripts/okf_loom/__init__.py": "77fce708dc1dd9f7b1a5b2f751a8b8ad1b30b683aea6371fe2a9e968df90cbc4",
+        "scripts/okf_loom/__main__.py": "4202ecccf173eb916fb4dbdade401073d613fb3685888450fac1f74c1c29f310",
+        "scripts/okf_loom/_yaml_compat.py": "484d0a443dc128bcf5f5a1f6ce5a03ca6bb8e94821378f79a2c05c2808854a50",
+        "scripts/okf_loom/aliases.py": "d8f999cc85529aa964c71c0916467178ba26a079013ffe32c801cf269a8803c3",
+        "scripts/okf_loom/annotations.py": "ce67a12b62320fe3961c825baaadcc1fcc52749f082896ed0f563e0ed61fbd92",
+        "scripts/okf_loom/bootstrap.py": "93332c518d18394d3e75151f9377454d6a0e66ddb72d6b335ea0ccdc8a630520",
+        "scripts/okf_loom/capture_provenance.py": "5395ade2bd7320df205306ad8ea806a1fb5d9f01b35ce116f19f91cbc414268b",
+        "scripts/okf_loom/cli.py": "c3defdec332f387d487157dfc9fd7c6cd8ee4a19cfc7b6008ba3237979bc10c2",
+        "scripts/okf_loom/config.py": "de3ca4ba19f1193ca6f7a2610547da26c2ce5fb818043ec7f05ced19b55f7718",
+        "scripts/okf_loom/directive_store.py": "46784f6e147dffdbcd69ac3f1bc496115fa701b0978fca3429c0ad4484c2b42c",
+        "scripts/okf_loom/discover.py": "001b100905f5abbdb4cf1f657099fe55a7dd6b9489caa3823196f6ea840e9c02",
+        "scripts/okf_loom/exceptions.py": "780af9becf73e4d8e4986c2a01e0ea7a377a415c1a51a6dd7242c6b317c1270b",
+        "scripts/okf_loom/extensions.py": "153ffc772fc9d8becbd1a293e4ae632c5d290bca60dff8fba8d623aa7320a1df",
+        "scripts/okf_loom/graph_quality.py": "fa4d2e521baf8cbc858ab17116547db2dd8a5848d9ac2e5287d88c3ee90f21dc",
+        "scripts/okf_loom/ignore.py": "517cde19af882cc45fb560d8783e7023ada0fdbaff3bb18ac29c9599a2b1159f",
+        "scripts/okf_loom/index.py": "a6e0568307ff629d1318da20fef738ecb6dcc5612af9d064076ff0d30ad9ab00",
+        "scripts/okf_loom/io_utils.py": "9832dc8cb03a5b0ac4724b72abfbe95d7729f75b448c7a42b9b0b9fcfbfeea45",
+        "scripts/okf_loom/log.py": "9ba323b964643953c7a52b65fe0271e749b4667ffb178c95508506dd5c3d03c8",
+        "scripts/okf_loom/markdown_blocks.py": "58a51821b54a9be7fff6f7535e1ab31e0e3451bdd04a843f4e959581ab5c12b9",
+        "scripts/okf_loom/model.py": "a7c9f4f31418c573ea70584876807f0761464b48b98b365c495a39e2bcb688ef",
+        "scripts/okf_loom/parse.py": "297a66232df77053e8b089003cfedbcebb4eaeecbccf0f3a00fc8d9ec4bf3e14",
+        "scripts/okf_loom/paths.py": "cb81aef3d4e514750bce454ffc27c1d0b6fad960d623cdeae95aefcec202ffa0",
+        "scripts/okf_loom/plan.py": "1849b31a0139fe95e3374a17ac5de839226a282972868c71f5fc9979bafe1a18",
+        "scripts/okf_loom/presence.py": "17dfc7506c8b72ed2fe069b480f720040f1932d6c3652e8e468fc7784d1a1b0a",
+        "scripts/okf_loom/proposal_frozen_validator.py": "047098e44205ca084529d5abe845a2c06fcfd20139aacfdf33e6abe5a69ba6f2",
+        "scripts/okf_loom/proposal_review/__init__.py": "479ce083ebd140daef996f952b1ccab573a701380a8a26ffbb922dc0c2be1924",
+        "scripts/okf_loom/proposal_review/activation.py": "213bb93aaa40366be493642deb4c9a07b7c0a73093547212448222e0acb2ec2b",
+        "scripts/okf_loom/proposal_review/activity.py": "e60ef50b1c2645ab3cb81529dca8f8a1e41ef4c4b59f142b47f49903028bde05",
+        "scripts/okf_loom/proposal_review/canonical.py": "50cb4c528000521de8da34982aed34cd45ac753a3ff1acdf1d7875fc8aa25d2d",
+        "scripts/okf_loom/proposal_review/cli_adapter.py": "dc2123dc517b1ff19f7431bd196f3d717e747b03558b0eec7d3cdab51496db73",
+        "scripts/okf_loom/proposal_review/errors.py": "742583dfb37539edbeb62fb9fb353dbb4ba2ccfda0b33380a5cb8d00f58ae5a3",
+        "scripts/okf_loom/proposal_review/http.py": "ef7b8b630c1a67fdee5aaba9487abbf18324e5dd16c1edced5d24a063b52a71c",
+        "scripts/okf_loom/proposal_review/ids.py": "930344cac809e6cf55f5b1a5c19622c724c9e611a11bc405a31106b7c40fe6be",
+        "scripts/okf_loom/proposal_review/legacy.py": "758a25f55e3801b64c284eaf3a57e77584999e640a38a38df103c34762b60384",
+        "scripts/okf_loom/proposal_review/operations.py": "d906297afd7b29b08c94771106e697bc1b26d0aa9e96194a2680198938d5fe10",
+        "scripts/okf_loom/proposal_review/outbox.py": "6cbe46c384e35e2bfc2f0c694d6cf557f52e7b6966c97252db60dcf138742f10",
+        "scripts/okf_loom/proposal_review/pagination.py": "224b6bacf262503eef38dd876541b9972451a83cebe61b5637469fbabc0da8b5",
+        "scripts/okf_loom/proposal_review/ports.py": "c4041d5afd560fbd612365740480029e571919c9db9ad16d77dd064ecb1c9777",
+        "scripts/okf_loom/proposal_review/preview.py": "a3396c864a22d7af186fad02358562f0e32912e419e7a7f4c019413d702dc37c",
+        "scripts/okf_loom/proposal_review/projectors.py": "524c27f3ac33ac58fd5ca460a45e114d2e636e1bc8c417b6692b656a522600c4",
+        "scripts/okf_loom/proposal_review/publication.py": "965e327ad18e6de53e74f6785fb3894997e582e0f441bbed80b57d785d140ef0",
+        "scripts/okf_loom/proposal_review/read_model.py": "058d5e6e4ec97a79d4c5bb448bbae858aba4604dd495bccb081cfc87e142c619",
+        "scripts/okf_loom/proposal_review/repository.py": "556a388f233fc2716790462dd8287543bce5db9d681ba18a8e370018797ec823",
+        "scripts/okf_loom/proposal_review/schemas.py": "3e1cdc56da4461facd8b5a5189160097e16042fe034a722054ecfb950c9f3a9f",
+        "scripts/okf_loom/proposal_review/service.py": "369d8dcfa32a4eb1423fa0aaa4b34dc2f8c72c764e6fbc2648c59db17eb270a4",
+        "scripts/okf_loom/proposal_review/service_contracts.py": "082e290a0ea5f1c76debb0cec8f8b399abf9c4eb295c9ae8f279b0fbcdf6835a",
+        "scripts/okf_loom/proposal_review/staging.py": "4ab0212740055db6520f9afdaec8a378e53fa0a072335a469a0b7470665a41f9",
+        "scripts/okf_loom/proposal_review/studio_activity.py": "85cc25898a2d6b0fcd41eddda615b3be0ff3e21ff4c7fc85f7f7b7c594ceb050",
+        "scripts/okf_loom/proposal_review/studio_outbox.py": "d86003a252239ec6a2ebc79f0fe79b3461736195265ec691d98f653dfb930087",
+        "scripts/okf_loom/proposal_review/transaction_intent.py": "63536101e75d2e5d08e65fdc5d068e3afcbdac3c4089593bf97b9cbf99ea7e57",
+        "scripts/okf_loom/proposal_review/transactions.py": "3c63f8df6f61630b2408626869c60fe0a73210b6eb5944df31576cf8d0a451ff",
+        "scripts/okf_loom/proposal_review/validation.py": "3d380a072ab8c13ff0312b5b7e07deafc4283de1b02844e2d219f8fe9cdc610f",
+        "scripts/okf_loom/proposal_runtime_identity.py": "008cecb80207dc02fd4cc1d106b424272f48b810099db6c2f3956d1ccdc5e72c",
+        "scripts/okf_loom/proposal_snapshot.py": "599d0532531c985f6c895d24aa3bd0833043606fa3c2dc5828a22530f5d1af6b",
+        "scripts/okf_loom/proposal_snapshot_adapter.py": "9d480b6ae021e28becefa5e5c1fdaf2704468f3e802c389e00a46866b862375f",
+        "scripts/okf_loom/render.py": "251aa36dcb30697d58d0b53311387b9236494e0843fb4446bd0b78f4bf0a578a",
+        "scripts/okf_loom/retrieval.py": "32e9c388daf8ce34600367905190c08c3faa61f4fb10522ba2ba4c65961b7567",
+        "scripts/okf_loom/roundtrip.py": "eb0618afdbd4145f6d0e3c64b3dafd89781e4443c36bbc790c70d766ea1ab870",
+        "scripts/okf_loom/search.py": "9d1f31c5619d2036ebb16d794df6aded41373085c7d0e700389b5a7f6210026f",
+        "scripts/okf_loom/server.py": "8da09165c490bc93f2d3e7217094756c355fb184ad013280f07687ae9569226a",
+        "scripts/okf_loom/session_authority.py": "36e4c51161d5368a09f414974fe5f244daa566bd13c168a2c1ceb5923520d443",
+        "scripts/okf_loom/studio.py": "6fcc91d6b629f6ba26abcfa96f5038a68c207e0872ae25999c808f67e8b0758f",
+        "scripts/okf_loom/update.py": "7b22fd4d5f8b1ccf8f95ff75f7d452163a712d58a03625a7e88ed5d543c43647",
+        "scripts/okf_loom/validate.py": "7badf3b71e0d0c2ef42fcd96e0e5965fc0ff0a54905b4d1a0a4a72382287ebbd",
+        "scripts/okf_loom/viewer/__init__.py": "88fe0a0945472320d5b1e08fd87893680da94dbea448331e4127d5db2fcec191",
+        "scripts/okf_loom/viewer/assets.py": "0ed751c846658b6b97891e5b7a471e7ccf70c625d899ca413a7e9c94f39c65f1",
+        "scripts/okf_loom/viewer/markdown.py": "b1fc0a667c85c533c993f8fc53d1e5ace8fb350e948659f658694117c16f8fe6",
+        "scripts/okf_loom/viewer/plugins.py": "ac17c7535091d50f3a794ae9cea3de1c365d744bd58b8e85597e00e910cfeb68",
+        "scripts/okf_loom/viewer/shell.py": "8b1709a2d3c8f043d78deb92c9eea8835167593bf19ad1ac95eab9a23687fa9c",
+        "scripts/okf_loom/viewer/static/capture-readiness.js": "bb1c3af5f94467967ee76faae34984f701eba37d51efcc22b247fd79caaaf0c1",
+        "scripts/okf_loom/viewer/static/document-outline.js": "11aa88eb4a79c70179cbfe3a6e8c721b22961d490de982b620602e14a64aa096",
+        "scripts/okf_loom/viewer/static/graph.css": "28f94ac0b83b9c608c3ced08ce65e3197dcd0fd5371426e725f5165590b9f633",
+        "scripts/okf_loom/viewer/static/graph.js": "4b31ce2d66a5bbcbb19b96c9de21fe9bcb13027d59bae561ed3a87501ab66e3b",
+        "scripts/okf_loom/viewer/static/index-browse.js": "a057ae84d62b550220c862ce582675cb761108be09f6f40fb6f5035e4c35aafd",
+        "scripts/okf_loom/viewer/static/live.js": "5e3b8c86972321f6312a07e841c5b32d915d6519a30f21e0a39f250e1c3edbf3",
+        "scripts/okf_loom/viewer/static/portable-retrieval.js": "10ab9a9a62b7cafa03b03868d79c334ed6e2d536aed2d520009751ca0df768a7",
+        "scripts/okf_loom/viewer/static/renderers.js": "710d9554be8f1c9c5f06397fd858dcf32f2274a4877542bbda8d123198b576fa",
+        "scripts/okf_loom/viewer/static/shell.css": "6577641e4ff92b55517eaa03c7ec613e11e57e7605bbc99863f1c86087d2f02d",
+        "scripts/okf_loom/viewer/static/single-search.js": "e7b54c3aa25c29406ea888832d65f42e6dbd62d00f2b62291873bae17e41c84e",
+        "scripts/okf_loom/viewer/static/static-search.js": "0c4cafed13e9dbc3b9ab486d7f2cfd174f9226b4d5112e92a32d18c6a37f865c",
+        "scripts/okf_loom/viewer/static/studio.css": "787162107a4939e448b320e44a30e58566d52e7f99a1634660b89cdc0b973aab",
+        "scripts/okf_loom/viewer/static/studio.js": "34ec134acc2d7e6f94a1b94c228e35e64a6e75cdf3bcff7ffbb85c68120cc148",
+        "scripts/okf_loom/viewer/static/theme.js": "e3cf3dbf19509cc05f211ec52847b5686a64c1111e27618e36d2b04829520355",
+        "scripts/okf_loom/viewer/static/wiki.css": "dba26382e34a492b7d7d31dd74e72f199563377fd15d570f846e4647ef7ea6cd",
+        "scripts/okf_loom/viewer/static/wiki.js": "1a2b6fb01f1b2e3cc9b89c602d25a15c8e21779b1ce81c669fb8f2583eb1517f",
+        "scripts/okf_loom/viewer/templates/concept_page.html": "3e6810ec4b6baf97d6a6f5fbb2eb671fc53409f21f6a4542eaf3305746cc90a4",
+        "scripts/okf_loom/viewer/templates/graph_page.html": "915e31d8e01e64067d142152b04a33b97c9a8acb94a0a583aa26253069da3080",
+        "scripts/okf_loom/viewer/templates/index_page.html": "37c75ba879beb39d5893185587756e2c44fe368627c35aa7da513c59699046a8",
+        "scripts/okf_loom/viewer/templates/search_page.html": "c9c92d41f7e5ade6af85e3597d07261d5aaacafe7a965013b2f729c5622a3b45",
+        "scripts/okf_loom/viewer/templates/single_file.html": "2847fbb0517aa26ed0768b099c57d5319e15a3d7dd0fd8ec84b5430e51f0819b",
+        "scripts/okf_loom/watch.py": "c3cb04945482a1e7b194cae02b45358a142494a398c14e586c7ff8437ed38b04"
+      },
+      "paths": [
+        "scripts/benchmark_retrieval_relevance.py",
+        "scripts/okf_loom/__init__.py",
+        "scripts/okf_loom/__main__.py",
+        "scripts/okf_loom/_yaml_compat.py",
+        "scripts/okf_loom/aliases.py",
+        "scripts/okf_loom/annotations.py",
+        "scripts/okf_loom/bootstrap.py",
+        "scripts/okf_loom/capture_provenance.py",
+        "scripts/okf_loom/cli.py",
+        "scripts/okf_loom/config.py",
+        "scripts/okf_loom/directive_store.py",
+        "scripts/okf_loom/discover.py",
+        "scripts/okf_loom/exceptions.py",
+        "scripts/okf_loom/extensions.py",
+        "scripts/okf_loom/graph_quality.py",
+        "scripts/okf_loom/ignore.py",
+        "scripts/okf_loom/index.py",
+        "scripts/okf_loom/io_utils.py",
+        "scripts/okf_loom/log.py",
+        "scripts/okf_loom/markdown_blocks.py",
+        "scripts/okf_loom/model.py",
+        "scripts/okf_loom/parse.py",
+        "scripts/okf_loom/paths.py",
+        "scripts/okf_loom/plan.py",
+        "scripts/okf_loom/presence.py",
+        "scripts/okf_loom/proposal_frozen_validator.py",
+        "scripts/okf_loom/proposal_review/__init__.py",
+        "scripts/okf_loom/proposal_review/activation.py",
+        "scripts/okf_loom/proposal_review/activity.py",
+        "scripts/okf_loom/proposal_review/canonical.py",
+        "scripts/okf_loom/proposal_review/cli_adapter.py",
+        "scripts/okf_loom/proposal_review/errors.py",
+        "scripts/okf_loom/proposal_review/http.py",
+        "scripts/okf_loom/proposal_review/ids.py",
+        "scripts/okf_loom/proposal_review/legacy.py",
+        "scripts/okf_loom/proposal_review/operations.py",
+        "scripts/okf_loom/proposal_review/outbox.py",
+        "scripts/okf_loom/proposal_review/pagination.py",
+        "scripts/okf_loom/proposal_review/ports.py",
+        "scripts/okf_loom/proposal_review/preview.py",
+        "scripts/okf_loom/proposal_review/projectors.py",
+        "scripts/okf_loom/proposal_review/publication.py",
+        "scripts/okf_loom/proposal_review/read_model.py",
+        "scripts/okf_loom/proposal_review/repository.py",
+        "scripts/okf_loom/proposal_review/schemas.py",
+        "scripts/okf_loom/proposal_review/service.py",
+        "scripts/okf_loom/proposal_review/service_contracts.py",
+        "scripts/okf_loom/proposal_review/staging.py",
+        "scripts/okf_loom/proposal_review/studio_activity.py",
+        "scripts/okf_loom/proposal_review/studio_outbox.py",
+        "scripts/okf_loom/proposal_review/transaction_intent.py",
+        "scripts/okf_loom/proposal_review/transactions.py",
+        "scripts/okf_loom/proposal_review/validation.py",
+        "scripts/okf_loom/proposal_runtime_identity.py",
+        "scripts/okf_loom/proposal_snapshot.py",
+        "scripts/okf_loom/proposal_snapshot_adapter.py",
+        "scripts/okf_loom/render.py",
+        "scripts/okf_loom/retrieval.py",
+        "scripts/okf_loom/roundtrip.py",
+        "scripts/okf_loom/search.py",
+        "scripts/okf_loom/server.py",
+        "scripts/okf_loom/session_authority.py",
+        "scripts/okf_loom/studio.py",
+        "scripts/okf_loom/update.py",
+        "scripts/okf_loom/validate.py",
+        "scripts/okf_loom/viewer/__init__.py",
+        "scripts/okf_loom/viewer/assets.py",
+        "scripts/okf_loom/viewer/markdown.py",
+        "scripts/okf_loom/viewer/plugins.py",
+        "scripts/okf_loom/viewer/shell.py",
+        "scripts/okf_loom/viewer/static/capture-readiness.js",
+        "scripts/okf_loom/viewer/static/document-outline.js",
+        "scripts/okf_loom/viewer/static/graph.css",
+        "scripts/okf_loom/viewer/static/graph.js",
+        "scripts/okf_loom/viewer/static/index-browse.js",
+        "scripts/okf_loom/viewer/static/live.js",
+        "scripts/okf_loom/viewer/static/portable-retrieval.js",
+        "scripts/okf_loom/viewer/static/renderers.js",
+        "scripts/okf_loom/viewer/static/shell.css",
+        "scripts/okf_loom/viewer/static/single-search.js",
+        "scripts/okf_loom/viewer/static/static-search.js",
+        "scripts/okf_loom/viewer/static/studio.css",
+        "scripts/okf_loom/viewer/static/studio.js",
+        "scripts/okf_loom/viewer/static/theme.js",
+        "scripts/okf_loom/viewer/static/wiki.css",
+        "scripts/okf_loom/viewer/static/wiki.js",
+        "scripts/okf_loom/viewer/templates/concept_page.html",
+        "scripts/okf_loom/viewer/templates/graph_page.html",
+        "scripts/okf_loom/viewer/templates/index_page.html",
+        "scripts/okf_loom/viewer/templates/search_page.html",
+        "scripts/okf_loom/viewer/templates/single_file.html",
+        "scripts/okf_loom/watch.py"
+      ],
+      "sha256": "63114bd4ad35f38544c9971a67df8e17adc78370f8759b0417f8ca7185e0f9ca"
+    }
+  },
+  "release_slice": "A+B retrieval relevance",
+  "revisions": {
+    "after": "8f332ff43a43db5294c4eef9b5c9c7b35826c69b",
+    "before": "c167909505da9abbac61e2d3889ebf51f4f1d947"
+  },
+  "schema_version": 1,
+  "verification_material": {
+    "baseline": {
+      "contexts": [],
+      "queries": [
+        {
+          "id": "lexical-retention",
+          "results": [
+            {
+              "backends": [],
+              "char_end": null,
+              "char_start": null,
+              "citation": null,
+              "citation_valid": null,
+              "concept_id": "policies/retention",
+              "excerpt": null,
+              "heading": null,
+              "line_end": null,
+              "line_start": null,
+              "passage_id": null,
+              "path": null,
+              "reasons": [],
+              "score": 27.470749117630458,
+              "source_backend": "lexical"
+            },
+            {
+              "backends": [],
+              "char_end": null,
+              "char_start": null,
+              "citation": null,
+              "citation_valid": null,
+              "concept_id": "glossary/quartz",
+              "excerpt": null,
+              "heading": null,
+              "line_end": null,
+              "line_start": null,
+              "passage_id": null,
+              "path": null,
+              "reasons": [],
+              "score": 18.261848273664164,
+              "source_backend": "lexical"
+            }
+          ]
+        },
+        {
+          "id": "semantic-identity-typo",
+          "results": [
+            {
+              "backends": [],
+              "char_end": null,
+              "char_start": null,
+              "citation": null,
+              "citation_valid": null,
+              "concept_id": "entities/customer-identity",
+              "excerpt": null,
+              "heading": null,
+              "line_end": null,
+              "line_start": null,
+              "passage_id": null,
+              "path": null,
+              "reasons": [],
+              "score": 0.2522524329815068,
+              "source_backend": "semantic-lite"
+            },
+            {
+              "backends": [],
+              "char_end": null,
+              "char_start": null,
+              "citation": null,
+              "citation_valid": null,
+              "concept_id": "entities/identity-noise",
+              "excerpt": null,
+              "heading": null,
+              "line_end": null,
+              "line_start": null,
+              "passage_id": null,
+              "path": null,
+              "reasons": [],
+              "score": 0.1682488998706747,
+              "source_backend": "semantic-lite"
+            },
+            {
+              "backends": [],
+              "char_end": null,
+              "char_start": null,
+              "citation": null,
+              "citation_valid": null,
+              "concept_id": "policies/retention",
+              "excerpt": null,
+              "heading": null,
+              "line_end": null,
+              "line_start": null,
+              "passage_id": null,
+              "path": null,
+              "reasons": [],
+              "score": 0.0771960462129504,
+              "source_backend": "semantic-lite"
+            }
+          ]
+        },
+        {
+          "id": "hybrid-payment",
+          "results": [
+            {
+              "backends": [],
+              "char_end": null,
+              "char_start": null,
+              "citation": null,
+              "citation_valid": null,
+              "concept_id": "runbooks/payment-retries",
+              "excerpt": null,
+              "heading": null,
+              "line_end": null,
+              "line_start": null,
+              "passage_id": null,
+              "path": null,
+              "reasons": [],
+              "score": 0.03278688524590164,
+              "source_backend": "hybrid"
+            },
+            {
+              "backends": [],
+              "char_end": null,
+              "char_start": null,
+              "citation": null,
+              "citation_valid": null,
+              "concept_id": "notes/payment-noise",
+              "excerpt": null,
+              "heading": null,
+              "line_end": null,
+              "line_start": null,
+              "passage_id": null,
+              "path": null,
+              "reasons": [],
+              "score": 0.03225806451612903,
+              "source_backend": "hybrid"
+            },
+            {
+              "backends": [],
+              "char_end": null,
+              "char_start": null,
+              "citation": null,
+              "citation_valid": null,
+              "concept_id": "policies/retention",
+              "excerpt": null,
+              "heading": null,
+              "line_end": null,
+              "line_start": null,
+              "passage_id": null,
+              "path": null,
+              "reasons": [],
+              "score": 0.015873015873015872,
+              "source_backend": "hybrid"
+            }
+          ]
+        },
+        {
+          "id": "tag-critical-path",
+          "results": [
+            {
+              "backends": [],
+              "char_end": null,
+              "char_start": null,
+              "citation": null,
+              "citation_valid": null,
+              "concept_id": "services/checkout",
+              "excerpt": null,
+              "heading": null,
+              "line_end": null,
+              "line_start": null,
+              "passage_id": null,
+              "path": null,
+              "reasons": [],
+              "score": 1.0,
+              "source_backend": "tag"
+            },
+            {
+              "backends": [],
+              "char_end": null,
+              "char_start": null,
+              "citation": null,
+              "citation_valid": null,
+              "concept_id": "runbooks/payment-retries",
+              "excerpt": null,
+              "heading": null,
+              "line_end": null,
+              "line_start": null,
+              "passage_id": null,
+              "path": null,
+              "reasons": [],
+              "score": 1.0,
+              "source_backend": "tag"
+            }
+          ]
+        },
+        {
+          "id": "entity-orion-ledger",
+          "results": [
+            {
+              "backends": [],
+              "char_end": null,
+              "char_start": null,
+              "citation": null,
+              "citation_valid": null,
+              "concept_id": "systems/ledger",
+              "excerpt": null,
+              "heading": null,
+              "line_end": null,
+              "line_start": null,
+              "passage_id": null,
+              "path": null,
+              "reasons": [],
+              "score": 3.0,
+              "source_backend": "entity"
+            }
+          ]
+        },
+        {
+          "id": "relation-ledger-dependency",
+          "results": [
+            {
+              "backends": [],
+              "char_end": null,
+              "char_start": null,
+              "citation": null,
+              "citation_valid": null,
+              "concept_id": "services/checkout",
+              "excerpt": null,
+              "heading": null,
+              "line_end": null,
+              "line_start": null,
+              "passage_id": null,
+              "path": null,
+              "reasons": [],
+              "score": 1.0,
+              "source_backend": "relation"
+            }
+          ]
+        },
+        {
+          "id": "section-rollback",
+          "results": [
+            {
+              "backends": [],
+              "char_end": null,
+              "char_start": null,
+              "citation": null,
+              "citation_valid": null,
+              "concept_id": "runbooks/deploy",
+              "excerpt": null,
+              "heading": null,
+              "line_end": null,
+              "line_start": null,
+              "passage_id": null,
+              "path": null,
+              "reasons": [],
+              "score": 28.062307990129998,
+              "source_backend": "lexical"
+            },
+            {
+              "backends": [],
+              "char_end": null,
+              "char_start": null,
+              "citation": null,
+              "citation_valid": null,
+              "concept_id": "notes/rollback-noise",
+              "excerpt": null,
+              "heading": null,
+              "line_end": null,
+              "line_start": null,
+              "passage_id": null,
+              "path": null,
+              "reasons": [],
+              "score": 13.569576886718318,
+              "source_backend": "lexical"
+            }
+          ]
+        }
+      ],
+      "revision": "c167909505da9abbac61e2d3889ebf51f4f1d947",
+      "section_evidence_available": false
+    },
+    "live_after": {
+      "contexts": [
+        {
+          "id": "lexical-retention",
+          "pack": {
+            "budget": {
+              "estimated_tokens": 103,
+              "requested_tokens": 128
+            },
+            "bundle_revision": "section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8",
+            "filters": {
+              "concept": null,
+              "entity": null,
+              "relation": null,
+              "source": null,
+              "tag": null,
+              "target": null,
+              "type": null
+            },
+            "included": 1,
+            "items": [
+              {
+                "backends": [
+                  "lexical"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[policies/retention.md#L14-L14]",
+                "concept_id": "policies/retention",
+                "estimated_tokens": 103,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "policies/retention:L14-L14",
+                  "schema_version": 1
+                },
+                "excerpt": "The quartz event ledger has a ninety day retention window.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Retention Windows",
+                "heading_line": 12,
+                "line_end": 14,
+                "line_start": 14,
+                "passage_id": "policies/retention:L14-L14",
+                "path": "policies/retention.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by lexical"
+                ],
+                "relation_path": [
+                  "policies/retention"
+                ],
+                "score": 27.470749117630458,
+                "title": "Data Retention Policy",
+                "type": "Policy"
+              }
+            ],
+            "mode": "lexical",
+            "neighbors": 0,
+            "omitted": 2,
+            "query": "quartz ninety day retention",
+            "representations": {
+              "markdown": "# OKF Context Pack\n\n- Schema: 1\n- Bundle revision: `section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8`\n- Query: `quartz ninety day retention`\n- Mode: `lexical`\n- Budget: 103/128 estimated tokens\n- Included: 1; omitted: 2\n\n## [policies/retention.md#L14-L14] Data Retention Policy\nType: Policy\nBackends: lexical\nReasons: ranked by lexical\nRelation path (undirected): policies/retention\nFreshness: \nProvenance: null\n\nThe quartz event ledger has a ninety day retention window.\n"
+            },
+            "schema_version": 1,
+            "truncated": true
+          }
+        },
+        {
+          "id": "semantic-identity-typo",
+          "pack": {
+            "budget": {
+              "estimated_tokens": 334,
+              "requested_tokens": 6000
+            },
+            "bundle_revision": "section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8",
+            "filters": {
+              "concept": null,
+              "entity": null,
+              "relation": null,
+              "source": null,
+              "tag": null,
+              "target": null,
+              "type": null
+            },
+            "included": 3,
+            "items": [
+              {
+                "backends": [
+                  "semantic-lite"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[entities/customer-identity.md#L13-L13]",
+                "concept_id": "entities/customer-identity",
+                "estimated_tokens": 118,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "entities/customer-identity:L13-L13",
+                  "schema_version": 1
+                },
+                "excerpt": "Customer identity resolution joins account aliases into one profile.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Resolution",
+                "heading_line": 11,
+                "line_end": 13,
+                "line_start": 13,
+                "passage_id": "entities/customer-identity:L13-L13",
+                "path": "entities/customer-identity.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by semantic-lite"
+                ],
+                "relation_path": [
+                  "entities/customer-identity"
+                ],
+                "score": 0.2522524329815068,
+                "title": "Customer Identity Resolution",
+                "type": "Data Product"
+              },
+              {
+                "backends": [
+                  "semantic-lite"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[entities/identity-noise.md#L10-L10]",
+                "concept_id": "entities/identity-noise",
+                "estimated_tokens": 109,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "entities/identity-noise:L10-L10",
+                  "schema_version": 1
+                },
+                "excerpt": "Discuss customer support and room resolution.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Agenda",
+                "heading_line": 8,
+                "line_end": 10,
+                "line_start": 10,
+                "passage_id": "entities/identity-noise:L10-L10",
+                "path": "entities/identity-noise.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by semantic-lite"
+                ],
+                "relation_path": [
+                  "entities/identity-noise"
+                ],
+                "score": 0.1682488998706747,
+                "title": "Customer Resolution Meeting",
+                "type": "Note"
+              },
+              {
+                "backends": [
+                  "semantic-lite"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[policies/retention.md#L10-L10]",
+                "concept_id": "policies/retention",
+                "estimated_tokens": 107,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "policies/retention:L10-L10",
+                  "schema_version": 1
+                },
+                "excerpt": "Quartz archives are mentioned here, but no duration is defined.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Scope",
+                "heading_line": 8,
+                "line_end": 10,
+                "line_start": 10,
+                "passage_id": "policies/retention:L10-L10",
+                "path": "policies/retention.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by semantic-lite"
+                ],
+                "relation_path": [
+                  "policies/retention"
+                ],
+                "score": 0.0771960462129504,
+                "title": "Data Retention Policy",
+                "type": "Policy"
+              }
+            ],
+            "mode": "semantic",
+            "neighbors": 0,
+            "omitted": 8,
+            "query": "custmer identty resoluton",
+            "representations": {
+              "markdown": "# OKF Context Pack\n\n- Schema: 1\n- Bundle revision: `section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8`\n- Query: `custmer identty resoluton`\n- Mode: `semantic`\n- Budget: 334/6000 estimated tokens\n- Included: 3; omitted: 8\n\n## [entities/customer-identity.md#L13-L13] Customer Identity Resolution\nType: Data Product\nBackends: semantic-lite\nReasons: ranked by semantic-lite\nRelation path (undirected): entities/customer-identity\nFreshness: \nProvenance: null\n\nCustomer identity resolution joins account aliases into one profile.\n\n## [entities/identity-noise.md#L10-L10] Customer Resolution Meeting\nType: Note\nBackends: semantic-lite\nReasons: ranked by semantic-lite\nRelation path (undirected): entities/identity-noise\nFreshness: \nProvenance: null\n\nDiscuss customer support and room resolution.\n\n## [policies/retention.md#L10-L10] Data Retention Policy\nType: Policy\nBackends: semantic-lite\nReasons: ranked by semantic-lite\nRelation path (undirected): policies/retention\nFreshness: \nProvenance: null\n\nQuartz archives are mentioned here, but no duration is defined.\n"
+            },
+            "schema_version": 1,
+            "truncated": true
+          }
+        },
+        {
+          "id": "hybrid-payment",
+          "pack": {
+            "budget": {
+              "estimated_tokens": 347,
+              "requested_tokens": 6000
+            },
+            "bundle_revision": "section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8",
+            "filters": {
+              "concept": null,
+              "entity": null,
+              "relation": null,
+              "source": null,
+              "tag": null,
+              "target": null,
+              "type": null
+            },
+            "included": 3,
+            "items": [
+              {
+                "backends": [
+                  "lexical",
+                  "semantic-lite"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[runbooks/payment-retries.md#L14-L14]",
+                "concept_id": "runbooks/payment-retries",
+                "estimated_tokens": 123,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "runbooks/payment-retries:L14-L14",
+                  "schema_version": 1
+                },
+                "excerpt": "Use the payment idempotency key before retrying a timed out charge.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Idempotent Retry",
+                "heading_line": 12,
+                "line_end": 14,
+                "line_start": 14,
+                "passage_id": "runbooks/payment-retries:L14-L14",
+                "path": "runbooks/payment-retries.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by lexical",
+                  "ranked by semantic-lite"
+                ],
+                "relation_path": [
+                  "runbooks/payment-retries"
+                ],
+                "score": 0.03278688524590164,
+                "title": "Payment Retry Safety",
+                "type": "Runbook"
+              },
+              {
+                "backends": [
+                  "lexical",
+                  "semantic-lite"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[notes/payment-noise.md#L10-L10]",
+                "concept_id": "notes/payment-noise",
+                "estimated_tokens": 117,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "notes/payment-noise:L10-L10",
+                  "schema_version": 1
+                },
+                "excerpt": "Payment retry idempotency is listed here without operational guidance.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Ideas",
+                "heading_line": 8,
+                "line_end": 10,
+                "line_start": 10,
+                "passage_id": "notes/payment-noise:L10-L10",
+                "path": "notes/payment-noise.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by lexical",
+                  "ranked by semantic-lite"
+                ],
+                "relation_path": [
+                  "notes/payment-noise"
+                ],
+                "score": 0.03225806451612903,
+                "title": "Payment Retry Brainstorm",
+                "type": "Note"
+              },
+              {
+                "backends": [
+                  "semantic-lite"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[policies/retention.md#L10-L10]",
+                "concept_id": "policies/retention",
+                "estimated_tokens": 107,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "policies/retention:L10-L10",
+                  "schema_version": 1
+                },
+                "excerpt": "Quartz archives are mentioned here, but no duration is defined.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Scope",
+                "heading_line": 8,
+                "line_end": 10,
+                "line_start": 10,
+                "passage_id": "policies/retention:L10-L10",
+                "path": "policies/retention.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by semantic-lite"
+                ],
+                "relation_path": [
+                  "policies/retention"
+                ],
+                "score": 0.015873015873015872,
+                "title": "Data Retention Policy",
+                "type": "Policy"
+              }
+            ],
+            "mode": "hybrid",
+            "neighbors": 0,
+            "omitted": 8,
+            "query": "payment retry idempotency key",
+            "representations": {
+              "markdown": "# OKF Context Pack\n\n- Schema: 1\n- Bundle revision: `section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8`\n- Query: `payment retry idempotency key`\n- Mode: `hybrid`\n- Budget: 347/6000 estimated tokens\n- Included: 3; omitted: 8\n\n## [runbooks/payment-retries.md#L14-L14] Payment Retry Safety\nType: Runbook\nBackends: lexical, semantic-lite\nReasons: ranked by lexical; ranked by semantic-lite\nRelation path (undirected): runbooks/payment-retries\nFreshness: \nProvenance: null\n\nUse the payment idempotency key before retrying a timed out charge.\n\n## [notes/payment-noise.md#L10-L10] Payment Retry Brainstorm\nType: Note\nBackends: lexical, semantic-lite\nReasons: ranked by lexical; ranked by semantic-lite\nRelation path (undirected): notes/payment-noise\nFreshness: \nProvenance: null\n\nPayment retry idempotency is listed here without operational guidance.\n\n## [policies/retention.md#L10-L10] Data Retention Policy\nType: Policy\nBackends: semantic-lite\nReasons: ranked by semantic-lite\nRelation path (undirected): policies/retention\nFreshness: \nProvenance: null\n\nQuartz archives are mentioned here, but no duration is defined.\n"
+            },
+            "schema_version": 1,
+            "truncated": true
+          }
+        },
+        {
+          "id": "tag-critical-path",
+          "pack": {
+            "budget": {
+              "estimated_tokens": 207,
+              "requested_tokens": 6000
+            },
+            "bundle_revision": "section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8",
+            "filters": {
+              "concept": null,
+              "entity": null,
+              "relation": null,
+              "source": null,
+              "tag": null,
+              "target": null,
+              "type": null
+            },
+            "included": 2,
+            "items": [
+              {
+                "backends": [
+                  "tag"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[services/checkout.md#L13-L13]",
+                "concept_id": "services/checkout",
+                "estimated_tokens": 97,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "services/checkout:L13-L13",
+                  "schema_version": 1
+                },
+                "excerpt": "Checkout writes completed charges to the ledger.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Dependencies",
+                "heading_line": 11,
+                "line_end": 13,
+                "line_start": 13,
+                "passage_id": "services/checkout:L13-L13",
+                "path": "services/checkout.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by tag"
+                ],
+                "relation_path": [
+                  "services/checkout"
+                ],
+                "score": 1.0,
+                "title": "Checkout Service",
+                "type": "Service"
+              },
+              {
+                "backends": [
+                  "tag"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[runbooks/payment-retries.md#L10-L10]",
+                "concept_id": "runbooks/payment-retries",
+                "estimated_tokens": 110,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "runbooks/payment-retries:L10-L10",
+                  "schema_version": 1
+                },
+                "excerpt": "Repeated gateway failures can create duplicate payment attempts.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Symptoms",
+                "heading_line": 8,
+                "line_end": 10,
+                "line_start": 10,
+                "passage_id": "runbooks/payment-retries:L10-L10",
+                "path": "runbooks/payment-retries.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by tag"
+                ],
+                "relation_path": [
+                  "runbooks/payment-retries"
+                ],
+                "score": 1.0,
+                "title": "Payment Retry Safety",
+                "type": "Runbook"
+              }
+            ],
+            "mode": "tag",
+            "neighbors": 0,
+            "omitted": 0,
+            "query": "critical-path",
+            "representations": {
+              "markdown": "# OKF Context Pack\n\n- Schema: 1\n- Bundle revision: `section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8`\n- Query: `critical-path`\n- Mode: `tag`\n- Budget: 207/6000 estimated tokens\n- Included: 2; omitted: 0\n\n## [services/checkout.md#L13-L13] Checkout Service\nType: Service\nBackends: tag\nReasons: ranked by tag\nRelation path (undirected): services/checkout\nFreshness: \nProvenance: null\n\nCheckout writes completed charges to the ledger.\n\n## [runbooks/payment-retries.md#L10-L10] Payment Retry Safety\nType: Runbook\nBackends: tag\nReasons: ranked by tag\nRelation path (undirected): runbooks/payment-retries\nFreshness: \nProvenance: null\n\nRepeated gateway failures can create duplicate payment attempts.\n"
+            },
+            "schema_version": 1,
+            "truncated": false
+          }
+        },
+        {
+          "id": "entity-orion-ledger",
+          "pack": {
+            "budget": {
+              "estimated_tokens": 94,
+              "requested_tokens": 6000
+            },
+            "bundle_revision": "section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8",
+            "filters": {
+              "concept": null,
+              "entity": null,
+              "relation": null,
+              "source": null,
+              "tag": null,
+              "target": null,
+              "type": null
+            },
+            "included": 1,
+            "items": [
+              {
+                "backends": [
+                  "entity"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[systems/ledger.md#L13-L13]",
+                "concept_id": "systems/ledger",
+                "estimated_tokens": 94,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "systems/ledger:L13-L13",
+                  "schema_version": 1
+                },
+                "excerpt": "Orion Ledger records settled charge entries.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Journal",
+                "heading_line": 11,
+                "line_end": 13,
+                "line_start": 13,
+                "passage_id": "systems/ledger:L13-L13",
+                "path": "systems/ledger.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by entity"
+                ],
+                "relation_path": [
+                  "systems/ledger"
+                ],
+                "score": 3.0,
+                "title": "Ledger System",
+                "type": "System"
+              }
+            ],
+            "mode": "entity",
+            "neighbors": 0,
+            "omitted": 0,
+            "query": "Orion Ledger",
+            "representations": {
+              "markdown": "# OKF Context Pack\n\n- Schema: 1\n- Bundle revision: `section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8`\n- Query: `Orion Ledger`\n- Mode: `entity`\n- Budget: 94/6000 estimated tokens\n- Included: 1; omitted: 0\n\n## [systems/ledger.md#L13-L13] Ledger System\nType: System\nBackends: entity\nReasons: ranked by entity\nRelation path (undirected): systems/ledger\nFreshness: \nProvenance: null\n\nOrion Ledger records settled charge entries.\n"
+            },
+            "schema_version": 1,
+            "truncated": false
+          }
+        },
+        {
+          "id": "relation-ledger-dependency",
+          "pack": {
+            "budget": {
+              "estimated_tokens": 116,
+              "requested_tokens": 6000
+            },
+            "bundle_revision": "section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8",
+            "filters": {
+              "concept": null,
+              "entity": null,
+              "relation": "depends_on",
+              "source": null,
+              "tag": null,
+              "target": "systems/ledger",
+              "type": null
+            },
+            "included": 1,
+            "items": [
+              {
+                "backends": [
+                  "relation"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[services/checkout.md#L13-L13]",
+                "concept_id": "services/checkout",
+                "estimated_tokens": 116,
+                "evidence": {
+                  "edges": [
+                    {
+                      "target": "systems/ledger",
+                      "type": "depends_on",
+                      "via": "relations"
+                    }
+                  ],
+                  "omitted_count": 0,
+                  "passage_id": "services/checkout:L13-L13",
+                  "schema_version": 1
+                },
+                "excerpt": "Checkout writes completed charges to the ledger.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Dependencies",
+                "heading_line": 11,
+                "line_end": 13,
+                "line_start": 13,
+                "passage_id": "services/checkout:L13-L13",
+                "path": "services/checkout.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by relation"
+                ],
+                "relation_path": [
+                  "services/checkout"
+                ],
+                "score": 1.0,
+                "title": "Checkout Service",
+                "type": "Service"
+              }
+            ],
+            "mode": "relation",
+            "neighbors": 0,
+            "omitted": 0,
+            "query": "",
+            "representations": {
+              "markdown": "# OKF Context Pack\n\n- Schema: 1\n- Bundle revision: `section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8`\n- Query: ``\n- Mode: `relation`\n- Budget: 116/6000 estimated tokens\n- Included: 1; omitted: 0\n\n## [services/checkout.md#L13-L13] Checkout Service\nType: Service\nBackends: relation\nReasons: ranked by relation\nRelation path (undirected): services/checkout\nFreshness: \nProvenance: null\n\nCheckout writes completed charges to the ledger.\n"
+            },
+            "schema_version": 1,
+            "truncated": false
+          }
+        },
+        {
+          "id": "section-rollback",
+          "pack": {
+            "budget": {
+              "estimated_tokens": 304,
+              "requested_tokens": 6000
+            },
+            "bundle_revision": "section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8",
+            "filters": {
+              "concept": null,
+              "entity": null,
+              "relation": null,
+              "source": null,
+              "tag": null,
+              "target": null,
+              "type": null
+            },
+            "included": 3,
+            "items": [
+              {
+                "backends": [
+                  "lexical"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[runbooks/deploy.md#L14-L14]",
+                "concept_id": "runbooks/deploy",
+                "estimated_tokens": 102,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "runbooks/deploy:L14-L14",
+                  "schema_version": 1
+                },
+                "excerpt": "During rollback, compare the recovery checksum before restoring traffic.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Rollback Verification",
+                "heading_line": 12,
+                "line_end": 14,
+                "line_start": 14,
+                "passage_id": "runbooks/deploy:L14-L14",
+                "path": "runbooks/deploy.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by lexical"
+                ],
+                "relation_path": [
+                  "runbooks/deploy"
+                ],
+                "score": 28.062307990129998,
+                "title": "Deployment Recovery",
+                "type": "Runbook"
+              },
+              {
+                "backends": [
+                  "lexical"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[notes/rollback-noise.md#L10-L10]",
+                "concept_id": "notes/rollback-noise",
+                "estimated_tokens": 106,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "notes/rollback-noise:L10-L10",
+                  "schema_version": 1
+                },
+                "excerpt": "Rollback checksum verification was proposed but never approved.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Draft",
+                "heading_line": 8,
+                "line_end": 10,
+                "line_start": 10,
+                "passage_id": "notes/rollback-noise:L10-L10",
+                "path": "notes/rollback-noise.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by lexical"
+                ],
+                "relation_path": [
+                  "notes/rollback-noise"
+                ],
+                "score": 13.569576886718318,
+                "title": "Rollback Verification Draft",
+                "type": "Note"
+              },
+              {
+                "backends": [
+                  "lexical"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[runbooks/deploy.md#L10-L10]",
+                "concept_id": "runbooks/deploy",
+                "estimated_tokens": 96,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "runbooks/deploy:L10-L10",
+                  "schema_version": 1
+                },
+                "excerpt": "Verify the release checksum before deployment.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Preflight Verification",
+                "heading_line": 8,
+                "line_end": 10,
+                "line_start": 10,
+                "passage_id": "runbooks/deploy:L10-L10",
+                "path": "runbooks/deploy.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by lexical"
+                ],
+                "relation_path": [
+                  "runbooks/deploy"
+                ],
+                "score": 28.062307990129998,
+                "title": "Deployment Recovery",
+                "type": "Runbook"
+              }
+            ],
+            "mode": "lexical",
+            "neighbors": 0,
+            "omitted": 0,
+            "query": "rollback recovery checksum traffic",
+            "representations": {
+              "markdown": "# OKF Context Pack\n\n- Schema: 1\n- Bundle revision: `section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8`\n- Query: `rollback recovery checksum traffic`\n- Mode: `lexical`\n- Budget: 304/6000 estimated tokens\n- Included: 3; omitted: 0\n\n## [runbooks/deploy.md#L14-L14] Deployment Recovery\nType: Runbook\nBackends: lexical\nReasons: ranked by lexical\nRelation path (undirected): runbooks/deploy\nFreshness: \nProvenance: null\n\nDuring rollback, compare the recovery checksum before restoring traffic.\n\n## [notes/rollback-noise.md#L10-L10] Rollback Verification Draft\nType: Note\nBackends: lexical\nReasons: ranked by lexical\nRelation path (undirected): notes/rollback-noise\nFreshness: \nProvenance: null\n\nRollback checksum verification was proposed but never approved.\n\n## [runbooks/deploy.md#L10-L10] Deployment Recovery\nType: Runbook\nBackends: lexical\nReasons: ranked by lexical\nRelation path (undirected): runbooks/deploy\nFreshness: \nProvenance: null\n\nVerify the release checksum before deployment.\n"
+            },
+            "schema_version": 1,
+            "truncated": false
+          }
+        }
+      ],
+      "queries": [
+        {
+          "id": "lexical-retention",
+          "results": [
+            {
+              "backends": [
+                "lexical"
+              ],
+              "char_end": null,
+              "char_start": null,
+              "citation": "[policies/retention.md#L14-L14]",
+              "citation_valid": true,
+              "concept_id": "policies/retention",
+              "excerpt": "The quartz event ledger has a ninety day retention window.",
+              "heading": "Retention Windows",
+              "line_end": 14,
+              "line_start": 14,
+              "passage_id": "policies/retention:L14-L14",
+              "path": "policies/retention.md",
+              "reasons": [
+                "ranked by lexical"
+              ],
+              "score": 27.470749117630458,
+              "source_backend": "lexical"
+            },
+            {
+              "backends": [
+                "lexical"
+              ],
+              "char_end": null,
+              "char_start": null,
+              "citation": "[glossary/quartz.md#L10-L10]",
+              "citation_valid": true,
+              "concept_id": "glossary/quartz",
+              "excerpt": "Quartz retention window is a phrase used in examples, not a policy.",
+              "heading": "Meaning",
+              "line_end": 10,
+              "line_start": 10,
+              "passage_id": "glossary/quartz:L10-L10",
+              "path": "glossary/quartz.md",
+              "reasons": [
+                "ranked by lexical"
+              ],
+              "score": 18.261848273664164,
+              "source_backend": "lexical"
+            }
+          ]
+        },
+        {
+          "id": "semantic-identity-typo",
+          "results": [
+            {
+              "backends": [
+                "semantic-lite"
+              ],
+              "char_end": null,
+              "char_start": null,
+              "citation": "[entities/customer-identity.md#L13-L13]",
+              "citation_valid": true,
+              "concept_id": "entities/customer-identity",
+              "excerpt": "Customer identity resolution joins account aliases into one profile.",
+              "heading": "Resolution",
+              "line_end": 13,
+              "line_start": 13,
+              "passage_id": "entities/customer-identity:L13-L13",
+              "path": "entities/customer-identity.md",
+              "reasons": [
+                "ranked by semantic-lite"
+              ],
+              "score": 0.2522524329815068,
+              "source_backend": "semantic-lite"
+            },
+            {
+              "backends": [
+                "semantic-lite"
+              ],
+              "char_end": null,
+              "char_start": null,
+              "citation": "[entities/identity-noise.md#L10-L10]",
+              "citation_valid": true,
+              "concept_id": "entities/identity-noise",
+              "excerpt": "Discuss customer support and room resolution.",
+              "heading": "Agenda",
+              "line_end": 10,
+              "line_start": 10,
+              "passage_id": "entities/identity-noise:L10-L10",
+              "path": "entities/identity-noise.md",
+              "reasons": [
+                "ranked by semantic-lite"
+              ],
+              "score": 0.1682488998706747,
+              "source_backend": "semantic-lite"
+            },
+            {
+              "backends": [
+                "semantic-lite"
+              ],
+              "char_end": null,
+              "char_start": null,
+              "citation": "[policies/retention.md#L10-L10]",
+              "citation_valid": true,
+              "concept_id": "policies/retention",
+              "excerpt": "Quartz archives are mentioned here, but no duration is defined.",
+              "heading": "Scope",
+              "line_end": 10,
+              "line_start": 10,
+              "passage_id": "policies/retention:L10-L10",
+              "path": "policies/retention.md",
+              "reasons": [
+                "ranked by semantic-lite"
+              ],
+              "score": 0.0771960462129504,
+              "source_backend": "semantic-lite"
+            }
+          ]
+        },
+        {
+          "id": "hybrid-payment",
+          "results": [
+            {
+              "backends": [
+                "lexical",
+                "semantic-lite"
+              ],
+              "char_end": null,
+              "char_start": null,
+              "citation": "[runbooks/payment-retries.md#L14-L14]",
+              "citation_valid": true,
+              "concept_id": "runbooks/payment-retries",
+              "excerpt": "Use the payment idempotency key before retrying a timed out charge.",
+              "heading": "Idempotent Retry",
+              "line_end": 14,
+              "line_start": 14,
+              "passage_id": "runbooks/payment-retries:L14-L14",
+              "path": "runbooks/payment-retries.md",
+              "reasons": [
+                "ranked by lexical",
+                "ranked by semantic-lite"
+              ],
+              "score": 0.03278688524590164,
+              "source_backend": "hybrid"
+            },
+            {
+              "backends": [
+                "lexical",
+                "semantic-lite"
+              ],
+              "char_end": null,
+              "char_start": null,
+              "citation": "[notes/payment-noise.md#L10-L10]",
+              "citation_valid": true,
+              "concept_id": "notes/payment-noise",
+              "excerpt": "Payment retry idempotency is listed here without operational guidance.",
+              "heading": "Ideas",
+              "line_end": 10,
+              "line_start": 10,
+              "passage_id": "notes/payment-noise:L10-L10",
+              "path": "notes/payment-noise.md",
+              "reasons": [
+                "ranked by lexical",
+                "ranked by semantic-lite"
+              ],
+              "score": 0.03225806451612903,
+              "source_backend": "hybrid"
+            },
+            {
+              "backends": [
+                "semantic-lite"
+              ],
+              "char_end": null,
+              "char_start": null,
+              "citation": "[policies/retention.md#L10-L10]",
+              "citation_valid": true,
+              "concept_id": "policies/retention",
+              "excerpt": "Quartz archives are mentioned here, but no duration is defined.",
+              "heading": "Scope",
+              "line_end": 10,
+              "line_start": 10,
+              "passage_id": "policies/retention:L10-L10",
+              "path": "policies/retention.md",
+              "reasons": [
+                "ranked by semantic-lite"
+              ],
+              "score": 0.015873015873015872,
+              "source_backend": "hybrid"
+            }
+          ]
+        },
+        {
+          "id": "tag-critical-path",
+          "results": [
+            {
+              "backends": [
+                "tag"
+              ],
+              "char_end": null,
+              "char_start": null,
+              "citation": "[services/checkout.md#L13-L13]",
+              "citation_valid": true,
+              "concept_id": "services/checkout",
+              "excerpt": "Checkout writes completed charges to the ledger.",
+              "heading": "Dependencies",
+              "line_end": 13,
+              "line_start": 13,
+              "passage_id": "services/checkout:L13-L13",
+              "path": "services/checkout.md",
+              "reasons": [
+                "ranked by tag"
+              ],
+              "score": 1.0,
+              "source_backend": "tag"
+            },
+            {
+              "backends": [
+                "tag"
+              ],
+              "char_end": null,
+              "char_start": null,
+              "citation": "[runbooks/payment-retries.md#L10-L10]",
+              "citation_valid": true,
+              "concept_id": "runbooks/payment-retries",
+              "excerpt": "Repeated gateway failures can create duplicate payment attempts.",
+              "heading": "Symptoms",
+              "line_end": 10,
+              "line_start": 10,
+              "passage_id": "runbooks/payment-retries:L10-L10",
+              "path": "runbooks/payment-retries.md",
+              "reasons": [
+                "ranked by tag"
+              ],
+              "score": 1.0,
+              "source_backend": "tag"
+            }
+          ]
+        },
+        {
+          "id": "entity-orion-ledger",
+          "results": [
+            {
+              "backends": [
+                "entity"
+              ],
+              "char_end": null,
+              "char_start": null,
+              "citation": "[systems/ledger.md#L13-L13]",
+              "citation_valid": true,
+              "concept_id": "systems/ledger",
+              "excerpt": "Orion Ledger records settled charge entries.",
+              "heading": "Journal",
+              "line_end": 13,
+              "line_start": 13,
+              "passage_id": "systems/ledger:L13-L13",
+              "path": "systems/ledger.md",
+              "reasons": [
+                "ranked by entity"
+              ],
+              "score": 3.0,
+              "source_backend": "entity"
+            }
+          ]
+        },
+        {
+          "id": "relation-ledger-dependency",
+          "results": [
+            {
+              "backends": [
+                "relation"
+              ],
+              "char_end": null,
+              "char_start": null,
+              "citation": "[services/checkout.md#L13-L13]",
+              "citation_valid": true,
+              "concept_id": "services/checkout",
+              "excerpt": "Checkout writes completed charges to the ledger.",
+              "heading": "Dependencies",
+              "line_end": 13,
+              "line_start": 13,
+              "passage_id": "services/checkout:L13-L13",
+              "path": "services/checkout.md",
+              "reasons": [
+                "ranked by relation"
+              ],
+              "score": 1.0,
+              "source_backend": "relation"
+            }
+          ]
+        },
+        {
+          "id": "section-rollback",
+          "results": [
+            {
+              "backends": [
+                "lexical"
+              ],
+              "char_end": null,
+              "char_start": null,
+              "citation": "[runbooks/deploy.md#L14-L14]",
+              "citation_valid": true,
+              "concept_id": "runbooks/deploy",
+              "excerpt": "During rollback, compare the recovery checksum before restoring traffic.",
+              "heading": "Rollback Verification",
+              "line_end": 14,
+              "line_start": 14,
+              "passage_id": "runbooks/deploy:L14-L14",
+              "path": "runbooks/deploy.md",
+              "reasons": [
+                "ranked by lexical"
+              ],
+              "score": 28.062307990129998,
+              "source_backend": "lexical"
+            },
+            {
+              "backends": [
+                "lexical"
+              ],
+              "char_end": null,
+              "char_start": null,
+              "citation": "[notes/rollback-noise.md#L10-L10]",
+              "citation_valid": true,
+              "concept_id": "notes/rollback-noise",
+              "excerpt": "Rollback checksum verification was proposed but never approved.",
+              "heading": "Draft",
+              "line_end": 10,
+              "line_start": 10,
+              "passage_id": "notes/rollback-noise:L10-L10",
+              "path": "notes/rollback-noise.md",
+              "reasons": [
+                "ranked by lexical"
+              ],
+              "score": 13.569576886718318,
+              "source_backend": "lexical"
+            }
+          ]
+        }
+      ],
+      "revision": "8f332ff43a43db5294c4eef9b5c9c7b35826c69b",
+      "section_evidence_available": true
+    },
+    "portable": {
+      "contexts": [
+        {
+          "id": "lexical-retention",
+          "pack": {
+            "budget": {
+              "estimated_tokens": 103,
+              "requested_tokens": 128
+            },
+            "bundle_revision": "section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8",
+            "filters": {
+              "concept": null,
+              "entity": null,
+              "relation": null,
+              "source": null,
+              "tag": null,
+              "target": null,
+              "type": null
+            },
+            "included": 1,
+            "items": [
+              {
+                "backends": [
+                  "lexical"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[policies/retention.md#L14-L14]",
+                "concept_id": "policies/retention",
+                "estimated_tokens": 103,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "policies/retention:L14-L14",
+                  "schema_version": 1
+                },
+                "excerpt": "The quartz event ledger has a ninety day retention window.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Retention Windows",
+                "heading_line": 12,
+                "line_end": 14,
+                "line_start": 14,
+                "passage_id": "policies/retention:L14-L14",
+                "path": "policies/retention.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by lexical"
+                ],
+                "relation_path": [
+                  "policies/retention"
+                ],
+                "score": 27.47074911763046,
+                "title": "Data Retention Policy",
+                "type": "Policy"
+              }
+            ],
+            "mode": "lexical",
+            "neighbors": 0,
+            "omitted": 2,
+            "query": "quartz ninety day retention",
+            "representations": {
+              "markdown": "# OKF Context Pack\n\n- Schema: 1\n- Bundle revision: `section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8`\n- Query: `quartz ninety day retention`\n- Mode: `lexical`\n- Budget: 103/128 estimated tokens\n- Included: 1; omitted: 2\n\n## [policies/retention.md#L14-L14] Data Retention Policy\nType: Policy\nBackends: lexical\nReasons: ranked by lexical\nRelation path (undirected): policies/retention\nFreshness: \nProvenance: null\n\nThe quartz event ledger has a ninety day retention window.\n"
+            },
+            "schema_version": 1,
+            "truncated": true
+          }
+        },
+        {
+          "id": "semantic-identity-typo",
+          "pack": {
+            "budget": {
+              "estimated_tokens": 334,
+              "requested_tokens": 6000
+            },
+            "bundle_revision": "section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8",
+            "filters": {
+              "concept": null,
+              "entity": null,
+              "relation": null,
+              "source": null,
+              "tag": null,
+              "target": null,
+              "type": null
+            },
+            "included": 3,
+            "items": [
+              {
+                "backends": [
+                  "semantic-lite"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[entities/customer-identity.md#L13-L13]",
+                "concept_id": "entities/customer-identity",
+                "estimated_tokens": 118,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "entities/customer-identity:L13-L13",
+                  "schema_version": 1
+                },
+                "excerpt": "Customer identity resolution joins account aliases into one profile.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Resolution",
+                "heading_line": 11,
+                "line_end": 13,
+                "line_start": 13,
+                "passage_id": "entities/customer-identity:L13-L13",
+                "path": "entities/customer-identity.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by semantic-lite"
+                ],
+                "relation_path": [
+                  "entities/customer-identity"
+                ],
+                "score": 0.2522524329815068,
+                "title": "Customer Identity Resolution",
+                "type": "Data Product"
+              },
+              {
+                "backends": [
+                  "semantic-lite"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[entities/identity-noise.md#L10-L10]",
+                "concept_id": "entities/identity-noise",
+                "estimated_tokens": 109,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "entities/identity-noise:L10-L10",
+                  "schema_version": 1
+                },
+                "excerpt": "Discuss customer support and room resolution.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Agenda",
+                "heading_line": 8,
+                "line_end": 10,
+                "line_start": 10,
+                "passage_id": "entities/identity-noise:L10-L10",
+                "path": "entities/identity-noise.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by semantic-lite"
+                ],
+                "relation_path": [
+                  "entities/identity-noise"
+                ],
+                "score": 0.1682488998706747,
+                "title": "Customer Resolution Meeting",
+                "type": "Note"
+              },
+              {
+                "backends": [
+                  "semantic-lite"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[policies/retention.md#L10-L10]",
+                "concept_id": "policies/retention",
+                "estimated_tokens": 107,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "policies/retention:L10-L10",
+                  "schema_version": 1
+                },
+                "excerpt": "Quartz archives are mentioned here, but no duration is defined.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Scope",
+                "heading_line": 8,
+                "line_end": 10,
+                "line_start": 10,
+                "passage_id": "policies/retention:L10-L10",
+                "path": "policies/retention.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by semantic-lite"
+                ],
+                "relation_path": [
+                  "policies/retention"
+                ],
+                "score": 0.0771960462129504,
+                "title": "Data Retention Policy",
+                "type": "Policy"
+              }
+            ],
+            "mode": "semantic",
+            "neighbors": 0,
+            "omitted": 8,
+            "query": "custmer identty resoluton",
+            "representations": {
+              "markdown": "# OKF Context Pack\n\n- Schema: 1\n- Bundle revision: `section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8`\n- Query: `custmer identty resoluton`\n- Mode: `semantic`\n- Budget: 334/6000 estimated tokens\n- Included: 3; omitted: 8\n\n## [entities/customer-identity.md#L13-L13] Customer Identity Resolution\nType: Data Product\nBackends: semantic-lite\nReasons: ranked by semantic-lite\nRelation path (undirected): entities/customer-identity\nFreshness: \nProvenance: null\n\nCustomer identity resolution joins account aliases into one profile.\n\n## [entities/identity-noise.md#L10-L10] Customer Resolution Meeting\nType: Note\nBackends: semantic-lite\nReasons: ranked by semantic-lite\nRelation path (undirected): entities/identity-noise\nFreshness: \nProvenance: null\n\nDiscuss customer support and room resolution.\n\n## [policies/retention.md#L10-L10] Data Retention Policy\nType: Policy\nBackends: semantic-lite\nReasons: ranked by semantic-lite\nRelation path (undirected): policies/retention\nFreshness: \nProvenance: null\n\nQuartz archives are mentioned here, but no duration is defined.\n"
+            },
+            "schema_version": 1,
+            "truncated": true
+          }
+        },
+        {
+          "id": "hybrid-payment",
+          "pack": {
+            "budget": {
+              "estimated_tokens": 347,
+              "requested_tokens": 6000
+            },
+            "bundle_revision": "section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8",
+            "filters": {
+              "concept": null,
+              "entity": null,
+              "relation": null,
+              "source": null,
+              "tag": null,
+              "target": null,
+              "type": null
+            },
+            "included": 3,
+            "items": [
+              {
+                "backends": [
+                  "lexical",
+                  "semantic-lite"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[runbooks/payment-retries.md#L14-L14]",
+                "concept_id": "runbooks/payment-retries",
+                "estimated_tokens": 123,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "runbooks/payment-retries:L14-L14",
+                  "schema_version": 1
+                },
+                "excerpt": "Use the payment idempotency key before retrying a timed out charge.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Idempotent Retry",
+                "heading_line": 12,
+                "line_end": 14,
+                "line_start": 14,
+                "passage_id": "runbooks/payment-retries:L14-L14",
+                "path": "runbooks/payment-retries.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by lexical",
+                  "ranked by semantic-lite"
+                ],
+                "relation_path": [
+                  "runbooks/payment-retries"
+                ],
+                "score": 0.03278688524590164,
+                "title": "Payment Retry Safety",
+                "type": "Runbook"
+              },
+              {
+                "backends": [
+                  "lexical",
+                  "semantic-lite"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[notes/payment-noise.md#L10-L10]",
+                "concept_id": "notes/payment-noise",
+                "estimated_tokens": 117,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "notes/payment-noise:L10-L10",
+                  "schema_version": 1
+                },
+                "excerpt": "Payment retry idempotency is listed here without operational guidance.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Ideas",
+                "heading_line": 8,
+                "line_end": 10,
+                "line_start": 10,
+                "passage_id": "notes/payment-noise:L10-L10",
+                "path": "notes/payment-noise.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by lexical",
+                  "ranked by semantic-lite"
+                ],
+                "relation_path": [
+                  "notes/payment-noise"
+                ],
+                "score": 0.03225806451612903,
+                "title": "Payment Retry Brainstorm",
+                "type": "Note"
+              },
+              {
+                "backends": [
+                  "semantic-lite"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[policies/retention.md#L10-L10]",
+                "concept_id": "policies/retention",
+                "estimated_tokens": 107,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "policies/retention:L10-L10",
+                  "schema_version": 1
+                },
+                "excerpt": "Quartz archives are mentioned here, but no duration is defined.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Scope",
+                "heading_line": 8,
+                "line_end": 10,
+                "line_start": 10,
+                "passage_id": "policies/retention:L10-L10",
+                "path": "policies/retention.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by semantic-lite"
+                ],
+                "relation_path": [
+                  "policies/retention"
+                ],
+                "score": 0.015873015873015872,
+                "title": "Data Retention Policy",
+                "type": "Policy"
+              }
+            ],
+            "mode": "hybrid",
+            "neighbors": 0,
+            "omitted": 8,
+            "query": "payment retry idempotency key",
+            "representations": {
+              "markdown": "# OKF Context Pack\n\n- Schema: 1\n- Bundle revision: `section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8`\n- Query: `payment retry idempotency key`\n- Mode: `hybrid`\n- Budget: 347/6000 estimated tokens\n- Included: 3; omitted: 8\n\n## [runbooks/payment-retries.md#L14-L14] Payment Retry Safety\nType: Runbook\nBackends: lexical, semantic-lite\nReasons: ranked by lexical; ranked by semantic-lite\nRelation path (undirected): runbooks/payment-retries\nFreshness: \nProvenance: null\n\nUse the payment idempotency key before retrying a timed out charge.\n\n## [notes/payment-noise.md#L10-L10] Payment Retry Brainstorm\nType: Note\nBackends: lexical, semantic-lite\nReasons: ranked by lexical; ranked by semantic-lite\nRelation path (undirected): notes/payment-noise\nFreshness: \nProvenance: null\n\nPayment retry idempotency is listed here without operational guidance.\n\n## [policies/retention.md#L10-L10] Data Retention Policy\nType: Policy\nBackends: semantic-lite\nReasons: ranked by semantic-lite\nRelation path (undirected): policies/retention\nFreshness: \nProvenance: null\n\nQuartz archives are mentioned here, but no duration is defined.\n"
+            },
+            "schema_version": 1,
+            "truncated": true
+          }
+        },
+        {
+          "id": "tag-critical-path",
+          "pack": {
+            "budget": {
+              "estimated_tokens": 207,
+              "requested_tokens": 6000
+            },
+            "bundle_revision": "section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8",
+            "filters": {
+              "concept": null,
+              "entity": null,
+              "relation": null,
+              "source": null,
+              "tag": null,
+              "target": null,
+              "type": null
+            },
+            "included": 2,
+            "items": [
+              {
+                "backends": [
+                  "tag"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[services/checkout.md#L13-L13]",
+                "concept_id": "services/checkout",
+                "estimated_tokens": 97,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "services/checkout:L13-L13",
+                  "schema_version": 1
+                },
+                "excerpt": "Checkout writes completed charges to the ledger.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Dependencies",
+                "heading_line": 11,
+                "line_end": 13,
+                "line_start": 13,
+                "passage_id": "services/checkout:L13-L13",
+                "path": "services/checkout.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by tag"
+                ],
+                "relation_path": [
+                  "services/checkout"
+                ],
+                "score": 1,
+                "title": "Checkout Service",
+                "type": "Service"
+              },
+              {
+                "backends": [
+                  "tag"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[runbooks/payment-retries.md#L10-L10]",
+                "concept_id": "runbooks/payment-retries",
+                "estimated_tokens": 110,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "runbooks/payment-retries:L10-L10",
+                  "schema_version": 1
+                },
+                "excerpt": "Repeated gateway failures can create duplicate payment attempts.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Symptoms",
+                "heading_line": 8,
+                "line_end": 10,
+                "line_start": 10,
+                "passage_id": "runbooks/payment-retries:L10-L10",
+                "path": "runbooks/payment-retries.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by tag"
+                ],
+                "relation_path": [
+                  "runbooks/payment-retries"
+                ],
+                "score": 1,
+                "title": "Payment Retry Safety",
+                "type": "Runbook"
+              }
+            ],
+            "mode": "tag",
+            "neighbors": 0,
+            "omitted": 0,
+            "query": "critical-path",
+            "representations": {
+              "markdown": "# OKF Context Pack\n\n- Schema: 1\n- Bundle revision: `section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8`\n- Query: `critical-path`\n- Mode: `tag`\n- Budget: 207/6000 estimated tokens\n- Included: 2; omitted: 0\n\n## [services/checkout.md#L13-L13] Checkout Service\nType: Service\nBackends: tag\nReasons: ranked by tag\nRelation path (undirected): services/checkout\nFreshness: \nProvenance: null\n\nCheckout writes completed charges to the ledger.\n\n## [runbooks/payment-retries.md#L10-L10] Payment Retry Safety\nType: Runbook\nBackends: tag\nReasons: ranked by tag\nRelation path (undirected): runbooks/payment-retries\nFreshness: \nProvenance: null\n\nRepeated gateway failures can create duplicate payment attempts.\n"
+            },
+            "schema_version": 1,
+            "truncated": false
+          }
+        },
+        {
+          "id": "entity-orion-ledger",
+          "pack": {
+            "budget": {
+              "estimated_tokens": 94,
+              "requested_tokens": 6000
+            },
+            "bundle_revision": "section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8",
+            "filters": {
+              "concept": null,
+              "entity": null,
+              "relation": null,
+              "source": null,
+              "tag": null,
+              "target": null,
+              "type": null
+            },
+            "included": 1,
+            "items": [
+              {
+                "backends": [
+                  "entity"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[systems/ledger.md#L13-L13]",
+                "concept_id": "systems/ledger",
+                "estimated_tokens": 94,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "systems/ledger:L13-L13",
+                  "schema_version": 1
+                },
+                "excerpt": "Orion Ledger records settled charge entries.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Journal",
+                "heading_line": 11,
+                "line_end": 13,
+                "line_start": 13,
+                "passage_id": "systems/ledger:L13-L13",
+                "path": "systems/ledger.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by entity"
+                ],
+                "relation_path": [
+                  "systems/ledger"
+                ],
+                "score": 3,
+                "title": "Ledger System",
+                "type": "System"
+              }
+            ],
+            "mode": "entity",
+            "neighbors": 0,
+            "omitted": 0,
+            "query": "Orion Ledger",
+            "representations": {
+              "markdown": "# OKF Context Pack\n\n- Schema: 1\n- Bundle revision: `section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8`\n- Query: `Orion Ledger`\n- Mode: `entity`\n- Budget: 94/6000 estimated tokens\n- Included: 1; omitted: 0\n\n## [systems/ledger.md#L13-L13] Ledger System\nType: System\nBackends: entity\nReasons: ranked by entity\nRelation path (undirected): systems/ledger\nFreshness: \nProvenance: null\n\nOrion Ledger records settled charge entries.\n"
+            },
+            "schema_version": 1,
+            "truncated": false
+          }
+        },
+        {
+          "id": "relation-ledger-dependency",
+          "pack": {
+            "budget": {
+              "estimated_tokens": 116,
+              "requested_tokens": 6000
+            },
+            "bundle_revision": "section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8",
+            "filters": {
+              "concept": null,
+              "entity": null,
+              "relation": "depends_on",
+              "source": null,
+              "tag": null,
+              "target": "systems/ledger",
+              "type": null
+            },
+            "included": 1,
+            "items": [
+              {
+                "backends": [
+                  "relation"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[services/checkout.md#L13-L13]",
+                "concept_id": "services/checkout",
+                "estimated_tokens": 116,
+                "evidence": {
+                  "edges": [
+                    {
+                      "target": "systems/ledger",
+                      "type": "depends_on",
+                      "via": "relations"
+                    }
+                  ],
+                  "omitted_count": 0,
+                  "passage_id": "services/checkout:L13-L13",
+                  "schema_version": 1
+                },
+                "excerpt": "Checkout writes completed charges to the ledger.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Dependencies",
+                "heading_line": 11,
+                "line_end": 13,
+                "line_start": 13,
+                "passage_id": "services/checkout:L13-L13",
+                "path": "services/checkout.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by relation"
+                ],
+                "relation_path": [
+                  "services/checkout"
+                ],
+                "score": 1,
+                "title": "Checkout Service",
+                "type": "Service"
+              }
+            ],
+            "mode": "relation",
+            "neighbors": 0,
+            "omitted": 0,
+            "query": "",
+            "representations": {
+              "markdown": "# OKF Context Pack\n\n- Schema: 1\n- Bundle revision: `section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8`\n- Query: ``\n- Mode: `relation`\n- Budget: 116/6000 estimated tokens\n- Included: 1; omitted: 0\n\n## [services/checkout.md#L13-L13] Checkout Service\nType: Service\nBackends: relation\nReasons: ranked by relation\nRelation path (undirected): services/checkout\nFreshness: \nProvenance: null\n\nCheckout writes completed charges to the ledger.\n"
+            },
+            "schema_version": 1,
+            "truncated": false
+          }
+        },
+        {
+          "id": "section-rollback",
+          "pack": {
+            "budget": {
+              "estimated_tokens": 304,
+              "requested_tokens": 6000
+            },
+            "bundle_revision": "section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8",
+            "filters": {
+              "concept": null,
+              "entity": null,
+              "relation": null,
+              "source": null,
+              "tag": null,
+              "target": null,
+              "type": null
+            },
+            "included": 3,
+            "items": [
+              {
+                "backends": [
+                  "lexical"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[runbooks/deploy.md#L14-L14]",
+                "concept_id": "runbooks/deploy",
+                "estimated_tokens": 102,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "runbooks/deploy:L14-L14",
+                  "schema_version": 1
+                },
+                "excerpt": "During rollback, compare the recovery checksum before restoring traffic.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Rollback Verification",
+                "heading_line": 12,
+                "line_end": 14,
+                "line_start": 14,
+                "passage_id": "runbooks/deploy:L14-L14",
+                "path": "runbooks/deploy.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by lexical"
+                ],
+                "relation_path": [
+                  "runbooks/deploy"
+                ],
+                "score": 28.062307990129998,
+                "title": "Deployment Recovery",
+                "type": "Runbook"
+              },
+              {
+                "backends": [
+                  "lexical"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[notes/rollback-noise.md#L10-L10]",
+                "concept_id": "notes/rollback-noise",
+                "estimated_tokens": 106,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "notes/rollback-noise:L10-L10",
+                  "schema_version": 1
+                },
+                "excerpt": "Rollback checksum verification was proposed but never approved.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Draft",
+                "heading_line": 8,
+                "line_end": 10,
+                "line_start": 10,
+                "passage_id": "notes/rollback-noise:L10-L10",
+                "path": "notes/rollback-noise.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by lexical"
+                ],
+                "relation_path": [
+                  "notes/rollback-noise"
+                ],
+                "score": 13.56957688671832,
+                "title": "Rollback Verification Draft",
+                "type": "Note"
+              },
+              {
+                "backends": [
+                  "lexical"
+                ],
+                "char_end": null,
+                "char_start": null,
+                "citation": "[runbooks/deploy.md#L10-L10]",
+                "concept_id": "runbooks/deploy",
+                "estimated_tokens": 96,
+                "evidence": {
+                  "edges": [],
+                  "omitted_count": 0,
+                  "passage_id": "runbooks/deploy:L10-L10",
+                  "schema_version": 1
+                },
+                "excerpt": "Verify the release checksum before deployment.",
+                "freshness": null,
+                "graph_distance": 0,
+                "heading": "Preflight Verification",
+                "heading_line": 8,
+                "line_end": 10,
+                "line_start": 10,
+                "passage_id": "runbooks/deploy:L10-L10",
+                "path": "runbooks/deploy.md",
+                "provenance": null,
+                "reasons": [
+                  "ranked by lexical"
+                ],
+                "relation_path": [
+                  "runbooks/deploy"
+                ],
+                "score": 28.062307990129998,
+                "title": "Deployment Recovery",
+                "type": "Runbook"
+              }
+            ],
+            "mode": "lexical",
+            "neighbors": 0,
+            "omitted": 0,
+            "query": "rollback recovery checksum traffic",
+            "representations": {
+              "markdown": "# OKF Context Pack\n\n- Schema: 1\n- Bundle revision: `section-retrieval-v1:d04a455cff9fac0a30640535a5729c9375566d8cd52e282dba5a92cee2908ac8`\n- Query: `rollback recovery checksum traffic`\n- Mode: `lexical`\n- Budget: 304/6000 estimated tokens\n- Included: 3; omitted: 0\n\n## [runbooks/deploy.md#L14-L14] Deployment Recovery\nType: Runbook\nBackends: lexical\nReasons: ranked by lexical\nRelation path (undirected): runbooks/deploy\nFreshness: \nProvenance: null\n\nDuring rollback, compare the recovery checksum before restoring traffic.\n\n## [notes/rollback-noise.md#L10-L10] Rollback Verification Draft\nType: Note\nBackends: lexical\nReasons: ranked by lexical\nRelation path (undirected): notes/rollback-noise\nFreshness: \nProvenance: null\n\nRollback checksum verification was proposed but never approved.\n\n## [runbooks/deploy.md#L10-L10] Deployment Recovery\nType: Runbook\nBackends: lexical\nReasons: ranked by lexical\nRelation path (undirected): runbooks/deploy\nFreshness: \nProvenance: null\n\nVerify the release checksum before deployment.\n"
+            },
+            "schema_version": 1,
+            "truncated": false
+          }
+        }
+      ],
+      "queries": [
+        {
+          "id": "lexical-retention",
+          "results": [
+            {
+              "backends": [
+                "lexical"
+              ],
+              "citation": "[policies/retention.md#L14-L14]",
+              "concept_id": "policies/retention",
+              "heading": "Retention Windows",
+              "passage_id": "policies/retention:L14-L14",
+              "reasons": [
+                "ranked by lexical"
+              ],
+              "score": 27.47074911763046,
+              "source_backend": "lexical"
+            },
+            {
+              "backends": [
+                "lexical"
+              ],
+              "citation": "[glossary/quartz.md#L10-L10]",
+              "concept_id": "glossary/quartz",
+              "heading": "Meaning",
+              "passage_id": "glossary/quartz:L10-L10",
+              "reasons": [
+                "ranked by lexical"
+              ],
+              "score": 18.26184827366416,
+              "source_backend": "lexical"
+            }
+          ]
+        },
+        {
+          "id": "semantic-identity-typo",
+          "results": [
+            {
+              "backends": [
+                "semantic-lite"
+              ],
+              "citation": "[entities/customer-identity.md#L13-L13]",
+              "concept_id": "entities/customer-identity",
+              "heading": "Resolution",
+              "passage_id": "entities/customer-identity:L13-L13",
+              "reasons": [
+                "ranked by semantic-lite"
+              ],
+              "score": 0.2522524329815068,
+              "source_backend": "semantic-lite"
+            },
+            {
+              "backends": [
+                "semantic-lite"
+              ],
+              "citation": "[entities/identity-noise.md#L10-L10]",
+              "concept_id": "entities/identity-noise",
+              "heading": "Agenda",
+              "passage_id": "entities/identity-noise:L10-L10",
+              "reasons": [
+                "ranked by semantic-lite"
+              ],
+              "score": 0.1682488998706747,
+              "source_backend": "semantic-lite"
+            },
+            {
+              "backends": [
+                "semantic-lite"
+              ],
+              "citation": "[policies/retention.md#L10-L10]",
+              "concept_id": "policies/retention",
+              "heading": "Scope",
+              "passage_id": "policies/retention:L10-L10",
+              "reasons": [
+                "ranked by semantic-lite"
+              ],
+              "score": 0.0771960462129504,
+              "source_backend": "semantic-lite"
+            }
+          ]
+        },
+        {
+          "id": "hybrid-payment",
+          "results": [
+            {
+              "backends": [
+                "lexical",
+                "semantic-lite"
+              ],
+              "citation": "[runbooks/payment-retries.md#L14-L14]",
+              "concept_id": "runbooks/payment-retries",
+              "heading": "Idempotent Retry",
+              "passage_id": "runbooks/payment-retries:L14-L14",
+              "reasons": [
+                "ranked by lexical",
+                "ranked by semantic-lite"
+              ],
+              "score": 0.03278688524590164,
+              "source_backend": "hybrid"
+            },
+            {
+              "backends": [
+                "lexical",
+                "semantic-lite"
+              ],
+              "citation": "[notes/payment-noise.md#L10-L10]",
+              "concept_id": "notes/payment-noise",
+              "heading": "Ideas",
+              "passage_id": "notes/payment-noise:L10-L10",
+              "reasons": [
+                "ranked by lexical",
+                "ranked by semantic-lite"
+              ],
+              "score": 0.03225806451612903,
+              "source_backend": "hybrid"
+            },
+            {
+              "backends": [
+                "semantic-lite"
+              ],
+              "citation": "[policies/retention.md#L10-L10]",
+              "concept_id": "policies/retention",
+              "heading": "Scope",
+              "passage_id": "policies/retention:L10-L10",
+              "reasons": [
+                "ranked by semantic-lite"
+              ],
+              "score": 0.015873015873015872,
+              "source_backend": "hybrid"
+            }
+          ]
+        },
+        {
+          "id": "tag-critical-path",
+          "results": [
+            {
+              "backends": [
+                "tag"
+              ],
+              "citation": "[services/checkout.md#L13-L13]",
+              "concept_id": "services/checkout",
+              "heading": "Dependencies",
+              "passage_id": "services/checkout:L13-L13",
+              "reasons": [
+                "ranked by tag"
+              ],
+              "score": 1,
+              "source_backend": "tag"
+            },
+            {
+              "backends": [
+                "tag"
+              ],
+              "citation": "[runbooks/payment-retries.md#L10-L10]",
+              "concept_id": "runbooks/payment-retries",
+              "heading": "Symptoms",
+              "passage_id": "runbooks/payment-retries:L10-L10",
+              "reasons": [
+                "ranked by tag"
+              ],
+              "score": 1,
+              "source_backend": "tag"
+            }
+          ]
+        },
+        {
+          "id": "entity-orion-ledger",
+          "results": [
+            {
+              "backends": [
+                "entity"
+              ],
+              "citation": "[systems/ledger.md#L13-L13]",
+              "concept_id": "systems/ledger",
+              "heading": "Journal",
+              "passage_id": "systems/ledger:L13-L13",
+              "reasons": [
+                "ranked by entity"
+              ],
+              "score": 3,
+              "source_backend": "entity"
+            }
+          ]
+        },
+        {
+          "id": "relation-ledger-dependency",
+          "results": [
+            {
+              "backends": [
+                "relation"
+              ],
+              "citation": "[services/checkout.md#L13-L13]",
+              "concept_id": "services/checkout",
+              "heading": "Dependencies",
+              "passage_id": "services/checkout:L13-L13",
+              "reasons": [
+                "ranked by relation"
+              ],
+              "score": 1,
+              "source_backend": "relation"
+            }
+          ]
+        },
+        {
+          "id": "section-rollback",
+          "results": [
+            {
+              "backends": [
+                "lexical"
+              ],
+              "citation": "[runbooks/deploy.md#L14-L14]",
+              "concept_id": "runbooks/deploy",
+              "heading": "Rollback Verification",
+              "passage_id": "runbooks/deploy:L14-L14",
+              "reasons": [
+                "ranked by lexical"
+              ],
+              "score": 28.062307990129998,
+              "source_backend": "lexical"
+            },
+            {
+              "backends": [
+                "lexical"
+              ],
+              "citation": "[notes/rollback-noise.md#L10-L10]",
+              "concept_id": "notes/rollback-noise",
+              "heading": "Draft",
+              "passage_id": "notes/rollback-noise:L10-L10",
+              "reasons": [
+                "ranked by lexical"
+              ],
+              "score": 13.56957688671832,
+              "source_backend": "lexical"
+            }
+          ]
+        }
+      ],
+      "status": "measured"
+    }
+  }
+}

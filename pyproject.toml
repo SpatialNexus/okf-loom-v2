@@ -1,0 +1,18 @@
+# This repo is intentionally distributed as a loadable skill checkout, not as
+# an installable Python package. Keep this file for pytest/coverage tool config
+# only; runtime invocation uses:
+#
+#   scripts/okf-loom <command> ...
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["scripts"]
+addopts = "-ra"
+markers = [
+    "browser: uses Playwright; absent optional tooling skips unless OKF_REQUIRE_BROWSER=1",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["scripts/okf_loom"]

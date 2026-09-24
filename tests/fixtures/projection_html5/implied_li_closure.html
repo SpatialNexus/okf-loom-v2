@@ -1,0 +1,21 @@
+<!--
+  Browser parity fixture — HTML5 implied list-item closure.
+  ReviewAll r7: "projection validation is not browser-tree complete".
+
+  <ul><li>first<li>second></ul> — the second <li> implicitly closes the
+  first. The browser produces two SIBLING <li> elements, not nested ones.
+  The stdlib HTMLParser nests the second <li> inside the first, so
+  textContent extraction per owner nonce would differ.
+
+  Expected browser behavior:
+    - <li#a> and <li#b> are SIBLINGS inside <ul>
+    - <li#a>.textContent == "first"
+    - <li#b>.textContent == "second"
+    - <li#a> does NOT contain <li#b>
+-->
+<!DOCTYPE html>
+<html>
+<body>
+<ul><li id="a">first<li id="b">second</ul>
+</body>
+</html>

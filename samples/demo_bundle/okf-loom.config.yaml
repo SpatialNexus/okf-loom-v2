@@ -1,0 +1,7 @@
+viewer:
+  title: "OKF Demo Bundle"
+
+studio:
+  edit: true
+  live: true
+  allowed_hosts: [127.0.0.1, localhost]

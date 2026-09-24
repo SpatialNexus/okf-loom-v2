@@ -1,0 +1,20 @@
+<!--
+  Browser parity fixture — HTML5 table foster parenting.
+  ReviewAll r7: "projection validation is not browser-tree complete".
+
+  A <p> inside <table> (not in a cell) is foster-parented by the browser:
+  it is removed from the table and inserted BEFORE it. The stdlib HTMLParser
+  keeps the <p> inside the table, so textContent extraction per owner nonce
+  would differ. This fixture proves the browser tree differs from HTMLParser.
+
+  Expected browser behavior (Chrome/Firefox/Safari):
+    - <p id="foster"> is a SIBLING of <table>, not a child
+    - document.body children: [<p#foster>, <table>]
+    - <table>.textContent == ""  (the "fostered" text was moved out)
+-->
+<!DOCTYPE html>
+<html>
+<body>
+<table><p id="foster">fostered</p><tr><td>cell</td></tr></table>
+</body>
+</html>

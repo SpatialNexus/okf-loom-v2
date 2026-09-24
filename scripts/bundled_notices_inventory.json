@@ -1,0 +1,2135 @@
+{
+ "fonts": {
+  "evidence": [
+   "name-table records 0/13 of package/dist/fonts/<face>.ttf in https://registry.npmjs.org/katex/-/katex-0.16.47.tgz (the same faces as the vendored .woff2 files)"
+  ],
+  "id": "katex-fonts@0.16.47",
+  "included_in": [
+   "katex-0.16.47/fonts/*.woff2 (inlined into katex-0.16.47/katex.offline.min.css)"
+  ],
+  "integrity": "sha512-Eeo8Ys1doU1z+x8AZsPpQu+p/QcZBI5PeOo7QGQdy2x2m0MU/hYagBbGOmXwr5KVbEfVuWv9LpnQWeehogurjg==",
+  "license": "OFL-1.1",
+  "name": "KaTeX fonts",
+  "notices": [
+   {
+    "faces": [
+     "KaTeX_AMS-Regular"
+    ],
+    "text": "Copyright (c) 2009-2010, Design Science, Inc. (<www.mathjax.org>)\nCopyright (c) 2014-2018 Khan Academy (<www.khanacademy.org>),\nwith Reserved Font Name KaTeX_AMS.\n\nThis Font Software is licensed under the SIL Open Font License, Version 1.1.\nThis license available with a FAQ at:\nhttp://scripts.sil.org/OFL"
+   },
+   {
+    "faces": [
+     "KaTeX_Caligraphic-Bold",
+     "KaTeX_Caligraphic-Regular"
+    ],
+    "text": "Copyright (c) 2009-2010, Design Science, Inc. (<www.mathjax.org>)\nCopyright (c) 2014-2018 Khan Academy (<www.khanacademy.org>),\nwith Reserved Font Name KaTeX_Caligraphic.\n\nThis Font Software is licensed under the SIL Open Font License, Version 1.1.\nThis license available with a FAQ at:\nhttp://scripts.sil.org/OFL"
+   },
+   {
+    "faces": [
+     "KaTeX_Fraktur-Bold",
+     "KaTeX_Fraktur-Regular"
+    ],
+    "text": "Copyright (c) 2009-2010, Design Science, Inc. (<www.mathjax.org>)\nCopyright (c) 2014-2018 Khan Academy (<www.khanacademy.org>),\nwith Reserved Font Name KaTeX_Fraktur.\n\nThis Font Software is licensed under the SIL Open Font License, Version 1.1.\nThis license available with a FAQ at:\nhttp://scripts.sil.org/OFL"
+   },
+   {
+    "faces": [
+     "KaTeX_Main-Bold",
+     "KaTeX_Main-BoldItalic",
+     "KaTeX_Main-Italic",
+     "KaTeX_Main-Regular"
+    ],
+    "text": "Copyright (c) 2009-2010, Design Science, Inc. (<www.mathjax.org>)\nCopyright (c) 2014-2018 Khan Academy (<www.khanacademy.org>),\nwith Reserved Font Name KaTeX_Main.\n\nThis Font Software is licensed under the SIL Open Font License, Version 1.1.\nThis license available with a FAQ at:\nhttp://scripts.sil.org/OFL"
+   },
+   {
+    "faces": [
+     "KaTeX_Math-BoldItalic",
+     "KaTeX_Math-Italic"
+    ],
+    "text": "Copyright (c) 2009-2010, Design Science, Inc. (<www.mathjax.org>)\nCopyright (c) 2014-2018 Khan Academy (<www.khanacademy.org>),\nwith Reserved Font Name KaTeX_Math.\n\nThis Font Software is licensed under the SIL Open Font License, Version 1.1.\nThis license available with a FAQ at:\nhttp://scripts.sil.org/OFL"
+   },
+   {
+    "faces": [
+     "KaTeX_SansSerif-Bold",
+     "KaTeX_SansSerif-Italic",
+     "KaTeX_SansSerif-Regular"
+    ],
+    "text": "Copyright (c) 2009-2010, Design Science, Inc. (<www.mathjax.org>)\nCopyright (c) 2014-2018 Khan Academy (<www.khanacademy.org>),\nwith Reserved Font Name KaTeX_SansSerif.\n\nThis Font Software is licensed under the SIL Open Font License, Version 1.1.\nThis license available with a FAQ at:\nhttp://scripts.sil.org/OFL"
+   },
+   {
+    "faces": [
+     "KaTeX_Script-Regular"
+    ],
+    "text": "Copyright (c) 2009-2010, Design Science, Inc. (<www.mathjax.org>)\nCopyright (c) 2014-2018 Khan Academy (<www.khanacademy.org>),\nwith Reserved Font Name KaTeX_Script.\n\nThis Font Software is licensed under the SIL Open Font License, Version 1.1.\nThis license available with a FAQ at:\nhttp://scripts.sil.org/OFL"
+   },
+   {
+    "faces": [
+     "KaTeX_Size1-Regular"
+    ],
+    "text": "Copyright (c) 2009-2010, Design Science, Inc. (<www.mathjax.org>)\nCopyright (c) 2014-2018 Khan Academy (<www.khanacademy.org>),\nwith Reserved Font Name KaTeX_Size1.\n\nThis Font Software is licensed under the SIL Open Font License, Version 1.1.\nThis license available with a FAQ at:\nhttp://scripts.sil.org/OFL"
+   },
+   {
+    "faces": [
+     "KaTeX_Size2-Regular"
+    ],
+    "text": "Copyright (c) 2009-2010, Design Science, Inc. (<www.mathjax.org>)\nCopyright (c) 2014-2018 Khan Academy (<www.khanacademy.org>),\nwith Reserved Font Name KaTeX_Size2.\n\nThis Font Software is licensed under the SIL Open Font License, Version 1.1.\nThis license available with a FAQ at:\nhttp://scripts.sil.org/OFL"
+   },
+   {
+    "faces": [
+     "KaTeX_Size3-Regular"
+    ],
+    "text": "Copyright (c) 2009-2010, Design Science, Inc. (<www.mathjax.org>)\nCopyright (c) 2014-2018 Khan Academy (<www.khanacademy.org>),\nwith Reserved Font Name KaTeX_Size3.\n\nThis Font Software is licensed under the SIL Open Font License, Version 1.1.\nThis license available with a FAQ at:\nhttp://scripts.sil.org/OFL"
+   },
+   {
+    "faces": [
+     "KaTeX_Size4-Regular"
+    ],
+    "text": "Copyright (c) 2009-2010, Design Science, Inc. (<www.mathjax.org>)\nCopyright (c) 2014-2018 Khan Academy (<www.khanacademy.org>),\nwith Reserved Font Name KaTeX_Size4.\n\nThis Font Software is licensed under the SIL Open Font License, Version 1.1.\nThis license available with a FAQ at:\nhttp://scripts.sil.org/OFL"
+   },
+   {
+    "faces": [
+     "KaTeX_Typewriter-Regular"
+    ],
+    "text": "Copyright (c) 2009-2010, Design Science, Inc. (<www.mathjax.org>)\nCopyright (c) 2014-2018 Khan Academy (<www.khanacademy.org>),\nwith Reserved Font Name KaTeX_Typewriter.\n\nThis Font Software is licensed under the SIL Open Font License, Version 1.1.\nThis license available with a FAQ at:\nhttp://scripts.sil.org/OFL"
+   }
+  ],
+  "tarball": "https://registry.npmjs.org/katex/-/katex-0.16.47.tgz",
+  "terms_source": "https://github.com/spdx/license-list-data/blob/31ba1a50e5397e00a304dbadc76531740e89ee48/text/OFL-1.1.txt",
+  "version": "0.16.47"
+ },
+ "gaps": [
+  {
+   "id": "snippet:stackoverflow-19303725",
+   "reason": "The two-line seeded random function was adapted from Stack Overflow answer 19303725; upstream records only the URL. The contribution's licence terms and author are not recorded in any exact upstream artifact, so no licence text is reproduced here."
+  }
+ ],
+ "generator": "scripts/generate_bundled_notices.py",
+ "github_inputs": {
+  "cytoscape-3.34.0-lock": {
+   "sha256": "77313c9711350bdfbcd2a669f5a4d2dc1cc3fd8c7d6fe3e0641bd134761927e5",
+   "url": "https://github.com/cytoscape/cytoscape.js/blob/22716bfb75834b56fa6679648b0abb06f4ae691c/package-lock.json"
+  },
+  "cytoscape-3.34.3-lock": {
+   "sha256": "602d7361177bf254f8f85225c4c036c6f04410d0236a98f36d90a2f7ecb2c8fb",
+   "url": "https://github.com/cytoscape/cytoscape.js/blob/716a1cb6c6015d57b674abe626deaeb5e817ee30/package-lock.json"
+  },
+  "dagre-0.8.5-lock": {
+   "sha256": "d859ed4f10013435b9d443225bafd01bd9971d1a95623d90452d4ecc4c941ae4",
+   "url": "https://github.com/dagrejs/dagre/blob/f56edb1abbb8530e532158f7cbd403228f5b0018/package-lock.json"
+  },
+  "mermaid-parser-license": {
+   "sha256": "d374061c40bfb6f99c5033290caefda97a9b3e7e477e5ee02f487143ef2177e8",
+   "url": "https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/packages/parser/LICENSE"
+  },
+  "mermaid-parser-package": {
+   "sha256": "131781c3d500d3c43453193dc3deeea281f8645d00831d85905180a6796e14ce",
+   "url": "https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/packages/parser/package.json"
+  },
+  "mermaid-pnpm-lock": {
+   "sha256": "fdc5fdda2c7067c9e10cc8743e0837554c5a924a763a7e2fbaa1cbaa9a775ffa",
+   "url": "https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+  },
+  "mermaid-root-package": {
+   "sha256": "7749d044bdbf36544669c544bb69428a12d18bd963d843c3776b8ae2bbc0ee37",
+   "url": "https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/package.json"
+  },
+  "mermaid-roughjs-patch": {
+   "sha256": "3543d47108cb41b68ec6a671c0e1f9d0cfe2ce524fea5b0992511ae84c3c6b64",
+   "url": "https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/patches/roughjs.patch"
+  },
+  "roughjs-4.6.6-lock": {
+   "sha256": "da065ed0bdfb3bf196c7cb05bf20dcb10100b6aa0f1f1d6037ea8aeb108b3ad5",
+   "url": "https://github.com/pshihn/rough/blob/56a2762171b1294d643501e8d14f120db6b27bd7/package-lock.json"
+  },
+  "spdx-MIT": {
+   "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5",
+   "url": "https://github.com/spdx/license-list-data/blob/31ba1a50e5397e00a304dbadc76531740e89ee48/text/MIT.txt"
+  },
+  "spdx-OFL-1.1": {
+   "sha256": "8eea8287e5876b539670cadb82e99f9a7afddec6f6730811be1daf25d2e9bcfd",
+   "url": "https://github.com/spdx/license-list-data/blob/31ba1a50e5397e00a304dbadc76531740e89ee48/text/OFL-1.1.txt"
+  },
+  "venn-2.0.0-fmin-patch": {
+   "sha256": "bfef8fd004e5d4e0703164521f3c943ab5a4ff422aaa6abf54f19626c282e399",
+   "url": "https://github.com/upsetjs/venn.js/blob/350c835aab4a92a7570963c28f725cf9f6e5f258/.yarn/patches/fmin-npm-0.0.4-e439f499bd.patch"
+  },
+  "venn-2.0.0-package": {
+   "sha256": "7687fdd6ab0d96ae3bc9d6b254ac8e89a51bb1cc40f5e52da5d3fb5e534211ae",
+   "url": "https://github.com/upsetjs/venn.js/blob/350c835aab4a92a7570963c28f725cf9f6e5f258/package.json"
+  },
+  "venn-2.0.0-yarn-lock": {
+   "sha256": "448c08192ee0db11a00e07fb87f30a7b4a4d32722a38ee15002ce6dea84be1d0",
+   "url": "https://github.com/upsetjs/venn.js/blob/350c835aab4a92a7570963c28f725cf9f6e5f258/yarn.lock"
+  }
+ },
+ "mermaid": {
+  "parser_workspace": {
+   "name": "@mermaid-js/parser",
+   "package_json": "https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/packages/parser/package.json",
+   "version": "1.2.1"
+  },
+  "pnpm_lock": "https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml",
+  "production_closure_not_in_bundle": [
+   "@antfu/install-pkg@1.1.0",
+   "@antfu/utils@9.2.0",
+   "@iconify/types@2.0.0",
+   "acorn@8.16.0",
+   "commander@7.2.0",
+   "commander@8.3.0",
+   "confbox@0.1.8",
+   "confbox@0.2.2",
+   "debug@4.4.3",
+   "delaunator@5.0.1",
+   "exsolve@1.0.7",
+   "globals@15.15.0",
+   "hachure-fill@0.5.2",
+   "iconv-lite@0.6.3",
+   "internmap@1.0.1",
+   "kolorist@1.8.0",
+   "local-pkg@1.1.2",
+   "mlly@1.8.0",
+   "ms@2.1.3",
+   "package-manager-detector@1.3.0",
+   "path-data-parser@0.1.0",
+   "pathe@2.0.3",
+   "pkg-types@1.3.1",
+   "pkg-types@2.3.0",
+   "points-on-curve@0.2.0",
+   "points-on-path@0.2.1",
+   "quansync@0.2.11",
+   "robust-predicates@3.0.2",
+   "rw@1.3.3",
+   "safer-buffer@2.1.2",
+   "strictdom@1.0.1",
+   "tinyexec@1.2.4",
+   "ufo@1.6.1"
+  ],
+  "production_closure_type_packages": [
+   "@types/d3-array@3.2.2",
+   "@types/d3-axis@3.0.6",
+   "@types/d3-brush@3.0.6",
+   "@types/d3-chord@3.0.6",
+   "@types/d3-color@3.1.3",
+   "@types/d3-contour@3.0.6",
+   "@types/d3-delaunay@6.0.4",
+   "@types/d3-dispatch@3.0.7",
+   "@types/d3-drag@3.0.7",
+   "@types/d3-dsv@3.0.7",
+   "@types/d3-ease@3.0.2",
+   "@types/d3-fetch@3.0.7",
+   "@types/d3-force@3.0.10",
+   "@types/d3-format@3.0.4",
+   "@types/d3-geo@3.1.0",
+   "@types/d3-hierarchy@3.1.7",
+   "@types/d3-interpolate@3.0.4",
+   "@types/d3-path@3.1.1",
+   "@types/d3-polygon@3.0.2",
+   "@types/d3-quadtree@3.0.6",
+   "@types/d3-random@3.0.3",
+   "@types/d3-scale-chromatic@3.1.0",
+   "@types/d3-scale@4.0.9",
+   "@types/d3-selection@3.0.11",
+   "@types/d3-shape@3.1.8",
+   "@types/d3-time-format@4.0.3",
+   "@types/d3-time@3.0.4",
+   "@types/d3-timer@3.0.2",
+   "@types/d3-transition@3.0.9",
+   "@types/d3-zoom@3.0.8",
+   "@types/d3@7.4.3",
+   "@types/geojson@7946.0.16",
+   "@types/trusted-types@2.0.7"
+  ],
+  "release": {
+   "commit": "dcb694ddb58dc5ad3502e7e903cac05fd812eac3",
+   "tag": "mermaid@11.17.2"
+  },
+  "sourcemap": {
+   "integrity": "sha512-V6K3C8EBdEsPFZXSKMJe6ppQOENxuHARr9GvHX4hh47lAbhMRD9qf4oEK7LoaRQxULMa80/qt5gHO73aCleBBg==",
+   "member": "package/dist/mermaid.min.js.map",
+   "mermaid_own_sources": 444,
+   "parser_chunk_sources": 32,
+   "sha256": "43cd977e8e0f351d6c47d31302c564f1c21fdc1e0be0d9e46370ee5e23cea004",
+   "sources": 1151,
+   "tarball": "https://registry.npmjs.org/mermaid/-/mermaid-11.17.2.tgz"
+  }
+ },
+ "mermaid_prebuilt_reviewed": {
+  "@braintree/sanitize-url@7.1.2": "modules",
+  "@upsetjs/venn.js@2.0.0": "bundle",
+  "cose-base@1.0.3": "bundle",
+  "cose-base@2.2.0": "bundle",
+  "cytoscape-cose-bilkent@4.1.0": "bundle",
+  "cytoscape-fcose@2.2.0": "bundle",
+  "cytoscape@3.34.0": "bundle",
+  "dayjs@1.11.21": "bundle",
+  "es-toolkit@1.45.1": "modules",
+  "fastdom@1.0.12": "bundle",
+  "js-yaml@4.3.0": "modules",
+  "katex@0.16.47": "bundle",
+  "khroma@2.1.0": "modules",
+  "layout-base@1.0.2": "bundle",
+  "layout-base@2.0.1": "bundle",
+  "lodash-es@4.18.1": "modules",
+  "roughjs@4.6.6": "bundle",
+  "uuid@14.0.0": "modules"
+ },
+ "notices_file": "scripts/okf_loom/viewer/vendor/BUNDLED-DEPENDENCY-NOTICES.txt",
+ "packages": [
+  {
+   "evidence": [
+    "2 module(s) in mermaid.min.js.map under node_modules/.pnpm/@braintree+sanitize-url@7.1.2; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "@braintree/sanitize-url@7.1.2",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-jigsZK+sMF/cuiB7sERuo9V7N9jx+dhmHHnQyDSVdpZwVutaBu7WvNYqMDLSgFgfB30n452TP3vjDAvFC973mA==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "0bc46fcdad091a1d914ff9f7981f467faa976fa7a998796afc512f5b6e13287f",
+     "sha256": "0984740e0c3d725c8044dec7edcefe1dbce180ef5a7bc710c251e19607000158"
+    }
+   ],
+   "license": "MIT",
+   "name": "@braintree/sanitize-url",
+   "tarball": "https://registry.npmjs.org/@braintree/sanitize-url/-/sanitize-url-7.1.2.tgz",
+   "version": "7.1.2"
+  },
+  {
+   "evidence": [
+    "3 module(s) in @mermaid-js/parser dist chunks under node_modules/.pnpm/@chevrotain+gast@11.1.2; lockfile: packages/parser dependencies and devDependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "@chevrotain/gast@11.1.2",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-Z9zfXR5jNZb1Hlsd/p+4XWeUFugrHirq36bKzPWDSIacV+GPSVXdk+ahVWZTwjhNwofAWg/sZg58fyucKSQx5g==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE.txt",
+     "quoted_sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+     "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    }
+   ],
+   "license": "Apache-2.0",
+   "name": "@chevrotain/gast",
+   "tarball": "https://registry.npmjs.org/@chevrotain/gast/-/gast-11.1.2.tgz",
+   "version": "11.1.2"
+  },
+  {
+   "evidence": [
+    "4 module(s) in @mermaid-js/parser dist chunks under node_modules/.pnpm/@chevrotain+regexp-to-ast@11.1.2; lockfile: packages/parser dependencies and devDependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "@chevrotain/regexp-to-ast@11.1.2",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-nMU3Uj8naWer7xpZTYJdxbAs6RIv/dxYzkYU8GSwgUtcAAlzjcPfX1w+RKRcYG8POlzMeayOQ/znfwxEGo5ulw==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE.txt",
+     "quoted_sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+     "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    }
+   ],
+   "license": "Apache-2.0",
+   "name": "@chevrotain/regexp-to-ast",
+   "tarball": "https://registry.npmjs.org/@chevrotain/regexp-to-ast/-/regexp-to-ast-11.1.2.tgz",
+   "version": "11.1.2"
+  },
+  {
+   "evidence": [
+    "3 module(s) in @mermaid-js/parser dist chunks under node_modules/.pnpm/@chevrotain+utils@11.1.2; lockfile: packages/parser dependencies and devDependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "@chevrotain/utils@11.1.2",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-4mudFAQ6H+MqBTfqLmU7G1ZwRzCLfJEooL/fsF6rCX5eePMbGhoy5n4g+G4vlh2muDcsCTJtL+uKbOzWxs5LHA==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE.txt",
+     "quoted_sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+     "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    }
+   ],
+   "license": "Apache-2.0",
+   "name": "@chevrotain/utils",
+   "tarball": "https://registry.npmjs.org/@chevrotain/utils/-/utils-11.1.2.tgz",
+   "version": "11.1.2"
+  },
+  {
+   "evidence": [
+    "13 module(s) in mermaid.min.js.map under node_modules/.pnpm/@iconify+utils@3.0.2; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "@iconify/utils@3.0.2",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-EfJS0rLfVuRuJRn4psJHtK2A9TqVnkxPpHY6lYHiB9+8eSuudsxbwMiavocG45ujOo6FJ+CIRlRnlOGinzkaGQ==",
+   "licence_files": [
+    {
+     "path": "package/license.txt",
+     "quoted_sha256": "a86793ac023162ce98b91899601c15f6712f44943163c4f92a0a4bf89152b3bf",
+     "sha256": "a86793ac023162ce98b91899601c15f6712f44943163c4f92a0a4bf89152b3bf"
+    }
+   ],
+   "license": "MIT",
+   "name": "@iconify/utils",
+   "tarball": "https://registry.npmjs.org/@iconify/utils/-/utils-3.0.2.tgz",
+   "version": "3.0.2"
+  },
+  {
+   "evidence": [
+    "workspace package bundled from ../../parser/dist (32 chunk files) at mermaid@11.17.2; https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/packages/parser/package.json"
+   ],
+   "id": "@mermaid-js/parser@1.2.1",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": null,
+   "licence_files": [
+    {
+     "path": "https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/packages/parser/LICENSE",
+     "quoted_sha256": "d872b89e34b794519bb00f82dbad5710435fe5eb37a0a80ed0b72a92db47ced5",
+     "sha256": "d374061c40bfb6f99c5033290caefda97a9b3e7e477e5ee02f487143ef2177e8"
+    }
+   ],
+   "license": "MIT",
+   "name": "@mermaid-js/parser",
+   "tarball": null,
+   "version": "1.2.1"
+  },
+  {
+   "evidence": [
+    "1 module(s) in mermaid.min.js.map under node_modules/.pnpm/@upsetjs+venn.js@2.0.0; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "@upsetjs/venn.js@2.0.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-WbBhLrooyePuQ1VZxrJjtLvTc4NVfpOyKx0sKqioq9bX1C1m7Jgykkn8gLrtwumBioXIqam8DLxp88Adbue6Hw==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "7bdac5ba137b8460596d8a7148ddf6e453c662bd22733a333ce4da500b3c889d",
+     "sha256": "6a3508febf2cfccfee96597394543a6154a4bb0b1f91f28404be42c09e9fcb54"
+    }
+   ],
+   "license": "MIT",
+   "name": "@upsetjs/venn.js",
+   "tarball": "https://registry.npmjs.org/@upsetjs/venn.js/-/venn.js-2.0.0.tgz",
+   "version": "2.0.0"
+  },
+  {
+   "evidence": [
+    "3 module(s) in @mermaid-js/parser dist chunks under node_modules/.pnpm/chevrotain-allstar@0.3.1; lockfile: packages/parser dependencies and devDependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "chevrotain-allstar@0.3.1",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-b7g+y9A0v4mxCW1qUhf3BSVPg+/NvGErk/dOkrDaHA0nQIQGAtrOjlX//9OQtRlSCy+x9rfB5N8yC71lH1nvMw==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "5e47d3a0ceed34758e9b20f1b86105546c9160026ad1769a72693f784bafdb43",
+     "sha256": "1db2cfbc7ce5fa3b82699b4ac4badce8984084d25b5308ece00f5c9b1381a0a5"
+    }
+   ],
+   "license": "MIT",
+   "name": "chevrotain-allstar",
+   "tarball": "https://registry.npmjs.org/chevrotain-allstar/-/chevrotain-allstar-0.3.1.tgz",
+   "version": "0.3.1"
+  },
+  {
+   "evidence": [
+    "35 module(s) in @mermaid-js/parser dist chunks under node_modules/.pnpm/chevrotain@11.1.2; lockfile: packages/parser dependencies and devDependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "chevrotain@11.1.2",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-opLQzEVriiH1uUQ4Kctsd49bRoFDXGGSC4GUqj7pGyxM3RehRhvTlZJc1FL/Flew2p5uwxa1tUDWKzI4wNM8pg==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE.txt",
+     "quoted_sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+     "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    }
+   ],
+   "license": "Apache-2.0",
+   "name": "chevrotain",
+   "tarball": "https://registry.npmjs.org/chevrotain/-/chevrotain-11.1.2.tgz",
+   "version": "11.1.2"
+  },
+  {
+   "evidence": [
+    "1 module(s) in mermaid.min.js.map under node_modules/.pnpm/cose-base@1.0.3; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "cose-base@1.0.3",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-s9whTXInMSgAp/NVXVNuVxVKzGH2qck3aQlVHxDCdAEPgtMKwc4Wq6/QKhgdEdgbLSi9rBTAcPoRa6JpiG4ksg==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "90ee3cca58dabf88333de774d3d05509516d5e80cec40e0109ae2717d52b0f94",
+     "sha256": "5fb3cf4a14c3c5af6e473a192df8bca10c77754e3a0c6492c79fb92a76a5478a"
+    }
+   ],
+   "license": "MIT",
+   "name": "cose-base",
+   "tarball": "https://registry.npmjs.org/cose-base/-/cose-base-1.0.3.tgz",
+   "version": "1.0.3"
+  },
+  {
+   "evidence": [
+    "1 module(s) in mermaid.min.js.map under node_modules/.pnpm/cose-base@2.2.0; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "cose-base@2.2.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-AzlgcsCbUMymkADOJtQm3wO9S3ltPfYOFD5033keQn9NJzIbtnZj+UdBJe7DYml/8TdbtHJW3j58SOnKhWY/5g==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "90ee3cca58dabf88333de774d3d05509516d5e80cec40e0109ae2717d52b0f94",
+     "sha256": "5fb3cf4a14c3c5af6e473a192df8bca10c77754e3a0c6492c79fb92a76a5478a"
+    }
+   ],
+   "license": "MIT",
+   "name": "cose-base",
+   "tarball": "https://registry.npmjs.org/cose-base/-/cose-base-2.2.0.tgz",
+   "version": "2.2.0"
+  },
+  {
+   "evidence": [
+    "1 module(s) in mermaid.min.js.map under node_modules/.pnpm/cytoscape-cose-bilkent@4.1.0; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "cytoscape-cose-bilkent@4.1.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-wgQlVIUJF13Quxiv5e1gstZ08rnZj2XaLHGoFMYXz7SkNfCDOOteKBE6SYRfA9WxxI/iBc3ajfDoc6hb/MRAHQ==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "440fc58a56a12814e417d2b341da89b050da052dc75bdb235607d37ec5fe74ef",
+     "sha256": "440fc58a56a12814e417d2b341da89b050da052dc75bdb235607d37ec5fe74ef"
+    }
+   ],
+   "license": "MIT",
+   "name": "cytoscape-cose-bilkent",
+   "tarball": "https://registry.npmjs.org/cytoscape-cose-bilkent/-/cytoscape-cose-bilkent-4.1.0.tgz",
+   "version": "4.1.0"
+  },
+  {
+   "evidence": [
+    "1 module(s) in mermaid.min.js.map under node_modules/.pnpm/cytoscape-fcose@2.2.0; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "cytoscape-fcose@2.2.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-ki1/VuRIHFCzxWNrsshHYPs6L7TvLu3DL+TyIGEsRcvVERmxokbf5Gdk7mFxZnTdiGtnA4cfSmjZJMviqSuZrQ==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "9f5ea8f5a2689d9e0fd255197282d4526fc2219637d7e76c4ef02f1ea289f544",
+     "sha256": "2837634f403949215760fcdd2fa1ed0c64875d02099ecc8318c704b852f1421d"
+    }
+   ],
+   "license": "MIT",
+   "name": "cytoscape-fcose",
+   "tarball": "https://registry.npmjs.org/cytoscape-fcose/-/cytoscape-fcose-2.2.0.tgz",
+   "version": "2.2.0"
+  },
+  {
+   "evidence": [
+    "1 module(s) in mermaid.min.js.map under node_modules/.pnpm/cytoscape@3.34.0; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "cytoscape@3.34.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-62rNSrioXw93uliKFBwjukeQyeWwH2PqDrTac31r2P6464u3AUvTk0xS4LVvT251g7IgkFunrI48ZEZGjywSOg==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "eb319c6e6f233607f71e8e2f450391751883cfc0eeb3ca7ef574c13d1d9c2203",
+     "sha256": "eb319c6e6f233607f71e8e2f450391751883cfc0eeb3ca7ef574c13d1d9c2203"
+    }
+   ],
+   "license": "MIT",
+   "name": "cytoscape",
+   "tarball": "https://registry.npmjs.org/cytoscape/-/cytoscape-3.34.0.tgz",
+   "version": "3.34.0"
+  },
+  {
+   "evidence": [
+    "4 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-array@2.12.1; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-array@2.12.1",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-B0ErZK/66mHtEsR1TkPEEkwdy+WDesimkM5gpZr5Dsg54BiTA5RXtYW5qTLIAcekaS9xfZrzBLF/OAkB3Qn1YQ==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "586409690da31408c8348e6acb0bdbabdf4611308778edfc6210eb09492f23a1",
+     "sha256": "0747bebeb06b10954913149be9b9a8bdf6fad3e6fdcbd9f9524e7a94c13d2cea"
+    }
+   ],
+   "license": "BSD-3-Clause",
+   "name": "d3-array",
+   "tarball": "https://registry.npmjs.org/d3-array/-/d3-array-2.12.1.tgz",
+   "version": "2.12.1"
+  },
+  {
+   "evidence": [
+    "10 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-array@3.2.4; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-array@3.2.4",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-tdQAmyA18i4J7wprpYq8ClcxZy3SC31QMeByyCFyRt7BVHdREQZ5lpzoe5mFEYZUWe+oq8HBvk9JjpibyEV4Jg==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "f57e3a2cabf2b43ab2fc942a8e9f4b38366ab0d1f859c6439b1fb69e80d9af73",
+     "sha256": "3e6849627f74ff73c257a3ae1efb574015d94fc1035c05ec3c15805165efcbc4"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-array",
+   "tarball": "https://registry.npmjs.org/d3-array/-/d3-array-3.2.4.tgz",
+   "version": "3.2.4"
+  },
+  {
+   "evidence": [
+    "3 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-axis@3.0.0; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-axis@3.0.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-IH5tgjV4jE/GhHkRV0HiVYPDtvfjHQlQfJHs0usq7M30XcSBvOotpmH1IgkcXsO/5gEQZD43B//fc7SRT5S+xw==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1",
+     "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-axis",
+   "tarball": "https://registry.npmjs.org/d3-axis/-/d3-axis-3.0.0.tgz",
+   "version": "3.0.0"
+  },
+  {
+   "evidence": [
+    "5 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-brush@3.0.0; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-brush@3.0.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-ALnjWlVYkXsVIGlOsuWH1+3udkYFI48Ljihfnh8FZPF2QS9o+PzGLBslO0PjzVoHLZ2KCVgAM8NVkXPJB2aNnQ==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1",
+     "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-brush",
+   "tarball": "https://registry.npmjs.org/d3-brush/-/d3-brush-3.0.0.tgz",
+   "version": "3.0.0"
+  },
+  {
+   "evidence": [
+    "1 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-chord@3.0.1; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-chord@3.0.1",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-VE5S6TNa+j8msksl7HwjxMHDM2yNK3XCkusIlpX5kwauBfXuyLAtNg9jCp/iHH61tgI4sb6R/EIMWCqEIdjT/g==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1",
+     "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-chord",
+   "tarball": "https://registry.npmjs.org/d3-chord/-/d3-chord-3.0.1.tgz",
+   "version": "3.0.1"
+  },
+  {
+   "evidence": [
+    "5 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-color@3.1.0; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-color@3.1.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-zg/chbXyeBtMQ1LbD/WSoW2DpC3I0mpmPdW+ynRTj/x2DAWYrIY7qeZIHidozwV24m4iavr15lNwIwLxRmOxhA==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "4f4f9997e3d96636b08171484bf3e2b5a8a46745e2b0dd4d4f86b0e5cfa632e8",
+     "sha256": "faa682e3e430941f958d26180458f5934a62f58dac4d70ccdd15608c15d0f884"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-color",
+   "tarball": "https://registry.npmjs.org/d3-color/-/d3-color-3.1.0.tgz",
+   "version": "3.1.0"
+  },
+  {
+   "evidence": [
+    "1 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-contour@4.0.2; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-contour@4.0.2",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-4EzFTRIikzs47RGmdxbeUvLWtGedDUNkTcmzoeyg4sP/dvCexO47AaQL7VKy/gul85TOxw+IBgA8US2xwbToNA==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "c8ea45f591c25c2a96e7a59f87ecc5adf64010c10cfd7938f4c1c5c9ff4c1885",
+     "sha256": "e51cba0e4fa1d8c078e15319868f2b90188f413f9ce9dac1043b62db32901e93"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-contour",
+   "tarball": "https://registry.npmjs.org/d3-contour/-/d3-contour-4.0.2.tgz",
+   "version": "4.0.2"
+  },
+  {
+   "evidence": [
+    "1 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-delaunay@6.0.4; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-delaunay@6.0.4",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-mdjtIZ1XLAM8bm/hx3WwjfHt6Sggek7qH043O8KEjDXN40xi3vx/6pYSVTwLjEgiXQTbvaouWKynLBiUZ6SK6A==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "4f8e381e74d41111b8220c5b93c5c8fd1e5abc9d1a4d963ee6dd679c4631b63c",
+     "sha256": "582c3022bd01942336095f92b58a90b1be624dc547d987555c6c956512dd24c1"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-delaunay",
+   "tarball": "https://registry.npmjs.org/d3-delaunay/-/d3-delaunay-6.0.4.tgz",
+   "version": "6.0.4"
+  },
+  {
+   "evidence": [
+    "2 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-dispatch@3.0.1; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-dispatch@3.0.1",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-rzUyPU/S7rwUflMyLc1ETDeBj0NRuHKKAcvukozwhshr6g6c5d8zh4c2gQjY2bZ0dXeGLWc1PF174P2tVvKhfg==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1",
+     "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-dispatch",
+   "tarball": "https://registry.npmjs.org/d3-dispatch/-/d3-dispatch-3.0.1.tgz",
+   "version": "3.0.1"
+  },
+  {
+   "evidence": [
+    "1 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-drag@3.0.0; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-drag@3.0.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-pWbUJLdETVA8lQNJecMxoXfH6x+mO2UQo8rSmZ+QqxcbyA3hfeprFgIT//HW2nlHChWeIIMwS2Fq+gEARkhTkg==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1",
+     "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-drag",
+   "tarball": "https://registry.npmjs.org/d3-drag/-/d3-drag-3.0.0.tgz",
+   "version": "3.0.0"
+  },
+  {
+   "evidence": [
+    "1 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-dsv@3.0.1; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-dsv@3.0.1",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-UG6OvdI5afDIFP9w4G0mNq50dSOsXHJaRE8arAS5o9ApWnIElp8GZw1Dun8vP8OyHOZ/QJUKUJwxiiCCnUwm+Q==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "4c1cd1d0c4f880ec6cc58495f54e57877fccefcf0a4050fe09c9d81b757bf494",
+     "sha256": "7842a82012622e5a37bfe4f6c1b67cd3bae6350716b5bf87f36cea0bdc1319dc"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-dsv",
+   "tarball": "https://registry.npmjs.org/d3-dsv/-/d3-dsv-3.0.1.tgz",
+   "version": "3.0.1"
+  },
+  {
+   "evidence": [
+    "2 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-ease@3.0.1; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-ease@3.0.1",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-wR/XK3D3XcLIZwpbvQwQ5fK+8Ykds1ip7A2Txe0yxncXSdq1L9skcG7blcedkOX+ZcgxGAmLX1FrRGbADwzi0w==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "69af84a0cb486bc97d578ea76f0aea3ad628ad97147551d2a898902941bd6db6",
+     "sha256": "b989d9085148d21ff64a75e14462aefa06b2589a55553b07b1460c70081c7d08"
+    }
+   ],
+   "license": "BSD-3-Clause",
+   "name": "d3-ease",
+   "tarball": "https://registry.npmjs.org/d3-ease/-/d3-ease-3.0.1.tgz",
+   "version": "3.0.1"
+  },
+  {
+   "evidence": [
+    "1 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-fetch@3.0.1; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-fetch@3.0.1",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-kpkQIM20n3oLVBKGg6oHrUchHM3xODkTzjMoj7aWQFq5QEM+R6E4WkzT5+tojDY7yjez8KgCBRoj4aEr99Fdqw==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "9d00baf34d17d2e5ca9301230b256f1ced369cdb41712daa6f18716d93c6e88c",
+     "sha256": "ffdc17dc9040006bddeb891c95bfbb492e86d6bc64a4a4233666febab1be35e0"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-fetch",
+   "tarball": "https://registry.npmjs.org/d3-fetch/-/d3-fetch-3.0.1.tgz",
+   "version": "3.0.1"
+  },
+  {
+   "evidence": [
+    "1 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-force@3.0.0; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-force@3.0.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-zxV/SsA+U4yte8051P4ECydjD/S+qeYtnaIyAs9tgHCqfguma/aAQDjo85A9Z6EKhBirHRJHXIgJUlffT4wdLg==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1",
+     "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-force",
+   "tarball": "https://registry.npmjs.org/d3-force/-/d3-force-3.0.0.tgz",
+   "version": "3.0.0"
+  },
+  {
+   "evidence": [
+    "16 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-format@3.1.0; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-format@3.1.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-YyUI6AEuY/Wpt8KWLgZHsIU86atmikuoOmCfommt0LYHiQSPjvX2AcFc38PX0CBpr2RCyZhjex+NS/LPOv6YqA==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1",
+     "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-format",
+   "tarball": "https://registry.npmjs.org/d3-format/-/d3-format-3.1.0.tgz",
+   "version": "3.1.0"
+  },
+  {
+   "evidence": [
+    "1 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-geo@3.1.1; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-geo@3.1.1",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-637ln3gXKXOwhalDzinUgY83KzNWZRKbYubaG+fGVuc/dxO64RRljtCTnf5ecMyE1RIdtqpkVcq0IbtU2S8j2Q==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "e87ae4ac338d47ce509af51623763b9a197e6ca26f958be54f67c1a64cd0062c",
+     "sha256": "3e3edc1224eec9c39cd26491a21304a62883c1e5b6a65c5283ccc7a6cc94baee"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-geo",
+   "tarball": "https://registry.npmjs.org/d3-geo/-/d3-geo-3.1.1.tgz",
+   "version": "3.1.1"
+  },
+  {
+   "evidence": [
+    "22 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-hierarchy@3.1.2; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-hierarchy@3.1.2",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-FX/9frcub54beBdugHjDCdikxThEqjnR93Qt7PvQTOHxyiNCAlvMrHhclk3cD5VeAaq9fxmfRp+CnWw9rEMBuA==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1",
+     "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-hierarchy",
+   "tarball": "https://registry.npmjs.org/d3-hierarchy/-/d3-hierarchy-3.1.2.tgz",
+   "version": "3.1.2"
+  },
+  {
+   "evidence": [
+    "18 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-interpolate@3.0.1; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-interpolate@3.0.1",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-3bYs1rOD33uo8aqJfKP3JWPAibgw8Zm2+L9vBKEHJ2Rg+viTR7o5Mmv5mZcieN+FRYaAOWX5SJATX6k1PWz72g==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1",
+     "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-interpolate",
+   "tarball": "https://registry.npmjs.org/d3-interpolate/-/d3-interpolate-3.0.1.tgz",
+   "version": "3.0.1"
+  },
+  {
+   "evidence": [
+    "2 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-path@1.0.9; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-path@1.0.9",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-VLaYcn81dtHVTjEHd8B+pbe9yHWpXKZUC87PzoFmsFrJqgFwDe/qxfp5MlfsfM1V5E/iVt0MmEbWQ7FVIXh/bg==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "4b2513f280f34835efbeaa334f82b04a9a4c7498786828f75c6d1bbcdc88c56d",
+     "sha256": "b8265327ab678f554800e71188b1cc6b1ff57522e292d2b1c0be66f27cf328b6"
+    }
+   ],
+   "license": "BSD-3-Clause",
+   "name": "d3-path",
+   "tarball": "https://registry.npmjs.org/d3-path/-/d3-path-1.0.9.tgz",
+   "version": "1.0.9"
+  },
+  {
+   "evidence": [
+    "2 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-path@3.1.0; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-path@3.1.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-p3KP5HCf/bvjBSSKuXid6Zqijx7wIfNW+J/maPs+iwR35at5JCbLUT0LzF1cnjbCHWhqzQTIN2Jpe8pRebIEFQ==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "58f959e2911ca1fdd6812a2cebe42193c6137922ecbcce86d8233873706181ab",
+     "sha256": "a09b0d6d76e768fca2085fad05743ee81ddd11946bcda160a3cf5e1081a479aa"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-path",
+   "tarball": "https://registry.npmjs.org/d3-path/-/d3-path-3.1.0.tgz",
+   "version": "3.1.0"
+  },
+  {
+   "evidence": [
+    "1 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-polygon@3.0.1; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-polygon@3.0.1",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-3vbA7vXYwfe1SYhED++fPUQlWSYTTGmFmQiany/gdbiWgU/iEyQzyymwL9SkJjFFuCS4902BSzewVGsHHmHtXg==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1",
+     "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-polygon",
+   "tarball": "https://registry.npmjs.org/d3-polygon/-/d3-polygon-3.0.1.tgz",
+   "version": "3.0.1"
+  },
+  {
+   "evidence": [
+    "1 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-quadtree@3.0.1; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-quadtree@3.0.1",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-04xDrxQTDTCFwP5H6hRhsRcb9xxv2RzkcsygFzmkSIOJy3PeRJP7sNk3VRIbKXcog561P9oU0/rVH6vDROAgUw==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1",
+     "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-quadtree",
+   "tarball": "https://registry.npmjs.org/d3-quadtree/-/d3-quadtree-3.0.1.tgz",
+   "version": "3.0.1"
+  },
+  {
+   "evidence": [
+    "1 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-random@3.0.1; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-random@3.0.1",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-FXMe9GfxTxqd5D6jFsQ+DJ8BJS4E/fT5mqqdjovykEB2oFbTMDVdg1MGFxfQW+FBOGoB++k8swBrgwSHT1cUXQ==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1",
+     "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-random",
+   "tarball": "https://registry.npmjs.org/d3-random/-/d3-random-3.0.1.tgz",
+   "version": "3.0.1"
+  },
+  {
+   "evidence": [
+    "5 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-sankey@0.12.3; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-sankey@0.12.3",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-nQhsBRmM19Ax5xEIPLMY9ZmJ/cDvd1BG3UVvt5h3WRxKg5zGRbvnteTyWAbzeSvlh3tW7ZEmq4VwR5mB3tutmQ==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "38fdb5e42d4842bde17baea7f4bf690c25706ce06c6a90c981c57379f01751b1",
+     "sha256": "2bf785e778d67a4f5266cffcd4f2cc5bb98cde73791666e7efeb8002ba32dfa5"
+    }
+   ],
+   "license": "BSD-3-Clause",
+   "name": "d3-sankey",
+   "tarball": "https://registry.npmjs.org/d3-sankey/-/d3-sankey-0.12.3.tgz",
+   "version": "0.12.3"
+  },
+  {
+   "evidence": [
+    "3 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-scale-chromatic@3.1.0; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-scale-chromatic@3.1.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-A3s5PWiZ9YCXFye1o246KoscMWqf8BsD9eRiJ3He7C9OBaxKhAd5TFCdEx/7VbKtxxTsu//1mMJFrEt572cEyQ==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "1549638d9e45cf99379d6e71aa706583e5952cd875a26a02f58c9b26499c94e9",
+     "sha256": "0986d93944902cca9af86824b6a641b4b7c2d10602fc510c433a8bcd443919fe"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-scale-chromatic",
+   "tarball": "https://registry.npmjs.org/d3-scale-chromatic/-/d3-scale-chromatic-3.1.0.tgz",
+   "version": "3.1.0"
+  },
+  {
+   "evidence": [
+    "11 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-scale@4.0.2; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-scale@4.0.2",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-GZW464g1SH7ag3Y7hXjf8RoUuAFIqklOAq3MRl4OaWabTFJY9PN/E1YklhXLh+OQ3fM9yS2nOkCoS+WLZ6kvxQ==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1",
+     "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-scale",
+   "tarball": "https://registry.npmjs.org/d3-scale/-/d3-scale-4.0.2.tgz",
+   "version": "4.0.2"
+  },
+  {
+   "evidence": [
+    "47 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-selection@3.0.0; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-selection@3.0.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-fmTRWbNMmsmWq6xJV8D19U/gw/bwrHfNXxrIN+HfZgnzqTHp9jOmKMhsTUjXOJnZOdZY9Q28y4yebKzqDKlxlQ==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1",
+     "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-selection",
+   "tarball": "https://registry.npmjs.org/d3-selection/-/d3-selection-3.0.0.tgz",
+   "version": "3.0.0"
+  },
+  {
+   "evidence": [
+    "5 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-shape@1.3.7; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-shape@1.3.7",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-EUkvKjqPFUAZyOlhY5gzCxCeI0Aep04LwIRpsZ/mLFelJiUfnK56jo5JMDSE7yyP2kLSb6LtF+S5chMk7uqPqw==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "50366760ca8535f84b7aee30309f9ec70f78677843b1fc73491e6d1803edea69",
+     "sha256": "7eea8533ea92bd8c32a901e89ecb0305890905bb12711449565ddff96891146d"
+    }
+   ],
+   "license": "BSD-3-Clause",
+   "name": "d3-shape",
+   "tarball": "https://registry.npmjs.org/d3-shape/-/d3-shape-1.3.7.tgz",
+   "version": "1.3.7"
+  },
+  {
+   "evidence": [
+    "28 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-shape@3.2.0; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-shape@3.2.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-SaLBuwGm3MOViRq2ABk3eLoxwZELpH6zhl3FbAoJ7Vm1gofKx6El1Ib5z23NUEhF9AsGl7y+dzLe5Cw2AArGTA==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "4f4f9997e3d96636b08171484bf3e2b5a8a46745e2b0dd4d4f86b0e5cfa632e8",
+     "sha256": "faa682e3e430941f958d26180458f5934a62f58dac4d70ccdd15608c15d0f884"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-shape",
+   "tarball": "https://registry.npmjs.org/d3-shape/-/d3-shape-3.2.0.tgz",
+   "version": "3.2.0"
+  },
+  {
+   "evidence": [
+    "3 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-time-format@4.1.0; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-time-format@4.1.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-dJxPBlzC7NugB2PDLwo9Q8JiTR3M3e4/XANkreKSUxF8vvXKqm1Yfq4Q5dl8budlunRVlUUaDUgFt7eA8D6NLg==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1",
+     "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-time-format",
+   "tarball": "https://registry.npmjs.org/d3-time-format/-/d3-time-format-4.1.0.tgz",
+   "version": "4.1.0"
+  },
+  {
+   "evidence": [
+    "11 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-time@3.1.0; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-time@3.1.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-VqKjzBLejbSMT4IgbmVgDjpkYrNWUYJnbCGo874u7MMKIWsILRX+OpX/gTk8MqjpT1A/c6HY2dCA77ZN0lkQ2Q==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "4f4f9997e3d96636b08171484bf3e2b5a8a46745e2b0dd4d4f86b0e5cfa632e8",
+     "sha256": "faa682e3e430941f958d26180458f5934a62f58dac4d70ccdd15608c15d0f884"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-time",
+   "tarball": "https://registry.npmjs.org/d3-time/-/d3-time-3.1.0.tgz",
+   "version": "3.1.0"
+  },
+  {
+   "evidence": [
+    "3 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-timer@3.0.1; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-timer@3.0.1",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-ndfJ/JxxMd3nw31uyKoY2naivF+r29V+Lc0svZxe1JvvIRmi8hUsrMvdOwgS1o6uBHmiz91geQ0ylPP0aj1VUA==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1",
+     "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-timer",
+   "tarball": "https://registry.npmjs.org/d3-timer/-/d3-timer-3.0.1.tgz",
+   "version": "3.0.1"
+  },
+  {
+   "evidence": [
+    "28 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-transition@3.0.1; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-transition@3.0.1",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-ApKvfjsSR6tg06xrL434C0WydLr7JewBB3V+/39RMHsaXTOG0zmt/OAXeng5M5LBm0ojmxJrpomQVZ1aPvBL4w==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1",
+     "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-transition",
+   "tarball": "https://registry.npmjs.org/d3-transition/-/d3-transition-3.0.1.tgz",
+   "version": "3.0.1"
+  },
+  {
+   "evidence": [
+    "6 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3-zoom@3.0.0; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3-zoom@3.0.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-b8AmV3kfQaqWAuacbPuNbL6vahnOJflOhexLzMMNLga62+/nh0JzvJ0aO/5a5MVgUFGS7Hu1P9P03o3fJkDCyw==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1",
+     "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3-zoom",
+   "tarball": "https://registry.npmjs.org/d3-zoom/-/d3-zoom-3.0.0.tgz",
+   "version": "3.0.0"
+  },
+  {
+   "evidence": [
+    "1 module(s) in mermaid.min.js.map under node_modules/.pnpm/d3@7.9.0; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "d3@7.9.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-e1U46jVP+w7Iut8Jt8ri1YsPOvFpg46k+K8TpCb0P+zjCkjkPnV7WzfDJzMHy1LnA+wj5pLT1wjO901gLXeEhA==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "f57e3a2cabf2b43ab2fc942a8e9f4b38366ab0d1f859c6439b1fb69e80d9af73",
+     "sha256": "3e6849627f74ff73c257a3ae1efb574015d94fc1035c05ec3c15805165efcbc4"
+    }
+   ],
+   "license": "ISC",
+   "name": "d3",
+   "tarball": "https://registry.npmjs.org/d3/-/d3-7.9.0.tgz",
+   "version": "7.9.0"
+  },
+  {
+   "evidence": [
+    "42 module(s) in mermaid.min.js.map under node_modules/.pnpm/dagre-d3-es@7.0.14; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "dagre-d3-es@7.0.14",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-P4rFMVq9ESWqmOgK+dlXvOtLwYg0i7u0HBGJER0LZDJT2VHIPAMZ/riPxqJceWMStH5+E61QxFra9kIS3AqdMg==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE.md",
+     "quoted_sha256": "1521adecf617469732f46e52c8da847796e27763eeec6e45b14522c53032c2f5",
+     "sha256": "d01eb84ccce437dbf5fd40853bceea0f287930920acea066597a4a25ead63858"
+    }
+   ],
+   "license": "MIT",
+   "name": "dagre-d3-es",
+   "tarball": "https://registry.npmjs.org/dagre-d3-es/-/dagre-d3-es-7.0.14.tgz",
+   "version": "7.0.14"
+  },
+  {
+   "evidence": [
+    "5 module(s) in mermaid.min.js.map under node_modules/.pnpm/dayjs@1.11.21; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "dayjs@1.11.21",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-98IT+HOahAisibz/yjKbzuOBwYcjJ7BCLPzARyHiyEBmRz4fatF+KPJszEHXsGYjUG234aH/cOjW1wwTbKUZlA==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "16e34a46fa584c2cc09682bd36edae63e88c4696371b5d95476f676a65763535",
+     "sha256": "5faab7526d055651be3aab769d58897be6bd91f3d39d137f25f12dba1b31d5dc"
+    }
+   ],
+   "license": "MIT",
+   "name": "dayjs",
+   "tarball": "https://registry.npmjs.org/dayjs/-/dayjs-1.11.21.tgz",
+   "version": "1.11.21"
+  },
+  {
+   "attribution": {
+    "source": "package/dist/purify.es.mjs",
+    "text": "/*! @license DOMPurify 3.4.12 | (c) Cure53 and other contributors | Released under the Apache license 2.0 and Mozilla Public License 2.0 | github.com/cure53/DOMPurify/blob/3.4.12/LICENSE */"
+   },
+   "evidence": [
+    "5 module(s) in mermaid.min.js.map under node_modules/.pnpm/dompurify@3.4.12; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "dompurify@3.4.12",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-zQvGet8Z2sWbQhCmfFz/T5QWH2oBmjnqK3qvOjaqaNLrLEF912WamU+ohnTp0TCep/MFVHpdJuCZEdFOdTnEFg==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+     "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+     "path": "package/LICENSE-MPL",
+     "quoted_sha256": "4b89d4518bd135ab4ee154a7bce722246b57a98c3d7efc1a09409898160c2bd1",
+     "sha256": "fab3dd6bdab226f1c08630b1dd917e11fcb4ec5e1e020e2c16f83a0a13863e85"
+    }
+   ],
+   "license": "(MPL-2.0 OR Apache-2.0)",
+   "name": "dompurify",
+   "tarball": "https://registry.npmjs.org/dompurify/-/dompurify-3.4.12.tgz",
+   "version": "3.4.12"
+  },
+  {
+   "evidence": [
+    "26 module(s) in mermaid.min.js.map under node_modules/.pnpm/es-toolkit@1.45.1; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "es-toolkit@1.45.1",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-/jhoOj/Fx+A+IIyDNOvO3TItGmlMKhtX8ISAHKE90c4b/k1tqaqEZ+uUqfpU8DMnW5cgNJv606zS55jGvza0Xw==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "0f1aa7b4194b95c55cb2696fabafbda5b137ef9a59c19251b6c45b429de985ac",
+     "sha256": "ed68888a2a28f32a05e88f24d4d4ee75075a1bda2b6372a1f2e00fa0576a5524"
+    }
+   ],
+   "license": "MIT",
+   "name": "es-toolkit",
+   "tarball": "https://registry.npmjs.org/es-toolkit/-/es-toolkit-1.45.1.tgz",
+   "version": "1.45.1"
+  },
+  {
+   "evidence": [
+    "2 module(s) in mermaid.min.js.map under node_modules/.pnpm/fastdom@1.0.12; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "fastdom@1.0.12",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-LB+xjSTEbjHE1cWsxu+tN2Xqr1kpi+V9aADI7sVM5ZMaXyYGPHULQMzpJMYqOTULK/73pUkWVzzObFRBkPr+hg==",
+   "licence_files": [
+    {
+     "path": "package/README.md (## License section)",
+     "quoted_sha256": "3eecae9be56edf91a938b2d371001553eca360b055cae55243c0202555e09b07",
+     "sha256": "df2ae14f12f31864acef768195afe4584b08a257f25925f49884619279f02f37"
+    }
+   ],
+   "license": "MIT",
+   "name": "fastdom",
+   "tarball": "https://registry.npmjs.org/fastdom/-/fastdom-1.0.12.tgz",
+   "version": "1.0.12"
+  },
+  {
+   "evidence": [
+    "inlined into @upsetjs/venn.js@2.0.0 (bundled by @upsetjs/venn.js@2.0.0; found by scanning its sources from package/src/index.js); version and integrity: https://github.com/upsetjs/venn.js/blob/350c835aab4a92a7570963c28f725cf9f6e5f258/yarn.lock (+ package.json at the same commit)"
+   ],
+   "id": "fmin@0.0.4",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-GDebBdizW6g1F5Kxm/y/D0bKjc8zBeIeGEXpgDuGejMyeaafuLkKZRxEzWKqehDRipxQ8h0cLhdDRCsx6T0t4w==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "41297ef9fa4dd872498bef6d447ad86f5fd8a2a4c8bbd7a362db009e3fa4924c",
+     "sha256": "e4503e78185bff178d3ee91835f082d05771da1b3a2d795f17e03a40251bab77"
+    }
+   ],
+   "license": "BSD-3-Clause",
+   "name": "fmin",
+   "tarball": "https://registry.npmjs.org/fmin/-/fmin-0.0.4.tgz",
+   "version": "0.0.4"
+  },
+  {
+   "evidence": [
+    "inlined into cytoscape@3.34.0 (bundled by cytoscape@3.34.0; found by scanning its sources from package/src/index.mjs); version and integrity: https://github.com/cytoscape/cytoscape.js/blob/22716bfb75834b56fa6679648b0abb06f4ae691c/package-lock.json",
+    "inlined into cytoscape@3.34.3 (found by scanning cytoscape@3.34.3 sources from package/src/index.mjs); version and integrity: https://github.com/cytoscape/cytoscape.js/blob/716a1cb6c6015d57b674abe626deaeb5e817ee30/package-lock.json"
+   ],
+   "id": "gl-matrix@3.4.3",
+   "included_in": [
+    "cytoscape-3.34.3/cytoscape.min.js",
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-wcCp8vu8FT22BnvKVPjXa/ICBWRq/zjFfdofZy1WSpQZpphblv12/bOQLBC1rMM7SGOFS9ltVmKOHil5+Ml7gA==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE.md",
+     "quoted_sha256": "f87e6877ea01390f34e32b1a618c3e5a718d0d57c4730d8195681419bcdc64d3",
+     "sha256": "f87e6877ea01390f34e32b1a618c3e5a718d0d57c4730d8195681419bcdc64d3"
+    }
+   ],
+   "license": "MIT",
+   "name": "gl-matrix",
+   "tarball": "https://registry.npmjs.org/gl-matrix/-/gl-matrix-3.4.3.tgz",
+   "version": "3.4.3"
+  },
+  {
+   "evidence": [
+    "inlined into dagre@0.8.5 (found by scanning dagre@0.8.5 sources from package/index.js); version and integrity: https://github.com/dagrejs/dagre/blob/f56edb1abbb8530e532158f7cbd403228f5b0018/package-lock.json"
+   ],
+   "id": "graphlib@2.1.8",
+   "included_in": [
+    "dagre-0.8.5/dagre.min.js"
+   ],
+   "integrity": "sha512-jcLLfkpoVGmH7/InMC/1hIvOPSUh38oJtGhvrOFGzioE1DZ+0YW16RgmOJhHiuWTvGiJQ9Z1Ik43JvkRPRvE+A==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "25add1a0136af5d3bbae590f3a04d6da2820e06913282012855fb34c0d8632e7",
+     "sha256": "6a349742a6cb219d5a2fc8d0844f6d89a6efc62e20c664450d884fc7ff2d6015"
+    }
+   ],
+   "license": "MIT",
+   "name": "graphlib",
+   "tarball": "https://registry.npmjs.org/graphlib/-/graphlib-2.1.8.tgz",
+   "version": "2.1.8"
+  },
+  {
+   "evidence": [
+    "inlined into roughjs@4.6.6 (bundled by roughjs@4.6.6; found by scanning its sources from package/bin/rough.js); version and integrity: https://github.com/pshihn/rough/blob/56a2762171b1294d643501e8d14f120db6b27bd7/package-lock.json"
+   ],
+   "id": "hachure-fill@0.5.2",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-3GKBOn+m2LX9iq+JC1064cSFprJY4jL1jCXTcpnfER5HYE2l/4EfWSGzkPa/ZDBmYI0ZOEj5VHV/eKnPGkHuOg==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "d3de97fbfe541d80b7e8d0c9c5ddc55d3d6b65acd2208b46235e5b0b10bbe920",
+     "sha256": "5e807b516a9be9229ed459880bf353a336e2d947867247290680d437017be391"
+    }
+   ],
+   "license": "MIT",
+   "name": "hachure-fill",
+   "tarball": "https://registry.npmjs.org/hachure-fill/-/hachure-fill-0.5.2.tgz",
+   "version": "0.5.2"
+  },
+  {
+   "evidence": [
+    "inlined into cytoscape@3.34.0 (bundled by cytoscape@3.34.0; found by scanning its sources from package/src/index.mjs); version and integrity: https://github.com/cytoscape/cytoscape.js/blob/22716bfb75834b56fa6679648b0abb06f4ae691c/package-lock.json",
+    "inlined into cytoscape@3.34.3 (found by scanning cytoscape@3.34.3 sources from package/src/index.mjs); version and integrity: https://github.com/cytoscape/cytoscape.js/blob/716a1cb6c6015d57b674abe626deaeb5e817ee30/package-lock.json"
+   ],
+   "id": "heap@0.2.7",
+   "included_in": [
+    "cytoscape-3.34.3/cytoscape.min.js",
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-2bsegYkkHO+h/9MGbn6KWcE45cHZgPANo5LXF7EvWdT0yT2EguSVO1nDgU5c8+ZOPwp2vMNa7YFsJhVcDR9Sdg==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "c09dcb6284f53b77aa7db63f0fe608a1ca719cf02dea3ae71a7dd66d015ca999",
+     "sha256": "e78f28382ac236a42dcbc16caaaaf2e76da55ddc67053a8bcb3aabdfc72df9cc"
+    }
+   ],
+   "license": "MIT",
+   "name": "heap",
+   "tarball": "https://registry.npmjs.org/heap/-/heap-0.2.7.tgz",
+   "version": "0.2.7"
+  },
+  {
+   "evidence": [
+    "1 module(s) in mermaid.min.js.map under node_modules/.pnpm/internmap@2.0.3; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "internmap@2.0.3",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-5Hh7Y1wQbvY5ooGgPbDaL5iYLAPzMTUrjMulskHLH6wnv/A+1q5rgEaiuqEjB+oxGXIVZs1FF+R/KPN3ZSQYYg==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "f4bb8f655fdb4d119878a0eea6dfcb871da509d83baa7426794f7c70b9bb9d46",
+     "sha256": "9ea8903938dab5f12c4572d60725069bec2d1b0dc3bcc210b09bae946a5ebb1f"
+    }
+   ],
+   "license": "ISC",
+   "name": "internmap",
+   "tarball": "https://registry.npmjs.org/internmap/-/internmap-2.0.3.tgz",
+   "version": "2.0.3"
+  },
+  {
+   "evidence": [
+    "26 module(s) in mermaid.min.js.map under node_modules/.pnpm/js-yaml@4.3.0; lockfile: packages/mermaid devDependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "js-yaml@4.3.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-1td788aAnnZ5qs7V2QIRl1owjtYpbKt749Y3xauqQgwIIGF/xXWz1wMTEBx5O3LK3lXLVuqXPdPxj2BoFHaW9Q==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "bd470a9114ffb0c125553667203e65dce3ed50a339a3f5c43de24e225c040b7a",
+     "sha256": "a07bc24468b9654ce76a547d47a2db282d07733b715db4c73a98bd63961f9550"
+    }
+   ],
+   "license": "MIT",
+   "name": "js-yaml",
+   "tarball": "https://registry.npmjs.org/js-yaml/-/js-yaml-4.3.0.tgz",
+   "version": "4.3.0"
+  },
+  {
+   "evidence": [
+    "1 module(s) in mermaid.min.js.map under node_modules/.pnpm/katex@0.16.47; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "katex@0.16.47",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-Eeo8Ys1doU1z+x8AZsPpQu+p/QcZBI5PeOo7QGQdy2x2m0MU/hYagBbGOmXwr5KVbEfVuWv9LpnQWeehogurjg==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "d3c8c167dfa0a8a7f2ace9fc23ddfb89e609adc13b113e958bede249592b852d",
+     "sha256": "766ccc1f306c885aa45542a9846bbd0a505b27a0374f146778171c2254ce18e3"
+    }
+   ],
+   "license": "MIT",
+   "name": "katex",
+   "tarball": "https://registry.npmjs.org/katex/-/katex-0.16.47.tgz",
+   "version": "0.16.47"
+  },
+  {
+   "evidence": [
+    "28 module(s) in mermaid.min.js.map under node_modules/.pnpm/khroma@2.1.0; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "khroma@2.1.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-Ls993zuzfayK269Svk9hzpeGUKob/sIgZzyHYdjQoAdQetRKpOLj+k/QQQ/6Qi0Yz65mlROrfd+Ev+1+7dz9Kw==",
+   "licence_files": [
+    {
+     "path": "package/license",
+     "quoted_sha256": "5135f3f7607134fae453693e070d5afb8704957fa2f4388dd4abdc14b99aebfb",
+     "sha256": "66b333b0f66759a0b710459e03f7029abe17f4358114a128d2c972e642961b49"
+    }
+   ],
+   "license": null,
+   "name": "khroma",
+   "tarball": "https://registry.npmjs.org/khroma/-/khroma-2.1.0.tgz",
+   "version": "2.1.0"
+  },
+  {
+   "evidence": [
+    "55 module(s) in @mermaid-js/parser dist chunks under node_modules/.pnpm/langium@4.2.1; lockfile: packages/parser dependencies and devDependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "langium@4.2.1",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-zu9QWmjpzJcomzdJQAHgDVhLGq5bLosVak1KVa40NzQHXfqr4eAHupvnPOVXEoLkg6Ocefvf/93d//SB7du4YQ==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "167b69205f44e8cd57b79383047a678feefd8ad1048752fce6177a12f8839a8f",
+     "sha256": "599bf70b4e55f06250571d103dbd8441e0c47cb7f858c0147ca312ce38e9ef2a"
+    }
+   ],
+   "license": "MIT",
+   "name": "langium",
+   "tarball": "https://registry.npmjs.org/langium/-/langium-4.2.1.tgz",
+   "version": "4.2.1"
+  },
+  {
+   "evidence": [
+    "1 module(s) in mermaid.min.js.map under node_modules/.pnpm/layout-base@1.0.2; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "layout-base@1.0.2",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-8h2oVEZNktL4BH2JCOI90iD1yXwL6iNW7KcCKT2QZgQJR2vbqDsldCTPRU9NifTCqHZci57XvQQ15YTu+sTYPg==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "6dfc8a41d27c6bfd01a963b61461f22060aa32909f1c0eda6863755cc3aea9a0",
+     "sha256": "eabb762d8a95109a39c9be3247325529a5239a7aca327d909c3ccdc41f3a06bf"
+    }
+   ],
+   "license": "MIT",
+   "name": "layout-base",
+   "tarball": "https://registry.npmjs.org/layout-base/-/layout-base-1.0.2.tgz",
+   "version": "1.0.2"
+  },
+  {
+   "evidence": [
+    "1 module(s) in mermaid.min.js.map under node_modules/.pnpm/layout-base@2.0.1; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "layout-base@2.0.1",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-dp3s92+uNI1hWIpPGH3jK2kxE2lMjdXdr+DH8ynZHpd6PUlH6x6cbuXnoMmiNumznqaNO31xu9e79F0uuZ0JFg==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "6dfc8a41d27c6bfd01a963b61461f22060aa32909f1c0eda6863755cc3aea9a0",
+     "sha256": "eabb762d8a95109a39c9be3247325529a5239a7aca327d909c3ccdc41f3a06bf"
+    }
+   ],
+   "license": "MIT",
+   "name": "layout-base",
+   "tarball": "https://registry.npmjs.org/layout-base/-/layout-base-2.0.1.tgz",
+   "version": "2.0.1"
+  },
+  {
+   "evidence": [
+    "227 module(s) in @mermaid-js/parser dist chunks under node_modules/.pnpm/lodash-es@4.17.23; lockfile: packages/parser dependencies and devDependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "lodash-es@4.17.23",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-kVI48u3PZr38HdYz98UmfPnXl2DXrpdctLrFLCd3kOx1xUkOmpFPx7gCWWM5MPkL/fD8zb+Ph0QzjGFs4+hHWg==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "2314aa0e2bae2fcbc099b29c8815e26688cef6c2cf76226927a3f24f091f7114",
+     "sha256": "f71e8ed126b46346494aad5486874cd8f0aafe95092ed67d2e3cb6110f939abc"
+    }
+   ],
+   "license": "MIT",
+   "name": "lodash-es",
+   "tarball": "https://registry.npmjs.org/lodash-es/-/lodash-es-4.17.23.tgz",
+   "version": "4.17.23"
+  },
+  {
+   "evidence": [
+    "240 module(s) in mermaid.min.js.map under node_modules/.pnpm/lodash-es@4.18.1; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml",
+    "147 module(s) in @mermaid-js/parser dist chunks under node_modules/.pnpm/lodash-es@4.18.1; lockfile: packages/parser dependencies and devDependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "lodash-es@4.18.1",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-J8xewKD/Gk22OZbhpOVSwcs60zhd95ESDwezOFuA3/099925PdHJ7OFHNTGtajL3AlZkykD32HykiMo+BIBI8A==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "2314aa0e2bae2fcbc099b29c8815e26688cef6c2cf76226927a3f24f091f7114",
+     "sha256": "f71e8ed126b46346494aad5486874cd8f0aafe95092ed67d2e3cb6110f939abc"
+    }
+   ],
+   "license": "MIT",
+   "name": "lodash-es",
+   "tarball": "https://registry.npmjs.org/lodash-es/-/lodash-es-4.18.1.tgz",
+   "version": "4.18.1"
+  },
+  {
+   "evidence": [
+    "inlined into dagre@0.8.5 (found by scanning dagre@0.8.5 sources from package/index.js); version and integrity: https://github.com/dagrejs/dagre/blob/f56edb1abbb8530e532158f7cbd403228f5b0018/package-lock.json"
+   ],
+   "id": "lodash@4.17.15",
+   "included_in": [
+    "dagre-0.8.5/dagre.min.js"
+   ],
+   "integrity": "sha512-8xOcRHvCjnocdS5cpwXQXVzmmh5e5+saE2QGoeQmbKmRS6J3VQppPOIt0MnmE+4xlZoumy0GPG0D0MVIQbNA1A==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "2314aa0e2bae2fcbc099b29c8815e26688cef6c2cf76226927a3f24f091f7114",
+     "sha256": "f71e8ed126b46346494aad5486874cd8f0aafe95092ed67d2e3cb6110f939abc"
+    }
+   ],
+   "license": "MIT",
+   "name": "lodash",
+   "tarball": "https://registry.npmjs.org/lodash/-/lodash-4.17.15.tgz",
+   "version": "4.17.15"
+  },
+  {
+   "evidence": [
+    "inlined into cytoscape@3.34.0 (bundled by cytoscape@3.34.0; found by scanning its sources from package/src/index.mjs); version and integrity: https://github.com/cytoscape/cytoscape.js/blob/22716bfb75834b56fa6679648b0abb06f4ae691c/package-lock.json",
+    "inlined into cytoscape@3.34.3 (found by scanning cytoscape@3.34.3 sources from package/src/index.mjs); version and integrity: https://github.com/cytoscape/cytoscape.js/blob/716a1cb6c6015d57b674abe626deaeb5e817ee30/package-lock.json"
+   ],
+   "id": "lodash@4.18.1",
+   "included_in": [
+    "cytoscape-3.34.3/cytoscape.min.js",
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-dMInicTPVE8d1e5otfwmmjlxkZoUpiVLwyeTdUsi/Caj/gfzzblBcCE5sRHV/AsjuCmxWrte2TNGSYuCeCq+0Q==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "2314aa0e2bae2fcbc099b29c8815e26688cef6c2cf76226927a3f24f091f7114",
+     "sha256": "f71e8ed126b46346494aad5486874cd8f0aafe95092ed67d2e3cb6110f939abc"
+    }
+   ],
+   "license": "MIT",
+   "name": "lodash",
+   "tarball": "https://registry.npmjs.org/lodash/-/lodash-4.18.1.tgz",
+   "version": "4.18.1"
+  },
+  {
+   "evidence": [
+    "11 module(s) in mermaid.min.js.map under node_modules/.pnpm/marked@16.3.0; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "marked@16.3.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-K3UxuKu6l6bmA5FUwYho8CfJBlsUWAooKtdGgMcERSpF7gcBUrCGsLH7wDaaNOzwq18JzSUDyoEb/YsrqMac3w==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE.md",
+     "quoted_sha256": "dd923de9769808b2820f68a2ea9d90b62d9348709e13ee95c234e4acc6d3ee09",
+     "sha256": "8e3a3f82f59a60958f56ca08f445647c32a4733dc7ca6c2c46f6eb898471ab9c"
+    }
+   ],
+   "license": "MIT",
+   "name": "marked",
+   "tarball": "https://registry.npmjs.org/marked/-/marked-16.3.0.tgz",
+   "version": "16.3.0"
+  },
+  {
+   "evidence": [
+    "inlined into roughjs@4.6.6 (bundled by roughjs@4.6.6; found by scanning its sources from package/bin/rough.js); version and integrity: https://github.com/pshihn/rough/blob/56a2762171b1294d643501e8d14f120db6b27bd7/package-lock.json"
+   ],
+   "id": "path-data-parser@0.1.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-NOnmBpt5Y2RWbuv0LMzsayp3lVylAHLPUTut412ZA3l+C4uw4ZVkQbjShYCQ8TCpUMdPapr4YjUqLYD6v68j+w==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "a734fd0e3f64745e4d78dd34b37a3546f4488a3e516879d62e952f2b9e0f69a4",
+     "sha256": "e9754a00aebde654e80f40bcf41dab667d6a41dfbbd2912bcf14fb07d468bf71"
+    }
+   ],
+   "license": "MIT",
+   "name": "path-data-parser",
+   "tarball": "https://registry.npmjs.org/path-data-parser/-/path-data-parser-0.1.0.tgz",
+   "version": "0.1.0"
+  },
+  {
+   "evidence": [
+    "inlined into roughjs@4.6.6 (bundled by roughjs@4.6.6; found by scanning its sources from package/bin/rough.js); version and integrity: https://github.com/pshihn/rough/blob/56a2762171b1294d643501e8d14f120db6b27bd7/package-lock.json"
+   ],
+   "id": "points-on-curve@0.2.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-0mYKnYYe9ZcqMCWhUjItv/oHjvgEsfKvnUTg8sAtnHr3GVy7rGkXCb6d5cSyqrWqL4k81b9CPg3urd+T7aop3A==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "a734fd0e3f64745e4d78dd34b37a3546f4488a3e516879d62e952f2b9e0f69a4",
+     "sha256": "e9754a00aebde654e80f40bcf41dab667d6a41dfbbd2912bcf14fb07d468bf71"
+    }
+   ],
+   "license": "MIT",
+   "name": "points-on-curve",
+   "tarball": "https://registry.npmjs.org/points-on-curve/-/points-on-curve-0.2.0.tgz",
+   "version": "0.2.0"
+  },
+  {
+   "evidence": [
+    "inlined into roughjs@4.6.6 (bundled by roughjs@4.6.6; found by scanning its sources from package/bin/rough.js); version and integrity: https://github.com/pshihn/rough/blob/56a2762171b1294d643501e8d14f120db6b27bd7/package-lock.json"
+   ],
+   "id": "points-on-path@0.2.1",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-25ClnWWuw7JbWZcgqY/gJ4FQWadKxGWk+3kR/7kD0tCaDtPPMj7oHu2ToLaVhfpnHrZzYby2w6tUA0eOIuUg8g==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "05a601c405df8b356c034413e7d3db9f57300cffad0eea2df809414151914864",
+     "sha256": "b6fc1f7f1d96a48bc97176f3dcef959e364c5c17ba44167511de421500a86c6c"
+    }
+   ],
+   "license": "MIT",
+   "name": "points-on-path",
+   "tarball": "https://registry.npmjs.org/points-on-path/-/points-on-path-0.2.1.tgz",
+   "version": "0.2.1"
+  },
+  {
+   "evidence": [
+    "1 module(s) in mermaid.min.js.map under node_modules/.pnpm/roughjs@4.6.6; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml",
+    "patched by mermaid: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/patches/roughjs.patch (SHA-256 = the pnpm patch_hash; it changes only the bin/rough.d.ts type declaration)"
+   ],
+   "id": "roughjs@4.6.6",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-ZUz/69+SYpFN/g/lUlo2FXcIjRkSu3nDarreVdGGndHEBJ6cXPdKguS8JGxwj5HA5xIbVKSmLgr5b3AWxtRfvQ==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "bb62e07404e8d5022ffaa6a7ac60c42b658df09605da52bbb9486825f941b2cc",
+     "sha256": "dca9a392272606ac748ac0976a2a1133f14eef841c27beaa51a844d53c56a09d"
+    }
+   ],
+   "license": "MIT",
+   "name": "roughjs",
+   "tarball": "https://registry.npmjs.org/roughjs/-/roughjs-4.6.6.tgz",
+   "version": "4.6.6"
+  },
+  {
+   "evidence": [
+    "6 module(s) in mermaid.min.js.map under node_modules/.pnpm/stylis@4.3.6; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "stylis@4.3.6",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-yQ3rwFWRfwNUY7H5vpU0wfdkNSnvnJinhF9830Swlaxl03zsOjCfmX0ugac+3LtK0lYSgwL/KXc8oYL3mG4YFQ==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "6821b85df4724cddb1de03c371af9a7cc055839d0331dcd7c2f1b1d025098c49",
+     "sha256": "88c579c6ee44b41137a21321190d177982e5b17d4fa1b83a4a2e3ea325a8fc9a"
+    }
+   ],
+   "license": "MIT",
+   "name": "stylis",
+   "tarball": "https://registry.npmjs.org/stylis/-/stylis-4.3.6.tgz",
+   "version": "4.3.6"
+  },
+  {
+   "evidence": [
+    "1 module(s) in mermaid.min.js.map under node_modules/.pnpm/ts-dedent@2.2.0; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "ts-dedent@2.2.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-q5W7tVM71e2xjHZTlgfTDoPF/SmqKG5hddq9SzR49CH2hayqRKJtQ4mtRlSxKaJlR/+9rEM+mnBHf7I2/BQcpQ==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE",
+     "quoted_sha256": "1078bbb5b87d77871937a28405a87b556e07ba12f5dbc87e01025925ad68bac9",
+     "sha256": "eff13095d9d762c3bd9dda74370c81e2130c28f2691bc455603abf973bac25b9"
+    }
+   ],
+   "license": "MIT",
+   "name": "ts-dedent",
+   "tarball": "https://registry.npmjs.org/ts-dedent/-/ts-dedent-2.2.0.tgz",
+   "version": "2.2.0"
+  },
+  {
+   "evidence": [
+    "4 module(s) in mermaid.min.js.map under node_modules/.pnpm/uuid@14.0.0; lockfile: packages/mermaid dependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "uuid@14.0.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-Qo+uWgilfSmAhXCMav1uYFynlQO7fMFiMVZsQqZRMIXp0O7rR7qjkj+cPvBHLgBqi960QCoo/PH2/6ZtVqKvrg==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE.md",
+     "quoted_sha256": "19f9e00b8c981751ab9b00c64c5d573976c192cbfba0937d8ab48777d38bbf9b",
+     "sha256": "beaa6b04fb82e41dd2ad679e19e27953afb5999b1abbb455b6564e78ebfeb332"
+    }
+   ],
+   "license": "MIT",
+   "name": "uuid",
+   "tarball": "https://registry.npmjs.org/uuid/-/uuid-14.0.0.tgz",
+   "version": "14.0.0"
+  },
+  {
+   "evidence": [
+    "17 module(s) in @mermaid-js/parser dist chunks under node_modules/.pnpm/vscode-jsonrpc@8.2.0; lockfile: packages/parser dependencies and devDependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "vscode-jsonrpc@8.2.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-C+r0eKJUIfiDIfwJhria30+TYWPtuHJXHtI7J0YlOmKAo7ogxP20T0zxB7HZQIFhIyvoBPwWskjxrvAtfjyZfA==",
+   "licence_files": [
+    {
+     "path": "package/License.txt",
+     "quoted_sha256": "ae00cb6006eaaa72d9b56c1d66cc8033398ec51f06add68be4e69742f9e63ea7",
+     "sha256": "ec9ee83580841e8eb687aca9867f221503809ba6426c7f876ede17d91b9fcfd0"
+    }
+   ],
+   "license": "MIT",
+   "name": "vscode-jsonrpc",
+   "tarball": "https://registry.npmjs.org/vscode-jsonrpc/-/vscode-jsonrpc-8.2.0.tgz",
+   "version": "8.2.0"
+  },
+  {
+   "evidence": [
+    "27 module(s) in @mermaid-js/parser dist chunks under node_modules/.pnpm/vscode-languageserver-protocol@3.17.5; lockfile: packages/parser dependencies and devDependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "vscode-languageserver-protocol@3.17.5",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-mb1bvRJN8SVznADSGWM9u/b07H7Ecg0I3OgXDuLdn307rl/J3A9YD6/eYOssqhecL27hK1IPZAsaqh00i/Jljg==",
+   "licence_files": [
+    {
+     "path": "package/License.txt",
+     "quoted_sha256": "ae00cb6006eaaa72d9b56c1d66cc8033398ec51f06add68be4e69742f9e63ea7",
+     "sha256": "ec9ee83580841e8eb687aca9867f221503809ba6426c7f876ede17d91b9fcfd0"
+    }
+   ],
+   "license": "MIT",
+   "name": "vscode-languageserver-protocol",
+   "tarball": "https://registry.npmjs.org/vscode-languageserver-protocol/-/vscode-languageserver-protocol-3.17.5.tgz",
+   "version": "3.17.5"
+  },
+  {
+   "evidence": [
+    "1 module(s) in @mermaid-js/parser dist chunks under node_modules/.pnpm/vscode-languageserver-textdocument@1.0.12; lockfile: packages/parser dependencies and devDependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "vscode-languageserver-textdocument@1.0.12",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-cxWNPesCnQCcMPeenjKKsOCKQZ/L6Tv19DTRIGuLWe32lyzWhihGVJ/rcckZXJxfdKCFvRLS3fpBIsV/ZGX4zA==",
+   "licence_files": [
+    {
+     "path": "package/License.txt",
+     "quoted_sha256": "ae00cb6006eaaa72d9b56c1d66cc8033398ec51f06add68be4e69742f9e63ea7",
+     "sha256": "ec9ee83580841e8eb687aca9867f221503809ba6426c7f876ede17d91b9fcfd0"
+    }
+   ],
+   "license": "MIT",
+   "name": "vscode-languageserver-textdocument",
+   "tarball": "https://registry.npmjs.org/vscode-languageserver-textdocument/-/vscode-languageserver-textdocument-1.0.12.tgz",
+   "version": "1.0.12"
+  },
+  {
+   "evidence": [
+    "1 module(s) in @mermaid-js/parser dist chunks under node_modules/.pnpm/vscode-languageserver-types@3.17.5; lockfile: packages/parser dependencies and devDependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "vscode-languageserver-types@3.17.5",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-Ld1VelNuX9pdF39h2Hgaeb5hEZM2Z3jUrrMgWQAu82jMtZp7p3vJT3BzToKtZI7NgQssZje5o0zryOrhQvzQAg==",
+   "licence_files": [
+    {
+     "path": "package/License.txt",
+     "quoted_sha256": "ae00cb6006eaaa72d9b56c1d66cc8033398ec51f06add68be4e69742f9e63ea7",
+     "sha256": "ec9ee83580841e8eb687aca9867f221503809ba6426c7f876ede17d91b9fcfd0"
+    }
+   ],
+   "license": "MIT",
+   "name": "vscode-languageserver-types",
+   "tarball": "https://registry.npmjs.org/vscode-languageserver-types/-/vscode-languageserver-types-3.17.5.tgz",
+   "version": "3.17.5"
+  },
+  {
+   "evidence": [
+    "1 module(s) in @mermaid-js/parser dist chunks under node_modules/.pnpm/vscode-uri@3.1.0; lockfile: packages/parser dependencies and devDependencies; version and integrity: https://github.com/mermaid-js/mermaid/blob/dcb694ddb58dc5ad3502e7e903cac05fd812eac3/pnpm-lock.yaml"
+   ],
+   "id": "vscode-uri@3.1.0",
+   "included_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "integrity": "sha512-/BpdSx+yCQGnCvecbyXdxHDkuk55/G3xwnC0GqY4gmQ3j+A+g8kzzgB4Nk/SINjqn6+waqw3EgbVF2QKExkRxQ==",
+   "licence_files": [
+    {
+     "path": "package/LICENSE.md",
+     "quoted_sha256": "c669138cb1eb01fbb745e8e460b291e4f2869c14a40061390b6095d845ed4c82",
+     "sha256": "c669138cb1eb01fbb745e8e460b291e4f2869c14a40061390b6095d845ed4c82"
+    }
+   ],
+   "license": "MIT",
+   "name": "vscode-uri",
+   "tarball": "https://registry.npmjs.org/vscode-uri/-/vscode-uri-3.1.0.tgz",
+   "version": "3.1.0"
+  }
+ ],
+ "schema": 1,
+ "snippets": [
+  {
+   "banner": "/*!\nEmbeddable Minimum Strictly-Compliant Promises/A+ 1.1.1 Thenable\nCopyright (c) 2013-2014 Ralf S. Engelschall (http://engelschall.com)\nLicensed under The MIT License (http://opensource.org/licenses/MIT)\n*/",
+   "banner_retained_in": [
+    "cytoscape-3.34.3/cytoscape.min.js",
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "found_in": "cytoscape@3.34.3 package/src/promise.mjs",
+   "id": "snippet:promises-aplus-thenable",
+   "included_in": [
+    "cytoscape-3.34.3/cytoscape.min.js",
+    "mermaid-11.17.2/mermaid.min.js (via cytoscape@3.34.0)"
+   ],
+   "license": "MIT",
+   "terms_source": "https://github.com/spdx/license-list-data/blob/31ba1a50e5397e00a304dbadc76531740e89ee48/text/MIT.txt",
+   "title": "Embeddable Minimum Strictly-Compliant Promises/A+ 1.1.1 Thenable"
+  },
+  {
+   "banner": "/*!\nEvent object based on jQuery events, MIT license\n\nhttps://jquery.org/license/\nhttps://tldrlegal.com/license/mit-license\nhttps://github.com/jquery/jquery/blob/master/src/event.js\n*/",
+   "banner_retained_in": [
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "found_in": "cytoscape@3.34.3 package/src/event.mjs",
+   "id": "snippet:jquery-event-object",
+   "included_in": [
+    "cytoscape-3.34.3/cytoscape.min.js",
+    "mermaid-11.17.2/mermaid.min.js (via cytoscape@3.34.0)"
+   ],
+   "license": "MIT",
+   "terms_source": "https://github.com/spdx/license-list-data/blob/31ba1a50e5397e00a304dbadc76531740e89ee48/text/MIT.txt",
+   "title": "Event object based on jQuery events"
+  },
+  {
+   "banner": "/*! Bezier curve function generator. Copyright Gaetan Renaudeau. MIT License: http://en.wikipedia.org/wiki/MIT_License */",
+   "banner_retained_in": [
+    "cytoscape-3.34.3/cytoscape.min.js",
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "found_in": "cytoscape@3.34.3 package/src/core/animation/cubic-bezier.mjs",
+   "id": "snippet:bezier-curve-generator",
+   "included_in": [
+    "cytoscape-3.34.3/cytoscape.min.js",
+    "mermaid-11.17.2/mermaid.min.js (via cytoscape@3.34.0)"
+   ],
+   "license": "MIT",
+   "terms_source": "https://github.com/spdx/license-list-data/blob/31ba1a50e5397e00a304dbadc76531740e89ee48/text/MIT.txt",
+   "title": "Bezier curve function generator (Gaetan Renaudeau)"
+  },
+  {
+   "banner": "/*! Runge-Kutta spring physics function generator. Adapted from Framer.js, copyright Koen Bok. MIT License: http://en.wikipedia.org/wiki/MIT_License */",
+   "banner_retained_in": [
+    "cytoscape-3.34.3/cytoscape.min.js",
+    "mermaid-11.17.2/mermaid.min.js"
+   ],
+   "found_in": "cytoscape@3.34.3 package/src/core/animation/spring.mjs",
+   "id": "snippet:runge-kutta-spring",
+   "included_in": [
+    "cytoscape-3.34.3/cytoscape.min.js",
+    "mermaid-11.17.2/mermaid.min.js (via cytoscape@3.34.0)"
+   ],
+   "license": "MIT",
+   "terms_source": "https://github.com/spdx/license-list-data/blob/31ba1a50e5397e00a304dbadc76531740e89ee48/text/MIT.txt",
+   "title": "Runge-Kutta spring physics function generator (Framer.js, Koen Bok)"
+  },
+  {
+   "banner": "/* Below singular value decomposition (svd) code including hypot function is adopted from https://github.com/dragonfly-ai/JamaJS\n   Some changes are applied to make the code compatible with the fcose code and to make it independent from Jama.\n   Input matrix is changed to a 2D array instead of Jama matrix. Matrix dimensions are taken according to 2D array instead of using Jama functions.\n   An object that includes singular value components is created for return. \n   The types of input parameters of the hypot function are removed. \n   let is used instead of var for the variable initialization.\n*/",
+   "banner_retained_in": [
+    "layout-base-2.0.1/layout-base.js"
+   ],
+   "found_in": "layout-base@2.0.1 package/src/util/SVD.js",
+   "id": "snippet:jamajs-svd",
+   "included_in": [
+    "layout-base-2.0.1/layout-base.js",
+    "mermaid-11.17.2/mermaid.min.js (via layout-base@2.0.1)"
+   ],
+   "license": "Apache-2.0",
+   "terms_source": "layout-base@2.0.1 package/src/util/SVD.js (verbatim)",
+   "title": "Singular value decomposition adopted from JamaJS"
+  },
+  {
+   "banner": "// adapted from: https://stackoverflow.com/a/19303725",
+   "banner_retained_in": [
+    "layout-base-2.0.1/layout-base.js"
+   ],
+   "found_in": "layout-base@2.0.1 package/src/util/RandomSeed.js",
+   "gap": "The two-line seeded random function was adapted from Stack Overflow answer 19303725; upstream records only the URL. The contribution's licence terms and author are not recorded in any exact upstream artifact, so no licence text is reproduced here.",
+   "id": "snippet:stackoverflow-19303725",
+   "included_in": [
+    "layout-base-2.0.1/layout-base.js",
+    "mermaid-11.17.2/mermaid.min.js (via layout-base@1.0.2)",
+    "mermaid-11.17.2/mermaid.min.js (via layout-base@2.0.1)"
+   ],
+   "license": null,
+   "title": "Seeded pseudo-random nextDouble"
+  }
+ ]
+}

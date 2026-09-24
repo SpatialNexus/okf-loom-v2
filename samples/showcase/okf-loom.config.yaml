@@ -1,0 +1,26 @@
+# okf-loom.config.yaml: OKF bundle configuration (current spec §5).
+# Every key is optional. Delete this file to fall back to built-in defaults.
+# Paths must be bundle-relative (absolute / ..-escaping values are rejected).
+
+viewer:
+  title: "OKF Bundle"               # viewer page <title>
+  override_dir: .okf-loom/viewer         # templates / static / palette overrides
+  extension_css: .okf-loom/viewer/extension.css
+  extension_js: .okf-loom/viewer/extension.js
+  allow_active_code: false          # gate JS / full-HTML override execution
+
+search:
+  default_mode: lexical             # lexical | semantic | hybrid | tag | entity | relation
+
+validate:
+  default_profile: spec             # spec | producer | loose
+  fail_on_broken_links: false
+
+studio:                             # live collaborative studio
+  edit: true
+  live: true
+  # Local-only. `serve --tunnel` admits its own tunnel host at runtime, so it
+  # need not be listed. A host added here, e.g.
+  # [127.0.0.1, localhost, <name>.trycloudflare.com], reaches the local
+  # editing/admin surface.
+  allowed_hosts: [127.0.0.1, localhost]

@@ -1,0 +1,21 @@
+<!--
+  Browser parity fixture — HTML5 foreign content (SVG).
+  ReviewAll r7: "projection validation is not browser-tree complete".
+
+  SVG/MathML inside HTML has fundamentally different tree-construction rules
+  (case-sensitive tag names, CDATA sections, non-void self-closing elements).
+  The stdlib HTMLParser does not model foreign content namespaces, so
+  textContent extraction per owner nonce would differ for any content
+  inside <svg>/<math>.
+
+  Expected browser behavior:
+    - <svg> is in the SVG namespace, not the HTML namespace
+    - <FOREIGNOBJECT> (uppercase) is parsed as <foreignObject> (case-preserved)
+    - HTMLParser lowercases all tags and does not distinguish namespaces
+-->
+<!DOCTYPE html>
+<html>
+<body>
+<p id="owner">text<svg width="10" height="10"><circle cx="5" cy="5" r="3"/></svg></p>
+</body>
+</html>

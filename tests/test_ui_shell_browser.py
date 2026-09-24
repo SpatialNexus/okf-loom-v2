@@ -1,0 +1,1352 @@
+"""Browser proof for the shared shell and consolidated Studio surface."""
+from __future__ import annotations
+
+import os
+import re
+import socket
+import subprocess
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+import pytest
+
+from browser_support import expect, sync_playwright, launch_chromium, copy_bundle, live_server, reveal_control
+
+from conftest import okf_module_argv, okf_subprocess_env
+
+pytestmark = pytest.mark.browser
+TOOLKIT_ROOT = Path(__file__).resolve().parent.parent
+DEMO_BUNDLE = TOOLKIT_ROOT / "samples" / "demo_bundle"
+
+
+def _capture_evidence(page, name: str) -> None:
+    root = os.environ.get("OKF_UI_CLOSEOUT_PROOF_DIR")
+    if not root:
+        return
+    destination = Path(root)
+    destination.mkdir(parents=True, exist_ok=True)
+    page.screenshot(path=str(destination / name), full_page=True)
+
+
+def _install_error_probe(page) -> list[str]:
+    failures: list[str] = []
+    page.on("console", lambda message: failures.append(f"console: {message.text}") if message.type == "error" else None)
+    page.on("requestfailed", lambda request: failures.append(f"requestfailed: {request.url}")
+            if not re.search(r"/(?:__events|__presence)(?:\?|$)", request.url) else None)
+    page.on("response", lambda response: failures.append(f"http {response.status}: {response.url}") if response.status >= 400 else None)
+    return failures
+
+
+def _free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+@pytest.fixture(scope="module")
+def server_url(tmp_path_factory) -> str:
+    bundle = copy_bundle(DEMO_BUNDLE, tmp_path_factory.mktemp("shell") / "bundle")
+    with live_server(bundle) as base:
+        yield base
+
+
+@pytest.fixture
+def page():
+    with sync_playwright() as playwright:
+        browser = launch_chromium(playwright)
+        context = browser.new_context(viewport={"width": 1440, "height": 900})
+        try:
+            yield context.new_page()
+        finally:
+            context.close()
+            browser.close()
+
+
+def test_studio_mounts_one_compact_launcher_in_the_shell(page, server_url: str) -> None:
+    page.goto(server_url + "/")
+    page.wait_for_function("() => window.okfStudioReadiness && window.okfStudioReadiness.ready")
+
+    slot = page.locator('[data-okf-shell-item="studio"]')
+    launcher = slot.get_by_role("button", name="Studio")
+    assert launcher.count() == 1
+    assert launcher.is_visible()
+    assert page.locator(".okf-studio-bar").count() == 0
+
+
+def test_visible_shell_and_graph_preview_labels_are_preserved_in_accessible_names(
+    page, server_url: str,
+) -> None:
+    failures = _install_error_probe(page)
+    page.goto(server_url + "/")
+    page.wait_for_function("() => window.okfStudioReadiness && window.okfStudioReadiness.ready")
+    checks = page.evaluate("""() => {
+      const normalized = value => String(value || '').replace(/\\s+/g, ' ').trim();
+      const row = selector => {
+        const node = document.querySelector(selector);
+        return {visible: normalized(node.innerText), name: normalized(node.getAttribute('aria-label') || node.innerText)};
+      };
+      return {
+        studio: row('.okf-studio-launcher'),
+        appearance: row('#okf-theme'),
+        graph: (() => {
+          const node = document.querySelector('.okf-graph-thumb__link');
+          return {visible: normalized(node.querySelector('figcaption').innerText),
+            name: normalized(node.querySelector('.sr-only').textContent + ' ' + node.querySelector('figcaption').innerText)};
+        })()
+      };
+    }""")
+    assert checks["studio"]["visible"] in checks["studio"]["name"]
+    assert checks["appearance"]["visible"] in checks["appearance"]["name"]
+    assert checks["graph"]["visible"] in checks["graph"]["name"]
+    _capture_evidence(page, "desktop-index-accessible-names.png")
+    assert failures == []
+
+
+def test_graph_summary_uses_ordered_headings(page, server_url: str) -> None:
+    failures = _install_error_probe(page)
+    page.goto(server_url + "/__graph")
+    page.wait_for_function("() => window.okfGraphCaptureState && window.okfGraphCaptureState().layoutSettled")
+    assert page.get_by_role("heading", name="Suggested starting points", level=2).count() == 1
+    levels = page.locator("h1:visible,h2:visible,h3:visible,h4:visible,h5:visible,h6:visible").evaluate_all(
+        "nodes => nodes.map(node => Number(node.tagName.slice(1)))"
+    )
+    assert all(current <= previous + 1 for previous, current in zip(levels, levels[1:])), levels
+    _capture_evidence(page, "desktop-graph-heading-order.png")
+    assert failures == []
+
+
+@pytest.mark.parametrize("query, expected_type", [("checkout", "Service"), ("refund", "Playbook")])
+def test_search_type_labels_meet_text_contrast_in_live_suggestions(
+    page, server_url: str, query: str, expected_type: str,
+) -> None:
+    failures = _install_error_probe(page)
+    page.goto(server_url + "/")
+    search = page.locator('.okf-shell__search-form input[type="search"]')
+    search.fill(query)
+    label = page.locator(".okf-search-live__type-label", has_text=expected_type).first
+    expect(label).to_be_visible()
+    contrast = label.evaluate("""node => {
+      const parse = value => {
+        const parts = value.match(/[\\d.]+/g).map(Number);
+        if (value.startsWith('color(srgb')) {
+          return {rgb: parts.slice(0, 3).map(channel => channel * 255), alpha: parts.length > 3 ? parts[3] : 1};
+        }
+        return {rgb: parts.slice(0, 3), alpha: parts.length > 3 ? parts[3] : 1};
+      };
+      const opaqueBackground = element => {
+        let current = element;
+        let result = [255, 255, 255];
+        const layers = [];
+        while (current) {
+          const color = parse(getComputedStyle(current).backgroundColor);
+          if (color.alpha > 0) layers.push(color);
+          if (color.alpha >= 1) break;
+          current = current.parentElement;
+        }
+        layers.reverse().forEach(color => {
+          result = color.rgb.map((channel, index) => channel * color.alpha + result[index] * (1 - color.alpha));
+        });
+        return result;
+      };
+      const linear = rgb => rgb.map(channel => {
+          channel /= 255;
+          return channel <= .04045 ? channel / 12.92 : Math.pow((channel + .055) / 1.055, 2.4);
+        });
+      const luminance = rgb => .2126 * rgb[0] + .7152 * rgb[1] + .0722 * rgb[2];
+      const fg = luminance(linear(parse(getComputedStyle(node).color).rgb));
+      const bg = luminance(linear(opaqueBackground(node.closest('.okf-search-live__type'))));
+      return {ratio: (Math.max(fg, bg) + .05) / (Math.min(fg, bg) + .05),
+        foreground: getComputedStyle(node).color,
+        background: getComputedStyle(node.closest('.okf-search-live__type')).backgroundColor,
+        opaqueBackground: opaqueBackground(node.closest('.okf-search-live__type'))};
+    }""")
+    assert contrast["ratio"] >= 4.5, (expected_type, contrast)
+    search.press("Enter")
+    page.wait_for_url(re.compile(r"/__search\?"))
+    result_label = page.locator(".okf-search-result__type", has_text=expected_type).first
+    expect(result_label).to_be_visible()
+    result_contrast = result_label.evaluate("""node => {
+      const parse = value => {
+        const parts = value.match(/[\\d.]+/g).map(Number);
+        if (value.startsWith('color(srgb')) {
+          return {rgb: parts.slice(0, 3).map(channel => channel * 255), alpha: parts.length > 3 ? parts[3] : 1};
+        }
+        return {rgb: parts.slice(0, 3), alpha: parts.length > 3 ? parts[3] : 1};
+      };
+      const linear = rgb => rgb.map(channel => {
+        channel /= 255;
+        return channel <= .04045 ? channel / 12.92 : Math.pow((channel + .055) / 1.055, 2.4);
+      });
+      const luminance = rgb => .2126 * rgb[0] + .7152 * rgb[1] + .0722 * rgb[2];
+      const style = getComputedStyle(node);
+      const fg = luminance(linear(parse(style.color).rgb));
+      const bg = luminance(linear(parse(getComputedStyle(document.body).backgroundColor).rgb));
+      return {ratio: (Math.max(fg, bg) + .05) / (Math.min(fg, bg) + .05),
+        foreground: style.color, background: getComputedStyle(document.body).backgroundColor};
+    }""")
+    assert result_contrast["ratio"] >= 4.5, (expected_type, result_contrast)
+    _capture_evidence(page, f"desktop-search-{expected_type.lower()}-contrast.png")
+    assert failures == []
+
+
+def test_mobile_studio_keeps_schema_and_sql_in_contained_horizontal_scrollports(
+    page, server_url: str,
+) -> None:
+    failures = _install_error_probe(page)
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(server_url + "/tables/orders")
+    page.wait_for_function("() => window.okfStudioReadiness && window.okfStudioReadiness.ready")
+    page.locator(".okf-studio-launcher").click()
+    page.locator("#okf-panel").wait_for(state="visible")
+    geometry = page.evaluate("""() => {
+      const root = document.documentElement;
+      const code = document.querySelector('.okf-content-scrollport--code');
+      const pre = code && code.querySelector('pre');
+      const cellCode = document.querySelector('.okf-table td code');
+      const tablePort = document.querySelector('.okf-tablewrap');
+      return {
+        pageOverflow: root.scrollWidth > root.clientWidth + 1,
+        codeLocal: !!code && code.scrollWidth >= code.clientWidth,
+        codeWhiteSpace: pre && getComputedStyle(pre).whiteSpace,
+        identifierWhiteSpace: cellCode && getComputedStyle(cellCode).whiteSpace,
+        tableContained: !!tablePort && tablePort.getBoundingClientRect().right <= root.clientWidth + 1,
+      };
+    }""")
+    assert geometry == {
+        "pageOverflow": False,
+        "codeLocal": True,
+        "codeWhiteSpace": "pre",
+        "identifierWhiteSpace": "nowrap",
+        "tableContained": True,
+    }
+    _capture_evidence(page, "mobile-studio-schema-code.png")
+    assert failures == []
+
+
+def test_shell_navigation_focuses_the_new_route_heading(page, server_url: str) -> None:
+    page.goto(server_url + "/")
+    # There is no standalone Search shortcut any more: an empty search submit
+    # is the header's way to open the full search route.
+    search = page.locator('.okf-shell__search-form input')
+    search.press("Enter")
+    page.wait_for_url(lambda url: '/__search' in url)
+
+    assert page.evaluate("document.activeElement === document.querySelector('[data-okf-route-heading]')")
+
+
+def test_studio_is_a_non_modal_rail_on_desktop_and_restores_its_trigger(page, server_url: str) -> None:
+    page.goto(server_url + "/")
+    page.wait_for_function("() => window.okfStudioReadiness && window.okfStudioReadiness.ready")
+    launcher = page.locator(".okf-studio-launcher")
+    launcher.click()
+
+    panel = page.locator("#okf-panel")
+    assert panel.get_attribute("role") == "complementary"
+    assert panel.get_attribute("aria-modal") is None
+    assert page.evaluate("document.activeElement === document.querySelector('#okf-panel-title')")
+
+    page.keyboard.press("Escape")
+    assert panel.is_hidden()
+    assert page.evaluate("document.activeElement === document.querySelector('.okf-studio-launcher')")
+
+
+def test_studio_reflows_to_a_named_modal_dialog(page, server_url: str) -> None:
+    page.set_viewport_size({"width": 600, "height": 800})
+    page.goto(server_url + "/")
+    page.wait_for_function("() => window.okfStudioReadiness && window.okfStudioReadiness.ready")
+    page.locator(".okf-studio-launcher").click()
+
+    panel = page.locator("#okf-panel")
+    assert panel.get_attribute("role") == "dialog"
+    assert panel.get_attribute("aria-modal") == "true"
+    assert panel.get_attribute("aria-labelledby") == "okf-panel-title"
+    assert page.locator("#okf-panel-title").inner_text() == "Studio"
+
+    page.keyboard.press("Escape")
+    assert panel.is_hidden()
+    assert page.evaluate("document.activeElement === document.querySelector('.okf-studio-launcher')")
+
+
+_LAUNCHER_FOCUSED = (
+    "() => document.activeElement instanceof HTMLElement "
+    "&& document.activeElement.classList.contains('okf-studio-launcher')"
+)
+
+
+@pytest.mark.parametrize("path,width,height", [
+    ("/", 1440, 900),
+    ("/tables/orders", 1440, 900),
+    ("/__graph", 1440, 900),
+    ("/", 390, 844),
+    ("/tables/orders", 390, 844),
+    ("/__graph", 390, 844),
+])
+def test_escape_after_palette_opened_a_panel_restores_a_connected_control(
+    page, server_url: str, path: str, width: int, height: int
+) -> None:
+    """F5 regression: a palette-activated panel must not strand focus on <body>.
+
+    When the palette was opened while <body> held focus, its close pass
+    re-focused <body>; the panel then captured that incidental origin, and
+    Escape sent focus nowhere. Panel and palette state must still close and
+    focus must land on a persistent, connected control (the Studio launcher).
+    """
+    page.set_viewport_size({"width": width, "height": height})
+    page.goto(server_url + path)
+    page.wait_for_function("() => window.okfStudioReadiness && window.okfStudioReadiness.ready")
+    assert page.evaluate("() => document.activeElement === document.body")
+
+    page.keyboard.press("Control+k")
+    option = page.get_by_role("option", name="Open Comments panel")
+    expect(option).to_be_visible()
+    option.click()
+
+    panel = page.locator("#okf-panel")
+    expect(panel).to_be_visible()
+    assert page.evaluate("() => window.okfLoomStudio.state.openPanel") == "comments"
+
+    page.keyboard.press("Escape")
+    expect(panel).to_be_hidden()
+    assert page.evaluate("() => window.okfLoomStudio.state.openPanel") is None
+    assert page.evaluate(_LAUNCHER_FOCUSED), (
+        f"Escape after a palette-opened panel left focus on "
+        f"{page.evaluate('document.activeElement && document.activeElement.tagName')} "
+        f"instead of the Studio launcher"
+    )
+
+
+@pytest.mark.parametrize("path,width,height", [
+    ("/tables/orders", 1440, 900),
+    ("/__graph", 1440, 900),
+    ("/tables/orders", 390, 844),
+    ("/__graph", 390, 844),
+])
+def test_launcher_escape_round_trip_restores_the_launcher(
+    page, server_url: str, path: str, width: int, height: int
+) -> None:
+    """F5 acceptance: launcher→Escape restores the launcher on doc and graph
+    routes at desktop and mobile widths (the index/modal variants are covered
+    by the two launcher tests above)."""
+    page.set_viewport_size({"width": width, "height": height})
+    page.goto(server_url + path)
+    page.wait_for_function("() => window.okfStudioReadiness && window.okfStudioReadiness.ready")
+
+    launcher = page.locator(".okf-studio-launcher")
+    launcher.click()
+    panel = page.locator("#okf-panel")
+    expect(panel).to_be_visible()
+
+    page.keyboard.press("Escape")
+    expect(panel).to_be_hidden()
+    assert page.evaluate("() => window.okfLoomStudio.state.openPanel") is None
+    assert page.evaluate(_LAUNCHER_FOCUSED)
+
+
+def test_concept_view_controls_are_local_and_preserve_url_state(page, server_url: str) -> None:
+    page.goto(server_url + "/tables/orders?view=source&focus=1")
+    page.wait_for_function("() => window.okfStudioReadiness && window.okfStudioReadiness.ready")
+
+    viewbar = page.locator(".okf-concept-viewbar")
+    assert viewbar.is_visible()
+    assert viewbar.get_by_role("button", name="Source").get_attribute("aria-pressed") == "true"
+    focus = viewbar.get_by_role("button", name="Focus view")
+    assert focus.get_attribute("aria-pressed") == "true"
+
+    focus.click()
+    assert "view=source" in page.url
+    assert "focus=" not in page.url
+
+
+@pytest.mark.parametrize("width", [390, 720, 360, 1280, 1440])
+def test_concept_shell_and_local_viewbar_follow_normal_flow_without_overflow(page, server_url: str, width: int) -> None:
+    page.set_viewport_size({"width": width, "height": 900})
+    page.goto(server_url + "/tables/orders")
+    page.wait_for_function("() => window.okfStudioReadiness && window.okfStudioReadiness.ready")
+    metrics = page.evaluate("""() => {
+      const shell=document.querySelector('.okf-shell'),bar=document.querySelector('.okf-concept-viewbar');
+      const sr=shell.getBoundingClientRect(),br=bar.getBoundingClientRect();
+      const visible=el=>!!el&&el.offsetParent!==null;
+      return {shellHeight:sr.height,shellBottom:sr.bottom,barTop:br.top,
+        overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth+1,
+        destinations:[...shell.querySelectorAll('[data-okf-shell-item]')].filter(visible).map(el=>el.dataset.okfShellItem),
+        modes:[...bar.querySelectorAll('button')].filter(visible).map(el=>el.textContent.trim())};
+    }""")
+    assert metrics["shellHeight"] >= 52 and metrics["barTop"] >= metrics["shellBottom"] - 1, metrics
+    assert metrics["overflow"] is False, metrics
+    assert set(("search", "index", "graph", "studio", "appearance")).issubset(metrics["destinations"]), metrics
+    assert {"Rendered", "Source", "Split", "Focus view"}.issubset(metrics["modes"]), metrics
+
+
+def test_studio_home_preserves_session_review_command_and_authority_capabilities(page, server_url: str) -> None:
+    page.goto(server_url + "/")
+    page.wait_for_function("() => window.okfStudioReadiness && window.okfStudioReadiness.ready")
+    page.locator(".okf-studio-launcher").click()
+
+    panel = page.locator("#okf-panel")
+    assert panel.get_by_role("button", name="Agent watching").count() == 1
+    assert panel.get_by_role("button", name="Comments").count() == 1
+    assert panel.get_by_role("button", name="Changes").count() == 1
+    assert panel.get_by_role("button", name="Agent activity").count() == 1
+    assert panel.get_by_role("button", name="Open the command palette").count() == 1
+    assert panel.get_by_role("heading", name="Authority and sharing").count() == 1
+    assert "Local editing authority is enabled" in panel.locator(".okf-studio-authority").inner_text()
+
+    panel.get_by_role("button", name="Comments").click()
+    assert page.locator("#okf-panel-title").inner_text() == "Comments"
+
+
+def test_route_links_expose_current_state_and_focus_visible_targets(page, server_url: str) -> None:
+    page.goto(server_url + "/")
+    index_link = page.locator('[data-okf-shell-item="index"] a')
+    assert index_link.get_attribute("aria-current") == "page"
+
+    # An empty query opens the full search route; the search form itself then
+    # carries the current-destination marker (there is no Search link).
+    page.locator('.okf-shell__search-form input').press("Enter")
+    page.wait_for_url(lambda url: '/__search' in url)
+    search_form = page.locator('form[data-okf-shell-item="search"]')
+    assert search_form.get_attribute("aria-current") == "page"
+    assert page.locator('[data-okf-shell-item="index"] a').get_attribute("aria-current") is None
+    assert page.evaluate("document.activeElement === document.querySelector('[data-okf-route-heading]')")
+
+    page.locator('[data-okf-shell-item="index"] a').click()
+    page.wait_for_url(server_url + "/")
+    assert page.evaluate("document.activeElement === document.querySelector('[data-okf-route-heading]')")
+
+    page.locator('[data-okf-shell-item="graph"] a').click()
+    page.wait_for_url(server_url + "/__graph")
+    heading = page.locator(".okf-graph-route-title")
+    assert heading.is_visible()
+    graph_focus = page.evaluate("() => ({matches:document.activeElement === document.querySelector('.okf-graph-route-title'), active:document.activeElement && document.activeElement.outerHTML})")
+    assert graph_focus["matches"], graph_focus
+    assert heading.evaluate("el => getComputedStyle(el).outlineStyle !== 'none'")
+
+    page.goto(server_url + "/tables/orders")
+    assert page.locator('[data-okf-shell-item="index"] a').get_attribute("aria-current") == "page"
+    assert page.locator(".okf-page__title").is_visible()
+
+
+def test_route_navigation_degrades_normally_when_session_storage_is_denied(server_url: str) -> None:
+    with sync_playwright() as playwright:
+        browser = launch_chromium(playwright)
+        context = browser.new_context(viewport={"width": 600, "height": 800})
+        context.add_init_script(
+            "Object.defineProperty(window, 'sessionStorage', {get(){throw new DOMException('denied')}})"
+        )
+        page = context.new_page()
+        try:
+            page.goto(server_url + "/")
+            page.locator('[data-okf-shell-item="graph"] a').click()
+            page.wait_for_url(server_url + "/__graph")
+            assert page.locator('[data-okf-shell-item="graph"] a').get_attribute("aria-current") == "page"
+            heading = page.locator(".okf-graph-route-title")
+            expect(heading).to_be_focused()
+            assert page.evaluate("window.name") == ""
+
+            page.locator("#okf-search").focus()
+            page.locator('[data-okf-shell-item="index"] a').click()
+            page.wait_for_url(server_url + "/")
+            page.go_back()
+            page.wait_for_url(server_url + "/__graph")
+            expect(heading).not_to_be_focused()
+
+            page.reload()
+            expect(heading).not_to_be_focused()
+
+            page.goto(server_url + "/")
+            page.evaluate("""() => {
+              const link=document.createElement('a');
+              link.id='ordinary-graph-entry'; link.href='/__graph'; link.textContent='Ordinary graph entry';
+              document.querySelector('main').prepend(link);
+            }""")
+            page.locator("#ordinary-graph-entry").click()
+            page.wait_for_url(server_url + "/__graph")
+            expect(heading).not_to_be_focused()
+
+            direct = context.new_page()
+            direct.goto(server_url + "/__graph")
+            expect(direct.locator(".okf-graph-route-title")).not_to_be_focused()
+            direct.close()
+        finally:
+            context.close()
+            browser.close()
+
+
+def test_graph_mobile_keeps_primary_nav_connected_visible_and_unclipped(page, server_url: str) -> None:
+    page.set_viewport_size({"width": 600, "height": 800})
+    page.goto(server_url + "/__graph")
+    nav = page.get_by_role("navigation", name="Primary navigation")
+    assert nav.is_visible()
+    assert nav.evaluate("el => el.parentElement.matches('[data-okf-application-shell]')")
+    assert page.locator(".okf-mobile-secondary .okf-shell__nav").count() == 0
+    for name in ("Index", "Graph"):
+        assert nav.get_by_role("link", name=name).is_visible()
+    searchbox = nav.get_by_role("searchbox", name="Search this bundle")
+    submit = nav.locator('.okf-shell__search-submit')
+    assert searchbox.is_visible()
+    assert submit.is_visible() and submit.inner_text().strip() == "Search"
+    assert nav.get_by_role("link", name="Search").count() == 0
+    clipped = page.evaluate(
+        "[...document.querySelectorAll('.okf-shell a,.okf-shell button,.okf-shell input')].filter(el=>el.offsetParent!==null).map(el=>{const r=el.getBoundingClientRect();return {name:el.getAttribute('aria-label')||el.textContent.trim(),left:r.left,right:r.right}}).filter(row=>row.left<0||row.right>innerWidth+.5)"
+    )
+    assert clipped == [], clipped
+    tour = page.get_by_role("dialog", name="Graph tour")
+    if tour.is_visible():
+        tour.get_by_role("button", name="Skip").click()
+    # Coherent keyboard order: the field hands focus to its own labelled
+    # submit, then to the primary destinations.
+    searchbox.focus()
+    page.keyboard.press("Tab")
+    assert page.evaluate("document.activeElement.matches('.okf-shell__search-submit')")
+    current_item = "document.activeElement.closest('[data-okf-shell-item]')?.dataset.okfShellItem"
+    page.keyboard.press("Tab")
+    assert page.evaluate(current_item) == "index"
+    page.keyboard.press("Tab")
+    assert page.evaluate(current_item) == "graph"
+
+
+def test_graph_nojs_keeps_honest_search_index_and_graph_destinations(server_url: str) -> None:
+    with sync_playwright() as playwright:
+        browser = launch_chromium(playwright)
+        context = browser.new_context(java_script_enabled=False, viewport={"width": 600, "height": 800})
+        page = context.new_page()
+        try:
+            page.goto(server_url + "/__graph")
+            nav = page.get_by_role("navigation", name="Primary navigation")
+            for name in ("Index", "Graph"):
+                assert nav.get_by_role("link", name=name).is_visible()
+            assert nav.get_by_role("link", name="Search").count() == 0
+            assert nav.get_by_role("searchbox", name="Search this bundle").is_visible()
+            assert nav.get_by_role("button", name="Search").is_visible()
+            assert nav.get_by_role("link", name="Graph").get_attribute("aria-current") == "page"
+            assert page.locator(".okf-mobile-secondary").count() == 0
+            # The real GET form navigates without JavaScript and lands on the
+            # honest full search route with server-rendered results.
+            searchbox = nav.get_by_role("searchbox", name="Search this bundle")
+            searchbox.fill("orders")
+            nav.get_by_role("button", name="Search").click()
+            page.wait_for_url(lambda url: "/__search" in url and "q=orders" in url)
+            assert page.locator(".okf-search-result").count() >= 1
+        finally:
+            context.close()
+            browser.close()
+
+
+def test_public_panel_extension_activates_returns_and_restores_focus(page, server_url: str) -> None:
+    page.goto(server_url + "/")
+    page.wait_for_function("() => window.okfLoomStudio && window.okfLoomStudio.register")
+    launcher = page.locator(".okf-studio-launcher")
+    launcher.click()
+    page.evaluate(
+        """window.okfLoomStudio.register('panel', {
+          id:'coverage-proof', label:'Coverage proof',
+          render(container){ container.textContent='Extension active'; }
+        })"""
+    )
+    extension = page.get_by_role("button", name="Coverage proof")
+    assert extension.is_visible()
+    extension.click()
+    assert page.evaluate("window.okfLoomStudio.panels['coverage-proof']._btn.getAttribute('aria-expanded')") == "true"
+    assert page.locator("#okf-panel-body").inner_text() == "Extension active"
+    back = page.get_by_role("button", name="Back to Studio")
+    assert back.is_visible()
+    back.click()
+    assert page.locator("#okf-panel-title").inner_text() == "Studio"
+    expect(extension).to_be_focused()
+    page.get_by_role("button", name="Close panel").click()
+    expect(launcher).to_be_focused()
+
+
+def test_studio_attention_is_actionable_unread_and_reconnect_honest(page, server_url: str) -> None:
+    page.goto(server_url + "/tables/orders")
+    page.wait_for_function("() => window.okfLoomStudio && window.okfLoomStudio.state.eventsReady")
+    launcher = page.locator(".okf-studio-launcher")
+    assert launcher.get_attribute("data-attention") == "idle"
+
+    page.evaluate("window.okfLoomLive.emit('activity',{event_id:'shell-new-work',type:'activity',action:'update',ts:new Date().toISOString()})")
+    assert launcher.get_attribute("data-attention") == "pending"
+    expect(launcher).to_have_accessible_name(re.compile(r"Studio\s+·\s+1 change"))
+
+    launcher.click()
+    page.get_by_role("button", name="Changes").click()
+    assert launcher.get_attribute("data-attention") == "idle"
+    page.get_by_role("button", name="Close panel").click()
+
+    page.evaluate("window.okfLoomLive.emit('conn',{state:'reconnecting'})")
+    # Truthful classification (phase-1 status fix): a degraded-but-recovering
+    # stream is NOT a failure — the name still says "Reconnecting", but no
+    # "· Error" projection fires. Only a dead connection is a failure.
+    assert launcher.get_attribute("data-attention") == "idle"
+    expect(launcher).to_have_accessible_name(re.compile(r"Studio\s+·\s+Reconnecting"))
+    assert page.evaluate(
+        "getComputedStyle(document.querySelector('.okf-studio-launcher'), '::after').content"
+    ) == "none"
+    page.evaluate("window.okfLoomLive.emit('conn',{state:'online'})")
+    assert launcher.get_attribute("data-attention") == "idle"
+
+    page.evaluate("window.okfLoomLive.emit('conn',{state:'offline'})")
+    assert launcher.get_attribute("data-attention") == "failure"
+    expect(launcher).to_have_accessible_name(re.compile(r"Studio\s+·\s+Offline"))
+    assert page.evaluate(
+        "getComputedStyle(document.querySelector('.okf-studio-launcher'), '::after').content"
+    ).replace('"', "") .strip() == "· Error"
+    page.evaluate("window.okfLoomLive.emit('conn',{state:'online'})")
+    assert launcher.get_attribute("data-attention") == "idle"
+
+    page.evaluate("window.okfLoomLive.emit('activity',{event_id:'stale-after-resync',type:'activity',action:'update'})")
+    assert launcher.get_attribute("data-attention") == "pending"
+    resync = page.evaluate("""async () => {
+      await Promise.all(window.okfLoomLive.emit('resync',{rev:1}));
+      return {
+        attention: document.querySelector('.okf-studio-launcher').dataset.attention,
+        unread: window.okfLoomStudio.state.attention.unread.size,
+        unreadKeys: [...window.okfLoomStudio.state.attention.unread],
+        eventKeys: window.okfLoomStudio.state.events.map(e => e.event_id ?? e.event_cursor ?? null).slice(0,5)
+      };
+    }""")
+    assert resync["attention"] == "idle" and resync["unread"] == 0, resync
+
+
+def test_connection_chip_distinguishes_boot_connecting_from_reconnecting(
+    page, server_url: str,
+) -> None:
+    """Phase-1 status truthfulness: the chip state machine never collapses
+    the first-boot "connecting" phase into "reconnecting" (which, paired
+    with the old failure classification, made every healthy fresh load
+    announce 'Reconnecting · Error'), and neither degraded-but-recovering
+    state raises the failure projection — only 'offline' does.
+    """
+    page.goto(server_url + "/tables/orders")
+    page.wait_for_function("() => window.okfLoomStudio && window.okfLoomStudio.state.eventsReady")
+    launcher = page.locator(".okf-studio-launcher")
+    # The connection chip is part of the Studio home panel's session UI; it
+    # only exists in the DOM while that panel is rendered. Scope to the
+    # panel: concept articles carry unrelated `.okf-conn` connection cards.
+    launcher.click()
+    chip = page.locator("#okf-panel .okf-conn")
+    chip.wait_for(state="attached")
+
+    def chip_state() -> str:
+        return page.evaluate(
+            "() => { const chip = document.querySelector('#okf-panel .okf-conn');"
+            " return chip ? chip.dataset.state : null; }"
+        )
+
+    page.evaluate("window.okfLoomStudio._applyConnectionState('connecting')")
+    assert chip_state() == "connecting"
+    assert launcher.get_attribute("data-attention") == "idle"
+    expect(launcher).to_have_accessible_name(re.compile(r"Connecting"))
+
+    page.evaluate("window.okfLoomStudio._applyConnectionState('reconnecting')")
+    assert chip_state() == "reconnecting"
+    assert launcher.get_attribute("data-attention") == "idle"
+    expect(launcher).to_have_accessible_name(re.compile(r"Reconnecting"))
+
+    page.evaluate("window.okfLoomStudio._applyConnectionState('offline')")
+    assert chip_state() == "offline"
+    assert launcher.get_attribute("data-attention") == "failure"
+
+    page.evaluate("window.okfLoomStudio._applyConnectionState('online')")
+    assert chip_state() == "online"
+    assert launcher.get_attribute("data-attention") == "idle"
+    expect(launcher).to_have_accessible_name(re.compile(r"Studio"))
+
+
+def _genuine_ready_frame(server_url: str) -> tuple[str, str]:
+    """Capture the real server's healthy /__events connect bytes.
+
+    Reads only up to the first frame terminator (the ready control frame);
+    the stream itself never ends, so a naive bulk read would block forever.
+    """
+    with urllib.request.urlopen(server_url + "/__events", timeout=5) as stream:
+        content_type = stream.headers.get("Content-Type", "text/event-stream")
+        chunks = bytearray()
+        while b"\n\n" not in chunks and len(chunks) < 8192:
+            byte = stream.read(1)
+            if not byte:
+                break
+            chunks += byte
+    body = chunks.decode("utf-8", "replace")
+    assert "event: ready" in body, body[:200]
+    # A short native retry keeps the real reconnect deterministic; the retry
+    # directive is the server's own SSE reconnection-time knob.
+    return content_type, body.rstrip("\n") + "\nretry: 100\n\n"
+
+
+def _hold_first_two_events(held: dict):
+    """Hold the initial /__events attempt AND the first genuine retry, so both
+    the "connecting" and the "reconnecting" phases are durable, observable
+    states instead of transient windows. Later attempts pass through."""
+    def hold(route) -> None:
+        if "route" not in held:
+            held["route"] = route
+        elif "retry" not in held:
+            held["retry"] = route
+        else:
+            route.continue_()
+    return hold
+
+
+def _release_held_events(page, held: dict, key: str, content_type: str, ready_body: str) -> None:
+    """Answer a held attempt with the server's genuine ready frame. The key
+    stays in `held` so the hold handler still files the next attempt (the
+    genuine retry) under its own slot instead of reusing this one."""
+    held[key].fulfill(status=200, headers={
+        "Content-Type": content_type, "Cache-Control": "no-store"},
+        body=ready_body)
+    held[key + "_served"] = True
+
+
+def _wait_for_held_retry(page, held: dict, timeout: float = 5.0) -> None:
+    """The native retry fires ~100ms after the error; wait for its route.
+    Playwright dispatches route callbacks while its own calls pump, so the
+    bounded wait uses page.wait_for_timeout rather than time.sleep."""
+    deadline = time.monotonic() + timeout
+    while "retry" not in held:
+        if time.monotonic() > deadline:
+            raise AssertionError("the genuine /__events retry never arrived")
+        page.wait_for_timeout(50)
+
+
+def test_connection_owner_lifecycle_connecting_online_reconnecting_online(
+    page, server_url: str,
+) -> None:
+    """The real live.js producer drives the honest connection lifecycle.
+
+    Regression for the phase-1 review blocker: boot() used to announce
+    "reconnecting" on the FIRST /__events attempt, before any error. The
+    session's first pending attempt must read "connecting" (a held healthy
+    response proves it), flip to online on the genuine open/ready frames,
+    become "reconnecting" only after a real stream error, and recover to
+    online through the real reconnect. The unsupported-EventSource path stays
+    honestly offline. Proof never injects _applyConnectionState; that
+    synthetic projection check remains as a separate supporting test above.
+    """
+    content_type, ready_body = _genuine_ready_frame(server_url)
+    held: dict = {}
+    page.route("**/__events", _hold_first_two_events(held))
+    try:
+        page.goto(server_url + "/tables/orders")
+        # The very first pending attempt must BE "connecting"; the pre-fix
+        # producer flipped to "reconnecting" synchronously during boot, so a
+        # regression fails here within seconds instead of at the assertions.
+        page.wait_for_function("() => window.okfLoomLive && window.okfLoomLive.state === 'connecting'", timeout=5_000)
+        launcher = page.locator(".okf-studio-launcher")
+        assert page.evaluate("window.okfLoomLive._debug.connState") == "connecting"
+        assert launcher.get_attribute("data-attention") == "idle"
+        expect(launcher).to_have_accessible_name(re.compile(r"Studio\s+·\s+Connecting"))
+        assert page.evaluate(
+            "getComputedStyle(document.querySelector('.okf-studio-launcher'), '::after').content"
+        ) == "none"
+        launcher.click()
+        chip = page.locator("#okf-panel .okf-conn")
+        expect(chip).to_have_attribute("data-state", "connecting")
+        expect(chip).to_have_accessible_name("Live updates connection: connecting")
+        # R3: Studio home's status line is the connection only. It never
+        # says "Live" for permission and carries no counts; updateBadges()
+        # keeps it on the owner's state through every transition below.
+        home_status = page.locator("#okf-panel .okf-studio-home__status")
+        expect(home_status).to_have_text("Live updates: connecting\u2026")
+        # Record the owner's own published transitions (public hub) so the
+        # ordered lifecycle is provable without racing transient windows.
+        page.evaluate("""() => {
+          window.__connSeq = [];
+          window.okfLoomLive.on('conn', (d) => window.__connSeq.push(d && d.state));
+        }""")
+
+        # Release the held attempt: the real transport opens and the server's
+        # genuine ready frame drives online through the real handler path;
+        # the stream then ends, the real error fires, and the genuine native
+        # retry stays held below — "reconnecting" is durable while it waits.
+        _release_held_events(page, held, "route", content_type, ready_body)
+        # Ordered owner truth: online comes from the genuine open/ready, and
+        # reconnecting only after the real stream end fired a real error.
+        # (onopen and the ready frame both legitimately publish "online".)
+        page.wait_for_function(
+            "() => { const s = window.__connSeq || [];"
+            " return s.length >= 2 && s[0] === 'online' && s[s.length-1] === 'reconnecting'"
+            " && s.every(x => x === 'online' || x === 'reconnecting'); }",
+            timeout=15_000)
+        _wait_for_held_retry(page, held)
+        assert launcher.get_attribute("data-attention") == "idle"
+        expect(launcher).to_have_accessible_name(re.compile(r"Studio\s+·\s+Reconnecting"))
+        expect(chip).to_have_attribute("data-state", "reconnecting")
+        expect(home_status).to_have_text("Live updates: reconnecting\u2026")
+
+        # Answer the genuine retry with the server's genuine ready frame,
+        # then unroute so any later retry reaches the real server.
+        _release_held_events(page, held, "retry", content_type, ready_body)
+        page.unroute("**/__events")
+        page.wait_for_function(
+            "() => { const s = window.__connSeq || [];"
+            " return window.okfLoomLive.state === 'online' && s.length >= 3"
+            " && s[0] === 'online' && s[s.length-1] === 'online'"
+            " && s.every(x => x === 'online' || x === 'reconnecting'); }",
+            timeout=15_000)
+        assert launcher.get_attribute("data-attention") == "idle"
+        # R3/D4: the launcher names the permission ("Editable"); "Live" is
+        # the connection chip's word for connected.
+        expect(launcher).to_have_accessible_name(re.compile(r"Studio\s+·\s+Editable\s*$"))
+        expect(chip).to_have_attribute("data-state", "online")
+        expect(home_status).to_have_text("Live updates: connected")
+
+        # Unsupported transport stays honestly offline (producer-owned), and
+        # recovery from offline re-enters through connecting — not by
+        # pretending the recovery already succeeded.
+        page.evaluate("""() => {
+          const Real = window.EventSource;
+          window.EventSource = function () { throw new TypeError('unsupported'); };
+          try { window.okfLoomLive._connectForTest(); } finally { window.EventSource = Real; }
+        }""")
+        assert page.evaluate("window.okfLoomLive.state") == "offline"
+        assert launcher.get_attribute("data-attention") == "failure"
+        expect(launcher).to_have_accessible_name(re.compile(r"Studio\s+·\s+Offline"))
+        expect(home_status).to_have_text("Live updates: offline")
+        page.evaluate("() => window.okfLoomLive._connectForTest()")
+        page.wait_for_function("() => window.okfLoomLive.state === 'online'", timeout=15_000)
+        assert launcher.get_attribute("data-attention") == "idle"
+        expect(home_status).to_have_text("Live updates: connected")
+    finally:
+        page.unroute("**/__events")
+
+
+@pytest.fixture(scope="module")
+def readonly_url(tmp_path_factory) -> str:
+    bundle = copy_bundle(DEMO_BUNDLE, tmp_path_factory.mktemp("shell-readonly") / "bundle")
+    with live_server(bundle, "--no-edit") as base:
+        yield base
+
+
+def test_connection_status_for_visitor_without_privileges_stays_honest(
+    page, readonly_url: str,
+) -> None:
+    """Public, unprivileged visitor through the same real lifecycle.
+
+    With no edit or comment authority, every degraded state reads
+    "Read-only · <state>" with the idle (never failure) projection except a
+    genuinely dead connection, and the comments surface confirms no
+    commenting privilege was granted while the connection was still only
+    "connecting".
+    """
+    content_type, ready_body = _genuine_ready_frame(readonly_url)
+    held: dict = {}
+    page.route("**/__events", _hold_first_two_events(held))
+    try:
+        page.goto(readonly_url + "/tables/orders")
+        page.wait_for_function("() => window.okfLoomLive && window.okfLoomLive.state === 'connecting'", timeout=5_000)
+        launcher = page.locator(".okf-studio-launcher")
+        assert launcher.get_attribute("data-attention") == "idle"
+        expect(launcher).to_have_accessible_name(
+            re.compile(r"Studio\s+·\s+Read-only\s+·\s+Connecting"))
+        # No privilege appears while the stream is merely pending: the
+        # comments pane states the disabled capability instead of offering it.
+        launcher.click()
+        page.locator("#okf-panel").get_by_role("button", name="Comments").click()
+        expect(page.get_by_text("Commenting is disabled", exact=False)).to_be_visible()
+
+        _release_held_events(page, held, "route", content_type, ready_body)
+        page.wait_for_function("() => window.okfLoomLive.state === 'reconnecting'", timeout=15_000)
+        _wait_for_held_retry(page, held)
+        assert launcher.get_attribute("data-attention") == "idle"
+        expect(launcher).to_have_accessible_name(
+            re.compile(r"Studio\s+·\s+Read-only\s+·\s+Reconnecting"))
+
+        _release_held_events(page, held, "retry", content_type, ready_body)
+        page.unroute("**/__events")
+        page.wait_for_function("() => window.okfLoomLive.state === 'online'", timeout=15_000)
+        expect(launcher).to_have_accessible_name(re.compile(r"Studio\s+·\s+Read-only\s*$"))
+
+        page.evaluate("""() => {
+          const Real = window.EventSource;
+          window.EventSource = function () { throw new TypeError('unsupported'); };
+          try { window.okfLoomLive._connectForTest(); } finally { window.EventSource = Real; }
+        }""")
+        assert page.evaluate("window.okfLoomLive.state") == "offline"
+        assert launcher.get_attribute("data-attention") == "failure"
+        expect(launcher).to_have_accessible_name(
+            re.compile(r"Studio\s+·\s+Read-only\s+·\s+Offline"))
+    finally:
+        page.unroute("**/__events")
+
+
+@pytest.mark.parametrize("width, max_rows, max_shell_h", [(390, 2, 150), (320, 3, 190)])
+def test_mobile_shell_compacts_rows_with_honest_identity_and_touch_targets(
+    page, server_url: str, width: int, max_rows: int, max_shell_h: int,
+) -> None:
+    """Phase-1 mobile chrome compaction on the real concept route.
+
+    The former four stacked rows (~195px of persistent chrome at 390px)
+    must wrap into the compact two-row arrangement (three rows at 320px,
+    where brand + Appearance exceed the linear budget) while keeping every
+    destination, a usable search field with its labelled submit, the full
+    honest brand name (wrapping, never an ellipsis cut or a shatter into a
+    narrow column), >=40px touch height on controls, and zero overflow.
+    """
+    page.set_viewport_size({"width": width, "height": 844})
+    page.goto(server_url + "/tables/orders")
+    page.wait_for_function("() => window.okfStudioReadiness && window.okfStudioReadiness.ready")
+    metrics = page.evaluate("""() => {
+      const shell = document.querySelector('[data-okf-application-shell], .okf-shell');
+      const items = [...shell.querySelectorAll('[data-okf-shell-item]')].filter(el => el.offsetParent !== null);
+      const boxes = items.map(el => { const r = el.getBoundingClientRect();
+        return {item: el.dataset.okfShellItem, y: r.top, x: r.left, w: r.width, h: r.height}; });
+      // Cluster into visual rows with an 8px tolerance (input vs button
+      // baseline rounding is ~1px).
+      const ys = boxes.map(b => b.y).sort((a, b) => a - b);
+      let rows = ys.length ? 1 : 0;
+      for (let i = 1; i < ys.length; i++) if (ys[i] - ys[i - 1] > 8) rows++;
+      const strong = shell.querySelector('.okf-topbar__brand strong');
+      const brand = strong ? {text: strong.textContent.trim(),
+        clipped: strong.scrollWidth > strong.clientWidth + 1,
+        height: strong.getBoundingClientRect().height} : null;
+      const submit = shell.querySelector('.okf-shell__search-submit');
+      const appearance = shell.querySelector('.okf-appearance-trigger');
+      const smallControls = boxes.filter(b => b.item !== 'bundle' && b.h < 40).map(b => b.item);
+      return {shellH: shell.getBoundingClientRect().height, rows, boxes, brand,
+        submitText: submit ? submit.textContent.trim() : null,
+        appearanceText: appearance ? appearance.textContent.trim() : null,
+        smallControls,
+        overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1};
+    }""")
+    assert metrics["overflow"] is False, metrics
+    assert metrics["shellH"] <= max_shell_h, metrics
+    assert metrics["rows"] <= max_rows, metrics
+    assert metrics["brand"] is not None, metrics
+    # Honest identity: the full authored bundle name is present, never
+    # clipped (no ellipsis cut, no shatter into a narrow column), and stays
+    # within the compact budget (wrap to 2 lines at most at 390px).
+    assert metrics["brand"]["text"] != "" and metrics["brand"]["clipped"] is False, metrics
+    assert metrics["brand"]["height"] <= 60, metrics
+    assert metrics["submitText"] == "Search", metrics
+    assert metrics["appearanceText"] and metrics["appearanceText"].startswith("Appearance"), metrics
+    assert metrics["smallControls"] == [], metrics
+    assert metrics["brand"]["height"] >= 24, metrics  # WCAG 2.5.8 floor for the text link
+    assert set(("search", "index", "graph", "studio", "appearance")).issubset(
+        {b["item"] for b in metrics["boxes"]}), metrics
+
+
+def test_search_filters_disclosure_is_expanding_and_marked(page, server_url: str) -> None:
+    """Phase-1 clarity: the working native filters <details> must read as a
+    disclosure — a visible non-colour affordance (rotating chevron glyph)
+    replacing the marker the flex summary suppresses — and must really
+    expand and collapse its filter grid through the summary.
+
+    U8: with no active filter the summary reads as a plain "Filters"
+    disclosure — the redundant zero count is omitted from the rendered text
+    and the accessible name. A nonzero count stays meaningful ("Filters, N
+    active") and the native disclosure/keyboard behaviour never regresses.
+    """
+    # Zero state: no number is spent on nothing, and the disclosure is closed.
+    page.goto(server_url + "/__search")
+    page.locator(".okf-search-workbench").wait_for(state="visible")
+    disclosure = page.locator("details.okf-search-filters")
+    expect(disclosure).to_have_count(1)
+    summary = disclosure.locator("summary")
+    assert summary.inner_text().strip() == "Filters", summary.inner_text()
+    assert "0 active" not in summary.text_content()
+    # The accessible name must not announce a zero count either (the trailing
+    # whitespace/glyph allowance keeps this a name assertion, not a CSS one).
+    expect(summary).to_have_accessible_name(re.compile(r"^Filters\s*▾?\s*$"))
+
+    grid = disclosure.locator(".okf-search-filter-grid")
+    assert not disclosure.evaluate("el => el.open")
+    expect(grid).to_be_hidden()
+    summary.click()
+    assert disclosure.evaluate("el => el.open")
+    expect(grid).to_be_visible()
+    summary.click()
+    assert not disclosure.evaluate("el => el.open")
+    expect(grid).to_be_hidden()
+
+    def chevron_state() -> dict:
+        return page.evaluate("""() => {
+          const s = document.querySelector('details.okf-search-filters > summary');
+          const st = getComputedStyle(s, '::after');
+          return {content: st.content, rotation: st.transform};
+        }""")
+
+    summary.click()
+    opened = chevron_state()
+    assert opened["content"] not in ("none", "normal"), opened  # glyph is present
+    summary.click()
+    closed = chevron_state()
+    assert closed["content"] == opened["content"] and closed["rotation"] != opened["rotation"], (closed, opened)
+
+    # Nonzero state: the count is meaningful and the disclosure auto-opens.
+    page.goto(server_url + "/__search?type=Service")
+    page.locator(".okf-search-workbench").wait_for(state="visible")
+    summary = page.locator("details.okf-search-filters > summary")
+    assert summary.inner_text().strip() == "Filters, 1 active", summary.inner_text()
+    expect(summary).to_have_accessible_name(re.compile(r"^Filters, 1 active\b"))
+    assert page.locator("details.okf-search-filters").evaluate("el => el.open") is True
+
+    # Clearing returns to the honest zero state.
+    page.locator(".okf-search-filter-actions").get_by_role("link", name="Clear").click()
+    page.locator(".okf-search-workbench").wait_for(state="visible")
+    summary = page.locator("details.okf-search-filters > summary")
+    assert summary.inner_text().strip() == "Filters", summary.inner_text()
+    assert "0 active" not in summary.text_content()
+    assert not page.locator("details.okf-search-filters").evaluate("el => el.open")
+
+
+def test_escape_ownership_differs_between_modal_and_nonmodal_editables(page, server_url: str) -> None:
+    page.set_viewport_size({"width": 600, "height": 800})
+    page.goto(server_url + "/tables/orders")
+    page.wait_for_function("() => window.okfLoomStudio && window.okfLoomStudio.state.commentsReady")
+    page.locator(".okf-studio-launcher").click()
+    page.locator("#okf-panel").get_by_role("button", name="Comments").click()
+    composer = page.locator("#okf-panel").get_by_role("textbox", name="Comment for agent")
+    composer.focus()
+    page.keyboard.press("Escape")
+    assert page.locator("#okf-panel").is_hidden()
+    expect(page.locator(".okf-studio-launcher")).to_be_focused()
+
+    page.set_viewport_size({"width": 1440, "height": 900})
+    page.locator(".okf-studio-launcher").click()
+    composer = page.locator("#okf-panel").get_by_role("textbox", name="Comment for agent")
+    if not composer.is_visible():
+        page.locator("#okf-panel").get_by_role("button", name="Comments").click()
+    composer.focus()
+    page.keyboard.press("Escape")
+    assert page.locator("#okf-panel").is_visible()
+
+
+@pytest.mark.parametrize("width", [390, 600, 640, 641])
+def test_graph_shell_boundary_geometry_and_rendered_pixels(page, server_url: str, tmp_path: Path, width: int) -> None:
+    page.set_viewport_size({"width": width, "height": 844})
+    page.goto(server_url + "/__graph")
+    page.wait_for_function("() => window.__okfLoomGraph && window.__okfLoomGraph.layoutStats.lastAppliedSeq >= 1")
+    metrics = page.evaluate("""() => {
+      const rect = el => el && el.getBoundingClientRect().toJSON();
+      const visible = el => !!el && el.offsetParent !== null;
+      const shell = document.querySelector('[data-okf-application-shell]');
+      const brand = shell.querySelector('.okf-shell__brand');
+      const nav = shell.querySelector('.okf-shell__nav');
+      const workspace = document.querySelector('.okf-layout');
+      const pane = document.querySelector('.okf-graph-mobile-nav');
+      const more = document.querySelector('.okf-mobile-secondary__toggle');
+      const clipped = [...shell.querySelectorAll('a,button,input')].filter(visible).filter(el => {
+        const r=el.getBoundingClientRect(); return r.left < -.5 || r.right > innerWidth + .5;
+      }).map(el => el.getAttribute('aria-label') || el.textContent.trim());
+      return {shell:rect(shell),brand:rect(brand),nav:rect(nav),workspace:rect(workspace),pane:rect(pane),more:rect(more),
+        clipped,overflow:document.documentElement.scrollWidth > innerWidth + 1,
+        narrow:document.body.hasAttribute('data-okf-narrow-reflow'),
+        destinations:[...nav.querySelectorAll('[data-okf-shell-item]')].filter(visible).map(el=>el.dataset.okfShellItem)};
+    }""")
+    assert not metrics["overflow"] and metrics["clipped"] == [], metrics
+    assert metrics["brand"]["width"] >= 120 and metrics["brand"]["height"] >= 32, metrics
+    assert metrics["workspace"]["width"] <= width + 1 and metrics["workspace"]["height"] >= 300, metrics
+    assert set(("search", "index", "graph", "studio", "appearance")).issubset(metrics["destinations"]), metrics
+    assert metrics["narrow"] is (width <= 640)
+    if width <= 640:
+        assert metrics["pane"], metrics
+        assert metrics["pane"]["top"] >= metrics["nav"]["bottom"] - 1, metrics
+        expect(page.get_by_role('searchbox', name='Search graph concepts')).to_be_visible()
+    shot = tmp_path / f"graph-shell-{width}.png"
+    page.screenshot(path=str(shot), full_page=False)
+    assert shot.stat().st_size > 10_000
+
+
+def test_mobile_graph_keeps_global_studio_ahead_of_graph_owned_rows(page, server_url: str) -> None:
+    """U1: at phone width the global Studio control sits in the shared compact
+    nav ahead of the graph route's own pane tabs — visually and in keyboard
+    (DOM) order — with exactly one launcher in the same local-edit state.
+
+    Every assertion is a real bounding box or live Cytoscape camera value on
+    the graph route: pane tabs keep their 44px touch height, the canvas keeps
+    real geometry, and a pane round-trip preserves the user camera (graph.js
+    stays the single resize/pane owner — no second geometry writer exists)."""
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(server_url + "/__graph")
+    page.wait_for_function("() => window.__okfLoomGraph && window.__okfLoomGraph.layoutStats.lastAppliedSeq >= 1")
+    metrics = page.evaluate("""() => {
+      const visible = el => !!el && el.getClientRects().length > 0;
+      const rect = el => { const r = el.getBoundingClientRect();
+        return {top: r.top, bottom: r.bottom, left: r.left, right: r.right, width: r.width, height: r.height}; };
+      const launchers = [...document.querySelectorAll('.okf-studio-launcher')];
+      const launcher = launchers.find(visible) || null;
+      const paneNav = document.querySelector('.okf-graph-mobile-nav');
+      const tabs = [...document.querySelectorAll('[data-graph-pane]')].filter(visible);
+      const shell = document.querySelector('[data-okf-application-shell]');
+      const workspace = document.querySelector('.okf-layout');
+      // Keyboard order is DOM order: DOCUMENT_POSITION_PRECEDING is read as
+      // "the launcher precedes the pane nav".
+      const launcherPrecedesPane = launcher && paneNav
+        ? !!(paneNav.compareDocumentPosition(launcher) & Node.DOCUMENT_POSITION_PRECEDING)
+        : null;
+      return {
+        launcherCount: launchers.length,
+        launcherVisible: !!launcher,
+        launcherPrecedesPane,
+        launcherBottom: launcher ? rect(launcher).bottom : null,
+        paneTop: paneNav ? rect(paneNav).top : null,
+        tabHeights: tabs.map(tab => rect(tab).height),
+        shellBottom: shell ? rect(shell).bottom : null,
+        workspaceTop: workspace ? rect(workspace).top : null,
+        overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
+      };
+    }""")
+    assert metrics["launcherCount"] == 1, metrics
+    assert metrics["launcherVisible"], metrics
+    assert metrics["launcherPrecedesPane"] is True, metrics
+    assert metrics["launcherBottom"] <= metrics["paneTop"] + 1, metrics
+    assert metrics["tabHeights"] and min(metrics["tabHeights"]) >= 44, metrics
+    assert not metrics["overflow"], metrics
+    assert metrics["workspaceTop"] >= metrics["shellBottom"] - 1, metrics
+
+    # Real canvas geometry on the graph pane (the compact route boots into
+    # the concepts pane, where the canvas is intentionally not rendered).
+    page.evaluate("""() => { document.querySelector('[data-graph-pane="graph"]').click(); }""")
+    expect(page.locator(".okf-layout")).to_have_attribute("data-mobile-pane", "graph")
+    canvas_ok = page.evaluate("""() => { const c = document.querySelector('#okf-graph canvas');
+      const r = c && c.getBoundingClientRect();
+      return !!r && r.width > 100 && r.height > 100; }""")
+    assert canvas_ok
+    camera = page.evaluate("""() => { const g = window.__okfLoomGraph;
+      return {pan: g.cy.pan(), zoom: g.cy.zoom()}; }""")
+
+    # A pane round-trip (graph → concepts → graph) must preserve the user
+    # camera: graph.js owns refit on pane change, and no chrome edit here
+    # introduces a second geometry owner.
+    page.evaluate("""() => { document.querySelector('[data-graph-pane="concepts"]').click(); }""")
+    expect(page.locator(".okf-layout")).to_have_attribute("data-mobile-pane", "concepts")
+    page.evaluate("""() => { document.querySelector('[data-graph-pane="graph"]').click(); }""")
+    expect(page.locator(".okf-layout")).to_have_attribute("data-mobile-pane", "graph")
+    page.wait_for_function(
+        "() => { const g = window.__okfLoomGraph; if (!g || !g.cy) return false;"
+        " const p = g.cy.pan(), z = g.cy.zoom();"
+        " return Math.abs(p.x - %f) < 0.5 && Math.abs(p.y - %f) < 0.5 && Math.abs(z - %f) < 1e-6; }"
+        % (camera["pan"]["x"], camera["pan"]["y"], camera["zoom"]),
+    )
+    assert page.locator(".okf-studio-launcher").count() == 1
+
+
+@pytest.mark.parametrize("width", [900, 901, 1280, 1440])
+def test_graph_heading_is_a_compact_row_above_a_usable_workspace(page, server_url: str, width: int) -> None:
+    page.set_viewport_size({"width": width, "height": 900})
+    page.goto(server_url + "/__graph")
+    page.wait_for_function("() => window.__okfLoomGraph && window.__okfLoomGraph.layoutStats.lastAppliedSeq >= 1")
+    metrics = page.evaluate("""() => {
+      const rect=selector=>document.querySelector(selector).getBoundingClientRect().toJSON();
+      return {heading:rect('.okf-graph-route-title'),workspace:rect('.okf-layout'),canvas:rect('#okf-graph')};
+    }""")
+    assert metrics["heading"]["height"] <= 56, metrics
+    assert metrics["heading"]["bottom"] <= metrics["workspace"]["top"] + 1, metrics
+    assert metrics["workspace"]["width"] >= width - 1, metrics
+    assert metrics["canvas"]["width"] >= (width - 1 if width <= 900 else width * 0.5), metrics
+
+
+@pytest.mark.parametrize("width", [641, 768, 900])
+def test_tablet_shell_nav_controls_meet_the_44px_usability_floor(
+    page, server_url: str, width: int,
+) -> None:
+    """U2: in the 641–900px band every global nav control reaches a 44px
+    touch floor (measured bounding boxes, not a CSS source assertion).
+
+    This is a usability recommendation, not a WCAG 2.5.8 finding — the
+    former ~30px links passed the 24px AA minimum. The floor must not turn
+    into a giant shell or an overflow: the shell stays two compact rows and
+    every control stays inside the viewport."""
+    page.set_viewport_size({"width": width, "height": 900})
+    page.goto(server_url + "/__graph")
+    page.wait_for_function("() => window.__okfLoomGraph && window.__okfLoomGraph.layoutStats.lastAppliedSeq >= 1")
+    metrics = page.evaluate("""() => {
+      const shell = document.querySelector('[data-okf-application-shell]');
+      const nav = shell.querySelector('.okf-shell__nav');
+      const controls = [...nav.querySelectorAll('a, button, input')]
+        .filter(el => el.getClientRects().length > 0)
+        .map(el => { const r = el.getBoundingClientRect();
+          return {name: el.getAttribute('aria-label') || el.textContent.trim() || el.tagName,
+            height: r.height, left: r.left, right: r.right}; });
+      return {controls,
+        shellHeight: shell.getBoundingClientRect().height,
+        overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
+        clipped: controls.filter(c => c.left < -0.5 || c.right > window.innerWidth + 0.5).map(c => c.name)};
+    }""")
+    assert metrics["controls"], metrics
+    short = [c for c in metrics["controls"] if c["height"] < 44]
+    assert not short, {"short": short, "metrics": metrics}
+    assert not metrics["overflow"] and metrics["clipped"] == [], metrics
+    # Usability floor, not a giant shell: brand row + one nav row stay bounded.
+    assert metrics["shellHeight"] <= 170, metrics
+
+
+def test_tablet_floor_stops_at_the_900px_edge(page, server_url: str) -> None:
+    """U2 edge sanity: 901px is ordinary desktop — the shell keeps its compact
+    single-row fit and gains no forced inflation from the tablet floor."""
+    page.set_viewport_size({"width": 901, "height": 900})
+    page.goto(server_url + "/__graph")
+    page.wait_for_function("() => window.__okfLoomGraph && window.__okfLoomGraph.layoutStats.lastAppliedSeq >= 1")
+    metrics = page.evaluate("""() => {
+      const shell = document.querySelector('[data-okf-application-shell]');
+      return {shellHeight: shell.getBoundingClientRect().height,
+        overflow: document.documentElement.scrollWidth > window.innerWidth + 1};
+    }""")
+    assert not metrics["overflow"] and metrics["shellHeight"] <= 110, metrics
+
+
+@pytest.mark.parametrize("width,rail", [(900, False), (901, False), (1024, False), (1100, False), (1280, True), (1440, True)])
+def test_studio_rail_requires_usable_document_width(page, server_url: str, width: int, rail: bool) -> None:
+    page.set_viewport_size({"width": width, "height": 900})
+    page.goto(server_url + "/tables/orders")
+    page.wait_for_function("() => window.okfLoomStudio && window.okfLoomStudio.state.commentsReady")
+    page.locator('.okf-studio-launcher').click()
+    metrics = page.evaluate("""() => { const article=document.querySelector('.okf-page'); const panel=document.querySelector('#okf-panel');
+      const ar=article.getBoundingClientRect(), pr=panel.getBoundingClientRect(); return {rail:document.body.classList.contains('okf-panel-rail'),
+      role:panel.getAttribute('role'),modal:panel.getAttribute('aria-modal'),articleWidth:ar.width,articleLeft:ar.left,articleRight:ar.right,
+      panelLeft:pr.left,overflow:document.documentElement.scrollWidth>innerWidth+1}; }""")
+    assert metrics["rail"] is rail and not metrics["overflow"], metrics
+    if rail:
+        assert metrics["role"] == "complementary" and metrics["modal"] is None
+        assert metrics["articleWidth"] >= 620 and metrics["articleRight"] <= metrics["panelLeft"] + 1, metrics
+    else:
+        assert metrics["role"] == "dialog" and metrics["modal"] == "true"
+        assert metrics["articleWidth"] >= min(width - 32, 620), metrics
+
+
+def test_shell_search_submit_focus_provenance_enter_go_back_reload_and_storage_denial(page, server_url: str) -> None:
+    page.goto(server_url + "/")
+    search = page.locator('.okf-shell__search-form input')
+    search.fill('orders')
+    search.press('Enter')
+    page.wait_for_url(lambda url: '/__search' in url)
+    assert page.evaluate("document.activeElement === document.querySelector('[data-okf-route-heading]')")
+    page.reload()
+    assert not page.evaluate("document.activeElement === document.querySelector('[data-okf-route-heading]')")
+    page.go_back()
+    assert not page.evaluate("document.activeElement === document.querySelector('[data-okf-route-heading]')")
+
+    page.add_init_script("Object.defineProperty(window,'sessionStorage',{get(){throw new DOMException('denied')}})")
+    page.goto(server_url + "/")
+    page.locator('.okf-shell__search-form input').fill('users')
+    page.locator('.okf-shell__search-submit').click()
+    page.wait_for_url(lambda url: '/__search' in url)
+    assert page.evaluate("document.activeElement === document.querySelector('[data-okf-route-heading]')")
+    assert page.evaluate("document.activeElement !== document.body")
+
+
+def test_shell_search_enter_and_submit_button_reach_actual_results(
+    page, server_url: str,
+) -> None:
+    page.goto(server_url + "/")
+    search = page.locator('.okf-shell__search-form input')
+    search.fill("orders")
+    search.press("Enter")
+    page.wait_for_url(lambda url: "/__search" in url and "q=orders" in url)
+    assert page.locator(".okf-search-result").count() >= 1
+    assert page.locator('.okf-shell__search-form input').get_attribute("value") == "orders"
+
+    page.goto(server_url + "/")
+    page.locator('.okf-shell__search-form input').fill("refund")
+    page.locator('.okf-shell__search-submit').click()
+    page.wait_for_url(lambda url: "/__search" in url and "q=refund" in url)
+    assert page.locator(".okf-search-result").count() >= 1
+
+    # A hostile query stays escaped: the value attribute round-trips the raw
+    # text and no script element is injected into the document.
+    hostile = '"><script>alert(1)</script>'
+    page.goto(server_url + "/")
+    page.locator('.okf-shell__search-form input').fill(hostile)
+    page.locator('.okf-shell__search-form input').press("Enter")
+    page.wait_for_url(lambda url: "/__search" in url)
+    echoed = page.locator('.okf-shell__search-form input').get_attribute("value")
+    assert echoed == hostile, echoed
+    assert "<script>alert" not in page.content()
+
+
+def test_search_five_default_results_fit_reproducible_geometry(page, server_url: str) -> None:
+    page.set_viewport_size({"width": 1440, "height": 900})
+    page.goto(server_url + "/__search?q=orders&limit=5")
+    results = page.locator(".okf-search-result")
+    expect(results).to_have_count(5)
+    geometry = page.evaluate("""() => { const rows=[...document.querySelectorAll('.okf-search-result')];
+      return {bottom:rows.at(-1).getBoundingClientRect().bottom+scrollY,
+        overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth+1,
+        complete:rows.every(row=>row.querySelector('.okf-search-snippet')&&row.querySelector('.okf-search-evidence-summary')&&
+          row.querySelector('.okf-search-open')&&row.querySelector('[data-search-action="copy-passage"]')&&
+          row.querySelector('.okf-search-disclosure'))}; }""")
+    # Four readable snippet lines deliberately replace the former two-line
+    # density target. Bound each result, not the old aggregate pixel count.
+    for row in results.all():
+        assert row.bounding_box()['height'] <= 420
+        assert not row.locator('.okf-search-disclosure').evaluate('el => el.open')
+    assert geometry["overflow"] is False and geometry["complete"] is True, geometry
+
+
+def test_authoritative_resync_preserves_only_post_snapshot_live_events_and_deduplicates(page, server_url: str) -> None:
+    page.goto(server_url + "/tables/orders")
+    page.wait_for_function("() => window.okfLoomStudio && window.okfLoomStudio.state.eventsReady")
+    result = page.evaluate("""async () => {
+      const S=window.okfLoomStudio, original=window.fetch.bind(window);
+      const comments=await (await original('/__comments')).json();
+      const envelope=await (await original('/__data/events?limit=500')).json();
+      window.okfLoomLive.emit('activity',{event_id:'stale-snapshot-event',id:'same-domain',type:'activity',action:'update'});
+      let release; const gate=new Promise(resolve=>release=resolve);
+      window.fetch=(url,opts)=>{
+        if(String(url).startsWith('/__comments')) return gate.then(()=>new Response(JSON.stringify(comments),{status:200,headers:{'Content-Type':'application/json'}}));
+        if(String(url).startsWith('/__data/events')) return gate.then(()=>new Response(JSON.stringify(envelope),{status:200,headers:{'Content-Type':'application/json'}}));
+        return original(url,opts);
+      };
+      const pending=S._loadComments(0,{authoritative:true});
+      window.okfLoomLive.emit('activity',{event_id:'live-survivor',id:'same-domain',type:'activity',action:'update'});
+      window.okfLoomLive.emit('activity',{event_id:'live-without-domain-id',type:'activity',action:'update'});
+      release(); await pending;
+      const once=S.state.events.filter(e=>['stale-snapshot-event','live-survivor','live-without-domain-id'].includes(e.event_id)).map(e=>e.event_id);
+      const canonical=JSON.parse(JSON.stringify(envelope));
+      canonical.events=(canonical.events||[]).concat([
+        {event_id:'live-survivor',id:'same-domain',type:'activity',action:'update'},
+        {event_id:'live-without-domain-id',type:'activity',action:'update'},
+        {event_id:'live-survivor',id:'same-domain',type:'activity',action:'duplicate'}
+      ]);
+      window.fetch=(url,opts)=>{
+        if(String(url).startsWith('/__comments')) return Promise.resolve(new Response(JSON.stringify(comments),{status:200,headers:{'Content-Type':'application/json'}}));
+        if(String(url).startsWith('/__data/events')) return Promise.resolve(new Response(JSON.stringify(canonical),{status:200,headers:{'Content-Type':'application/json'}}));
+        return original(url,opts);
+      };
+      await S._loadComments(0,{authoritative:true});
+      window.fetch=original;
+      const twice=S.state.events.filter(e=>['stale-snapshot-event','live-survivor','live-without-domain-id'].includes(e.event_id)).map(e=>e.event_id);
+      return {once,twice,unread:[...S.state.attention.unread]};
+    }""")
+    assert result["once"].count("stale-snapshot-event") == 0, result
+    assert result["once"].count("live-survivor") == 1 and result["once"].count("live-without-domain-id") == 1, result
+    assert len(result["twice"]) == len(set(result["twice"])), result
+    assert "stale-snapshot-event" not in result["unread"], result
+
+
+def test_graph_tour_is_opt_in_and_restores_invitation_focus(page, server_url: str) -> None:
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.add_init_script("try{localStorage.clear()}catch(e){}")
+    page.goto(server_url + "/__graph")
+    page.wait_for_function("() => window.__okfLoomGraph && window.__okfLoomGraph.layoutStats.lastAppliedSeq >= 1")
+    assert page.get_by_role('dialog', name='Graph tour').count() == 0
+    invitation = page.get_by_role('button', name='Take a 45-second graph tour', include_hidden=True)
+    reveal_control(page, invitation)
+    expect(invitation).to_be_visible()
+    invitation.click()
+    expect(page.get_by_role('dialog', name='Graph tour')).to_be_visible()
+    page.keyboard.press('Escape')
+    expect(invitation).to_be_focused()
+    assert page.locator('.okf-graph-tour-scrim').count() == 0
+
+
+@pytest.mark.parametrize("kind", ["input", "select", "textarea", "contenteditable", "textbox"])
+@pytest.mark.parametrize("width,closes", [(600, True), (1440, False)])
+def test_studio_direct_escape_matrix_for_modal_and_nonmodal_editables(page, server_url: str, width: int, closes: bool, kind: str) -> None:
+    page.set_viewport_size({"width": width, "height": 850})
+    page.goto(server_url + "/tables/orders")
+    page.wait_for_function("() => window.okfLoomStudio && window.okfLoomStudio.state.commentsReady")
+    page.locator('.okf-studio-launcher').click()
+    page.evaluate("""kind => { const host=document.querySelector('#okf-panel-body'); let el;
+      if(kind==='contenteditable'){el=document.createElement('div');el.contentEditable='true';}
+      else if(kind==='textbox'){el=document.createElement('div');el.setAttribute('role','textbox');el.tabIndex=0;}
+      else {el=document.createElement(kind); if(kind==='select')el.appendChild(new Option('One','1'));}
+      el.id='escape-matrix-target';el.setAttribute('aria-label','Escape matrix target');host.appendChild(el);el.focus(); }""", kind)
+    page.keyboard.press('Escape')
+    assert page.locator('#okf-panel').is_hidden() is closes
+    if closes:
+        expect(page.locator('.okf-studio-launcher')).to_be_focused()
+    else:
+        assert page.evaluate("document.activeElement && document.activeElement.id === 'escape-matrix-target'")

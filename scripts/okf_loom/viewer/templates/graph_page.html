@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<!--
+  OKF full-page graph view template.
+
+  Placeholders (str.replace):
+      __LANG__             → document language
+      __THEME_ATTR__       → ` data-theme="<family>-<mode>"` (technical/swiss × light/dark)
+      __DATA_ATTRS__       → ` data-okf-mode="..." data-okf-enhance="..."` (P1-3)
+                             graph.js reads data-okf-mode to decide whether
+                             Open-page hrefs need a .html suffix.
+      __HEAD_TITLE__       → <title> text
+      __BUNDLE_NAME__      → display name
+      __STATIC_PREFIX__    → URL prefix for /__static/ assets
+       __WIKI_CSS_LINK__    → <link rel="stylesheet" href="...wiki.css">
+       __THEME_CONFIG__     → CSP-safe configured theme/modifier preference JSON
+      __GRAPH_CSS_LINK__   → <link rel="stylesheet" href="...graph.css">
+      __GRAPH_JS_SRC__     → <script src="...graph.js" defer></script>
+      __CDN_SCRIPTS__      → Cytoscape.js CDN tag (or empty if config.cdn=false)
+      __INITIAL_THEME__    → one of the eight concrete Technical/Swiss/Purple/Coffee light/dark themes
+      __INITIAL_LAYOUT__   → "cose" | "concentric" | ...
+      __GRAPH_DATA_URL__   → URL to fetch graph.json from (or empty to inline)
+      __BACK_LINK__        → URL back to the index
+-->
+<html lang="__LANG__"__THEME_ATTR__>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230c7373'/%3E%3Cpath d='M8 10h16M8 16h10M8 22h16' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self'; form-action 'self'">
+<title>__HEAD_TITLE__</title>
+__WIKI_CSS_LINK__
+__SHELL_CSS_LINK__
+__GRAPH_CSS_LINK__
+__CDN_SCRIPTS__
+__THEME_CONFIG__
+__THEME_HEAD_JS__
+</head>
+<body class="okf-viewer okf-viewer--graph" __DATA_ATTRS__>
+<a href="#okf-main" class="okf-skip-link">Skip to content</a>
+__APPLICATION_SHELL__
+
+<!-- Keep this notice in ordinary markup: a no-JS browser may lay out
+     <noscript> children without exposing them to its accessibility tree. -->
+<p class="okf-studio-fallback-banner okf-nojs-fallback okf-nojs-live-banner" role="note">JavaScript is off. The static relationship map and authored graph links remain available below.</p>
+<p class="okf-studio-fallback-banner okf-nojs-fallback okf-nojs-spa-banner" role="note">JavaScript is off. This SPA build keeps the static relationship map and authored graph links available below.</p>
+<p class="okf-studio-fallback-banner okf-nojs-fallback okf-nojs-static-banner" role="note">JavaScript is off. This static build keeps the static relationship map and authored graph links available below.</p>
+<p class="okf-studio-fallback-banner okf-js-only okf-live-studio-fallback" role="status">Live Studio is unavailable. Graph exploration and context tools remain interactive.</p>
+<p class="okf-studio-fallback-banner okf-static-viewer-note" role="status">Static viewer: live Studio editing and annotations are not included. Graph exploration and context tools remain available.</p>
+
+<main id="okf-main" class="okf-graph-main">
+  __NOJS_GRAPH_BODY__
+  <nav class="okf-graph-skip-links" aria-label="Graph shortcuts">
+    <a class="okf-skip-link" href="#okf-concept-index">Skip graph visualization</a>
+    <a class="okf-skip-link" href="#okf-detail">Jump to graph results and details</a>
+  </nav>
+  <section class="okf-graph-tools" role="search" aria-labelledby="okf-find-graph-title">
+    <h2 id="okf-find-graph-title">Find in graph</h2>
+    <label class="okf-graph-tools__search">
+      <span>Concept title, id, or tag</span>
+      <input id="okf-search" type="search" placeholder="Title, id, or tag" autocomplete="off" aria-label="Search graph concepts">
+    </label>
+    <label class="okf-graph-tools__filter">
+      <span>Type</span>
+      <select id="okf-filter-type" aria-label="Filter graph by type">
+        <option value="">All types</option>
+      </select>
+    </label>
+    <button id="okf-reset" class="okf-btn okf-graph-tools__reset" type="button">Reset view</button>
+  </section>
+  <!-- The route target stays visible so shell navigation never places focus
+       on hidden content. The detail panel's selected-node title is an h2. -->
+  <h1 class="okf-graph-route-title">__BUNDLE_NAME__ graph view</h1>
+  <div class="okf-layout">
+  <nav class="okf-graph-mobile-nav" aria-label="Graph panes">
+    <button type="button" data-graph-pane="graph" aria-controls="okf-graph" aria-pressed="true">Graph</button>
+    <button type="button" data-graph-pane="concepts" aria-controls="okf-concept-index" aria-pressed="false">Concepts</button>
+    <button type="button" data-graph-pane="details" aria-controls="okf-detail" aria-pressed="false">Details</button>
+  </nav>
+
+  <section id="okf-graph" class="okf-graph" aria-label="Concept graph"
+           data-graph-url="__GRAPH_DATA_URL__"
+           data-concept-prefix="__STATIC_PREFIX__/../"
+           data-initial-layout="__INITIAL_LAYOUT__"
+           data-initial-theme="__INITIAL_THEME__">
+    <!-- P1-4 / P2-2 (iter-1): keyboard-accessible node index. Each entry is
+          one listbox populated by graph.js (sorted by label). Arrow/Home/End
+          move the active descendant; Space selects and Enter opens. Collapsible
+          via <details>.
+         P2-4 (iter-2): defaults to COLLAPSED on all screen sizes (the `open`
+         attribute was removed). On mobile this prevents the overlay from
+         crowding the 50vh canvas; the <summary> is still keyboard-reachable
+         so users expand it with one click or Enter/Space. -->
+    <details class="okf-node-index" id="okf-concept-index">
+      <summary aria-controls="okf-node-index-list">All concepts <span class="okf-node-index__count" id="okf-node-index-count"></span></summary>
+      <p class="okf-node-index__hint okf-muted">Use arrows to move, Space to select, Shift+Space for a path, and Enter to open.</p>
+      <div class="okf-node-index__list" id="okf-node-index-list"></div>
+    </details>
+  </section>
+
+  <!-- No aria-live here: graph.js mounts its own role="status" region
+       (.okf-signal__status) inside this pane, and a live region nested inside
+       another double-announces. The inner status region is the single owner. -->
+  <aside id="okf-detail" class="okf-detail" aria-label="Details">
+    <div class="okf-cytoscape-fallback-actions" role="note">
+      <a class="okf-btn" href="__SEARCH_LINK__">Open Search &amp; Context</a>
+      <a class="okf-btn" href="__BACK_LINK__">Browse the concept index</a>
+    </div>
+    <div id="detail-empty" class="okf-muted okf-detail__empty">Select a node to see its details.</div>
+    <article id="detail-content" aria-labelledby="detail-title" hidden>
+      <header class="okf-detail__header" id="okf-detail-actions-slot">
+        <span class="okf-type-chip" id="detail-type"></span>
+        <h2 id="detail-title"></h2>
+          <span class="okf-detail-selected-status okf-visually-hidden"></span>
+        <div class="okf-muted" id="detail-id"></div>
+        <p class="okf-detail__description" id="detail-description"></p>
+        <p class="okf-detail__open"><a id="detail-open-link" href="#">Open page →</a></p>
+        <div class="okf-graph-context-actions" id="okf-graph-context-actions" hidden>
+          <p class="okf-context-scope-note">Source: selected graph concept · Scope: one concept with bounded neighborhood evidence · Estimated size: calculated before copy.</p>
+          <button type="button" class="okf-btn" id="okf-copy-neighbourhood">Copy concept context</button>
+        </div>
+      </header>
+      <details class="okf-graph-document-details"><summary>Document details</summary>
+      <dl class="okf-frontmatter">
+        <dt>Resource</dt><dd id="detail-resource"></dd>
+        <dt>Tags</dt><dd id="detail-tags"></dd>
+      </dl>
+      <!-- P1-3 (iter-1): §7 governed keys rendered client-side by graph.js
+           showDetail(), mirroring the concept page's _render_governed_keys
+           treatment (aliases pills, entities <dl>, provenance list,
+           citations <ol>, relations chips). Hidden when all sections empty. -->
+      <div class="okf-detail__governed" id="detail-governed" hidden></div>
+      </details>
+      <section class="okf-detail__connection-summary" id="detail-connection-summary" aria-labelledby="detail-connection-summary-title">
+        <h3 id="detail-connection-summary-title">Connections at a glance</h3>
+        <p id="detail-connection-summary-text"></p>
+      </section>
+      <div id="detail-body" class="okf-prose"></div>
+      <div id="detail-relationships-slot"></div>
+      <section id="okf-detail-signals" class="okf-detail__signals" aria-labelledby="okf-detail-signals-title">
+        <h3 id="okf-detail-signals-title" class="okf-detail__signals-head">Why this connects</h3>
+        <dl class="okf-detail__signals-list"></dl>
+      </section>
+    </article>
+    <p id="okf-graph-announcer" class="okf-signal__status" role="status" aria-live="polite" aria-atomic="true"></p>
+    <div id="okf-lens-controls-slot"></div>
+  </aside>
+  </div>
+</main>
+
+<div id="okf-graph-copy-fallback" class="okf-copy-fallback okf-graph-copy-fallback" hidden><label for="okf-graph-copy-text">Copy neighbourhood manually</label><textarea id="okf-graph-copy-text" readonly rows="8"></textarea><button type="button" class="okf-btn" id="okf-graph-copy-select">Select all</button></div>
+<p id="okf-graph-copy-status" class="okf-visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
+
+<!-- graph.js reads config from data-* attributes on #okf-graph (CSP-safe:
+     no inline scripting). The previous comment-only inline script element
+     here triggered a CSP violation even though it had no executable code,
+     so it was removed (iter-1). -->
+__GRAPH_JS_SRC__
+<!-- The document-outline owner rides along so the selected concept detail
+     document gets the same heading traversal lifecycle as concept pages:
+     the owner presents its outline beside whichever detail document is
+     currently visible (graph.js dispatches okf-loom:bodyPatched after each
+     selection body patch). -->
+<script src="__STATIC_PREFIX__/document-outline.js" defer></script>
+</body>
+</html>

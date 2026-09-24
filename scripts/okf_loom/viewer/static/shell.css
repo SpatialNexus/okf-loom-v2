@@ -1,0 +1,234 @@
+/* Shared application shell. Loaded after wiki.css so every route keeps one
+ * navigation hierarchy even where older route-specific chrome rules exist. */
+.okf-shell {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1fr) auto;
+  align-items: center;
+  gap: var(--okf-space-4);
+  height: auto;
+  min-height: var(--okf-topbar-h);
+}
+.okf-topbar.okf-shell {
+  box-sizing: border-box;
+  height: auto;
+  min-height: var(--okf-topbar-h);
+  flex-shrink: 0;
+}
+.okf-shell__nav {
+  position: static;
+  inset: auto;
+  transform: none;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--okf-space-1);
+  overflow: visible;
+}
+.okf-shell [data-okf-shell-item] > [aria-current="page"] {
+  background: var(--okf-accent-bg);
+  color: var(--okf-accent);
+  box-shadow: inset 0 -2px 0 var(--okf-accent);
+  font-weight: 700;
+}
+/* The search route's current-destination marker lives on the search form
+ * itself (the form replaced the former Search shortcut link), so translate
+ * the shared active affordance into an underline around the whole control
+ * instead of tinting the field's background. */
+.okf-shell__nav > form[data-okf-shell-item="search"][aria-current="page"] {
+  background: transparent;
+  color: inherit;
+  box-shadow: inset 0 -2px 0 var(--okf-accent);
+  padding-bottom: 2px;
+  font-weight: 400;
+}
+.okf-shell__search-form { display: flex; min-width: 0; }
+.okf-shell__search-form input { min-width: 7rem; width: clamp(7rem, 15vw, 13rem); }
+html:not([data-okf-js="1"]) #okf-theme { display: none !important; }
+.okf-shell__studio-slot:not([hidden]),
+.okf-shell__appearance { display: inline-flex; align-items: center; }
+.okf-shell__studio-slot[hidden] { display: none; }
+.okf-shell :is(a, button):focus-visible,
+[data-okf-route-heading]:focus-visible {
+  outline: 2px solid var(--okf-focus-ring, var(--okf-accent));
+  outline-offset: 2px;
+}
+.okf-graph-route-title {
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  width: 100%;
+  margin: 0;
+  padding: var(--okf-space-2) var(--okf-space-4);
+  font-size: var(--okf-text-xl);
+  line-height: 1.2;
+  border-bottom: 1px solid var(--okf-border);
+}
+@media (max-width: 640px) {
+  .okf-graph-route-title {
+    padding: 2px var(--okf-space-2);
+    font-size: var(--okf-text-base);
+    line-height: 1.2;
+  }
+  /* ---- Compact two-row chrome ---------------------------------------
+   * The former four stacked rows (brand / search / Index+Graph+Appearance /
+   * Studio) cost ~195px of persistent viewport at 390px. The flat DOM
+   * sequence (bundle, search, index, graph, studio, appearance — the public
+   * shell order, unchanged) wraps into two rows instead:
+   *   row 1 = brand · Appearance
+   *   row 2 = search (input + labelled submit) · Index · Graph · Studio
+   * display:contents lets the nav's items join the shell's wrap layout
+   * while the nav landmark and keyboard order stay exactly as authored.
+   * Every route shares this arrangement, including the graph route: its
+   * graph-owned layers (pane tabs, tools) keep their graph.css styling and
+   * slot in as further full-width rows of the same wrap layout.
+   * ------------------------------------------------------------------ */
+  body.okf-viewer .okf-shell {
+    box-sizing: border-box;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    width: 100%;
+    max-width: 100vw;
+    inset-inline: auto;
+    margin-inline: 0;
+    transform: none;
+    padding-block: var(--okf-space-2);
+    padding-inline: var(--okf-space-3);
+    gap: var(--okf-space-2);
+  }
+  body.okf-viewer .okf-shell__nav { display: contents; }
+  body.okf-viewer .okf-shell__brand {
+    order: -3;
+    flex: 1 1 9rem;
+    position: static;
+    min-width: 0;
+    min-height: 44px;
+  }
+  /* U1: no explicit order here. The studio slot keeps its authored DOM
+   * position (after the shell's own Graph destination) so it joins the
+   * order-0 wrap BEFORE the graph route's pane tabs and More-tools row,
+   * which graph.js appends to the topbar after the nav. A former
+   * `order: 1` sank the global Studio control below those graph-owned
+   * rows on the graph route (measured at 390px: launcher bottom ~300px
+   * vs pane tabs top ~197px) despite the launcher already preceding them
+   * in the shared nav's keyboard order. Document routes are unchanged:
+   * DOM order already put Studio last among the shell's own controls. */
+  body.okf-viewer .okf-shell__studio-slot:not([hidden]) { flex: 0 0 auto; }
+  body.okf-viewer .okf-shell__appearance { order: -2; flex: 0 0 auto; width: auto; }
+  /* Honest full identity: a long bundle name wraps instead of the cryptic
+   * "okf-lo…" ellipsis cut (the same honesty rule the graph route already
+   * applies). The link owns the growth (break-word keeps intrinsic sizing
+   * intact — 'anywhere' here collapsed the flex item to min-content); the
+   * duplicated muted wordmark yields its space on phones. */
+  body.okf-viewer .okf-shell__brand .okf-brand-link { flex: 1 1 auto; min-width: 0; }
+  .okf-shell .okf-topbar__brand strong {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: break-word;
+    /* Retire the single-row-era vw caps (wiki.css 32vw/18vw/16vw + the
+     * inline-block enabler): with wrapping they only shatter the name into
+     * a 70px column ("18vw" at 390px). */
+    max-width: none;
+  }
+  .okf-shell .okf-topbar__brand .okf-muted { display: none; }
+  /* Compact but complete appearance label: keep "Appearance" and the current
+   * family (honest state, no dangling separator, no icon-only guesswork). */
+  .okf-shell .okf-appearance-trigger__prefix,
+  .okf-shell .okf-appearance-trigger__family { font-size: 12px; }
+  .okf-shell .okf-appearance-trigger { min-height: 44px; }
+  /* Row 2: the one real search control grows; Index and Graph stay labelled
+   * text controls at full touch height. */
+  body.okf-viewer .okf-shell [data-okf-shell-item="search"] { flex: 1 1 9rem; min-width: 0; }
+  body.okf-viewer .okf-shell__search-form { flex: 1 1 auto; min-width: 0; }
+  .okf-shell__search-form input { flex: 1 1 auto; width: auto; min-width: 0; min-height: 44px; }
+  .okf-shell__search-form button { flex: 0 0 auto; min-width: 44px; min-height: 44px; }
+  .okf-shell :is(a, button, input) { max-width: 100%; }
+  /* Links are inline by default; make the nav controls real flex boxes so
+   * the 44px touch height actually applies. */
+  .okf-shell__nav .okf-btn { display: inline-flex; align-items: center; min-height: 44px; }
+  .okf-shell__nav .okf-studiobtn { min-height: 44px; }
+  /* Same studio.css graph-chrome defeat as the 641–900px band below: at
+   * <=640px on the graph route the launcher would otherwise compute 40px
+   * instead of the shell's promised 44px floor. */
+  body.okf-viewer .okf-shell__nav .okf-studio-launcher { min-height: 44px; }
+  /* Inline launcher status is consolidated to the action label at this
+   * width; genuine failure/pending states still print through the
+   * data-attention "· Error" / "· Needs attention" projections. */
+  .okf-shell .okf-studio-launcher__summary { display: none; }
+}
+/* At the narrowest supported widths the two-row arrangement runs out of
+ * linear budget (brand + Appearance exceed ~296px of inner width), so the
+ * settings pair shares the final compact row instead:
+ * row 1 = brand · row 2 = search · Index · Graph · row 3 = Studio ·
+ * Appearance — still every control, no clipping, honest labels. */
+@media (max-width: 340px) {
+  body.okf-viewer .okf-shell__brand { flex-basis: 100%; }
+  body.okf-viewer .okf-shell__appearance { order: 2; }
+}
+/* Short narrow viewports (for example 400% zoom of 1280x1024, a 320x256 CSS
+ * viewport): the wrapped shell alone is ~165px and the document view bar
+ * below it ~106px, together taller than the viewport, so pinning them would
+ * cover every focused control in main (WCAG 1.4.10 / 2.4.11). Here the shell
+ * scrolls with the page; studio.css releases the view bar under the same
+ * query and wiki.css drops the measured scroll offset to match. */
+@media (max-width: 640px) and (max-height: 480px) {
+  .okf-topbar.okf-shell { position: static; }
+}
+@media (forced-colors: active) {
+  .okf-shell [data-okf-shell-item] > [aria-current="page"] {
+    border-color: Highlight;
+    box-shadow: inset 0 -3px 0 Highlight;
+  }
+  .okf-shell__nav > form[data-okf-shell-item="search"][aria-current="page"] {
+    box-shadow: inset 0 -3px 0 Highlight;
+  }
+}
+
+/* Mid-size documents keep the full destination set without allowing the nav
+ * intrinsic width to widen the page. This is also the Studio modal handoff
+ * range, so the article retains its normal readable measure underneath. */
+@media (min-width: 641px) and (max-width: 1100px) {
+  .okf-shell {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+    padding-block: var(--okf-space-2);
+    gap: var(--okf-space-2);
+  }
+  .okf-shell__brand { width: 100%; min-width: 120px; min-height: 40px; }
+  .okf-shell__nav {
+    width: 100%; min-width: 0; max-width: 100%;
+    justify-content: flex-start; flex-wrap: wrap;
+  }
+}
+/* U2 tablet band: give every global nav control the same 44px touch floor
+ * the <=640px compact block already applies. The former ~30px links passed
+ * WCAG 2.5.8 AA (24px); this is a usability recommendation for the
+ * touch-typical 641–900px band, not an accessibility fix. Desktop (>900px)
+ * keeps its compact pointer-sized controls, and the floor is min-height
+ * only — no padding inflation, so the shell stays two bounded rows. */
+@media (min-width: 641px) and (max-width: 900px) {
+  .okf-shell__nav .okf-btn,
+  .okf-shell__nav .okf-studiobtn {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  .okf-shell__search-form input,
+  .okf-shell__search-form button { min-height: 44px; }
+  /* studio.css's graph compact-chrome rule (.okf-viewer--graph
+   * .okf-studiobtn, min-height 40px at <=900px) is injected after this
+   * sheet and, at equal specificity, would quietly defeat the floor for
+   * the shell launcher on the graph route. The launcher is global-nav
+   * chrome, so the shared shell layer re-owns it one specificity higher. */
+  body.okf-viewer .okf-shell__nav .okf-studio-launcher { min-height: 44px; }
+}
+/* The viewbar follows the shell in the DOM. Its positioning is owned by
+ * studio.css (the bar is only mounted on live concept pages): the bar is
+ * sticky, stacked below this measured shell in normal view and at top 0 in
+ * Reading Focus. This rule keeps only the in-flow normalization; the former
+ * `position: relative` here outranked studio.css on specificity and silently
+ * defeated that stickiness at every scroll position. */
+.okf-topbar.okf-shell + .okf-concept-viewbar {
+  clear: both;
+}

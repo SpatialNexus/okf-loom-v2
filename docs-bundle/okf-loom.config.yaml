@@ -1,0 +1,31 @@
+# okf-loom.config.yaml — OKF bundle configuration (current spec §5).
+# Every key is optional. Delete this file to fall back to built-in defaults.
+# Paths must be bundle-relative (absolute / ..-escaping values are rejected).
+
+viewer:
+  title: "okf-loom Documentation"  # viewer page <title>
+  override_dir: .okf-loom/viewer         # templates / static / palette overrides
+  extension_css: .okf-loom/viewer/extension.css
+  extension_js: .okf-loom/viewer/extension.js
+  allow_active_code: false          # gate JS / full-HTML override execution
+
+search:
+  default_mode: lexical             # lexical | semantic | hybrid | tag | entity | relation
+
+validate:
+  default_profile: spec             # spec | producer | loose
+  fail_on_broken_links: false
+
+studio:                             # live collaborative studio (all ON by default)
+  edit: true                        # interactive studio (commenting/directing + live); --no-edit = read-only kiosk
+  live: true                        # SSE live updates on
+  enrich_offer: true                # reserved external-agent metadata; server does not consume it
+  auto_enrich: true                 # reserved external-agent metadata; server does not consume it
+  constraints: {}                   # external-harness policy metadata; server does not enforce it
+  debounce_ms: 600                  # reserved; use `watch --debounce-ms` for watcher debounce
+  session_dir: .okf-loom/session
+  log_edits: true                   # append a SPEC §7 log.md entry per agent write / resolved comment
+  max_sse_clients: 32
+  allowed_hosts: [127.0.0.1, localhost]   # invisible cross-origin guard (§15);
+                                          # `serve --tunnel` adds its quick-tunnel host at runtime
+  theme: auto                       # auto | swiss-light | swiss-dark | technical-light | technical-dark

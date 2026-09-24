@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<!--
+  OKF concept page template.
+
+  Placeholder convention (str.replace):
+      __LANG__             → document language (default "en")
+      __THEME_ATTR__       → ` data-theme="<family>-<mode>"` (technical/swiss × light/dark)
+      __DATA_ATTRS__       → extra data-* attributes for the SPA/static JS hook
+      __HEAD_TITLE__       → <title> text
+      __BUNDLE_NAME__      → display name shown in the topbar
+      __NAV_HTML__         → topbar inner HTML (search, links)
+       __STATIC_PREFIX__    → URL prefix for /__static/ assets
+  __BRAND_HREF__       → URL of the bundle root for the topbar brand link
+                         (P1-8: "/" for serve/spa, "./" or "../../" for
+                          static: never resolves to the parent dir of a
+                         nested concept)
+  __ROOT_PREFIX__      → URL prefix the local-graph pill nav uses to build
+                         neighbour links (P1-9). Only consumed by wiki.js
+                         in static mode; empty for serve/spa.
+    __WIKI_CSS_LINK__    → <link rel="stylesheet" href="...wiki.css">
+    __THEME_CONFIG__     → CSP-safe configured theme/modifier preference JSON
+  __WIKI_JS_LINK__     → <script src="...wiki.js" defer></script>
+       __CONCEPT_ID__       → concept id string (escaped; kept for compatibility
+                              references; the visible breadcrumb is
+                              __BREADCRUMB_HTML__)
+       __BREADCRUMB_HTML__  → clickable breadcrumb <nav> (P2-3 iter-1)
+      __CONCEPT_TYPE__     → type (escaped)
+      __CONCEPT_TYPE_COLOR__ → CSS colour for the type chip
+       __CONCEPT_TITLE__    → page <h1> text (phrasing content only)
+       __CONCEPT_SUBTITLE__ → sibling subtitle <p> after the h1 (P1-1 iter-2):
+                              empty string when the concept has no aliases.
+                              Kept OUT of the h1 so the heading's accessible
+                              name is just the title (HTML validity + AT).
+       __CONCEPT_DESCRIPTION__ → description text
+       __ENTITY_CHIPS_HTML__ → frontmatter entities as clickable search chips (Phase 2)
+      __CONCEPT_RESOURCE__  → resource URL HTML (link or empty)
+       __CONCEPT_BODY__     → rendered markdown body HTML
+       __ONTHISPAGE_HTML__  → shared near-header 'On this page' document-outline
+                              host, initially collapsed (a hidden empty shell
+                              when the body is headingless). SSR provides native
+                              heading links; document-outline.js owns the live
+                              lifecycle, filtering, traversal, current-section
+                              state, and the Studio Sections popover.
+       __INFOBOX_HTML__     → native Document details disclosure (type/rev
+                              summary, tags, frontmatter facts, governed keys)
+                              after the authored reading region, OUTSIDE
+                              .okf-page__body so projection parity is preserved;
+                              collapsed by default, with reader-owned open state.
+       __CONNECTIONS_HTML__ → typed directional connections footer (Phase 2):
+                             outgoing + incoming cards.
+      __PREVNEXT_HTML__    → deterministic prev/next-in-section nav (Phase 2).
+      __BACKLINKS_HTML__   → rendered "Cited by" list (legacy/external template compat)
+      __OUTGOING_HTML__    → rendered "Links to" list (legacy/external template compat)
+      __FRONTMATTER_HTML__ → rendered frontmatter table (legacy/external template compat)
+      __GOVERNED_HTML__    → rendered governed keys (legacy/external template compat)
+      __LOCAL_GRAPH_DATA__ → JSON-encoded {nodes, edges} for the local graph widget
+-->
+<html lang="__LANG__"__THEME_ATTR__>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230c7373'/%3E%3Cpath d='M8 10h16M8 16h10M8 22h16' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self'; form-action 'self'">
+<title>__HEAD_TITLE__</title>
+__WIKI_CSS_LINK__
+__SHELL_CSS_LINK__
+__THEME_CONFIG__
+__THEME_HEAD_JS__
+</head>
+<body class="okf-viewer okf-viewer--page" __DATA_ATTRS__>
+<a href="#okf-main" class="okf-skip-link">Skip to content</a>
+__APPLICATION_SHELL__
+
+<!-- The live notice remains visible until Studio publishes terminal success;
+     static output swaps it for an intentional read-only outcome in wiki.css.
+     No-JS notices are ordinary accessible markup, not <noscript> content:
+     Chromium can lay out a <noscript> child while omitting it from the
+     accessibility tree when scripting is disabled. The parser-blocking theme
+     bootstrap marks script availability before this body is parsed, and CSS
+     selects exactly one mode-specific notice. -->
+<p class="okf-studio-fallback-banner okf-nojs-fallback okf-nojs-live-banner" role="note">JavaScript is off. Live editing and annotation controls are unavailable; authored content remains readable. <a href="__BRAND_HREF__">Browse the index</a>.</p>
+<p class="okf-studio-fallback-banner okf-nojs-fallback okf-nojs-spa-banner" role="note">JavaScript is off. This SPA build keeps authored content and links available; interactive enhancements are unavailable. <a href="__BRAND_HREF__">Browse the index</a>.</p>
+<p class="okf-studio-fallback-banner okf-nojs-fallback okf-nojs-static-banner" role="note">JavaScript is off. This static build keeps authored content and links available; interactive enhancements are unavailable. <a href="__BRAND_HREF__">Browse the index</a>.</p>
+<noscript><style>.okf-js-action{display:none!important}</style></noscript>
+<p class="okf-studio-fallback-banner okf-live-studio-fallback" role="status">Live Studio is unavailable. Editing and annotation controls cannot be loaded; authored content remains readable. <a href="__BRAND_HREF__">Browse the index</a>.</p>
+<p class="okf-studio-fallback-banner okf-static-viewer-note" role="status">Static viewer: read and copy. Live authoring is unavailable. <a href="__BRAND_HREF__">Index</a>.</p>
+
+<main id="okf-main" class="okf-page">
+  <article class="okf-page__main">
+    <header class="okf-page__header" style="--okf-type-accent:__CONCEPT_TYPE_COLOR__">
+      __BREADCRUMB_HTML__
+      <div class="okf-page__typerow">
+        <span class="okf-type-iconwrap" style="color:__CONCEPT_TYPE_COLOR__" aria-hidden="true">__TYPE_ICON__</span>
+        <span class="okf-type-chip" style="background:__CONCEPT_TYPE_COLOR__;color:__CONCEPT_TYPE_FG__">__CONCEPT_TYPE__</span>
+        __READTIME_HTML__
+      </div>
+      <h1 class="okf-page__title">__CONCEPT_TITLE__</h1>
+      __CONCEPT_SUBTITLE__
+      <p class="okf-page__description">__CONCEPT_DESCRIPTION__</p>
+      __ENTITY_CHIPS_HTML__
+      <div class="okf-page__meta">__CONCEPT_RESOURCE__</div>
+    </header>
+
+    <div data-okf-metadata-slot>__METADATA_HTML__</div>
+
+    <!-- Shared document tools: the near-header 'On this page' outline and
+         the Document utilities. SSR outline links come from the rendered
+         body headings and remain usable without JavaScript.
+         document-outline.js owns the outline lifecycle and the Studio
+         Sections control from the same heading state; this is not a
+         separate desktop sidebar outline. -->
+    <div class="okf-document-tools">
+      __ONTHISPAGE_HTML__
+
+    <nav class="okf-page-utilities okf-context-actions" aria-label="Document utilities" data-okf-page-utilities>
+      __CONTEXT_ACTION_HTML__
+      <span data-okf-live-utilities></span>
+    </nav>
+    </div>
+
+    <!-- Single-column authored reading region. Document details follows
+         this region and stays outside .okf-page__body; its native
+         disclosure state belongs to the reader. -->
+    <div class="okf-page__reading">
+      <div class="okf-page__body-col">
+        <p class="okf-selection-hint okf-js-action">Select text to copy exact context.</p>
+        <div class="okf-prose okf-page__body">
+        __CONCEPT_BODY__
+      </div>
+      </div>
+    </div>
+    __INFOBOX_HTML__
+      <textarea id="okf-canonical-source" hidden readonly aria-hidden="true" data-encoding="base64-utf8">__CANONICAL_SOURCE__</textarea>
+      <script type="application/json" id="okf-annotation-projection">__ANNOTATION_PROJECTION__</script>
+
+    __CONNECTIONS_HTML__
+    __PREVNEXT_HTML__
+    __DOCUMENT_END_HTML__
+  </article>
+
+  <aside class="okf-page__sidebar" aria-label="Related concepts">
+    <div class="okf-local-graph" id="okf-local-graph" data-graph="__LOCAL_GRAPH_DATA__" data-root-prefix="__ROOT_PREFIX__"></div>
+  </aside>
+</main>
+
+__WIKI_JS_LINK__
+__DOCUMENT_OUTLINE_JS_LINK__
+__RENDERERS_JS_LINK__
+</body>
+</html>

@@ -1,0 +1,7 @@
+# Optional browser lane, separate from the lean core environment.
+-r requirements-dev.txt
+# Deliberate compatible release, not an unbounded latest dependency.
+playwright==1.58.0
+pyee==13.0.1
+greenlet==3.3.1
+typing_extensions==4.15.0

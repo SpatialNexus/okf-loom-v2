@@ -1,0 +1,20 @@
+<!--
+  Browser parity fixture — HTML5 formatting reconstruction (adoption agency).
+  ReviewAll r7: "projection validation is not browser-tree complete".
+
+  <b>bold<p>still</b> — the <b> formatting element spans a block boundary.
+  The browser's adoption agency algorithm reconstructs the <b> inside the
+  <p>, producing a different DOM tree than the stdlib HTMLParser would.
+  textContent extraction per owner nonce would differ.
+
+  Expected browser behavior:
+    - Two <b> elements exist (one outside <p>, one reconstructed inside)
+    - The text "bold" and "still" are in separate elements
+    - HTMLParser would nest differently
+-->
+<!DOCTYPE html>
+<html>
+<body>
+<b id="outer">bold<p id="inner">still</b>
+</body>
+</html>

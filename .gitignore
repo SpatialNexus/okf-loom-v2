@@ -1,0 +1,76 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+.tox/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+uv.lock
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Generated viewer output (kept out of VCS by default; users may opt-in)
+/okf-loom-v2.zip
+/okf-loom-v2-studio-feedback-handoff.zip
+*.viz.html
+_site/
+okf-site/
+*.okf-lock
+*.publish-lock
+
+# Per-bundle transaction lock file (okf_loom.io_utils.BUNDLE_LOCK_FILENAME)
+# and local handoff snapshots: never commit them.
+.okf-loom-bundle.lock
+/okf-loom-v2-handoff-*/
+/okf-loom-v2-handoff-*.zip
+
+# Local work tracker: kept on disk, not published.
+/future-work.md
+
+# Studio session state (ephemeral live feed + undo + auth token;
+# per-bundle). Duplicated from the parent repo's ignore so a standalone
+# clone of this directory (the documented skill distribution model) keeps
+# ignoring samples/*/.okf-loom/session/.
+**/.okf-loom/session/
+
+# Local agent/runtime workspace state
+.aic/
+.pi/
+.playwright-mcp/
+workspace/
+
+# Historical design checkout and stale local proof are reference-only input,
+# never release artifacts.
+/docs/design/incoming-v1-theme/
+/docs/screenshots/r6-frontend-proof/
+
+# OS
+.DS_Store
+Thumbs.db
+.aic/overlay/
+.aic/overlay*/
+.aic/history/
+.aic/job_memory/
+.aic/pi/
+.aic/project-brain/
+.aic/project-brain.json
+.aic/project-brain-init.lock
+.aic/project-brain-backups/
+.aic/telemetry/
+.aic/tmp/
+.aic/.gitignore
+.aic/run_defaults
+.aic/git-identity.conf
+.aic/opencode/

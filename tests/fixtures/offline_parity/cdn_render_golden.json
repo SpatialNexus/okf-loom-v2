@@ -1,0 +1,288 @@
+{
+ "provenance": {
+  "generator": "tests/regenerate_offline_cdn_golden.py",
+  "generated": "2026-09-22",
+  "source": "default CDN build (`build --target static --assets cdn`) of the write_offline_fixture bundle in tests/test_offline_assets.py; page rich.html, scope .okf-page__body, theme technical-light, viewport 1280x900",
+  "browser": "Chromium 153.0.8010.36 (Playwright)",
+  "versions": {
+   "highlight.js": "11.12.0",
+   "katex": "0.16.47",
+   "mermaid": "11.17.2"
+  },
+  "cdn_requests": [
+   "https://cdn.jsdelivr.net/npm/highlight.js@11.12.0/+esm",
+   "https://cdn.jsdelivr.net/npm/highlight.js@11.12.0/styles/github.min.css",
+   "https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/fonts/KaTeX_AMS-Regular.woff2",
+   "https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/fonts/KaTeX_Fraktur-Regular.woff2",
+   "https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/fonts/KaTeX_Main-Regular.woff2",
+   "https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/fonts/KaTeX_Math-Italic.woff2",
+   "https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/fonts/KaTeX_Script-Regular.woff2",
+   "https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/fonts/KaTeX_Size2-Regular.woff2",
+   "https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/fonts/KaTeX_Size4-Regular.woff2",
+   "https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/katex.min.css",
+   "https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/katex.min.js",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/chunk-2NMSUPJH.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/chunk-4CAJECRU.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/chunk-4OADUZ5Q.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/chunk-5IMINLNL.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/chunk-AQ6EADP3.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/chunk-AZZRMDJM.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/chunk-CLS4B6BI.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/chunk-DZP67EKU.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/chunk-EICP7K5X.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/chunk-H7VHZCWX.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/chunk-IJBDOHL6.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/chunk-NUDPKBEF.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/chunk-QJSWEUOL.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/chunk-R7JDMUKV.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/chunk-RCXAM2GK.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/chunk-STOV2HOB.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/chunk-VRZKL3EH.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/chunk-VTHDQ7BV.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/chunk-VY2OSTJR.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/chunk-WUBWJARI.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/chunk-YDMLL4PJ.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/chunk-Z6V44ARX.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/chunk-ZNLK7HRR.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/chunk-ZQN7UHIL.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/dagre-MPVFI544.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/flowDiagram-YHGXBVSY.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/chunks/mermaid.esm.min/ganttDiagram-RWFTB7ED.mjs",
+   "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.esm.min.mjs"
+  ],
+  "normalisation": "RENDER_SNAPSHOT in tests/test_offline_assets_browser.py: Mermaid SVG element/id/class/role/text structure (render counter normalised, <style> text and geometry excluded), highlight.js token class/text sequences per block, KaTeX MathML"
+ },
+ "mermaid": [
+  [
+   "svg|okf-mermaid-svg-N|flowchart|graphics-document document|flowchart-v2",
+   "style||||",
+   "g||||",
+   "marker|okf-mermaid-svg-N_flowchart-v2-pointEnd|marker flowchart-v2||",
+   "path||arrowMarkerPath||",
+   "marker|okf-mermaid-svg-N_flowchart-v2-pointStart|marker flowchart-v2||",
+   "path||arrowMarkerPath||",
+   "marker|okf-mermaid-svg-N_flowchart-v2-pointEnd-margin|marker flowchart-v2||",
+   "path||arrowMarkerPath||",
+   "marker|okf-mermaid-svg-N_flowchart-v2-pointStart-margin|marker flowchart-v2||",
+   "polygon||arrowMarkerPath||",
+   "marker|okf-mermaid-svg-N_flowchart-v2-circleEnd|marker flowchart-v2||",
+   "circle||arrowMarkerPath||",
+   "marker|okf-mermaid-svg-N_flowchart-v2-circleStart|marker flowchart-v2||",
+   "circle||arrowMarkerPath||",
+   "marker|okf-mermaid-svg-N_flowchart-v2-circleEnd-margin|marker flowchart-v2||",
+   "circle||arrowMarkerPath||",
+   "marker|okf-mermaid-svg-N_flowchart-v2-circleStart-margin|marker flowchart-v2||",
+   "circle||arrowMarkerPath||",
+   "marker|okf-mermaid-svg-N_flowchart-v2-crossEnd|marker cross flowchart-v2||",
+   "path||arrowMarkerPath||",
+   "marker|okf-mermaid-svg-N_flowchart-v2-crossStart|marker cross flowchart-v2||",
+   "path||arrowMarkerPath||",
+   "marker|okf-mermaid-svg-N_flowchart-v2-crossEnd-margin|marker cross flowchart-v2||",
+   "path||arrowMarkerPath||",
+   "marker|okf-mermaid-svg-N_flowchart-v2-crossStart-margin|marker cross flowchart-v2||",
+   "path||arrowMarkerPath||",
+   "g||root||",
+   "g||clusters||",
+   "g||edgePaths||",
+   "path|okf-mermaid-svg-N-L_A_B_0|edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link||",
+   "path|okf-mermaid-svg-N-L_B_C_0|edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link||",
+   "g||edgeLabels||",
+   "g||edgeLabel||",
+   "g||label||",
+   "foreignobject||||",
+   "div||labelBkg||",
+   "span||edgeLabel||",
+   "g||edgeLabel||",
+   "g||label||",
+   "foreignobject||||",
+   "div||labelBkg||",
+   "span||edgeLabel||",
+   "g||nodes||",
+   "g|okf-mermaid-svg-N-flowchart-A-0|node default||",
+   "rect||basic label-container||",
+   "g||label||",
+   "rect||||",
+   "foreignobject||||",
+   "div||||",
+   "span||nodeLabel||",
+   "p||||",
+   "#Start",
+   "g|okf-mermaid-svg-N-flowchart-B-1|node default||",
+   "polygon||label-container||",
+   "g||label||",
+   "rect||||",
+   "foreignobject||||",
+   "div||||",
+   "span||nodeLabel||",
+   "p||||",
+   "#Check",
+   "g|okf-mermaid-svg-N-flowchart-C-3|node default||",
+   "rect||basic label-container||",
+   "g||label||",
+   "rect||||",
+   "foreignobject||||",
+   "div||||",
+   "span||nodeLabel||",
+   "p||||",
+   "#Done",
+   "defs||||",
+   "filter|okf-mermaid-svg-N-drop-shadow|||",
+   "fedropshadow||||",
+   "defs||||",
+   "filter|okf-mermaid-svg-N-drop-shadow-small|||",
+   "fedropshadow||||"
+  ],
+  [
+   "svg|okf-mermaid-svg-N||graphics-document document|gantt",
+   "style||||",
+   "g||||",
+   "g||grid||",
+   "path||domain||",
+   "g||tick||",
+   "line||||",
+   "text||||",
+   "#2026-01-01",
+   "g||tick||",
+   "line||||",
+   "text||||",
+   "#2026-01-01",
+   "g||tick||",
+   "line||||",
+   "text||||",
+   "#2026-01-02",
+   "g||tick||",
+   "line||||",
+   "text||||",
+   "#2026-01-02",
+   "g||tick||",
+   "line||||",
+   "text||||",
+   "#2026-01-03",
+   "g||tick||",
+   "line||||",
+   "text||||",
+   "#2026-01-03",
+   "g||tick||",
+   "line||||",
+   "text||||",
+   "#2026-01-04",
+   "g||tick||",
+   "line||||",
+   "text||||",
+   "#2026-01-04",
+   "g||tick||",
+   "line||||",
+   "text||||",
+   "#2026-01-05",
+   "g||tick||",
+   "line||||",
+   "text||||",
+   "#2026-01-05",
+   "g||tick||",
+   "line||||",
+   "text||||",
+   "#2026-01-06",
+   "g||||",
+   "rect||section section0||",
+   "rect||section section0||",
+   "g||||",
+   "rect|okf-mermaid-svg-N-a1|task task0||",
+   "rect|okf-mermaid-svg-N-task1|task task0||",
+   "text|okf-mermaid-svg-N-a1-text|taskText taskText0  width-35.20068359375||",
+   "#Vendor",
+   "text|okf-mermaid-svg-N-task1-text|taskText taskText0  width-28.75||",
+   "#Prove",
+   "g||||",
+   "text||sectionTitle sectionTitle0||",
+   "tspan||||",
+   "#Build",
+   "g||today||",
+   "line||today||",
+   "text||titleText||",
+   "#Plan"
+  ]
+ ],
+ "hljs": [
+  {
+   "language": "language-python",
+   "tokens": [
+    [
+     "hljs-keyword",
+     "def"
+    ],
+    [
+     "hljs-title function_",
+     "greet"
+    ],
+    [
+     "hljs-params",
+     "name"
+    ],
+    [
+     "hljs-keyword",
+     "return"
+    ],
+    [
+     "hljs-string",
+     "f\"hello {name}\""
+    ],
+    [
+     "hljs-subst",
+     "{name}"
+    ]
+   ]
+  },
+  {
+   "language": "language-elixir",
+   "tokens": [
+    [
+     "hljs-class",
+     "defmodule Greeter"
+    ],
+    [
+     "hljs-keyword",
+     "defmodule"
+    ],
+    [
+     "hljs-title",
+     "Greeter"
+    ],
+    [
+     "hljs-keyword",
+     "do"
+    ],
+    [
+     "hljs-function",
+     "def hello"
+    ],
+    [
+     "hljs-keyword",
+     "def"
+    ],
+    [
+     "hljs-title",
+     "hello"
+    ],
+    [
+     "hljs-symbol",
+     "do:"
+    ],
+    [
+     "hljs-string",
+     "\"hello #{name}\""
+    ],
+    [
+     "hljs-subst",
+     "#{name}"
+    ],
+    [
+     "hljs-keyword",
+     "end"
+    ]
+   ]
+  }
+ ],
+ "katex": [
+  "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\"><semantics><mrow><mi mathvariant=\"double-struck\">R</mi><mo>∋</mo><mi>x</mi><mo>↦</mo><mi mathvariant=\"fraktur\">g</mi><mo stretchy=\"false\">(</mo><mi>x</mi><mo stretchy=\"false\">)</mo><mo>+</mo><mi mathvariant=\"script\">L</mi><mrow><mo fence=\"true\">(</mo><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><mfrac><msub><mi>a</mi><mi>i</mi></msub><msub><mi>b</mi><mi>i</mi></msub></mfrac><mo fence=\"true\">)</mo></mrow></mrow><annotation encoding=\"application/x-tex\">\\mathbb{R} \\ni x \\mapsto \\mathfrak{g}(x) + \\mathscr{L}\\left( \\sum_{i=1}^{n} \\frac{a_i}{b_i} \\right)</annotation></semantics></math>"
+ ]
+}

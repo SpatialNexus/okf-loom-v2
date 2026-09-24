@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<!--
+  OKF directory index / root index page template.
+
+  Placeholders (str.replace):
+      __LANG__           → document language
+        __THEME_ATTR__     → ` data-theme="technical-light|technical-dark|swiss-light|swiss-dark|purple-light|purple-dark|coffee-light|coffee-dark"` (or empty)
+      __HEAD_TITLE__     → <title> text
+      __BUNDLE_NAME__    → display name
+  __STATIC_PREFIX__  → URL prefix for /__static/ assets
+  __DATA_ATTRS__     → extra data-* attributes for the SPA/static JS hook
+                       (P1-10: lets wiki.js detect static mode on index pages
+                       so typed-query live suggestions stay gated while
+                       recent pages keep working)
+  __WIKI_CSS_LINK__  → <link rel="stylesheet" href="...wiki.css">
+  __THEME_CONFIG__   → CSP-safe configured theme/modifier preference JSON
+  __WIKI_JS_LINK__   → <script src="...wiki.js" defer></script>
+  __RENDERERS_JS_LINK__ → <script src="...renderers.js" defer></script>
+                       (progressive renderers + markdown UX enhancers
+                       for tables/code/images in rendered prose)
+      __INDEX_TITLE__    → page <h1>
+      __HERO_MODIFIER__  → extra class for the hero header (e.g. " okf-hero--split"
+                          when the v2 spotlight module is present, else "")
+      __HERO_V2__        → 'New in Annotations v2' spotlight module HTML (root
+                          index only; "" on subdir indexes and bundles without
+                          the demo/annotations_v2_showcase concept). Rendered
+                          right after the <h1> so it lands above the fold on
+                          mobile and in the right column on wide screens.
+      __INDEX_INTRO__    → optional intro HTML (e.g. bundle description)
+      __INDEX_INTRO_REMAINDER__ → remaining authored root-index body, preserved
+                                  after generated type groups
+      __INDEX_ENGAGEMENT__ → authoritative comment/recent snapshot, or empty
+      __GROUPS_HTML__    → concepts grouped by type, as HTML cards/lists
+      __SUBDIRS_HTML__   → subdirectory index links
+      __GLOBAL_GRAPH_LINK__ → URL to the global graph page
+-->
+<html lang="__LANG__"__THEME_ATTR__>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230c7373'/%3E%3Cpath d='M8 10h16M8 16h10M8 22h16' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self'; form-action 'self'">
+<title>__HEAD_TITLE__</title>
+__WIKI_CSS_LINK__
+__SHELL_CSS_LINK__
+__THEME_CONFIG__
+__THEME_HEAD_JS__
+</head>
+<body class="okf-viewer okf-viewer--index" __DATA_ATTRS__>
+<a href="#okf-main" class="okf-skip-link">Skip to content</a>
+__APPLICATION_SHELL__
+
+<!-- Keep the no-JS note in ordinary markup so it remains in Chromium's
+     accessibility tree. The parser-blocking theme marker and wiki.css hide
+     the non-applicable mode copies before a scripted first paint. -->
+<p class="okf-studio-fallback-banner okf-nojs-fallback okf-nojs-live-banner" role="note">JavaScript is off. The authored index and concept links remain available.</p>
+<p class="okf-studio-fallback-banner okf-nojs-fallback okf-nojs-spa-banner" role="note">JavaScript is off. This SPA build keeps the authored index and concept links available; interactive enhancements are unavailable.</p>
+<p class="okf-studio-fallback-banner okf-nojs-fallback okf-nojs-static-banner" role="note">JavaScript is off. This static build keeps the authored index and concept links available; interactive enhancements are unavailable.</p>
+<p class="okf-studio-fallback-banner okf-live-studio-fallback" role="status">Live Studio is unavailable. Index browsing remains interactive.</p>
+<p class="okf-studio-fallback-banner okf-static-viewer-note" role="status">Static viewer: live Studio editing and annotations are not included. Index browsing remains available.</p>
+
+<main id="okf-main" class="okf-index">
+  <header class="okf-hero__HERO_MODIFIER__">
+    <h1 class="okf-index__title"__INDEX_TITLE_ANCHOR__>__INDEX_TITLE__</h1>
+    <div class="okf-index__intro okf-prose">__INDEX_INTRO__</div>
+    __HERO_STATS__
+    <div class="okf-hero__visual">
+      __HERO_V2__
+      __GRAPH_THUMBNAIL__
+    </div>
+    __INDEX_ENGAGEMENT__
+  </header>
+
+  __INDEX_BROWSE_CONTROLS__
+
+  __SUBDIRS_HTML__
+
+  __GROUPS_HTML__
+
+  __INDEX_OVERVIEW__
+
+</main>
+
+__WIKI_JS_LINK__
+__RENDERERS_JS_LINK__
+</body>
+</html>

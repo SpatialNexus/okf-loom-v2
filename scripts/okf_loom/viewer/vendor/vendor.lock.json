@@ -1,0 +1,1752 @@
+{
+ "auxiliary": [
+  {
+   "dest": "BUNDLED-DEPENDENCY-NOTICES.txt",
+   "role": "notices",
+   "sha256": "75cc869e7d42b305a81d17c8a5cec397629b91a54d265008b3ddf52d09c8254e",
+   "sha384": "sha384-655YTOgz2AD/i3v14TlL56TjX4+2IL7eDUQSumqrDSwZ9dUXoectTafqfZhycyzY",
+   "size": 263674
+  },
+  {
+   "dest": "THIRD-PARTY-NOTICES.txt",
+   "role": "notices",
+   "sha256": "2ef051122f003b6333546af4c48907ed3a110f2e51a1a204f1bfd93ec8b40b87",
+   "sha384": "sha384-cSoxuJZDCAnY3MuYxC9G91vaPwIQFHK79BRys0A6EnZtZs3Zi/jYuq5Uk5108vOK",
+   "size": 3344
+  }
+ ],
+ "derived": {
+  "highlightjs-11.12.0/highlight.offline.min.js": {
+   "sha256": "1fbeb8b865706ecf1e967f8b401837c0a7c01fc635b2c46cc118d6a65e210c74",
+   "size": 1064218
+  },
+  "katex-0.16.47/katex.offline.min.css": {
+   "sha256": "446d44f15ab6da203199838dd6a2d9554d7acfc4334950777423ff77cdc9ebe7",
+   "size": 367928
+  }
+ },
+ "packages": [
+  {
+   "files": [
+    {
+     "dest": "mermaid-11.17.2/mermaid.min.js",
+     "sha256": "581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8",
+     "sha384": "sha384-EOXBFmc3gx5mb+vn0vPvvGqACToJD24hhacX5Yx+8NUUQrHIle/Qi5Bg9o3zKwW2",
+     "size": 3572661,
+     "src": "package/dist/mermaid.min.js"
+    },
+    {
+     "dest": "mermaid-11.17.2/LICENSE",
+     "sha256": "ec9fb67dcb25eccc416ed56e1aab819222c805a2a4bfe4cb19e7556bf2ffde80",
+     "sha384": "sha384-FCnkWxNcDqSeMyGV7DzhA4eWHiIbf8mNLMrlPTH+aJ/u2mGjKQSvwo10hu5IH0DC",
+     "size": 1089,
+     "src": "package/LICENSE"
+    }
+   ],
+   "integrity": "sha512-V6K3C8EBdEsPFZXSKMJe6ppQOENxuHARr9GvHX4hh47lAbhMRD9qf4oEK7LoaRQxULMa80/qt5gHO73aCleBBg==",
+   "license": "MIT",
+   "name": "mermaid",
+   "tarball": "https://registry.npmjs.org/mermaid/-/mermaid-11.17.2.tgz",
+   "version": "11.17.2"
+  },
+  {
+   "files": [
+    {
+     "cdn": "https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/katex.min.js",
+     "dest": "katex-0.16.47/katex.min.js",
+     "sha256": "a29d2961d3146de5949d78ac7c1a9d93ae54955bad22a6db4fbe836e88e8bf48",
+     "sha384": "sha384-CwjPRVHTvLiMBFjEoij+QZViMV5rhTOIp7CJzl24JEqpRDA1sJFHVXXLURktbYYp",
+     "size": 272537,
+     "src": "package/dist/katex.min.js"
+    },
+    {
+     "cdn": "https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/katex.min.css",
+     "dest": "katex-0.16.47/katex.min.css",
+     "sha256": "0289a02cf451a44dd73add683a09644252363871ac11713a647b732cee8b1ee3",
+     "sha384": "sha384-nH0MfJ44wi1dd7w6jinlyBgljjS8EJAh2JBoRad8a3VDw2K69vfaaqm4WnR+gXtA",
+     "size": 23827,
+     "src": "package/dist/katex.min.css"
+    },
+    {
+     "dest": "katex-0.16.47/LICENSE",
+     "sha256": "766ccc1f306c885aa45542a9846bbd0a505b27a0374f146778171c2254ce18e3",
+     "sha384": "sha384-8/FKNbIH5mozwy+sV5pgpgutNbMMGyLRBrS03uW5zky5crMM84tQVBEjiOEkDuqL",
+     "size": 1107,
+     "src": "package/LICENSE"
+    },
+    {
+     "dest": "katex-0.16.47/fonts/KaTeX_AMS-Regular.woff2",
+     "sha256": "0cdd387c9590a1a9f9794560022dbb59654a7d86f187aa0c81495ad42d3a7308",
+     "sha384": "sha384-PY9KakbvJJoGRFr9TsImY6e9PzVmMRFtphQ0xTPhQj7VgIR9nnPXP2nA4P49sNux",
+     "size": 28076,
+     "src": "package/dist/fonts/KaTeX_AMS-Regular.woff2"
+    },
+    {
+     "dest": "katex-0.16.47/fonts/KaTeX_Caligraphic-Bold.woff2",
+     "sha256": "de7701e42cf1f4cf0b766c03fb27977207eee2f4fd5d76fa82188406da43ea4c",
+     "sha384": "sha384-GhFwF3Lk94gRRX3fKvK8qVRIaPRKBawaOWoLpTeJCC1rYaTrY7A8sjVjyaJCdvb0",
+     "size": 6912,
+     "src": "package/dist/fonts/KaTeX_Caligraphic-Bold.woff2"
+    },
+    {
+     "dest": "katex-0.16.47/fonts/KaTeX_Caligraphic-Regular.woff2",
+     "sha256": "5d53e70ad607c2352162dec9e0923fb54ecdafaccbf604cd8dcf7d00facb989b",
+     "sha384": "sha384-0LpsQdZ8FRkW+0vIhMl+kNMsgYPhTA7pbCJDt43k6AHTpq7dv67sLl+bIaMuOiON",
+     "size": 6908,
+     "src": "package/dist/fonts/KaTeX_Caligraphic-Regular.woff2"
+    },
+    {
+     "dest": "katex-0.16.47/fonts/KaTeX_Fraktur-Bold.woff2",
+     "sha256": "74444efd593c005e3f4573b44524704c0af0a937fe911cca9e94068d0d140d3f",
+     "sha384": "sha384-23N9yDc6628Shv+2pdeDIDYIXemJPKfZaANtneHGjhBoaxqeQsZQFBRLj+0/drG9",
+     "size": 11348,
+     "src": "package/dist/fonts/KaTeX_Fraktur-Bold.woff2"
+    },
+    {
+     "dest": "katex-0.16.47/fonts/KaTeX_Fraktur-Regular.woff2",
+     "sha256": "51814d270d06ff0255dba0799994fa4d8c84d11f09951d47595f4abb1f3602dc",
+     "sha384": "sha384-N4B5/o3aSwC8EE7MIGghu2mB6cSIwYHNyiY9bhuVnozyLoHpYT+VEEjdYqJ+7mN7",
+     "size": 11316,
+     "src": "package/dist/fonts/KaTeX_Fraktur-Regular.woff2"
+    },
+    {
+     "dest": "katex-0.16.47/fonts/KaTeX_Main-Bold.woff2",
+     "sha256": "0f60d1b897938ec918c8ce073092411baf9438f6739465693ff18b0f9d20b021",
+     "sha384": "sha384-MnzwPa3V5+Sly78huHTxfNszB+vQQmvhX4O4+m3UZ7LzQoA9wxEhsgxQsvW1y8dV",
+     "size": 25324,
+     "src": "package/dist/fonts/KaTeX_Main-Bold.woff2"
+    },
+    {
+     "dest": "katex-0.16.47/fonts/KaTeX_Main-BoldItalic.woff2",
+     "sha256": "99cd42a3c072d918f2f44984a807cf7aa16e13545fd0875fc07c6c65f99e715b",
+     "sha384": "sha384-XtHiL6YLLShFl6oq2ZOcqTQBsloU+AvJDaGE7Xz/76bt4BWZuJn8tsj7dHnKndKi",
+     "size": 16780,
+     "src": "package/dist/fonts/KaTeX_Main-BoldItalic.woff2"
+    },
+    {
+     "dest": "katex-0.16.47/fonts/KaTeX_Main-Italic.woff2",
+     "sha256": "97479ca6cce906abc961ecac96faa5f9ca2e61b8e7670d475826bcdee9a7c267",
+     "sha384": "sha384-pZ+saBD2/qiUjsKqk1z1NqixWQMZGxYCRcit0Dqfscp5Mj2xUX8bxMm8iKOYsAsQ",
+     "size": 16988,
+     "src": "package/dist/fonts/KaTeX_Main-Italic.woff2"
+    },
+    {
+     "dest": "katex-0.16.47/fonts/KaTeX_Main-Regular.woff2",
+     "sha256": "c2342cd8b869e01752a9321dc17213fc40d4d04c79688c1d43f2cf316abd7866",
+     "sha384": "sha384-K4rU/m6R4ygdFA2s4iphVuNOm4ksiQlo7BPut2DKbuGQFsmOTsh1vie2QdS8+qD/",
+     "size": 26272,
+     "src": "package/dist/fonts/KaTeX_Main-Regular.woff2"
+    },
+    {
+     "dest": "katex-0.16.47/fonts/KaTeX_Math-BoldItalic.woff2",
+     "sha256": "dc47344dbb6cb5b655c8460d561f4df5f501b90c804ad3c6cec65fe322351ab1",
+     "sha384": "sha384-/bG/IuB65SsDidFgz28e7vwT1pxHih+EkPgQpjqmDVtOaSsPi/CXI7uT4nJnozAI",
+     "size": 16400,
+     "src": "package/dist/fonts/KaTeX_Math-BoldItalic.woff2"
+    },
+    {
+     "dest": "katex-0.16.47/fonts/KaTeX_Math-Italic.woff2",
+     "sha256": "7af58c5ec8f132a2ddde9027c6d7814decce4d3b822a11192a42a20e2e973264",
+     "sha384": "sha384-ahAgpD3waV7F+QiHuM0WaQnVF/FMS0RXhS0dsThbGBuwv3RPHoxvT/8UGwzyOATH",
+     "size": 16440,
+     "src": "package/dist/fonts/KaTeX_Math-Italic.woff2"
+    },
+    {
+     "dest": "katex-0.16.47/fonts/KaTeX_SansSerif-Bold.woff2",
+     "sha256": "e99ae51144bf1232efcc1bfe5add36262c6866b0faab24fa75740e1b98577a62",
+     "sha384": "sha384-FWRmzdMUcxpbgWzOqA1THk/7QOuMshS6cTUeprW3TVnzjVrGnO9oCvWhE9lEwgGX",
+     "size": 12216,
+     "src": "package/dist/fonts/KaTeX_SansSerif-Bold.woff2"
+    },
+    {
+     "dest": "katex-0.16.47/fonts/KaTeX_SansSerif-Italic.woff2",
+     "sha256": "00b26ac825e2095056396e0553b8ac26d3f8ad158c3826e28b4c45b385c4714a",
+     "sha384": "sha384-cIAn4buHZvRkXL5LFuK8pAPVzxv0niY78zTOBRHvRmalHZh9IYFAzZQPwNnHj05g",
+     "size": 12028,
+     "src": "package/dist/fonts/KaTeX_SansSerif-Italic.woff2"
+    },
+    {
+     "dest": "katex-0.16.47/fonts/KaTeX_SansSerif-Regular.woff2",
+     "sha256": "68e8c73ef42afd3ccec58bf0fba302cce448938e7fc020a5e31f8a952eee1342",
+     "sha384": "sha384-hFb2fFUxKsM3r80syP3hRUPdmRjMS09eYDF7almTU926xWabYjc1wdbrC7CaV5N/",
+     "size": 10344,
+     "src": "package/dist/fonts/KaTeX_SansSerif-Regular.woff2"
+    },
+    {
+     "dest": "katex-0.16.47/fonts/KaTeX_Script-Regular.woff2",
+     "sha256": "036d4e95149b69ff9bcc0cd55771efeb25ffa3947293e69acd78d5ac328c684b",
+     "sha384": "sha384-A6AdZ/mywRJao07EiGdwk4swWZyx+X1pi9aYMAdEYNUcIzbZzbrOlEnIBFn2tUvI",
+     "size": 9644,
+     "src": "package/dist/fonts/KaTeX_Script-Regular.woff2"
+    },
+    {
+     "dest": "katex-0.16.47/fonts/KaTeX_Size1-Regular.woff2",
+     "sha256": "6b47c40166b6dbe21a5dfca7718413f2147fd2399be1ba605d8ad39cedf25dfe",
+     "sha384": "sha384-vXXP3yBdT6+htUbz5gNLFqA/PE6AUmW++GDGZTnxOaHX2IFPIG1ie1qo3Ra6QXHy",
+     "size": 5468,
+     "src": "package/dist/fonts/KaTeX_Size1-Regular.woff2"
+    },
+    {
+     "dest": "katex-0.16.47/fonts/KaTeX_Size2-Regular.woff2",
+     "sha256": "d04c54219f9eaec6d4d4fd42dfb28785975a4794d6b2fc71e566b9cd6db842dd",
+     "sha384": "sha384-hCKAtKJzh4FhbOKEWInGgZoaS+sek0VFv7B866K51w2+KRZ5E6GJcpWQHbEPGPZz",
+     "size": 5208,
+     "src": "package/dist/fonts/KaTeX_Size2-Regular.woff2"
+    },
+    {
+     "dest": "katex-0.16.47/fonts/KaTeX_Size3-Regular.woff2",
+     "sha256": "73d591271b1604960cb10bb90fee021670af7297017e0e98480b332d11f51995",
+     "sha384": "sha384-dJES0vnXQqt06SV8gVM87Qsddvp2jjMCSjJ/jfADNWOP1feq4AqxkHeo/HZRTeya",
+     "size": 3624,
+     "src": "package/dist/fonts/KaTeX_Size3-Regular.woff2"
+    },
+    {
+     "dest": "katex-0.16.47/fonts/KaTeX_Size4-Regular.woff2",
+     "sha256": "a4af7d414440a1c1790825cfb700cf9cf43b0f2c4b04f0ebc523011ad9853ec0",
+     "sha384": "sha384-N0i7aW7M3/ioHKtRjR78Td+YATjbmUh0waMuUQOjBtv/bp4qTWd58I4etzZ71USy",
+     "size": 4928,
+     "src": "package/dist/fonts/KaTeX_Size4-Regular.woff2"
+    },
+    {
+     "dest": "katex-0.16.47/fonts/KaTeX_Typewriter-Regular.woff2",
+     "sha256": "71d517d67827787cfabdf186914cc3358eda539e37931941f2b2fd4a21f68c0b",
+     "sha384": "sha384-EwGF1si4JOX2592vVUMe7CnToRBlq2lo+w+8tVWLrJW5ZiwBuSry7Ozgs+cGHjmB",
+     "size": 13568,
+     "src": "package/dist/fonts/KaTeX_Typewriter-Regular.woff2"
+    }
+   ],
+   "integrity": "sha512-Eeo8Ys1doU1z+x8AZsPpQu+p/QcZBI5PeOo7QGQdy2x2m0MU/hYagBbGOmXwr5KVbEfVuWv9LpnQWeehogurjg==",
+   "license": "MIT",
+   "name": "katex",
+   "tarball": "https://registry.npmjs.org/katex/-/katex-0.16.47.tgz",
+   "version": "0.16.47"
+  },
+  {
+   "files": [
+    {
+     "dest": "highlightjs-11.12.0/highlight.min.js",
+     "sha256": "8ab71eb09c51f501e5e25157d9cff100e46cc29bcbfc744d0b746d451fca7f53",
+     "sha384": "sha384-wjfDDhOPPdjtva8vWBhWeVprSpmxisEu5aYT3q1JyACqXpdKpo3PWZTMVq24MBix",
+     "size": 129254,
+     "src": "package/highlight.min.js"
+    },
+    {
+     "cdn": "https://cdn.jsdelivr.net/npm/highlight.js@11.12.0/styles/github.min.css",
+     "dest": "highlightjs-11.12.0/github.min.css",
+     "sha256": "3a9a5def8b9c311e5ae43abde85c63133185eed4f0d9f67fea4b00a8308cf066",
+     "sha384": "sha384-eFTL69TLRZTkNfYZOLM+G04821K1qZao/4QLJbet1pP4tcF+fdXq/9CdqAbWRl/L",
+     "size": 1309,
+     "src": "package/styles/github.min.css"
+    },
+    {
+     "cdn": "https://cdn.jsdelivr.net/npm/highlight.js@11.12.0/styles/github-dark.min.css",
+     "dest": "highlightjs-11.12.0/github-dark.min.css",
+     "sha256": "9f208d022102b1d0c7aebfecd8e42ca7997d5de636649d2b31ea63093d809019",
+     "sha384": "sha384-wH75j6z1lH97ZOpMOInqhgKzFkAInZPPSPlZpYKYTOqsaizPvhQZmAtLcPKXpLyH",
+     "size": 1315,
+     "src": "package/styles/github-dark.min.css"
+    },
+    {
+     "dest": "highlightjs-11.12.0/LICENSE",
+     "sha256": "6c081431591d9df696c82dc598fe1423765b8a299b200ed00b281afd0f64c490",
+     "sha384": "sha384-PdMCsAZNy5AH7gGEL6XVxHEXIrtvn5oA704FTocp7whxdzCQ+AuammKPDLS1ubFV",
+     "size": 1514,
+     "src": "package/LICENSE"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/1c.min.js",
+     "sha256": "908411c08c941e86fecfbc9dddee60089e240cbc36be96971f668f3fecfc9104",
+     "sha384": "sha384-0dEOKwfMDCQjiskq0W/EY0WUrffrp1sMioAlHDExIHbFB/He9msytFsqVzFAAwgD",
+     "size": 159677,
+     "src": "package/languages/1c.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/abnf.min.js",
+     "sha256": "ef9d9cb5eea4727c6ace08a7dc2447f1de76e85187003e54bc3dc4b7cab54408",
+     "sha384": "sha384-FXzSjPUGeHjiR6Xqkyg5VYhDcu699UrsffgfbQ8eWOMxS7wefq6u4FanwSAjMqC5",
+     "size": 743,
+     "src": "package/languages/abnf.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/accesslog.min.js",
+     "sha256": "acd1a0f21753ef8160f47bc78d96a944ebb66cca1aa97733f5d764daf377391a",
+     "sha384": "sha384-bG/6dXLz6Su49NXLKaZ6gCNHJLZEYJCBC6L2uFC7FymcYiXa+mWaHT5f5niJWf2J",
+     "size": 867,
+     "src": "package/languages/accesslog.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/actionscript.min.js",
+     "sha256": "c83d4aea5761714a7f57ebd76fab4a46cae4e36b34e0a04e0358a11e6ee17124",
+     "sha384": "sha384-9x3tLiEFYbGRxL2aW2dE4bBLIC2ikrzq3hDr0QhY6o3wOBeOqccOlN5CdQtw3TtU",
+     "size": 1569,
+     "src": "package/languages/actionscript.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/ada.min.js",
+     "sha256": "83853d1e3dc7e206d51b179b7d40d3183bbd803d8149cb650138d52e16a1f3e9",
+     "sha384": "sha384-jhYDVknGeZezdLAK9F/+PVHdfTsHQx/8ceOATkW5vch1qWvMj1d8f8yRxu8F9uZU",
+     "size": 2215,
+     "src": "package/languages/ada.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/angelscript.min.js",
+     "sha256": "6be540cbf2d72776bb93e4955bbf6cff1df8146e67d3886c50fe0b87420b20ce",
+     "sha384": "sha384-eS14DqT/Hn+h7VImaaNcfRwvD0x0thQKkYt2NjsPYvOXHjBbd8pY8u7it8Rop/um",
+     "size": 1795,
+     "src": "package/languages/angelscript.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/apache.min.js",
+     "sha256": "9dc53948535832b25d4eb23d40fef70510317398fdaf15f8a3fcc3ae7e0c490c",
+     "sha384": "sha384-QraNZk4EDfTVeWmClFLg5BZNVnDF8kF6L0wgGHxg201ohjeXkPbNzC5dzdpjxdnB",
+     "size": 1064,
+     "src": "package/languages/apache.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/applescript.min.js",
+     "sha256": "874a734d1443c4a5d91c388ee3c8244fa79f8d9fe886e2a58fcc7a42df363aef",
+     "sha384": "sha384-sHEGnomo/lWUBg5I8TICidwswwIA/xv83CJu2P5EPOeM/GouFNz0DqApK1rXyR+X",
+     "size": 2604,
+     "src": "package/languages/applescript.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/arcade.min.js",
+     "sha256": "fd432ae58593247f37cb016a5e7fe8bfc59e142892894eccbac873e5b35ef19d",
+     "sha384": "sha384-rOtRAS0OD08WHxvsw5rVsm42uYKtAqNr0LupkmvItimfNC9yey6QC+eSBPWeewet",
+     "size": 4830,
+     "src": "package/languages/arcade.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/arduino.min.js",
+     "sha256": "d98bb0f286974b00e4a0b58a8e565d027ff6fe769b92ba4e7f4ab4602faa1524",
+     "sha384": "sha384-E6FJkg0YQwr6DdDR0LLLYf7x4jf5uhy73koai3bqN25Mw307x8y1ERpV1kpK7o17",
+     "size": 10744,
+     "src": "package/languages/arduino.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/armasm.min.js",
+     "sha256": "d6224ddeb6b3a0db31041a5b1b5fb8377e5042bdd547488f781828b1acf5c689",
+     "sha384": "sha384-lPVdJSvbOCURN6N0fEp7MDhI9mRVUZffGHI6I63SY8afZiqUxOPAwnUeuWmTDgkC",
+     "size": 3461,
+     "src": "package/languages/armasm.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/asciidoc.min.js",
+     "sha256": "cd401de67ef4fd5fed7fbfbb547bda8a6f05e5d99bca1545fd4c90319b37c372",
+     "sha384": "sha384-lNQ5H7q4BZECipdS2g8FzHQm0Fqi0O8bb9SE8zJ2qlSrEaQcybfGCarQ71Oj6o0R",
+     "size": 2506,
+     "src": "package/languages/asciidoc.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/aspectj.min.js",
+     "sha256": "ffce0766291c9ef1c8e6246bab02f012ca340a11d601cb72945b1f6e7446f344",
+     "sha384": "sha384-H+o9fKU23Vvx1mSPmVHf2wmhzm87eve67KRs2WMckK2npr0tLOynNF3RUyMLw9u7",
+     "size": 2757,
+     "src": "package/languages/aspectj.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/autohotkey.min.js",
+     "sha256": "578de62fed6e7bb2ff165562c5f2be2b780e68be7ffe97f3fba8b0380976082f",
+     "sha384": "sha384-ETU9ophSb0GK/xgHFcGYMaf/7Xufu0TKDpmyumud5YRR6tX1m8xStyA/8hdGNp+6",
+     "size": 1009,
+     "src": "package/languages/autohotkey.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/autoit.min.js",
+     "sha256": "ace9dcaf567b60a73284ad35df6639a41516345534a28124d61f835e13d11bc2",
+     "sha384": "sha384-Sbt2je4y9ZaA7ZS1i/fp7UeAoG1QmeVjB7ZuyWfDJC6Yrlmj0Sqh9ZPOtaJJkm3/",
+     "size": 6679,
+     "src": "package/languages/autoit.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/avrasm.min.js",
+     "sha256": "3faa255a4e4b5a60e5194293934a153a856fb82cea9adab20b2df45ed3739dc0",
+     "sha384": "sha384-+am0iA2QGpg6L06g3XfD4SiigInt/+GXpyW6Og6heUd0fJjexL5BWUc/mxrPBLAc",
+     "size": 2055,
+     "src": "package/languages/avrasm.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/awk.min.js",
+     "sha256": "439d2b6bc3228f9e882851e3a20e947b41b51ffc5704c4e07f3a05730755e086",
+     "sha384": "sha384-fMmTpnt13E+OHdNVNrGGh8dQn7suHkyJqXK3gZHJc/JbDk9QTmpo4l8lmxduLuT3",
+     "size": 741,
+     "src": "package/languages/awk.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/axapta.min.js",
+     "sha256": "706394dcc4de0f1bfb5b44dac8bbd2fea1f1766fdd644f90848b4ece7be97c18",
+     "sha384": "sha384-82uq922/34e1t7kUAnlqzTgfZYNGOagCr8ncXe2CXMLPRVKHkeI9ox3E23eUuD8V",
+     "size": 1755,
+     "src": "package/languages/axapta.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/basic.min.js",
+     "sha256": "cd0ab63b4fc6a73323015cd192e44571abc3aa8db93f75fb22e702fc1283e6a5",
+     "sha384": "sha384-FY2WbFC0MWOkOmPYdCtW5yYLOFdbA15A6W7w/NUN8bgxyOxBFRp/KuWVkxHJzNA/",
+     "size": 1947,
+     "src": "package/languages/basic.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/bnf.min.js",
+     "sha256": "76d408e0ac0b84f3eaa51bfed50f4fcec58b35768ef013805f1af88b07cb4980",
+     "sha384": "sha384-Y03dArsKeMrGwpVX6QCDOakY1f0URmRusH9MeHeJTZuas3f2PmqZQmqdr4lHmxNq",
+     "size": 362,
+     "src": "package/languages/bnf.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/brainfuck.min.js",
+     "sha256": "aae6c3622f3d4949820ed41248b23d2c3f9b0a63fdc5666f8d3ffd8d6ecc8e20",
+     "sha384": "sha384-F8zIwjSEu5xB+rnbqwb1UvoFj3VZ8wEl5PHFgGjL8WxwqE5U0aBWVrUO0dyJSyWF",
+     "size": 540,
+     "src": "package/languages/brainfuck.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/cal.min.js",
+     "sha256": "e33f03a8d0bc05d383b29cbe11778a16c132f0352aab54bcc35329d0bd1e36b9",
+     "sha384": "sha384-vmDBweDvmEqidY+ZDWczJffF/pIGBeFlQTut7M/x/0LHWCh5oC2Ma2T/91EU5gz3",
+     "size": 1248,
+     "src": "package/languages/cal.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/capnproto.min.js",
+     "sha256": "6614ced89cd6f1f1a6b6ab3b6a65b4aeeff80f548e6219d3ffcd67ce937914ae",
+     "sha384": "sha384-8bOy3ubemWYxm9rxlBMy2bZ1NsUOmYQoat/Bfg72eAcE0fk5oImNGP3By4dfbDVz",
+     "size": 869,
+     "src": "package/languages/capnproto.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/ceylon.min.js",
+     "sha256": "0e7c94b551fc1cbb0965e303259a34ade19a90cbec0d73e075dccb11a958d522",
+     "sha384": "sha384-krTIAgwQ/++ru5IvZ1XgtUo0myP2OkCfanpHRZwIHCEfDpvjHosb+5J3tm5APFM1",
+     "size": 1325,
+     "src": "package/languages/ceylon.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/clean.min.js",
+     "sha256": "16448d98d5abb81b7b756124b05e66ba1de2acd3b3498340e7dc5ac8fc49f59b",
+     "sha384": "sha384-XL4iQcDSwrpTY3gzSgQ4PFvbbrK+4Jovmq4h5IIBbhLasA40RmmnrA8kVie5GEJP",
+     "size": 683,
+     "src": "package/languages/clean.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/clojure.min.js",
+     "sha256": "f5e2b3e886c93d972a8512ae889189476265a3e14dd79bd57f565e98c5c11c3d",
+     "sha384": "sha384-5FYEb05i3NG1q8w76Ak5/2HAiF2Yw1428YR0YbS1mezlHl8HPolqt7RR7Ob8Pzoa",
+     "size": 4189,
+     "src": "package/languages/clojure.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/clojure-repl.min.js",
+     "sha256": "c2ee139cfd23bf0be15b71805a83232f5c82cca7de3379fb0ead6982aa8ac806",
+     "sha384": "sha384-pV4ACrf3iOv5wCu3/yZ1Ygku8jWQBMUpYd0RZwRFW1uo6kKnw9XRdScX7uAH4UGO",
+     "size": 283,
+     "src": "package/languages/clojure-repl.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/cmake.min.js",
+     "sha256": "0cd6dc22b0b99dc53a4288ae30f760dab4da12ddde570f617be30a396b5b97ec",
+     "sha384": "sha384-2+d+VUsqaxDE3yoeRJxqWmX1dF5Ongwq0zKRb+NmBsIQXlRr0GTQOkDDD6eujd4k",
+     "size": 2593,
+     "src": "package/languages/cmake.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/coffeescript.min.js",
+     "sha256": "252bdf970c5cabf1878e65c54e06e747d4d9fe0cb61605bf39630727fef48a80",
+     "sha384": "sha384-yrDrCtmo8etajTcWsAFTXXy2lvhgjM8jMtC1z6L7GpN/PT6aKWV+KOG6lU5U7Uo0",
+     "size": 3101,
+     "src": "package/languages/coffeescript.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/coq.min.js",
+     "sha256": "55926d4a50945ad1a0ed0d2f6f67bc7d577b0f81aa587d77390fbc10c571da1a",
+     "sha384": "sha384-0t/U+jKUwNGBMz+jigZWD22/cnBv9hx14YTCafL0lu3xsXZWMM23SQUIPKBhoZJJ",
+     "size": 4369,
+     "src": "package/languages/coq.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/cos.min.js",
+     "sha256": "6a33ecec61aca44b65e865308a254dd87655fccdf0c994858c3b2b97fb568b27",
+     "sha384": "sha384-/qPSbF1akbxjHjQf7bOhIRXLZgNJoWw8niSlJZZyBbO/B8RImuhUSsT9x5cUP9V2",
+     "size": 1411,
+     "src": "package/languages/cos.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/crmsh.min.js",
+     "sha256": "cc4831fdde44f7aa52d46116863a0db5506fb243f5f142ba026aa9084b1e63be",
+     "sha384": "sha384-E7L2u7n7GUbz1MXC1S6zg4+s6rjbsqKI5xwY7w3p3J1Ta0vR6X1p1afJngI5nqBC",
+     "size": 1481,
+     "src": "package/languages/crmsh.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/crystal.min.js",
+     "sha256": "666a115f1bcc9b580a76c19aac1cc66a8b723bbfabe0ccc86a3d4f99d9992abf",
+     "sha384": "sha384-OG9G2vQgic2ttJmLFSa20DUnq9PVRVfDzL1kp0n8Kn3LqwkJHgJU8ZOJGbHtSemk",
+     "size": 3742,
+     "src": "package/languages/crystal.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/csp.min.js",
+     "sha256": "9c5f54d978595a20429f464fc9261fffccb9f1e85305f689d297bca3ed75ad87",
+     "sha384": "sha384-jMr7+vSjFN1KTFNnda+KOWis54jQMePKxY0ZJlY6xnCivezo9FQt4/cb75LIZ4oC",
+     "size": 736,
+     "src": "package/languages/csp.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/d.min.js",
+     "sha256": "1af314ee7ff9fed75bf3e097335d3ed1c16ea9a5b6e11e2ca373c617d94684ba",
+     "sha384": "sha384-TWra7B89iv3+66u3qcxxg+96U4d+EeRMBZeHqUium1ttSIZWal995eWGrBcDKjqq",
+     "size": 2252,
+     "src": "package/languages/d.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/dart.min.js",
+     "sha256": "0afb39830e15611e0415131a4c375a68596c5c330ed7fa1d20e2efaddbb37d34",
+     "sha384": "sha384-m692RDTeyWok7r6KORdic5N2fD4sqVvyPrwZsS1U6CKcx7d3Kw88TvlMnSVPIFba",
+     "size": 2583,
+     "src": "package/languages/dart.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/delphi.min.js",
+     "sha256": "a382676df421565798d45fe760da0e6112bc5288cac0f8ade716bba63cf70bb0",
+     "sha384": "sha384-Exb4Oc6c5Ij2XVX61DwugOd4tsupIyy3qfq7xWQCLe3fJEtCoV1W+/NR+ZDB+N/d",
+     "size": 2453,
+     "src": "package/languages/delphi.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/django.min.js",
+     "sha256": "c4d39864771850ba927c8b5f0bc258e5d76131022db95679b8e7d218020d0389",
+     "sha384": "sha384-iCQMVBDvaK7uW9unjuim0DlLN7Jwk+qOtE8tAOVrjsp38zhncxewwgOc4G6hxFLE",
+     "size": 1865,
+     "src": "package/languages/django.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/dns.min.js",
+     "sha256": "b2939640f5c2825cd660dc2ba958a35553166c9a9e5fd68e4cd14b48efa5a4d4",
+     "sha384": "sha384-PwqNa5d0HtCty8ZGcWhEKnB5EZMQlsbFPo3KQ8SSlgI/nYMiJDr827UC5DoH5SHa",
+     "size": 2365,
+     "src": "package/languages/dns.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/dockerfile.min.js",
+     "sha256": "d96f73b077d654d776795097cf49afae5dce3ce453106af022eae013ad2ec8b1",
+     "sha384": "sha384-/zu1pI8+9j/v/qNlCRRyidiBhGdxfvGwOLXEPBXpKc77eFNUAhccr0WglEQ+x9La",
+     "size": 521,
+     "src": "package/languages/dockerfile.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/dos.min.js",
+     "sha256": "e184a6f9cead550b7b39b6114d17cafd08904557317622d7ea488aed01cf31ee",
+     "sha384": "sha384-OP6ey9zMpJWPVgF9AGbxxfHDX5xCrPeJuM9x1nAZXFMNjzNz3xOUrRtphSL+N3h3",
+     "size": 1433,
+     "src": "package/languages/dos.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/dsconfig.min.js",
+     "sha256": "03b99009cb7cee6458d0cf91ecb7a87d155ff3ce9d2b17ab2a3e576bc034a634",
+     "sha384": "sha384-+GHqzlK5aZupzzIEqbB/qPw98otJ/iGERYerZlGOnruCrR+igVglD5TSmdBnAN84",
+     "size": 675,
+     "src": "package/languages/dsconfig.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/dts.min.js",
+     "sha256": "86e6be559e67611d4b9bad49642bfd7093dbe8752fc9d13834a306d3a29c518f",
+     "sha384": "sha384-r2Sig3wjLrzZlYfjdtpqhQd0dcy0i2qeW0Cb+N1YP9DGMZTSQzoVoO9CJCW87aGU",
+     "size": 1493,
+     "src": "package/languages/dts.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/dust.min.js",
+     "sha256": "64542cea16ffff65e04291e27c96fe0f37fb0a4696073c1843109644c7b20283",
+     "sha384": "sha384-YxagUvN2fZdTSEehRxc7l2VRMrf+ugybWxa84Uc2VTH+KFYgKN501D/uOVnoO3Kz",
+     "size": 531,
+     "src": "package/languages/dust.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/ebnf.min.js",
+     "sha256": "1d0c7cd44e7c4d4bdbb61f8cfded57270a5497838e4d907074c0cfd01173a4dd",
+     "sha384": "sha384-aCUVIjvl2rogTdwHA4g5Zqv/t+yjx+rGbawUrsQvod5u1Q2+8m6aaep47Gj92NHx",
+     "size": 471,
+     "src": "package/languages/ebnf.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/elixir.min.js",
+     "sha256": "c45c72f60c2a693341d41fab47b8c8fe4bf11221469a4c5a20fe5f2bd4e6f215",
+     "sha384": "sha384-rSOGzFmdaGExhx6WbibC/dE+Pdl0aqugcyUKj5yiT2Gxf4BQVIKdL0bwry1c31Ux",
+     "size": 2563,
+     "src": "package/languages/elixir.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/elm.min.js",
+     "sha256": "62187fe6b3eb0cfaea1961aad47d24801b58a4791f721fbdf3d75ec010177ec0",
+     "sha384": "sha384-hs4dZwWxSJrpxD9pl+8bxS3eASv5D8ZMeX4lsxA1F2D3ogZYR+OCYUmBwNeujPf9",
+     "size": 1264,
+     "src": "package/languages/elm.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/erb.min.js",
+     "sha256": "041d1d4eb53f632038cc38770ac0f522ff591f4fa171985abc6d40d933c606b4",
+     "sha384": "sha384-xB8oLM0LrPv+htjhcmtkA56WWSgOP63K6ViZz9w42VHteQYbj6RvvREIhpoDOLZ2",
+     "size": 286,
+     "src": "package/languages/erb.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/erlang.min.js",
+     "sha256": "5e1b88cdc7bc4e83cb989f558aa2ad06f610f961d66a7466cbd1fd402e7a8515",
+     "sha384": "sha384-nQ2ULvfpV6vH0atPFJwG6BJgCeCt9Pg1Nx1EnsJELoO2u7D3hfyDPgLOtxHtPA+w",
+     "size": 2618,
+     "src": "package/languages/erlang.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/erlang-repl.min.js",
+     "sha256": "ec81bde6c6d2bc368ed9ef4f0a04db7052f20effe2cfd7b924e7087c1263b6ac",
+     "sha384": "sha384-KP7Mlg3LtFTdlil6xhIhhSF/vEtsvhr6fPRZFkZsrkKQknUlYOVGbjw0PkHHM7C5",
+     "size": 896,
+     "src": "package/languages/erlang-repl.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/excel.min.js",
+     "sha256": "6f134735f78fbdefa5520ca51075764daf2aee30dc54aad2ac35e019aae6a185",
+     "sha384": "sha384-58/fdyRU4xnHhJjtucGxcmuREWKSkYeGELj5LoqjS2pk2/HxrKXfTWIFdShavX71",
+     "size": 5698,
+     "src": "package/languages/excel.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/fix.min.js",
+     "sha256": "39eaa5ce96b53b90c6ef38227d9bd0ce099c13ac664222fe1f8fead5ec1893ab",
+     "sha384": "sha384-ldXyjW3xyU33gaiaepCcxaTUx3c+J9blAhWmu3dM7zroi6DJtT7JSc+9kRz+WnMA",
+     "size": 473,
+     "src": "package/languages/fix.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/flix.min.js",
+     "sha256": "b65e75ae9cc837dd877fdb6416048f9782709211249102dcd4e675c505cb8661",
+     "sha384": "sha384-OM/h+Uw48vU4oxzXcfmbmhSnjuexVK5cu2G6e4ik/CZCuJ2JxdnS/Jr0oWTIQv6Y",
+     "size": 730,
+     "src": "package/languages/flix.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/fortran.min.js",
+     "sha256": "0d7ee562b350e805f9e43d4ebd91388754cc92860c2efaa90f698fdb9be1419e",
+     "sha384": "sha384-w5JXWi0B42BKEfpqDLgy0wBSgI6JzYBT3SV12nBjFnJT3YCdvmdS6k9BtcwOe39J",
+     "size": 5829,
+     "src": "package/languages/fortran.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/freedesktop.min.js",
+     "sha256": "978c07a7b9638b90c1e0ad3b762b864329d6a7057c95c7093b2a8e042fe3de1a",
+     "sha384": "sha384-XjjUVKQ2Fx8YJy5LVeKGC4fPTIIpAlazSKxo7byd66vgDpebwYntjjoZWzC3RIyX",
+     "size": 1041,
+     "src": "package/languages/freedesktop.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/fsharp.min.js",
+     "sha256": "4eccd0e3457b8a8f10c771149e174a4fcd9614fdd713d16e3f67cd5f18379d99",
+     "sha384": "sha384-497P//su89C+0b52jLnsXDpvjDqVAcOCeeVpH8tF2ZoPawmI9zMcV7immAWa31Ou",
+     "size": 4270,
+     "src": "package/languages/fsharp.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/gams.min.js",
+     "sha256": "a2a40f6a2c98222336fc26ad69241dfe755595e445631491660d3da9ed5ecce5",
+     "sha384": "sha384-Nx52aykgVC4vrHLghZ3Kkn7GHrWYeShkiWuZ1t6M4+fiWT4lgI06hI0S9NdYKuNp",
+     "size": 3037,
+     "src": "package/languages/gams.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/gauss.min.js",
+     "sha256": "ef684fbe0e910c40999d8ca00023db568a761e2caa55fac5963b3f213b5fb357",
+     "sha384": "sha384-8sReisoQGjQli1Ia+TGArpj0o1k3NklVdNmmFNSoD2dHgfhXDTg0LAr1OkIZvdX6",
+     "size": 13065,
+     "src": "package/languages/gauss.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/gcode.min.js",
+     "sha256": "808106dc5916f1ae2b2bef5b68d4fc3e32a5716128ad313f5e84a074cadc4785",
+     "sha384": "sha384-5nVtxRRtNqyNVeeOUvL6T8lG3mzOD6p4+FxGRTPxdWFgCQB1WUgf8Ra46AuCwzJ1",
+     "size": 1407,
+     "src": "package/languages/gcode.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/gherkin.min.js",
+     "sha256": "4ec1d730659018c6d078a93cf925c9c03234692e050ac53d60a8a8e7d7ad5975",
+     "sha384": "sha384-nvNtLf3hmt8LjP5Z+rza+Li8AWt59cWAf4A8dQBTMNdJtAUGkTo+q0U5Pk8rDBEK",
+     "size": 985,
+     "src": "package/languages/gherkin.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/glsl.min.js",
+     "sha256": "7c6a1de750fe3ebbf91011d080329fb439e76cf0fcf75a2f031a069f8aee93ef",
+     "sha384": "sha384-XiS1+JPWHSXaiCUiJCajSKauKAAgJOpuw9JaBRiwU3b/MOLvB6WWi59K+xFGI6hn",
+     "size": 8400,
+     "src": "package/languages/glsl.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/gml.min.js",
+     "sha256": "1fb527c607047002192e93f42ba4c00454f11984b0580a20a6563cf9d7c98a70",
+     "sha384": "sha384-CRyja0w2eRMQEFeDkK949rRHnLAjmHt7t3yUDRwLlIvC2uTsUbMA7iobj50T8Gi9",
+     "size": 61982,
+     "src": "package/languages/gml.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/golo.min.js",
+     "sha256": "5b24d91efacfbaa1a0a0ace48079f474eed88b4cc71c7018b4545ae334b886be",
+     "sha384": "sha384-E/RDk+3zW2qYv09FHgdHh7TtJVapeQYqHysvsmK3SWJ2Crfsds7XvuaXwjsY6Bto",
+     "size": 719,
+     "src": "package/languages/golo.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/gradle.min.js",
+     "sha256": "03977cf861c7daafe75bbf9aa5bcb39f428fb5ea113ba282dde61f85fde6fe9e",
+     "sha384": "sha384-ZMf1TkmgwGuFpXWyanMnGiBQS/hdqUrJkNZfPm3GZ/CGypwNzesT3EX03iY30WN5",
+     "size": 1936,
+     "src": "package/languages/gradle.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/groovy.min.js",
+     "sha256": "55b81d783372ed6c8c99d5c3568113845dceb93ea454c54f61582ef8d2970a17",
+     "sha384": "sha384-T3pAOCMtlhvbttiHMLES5r/LSOZUGYphLrWRjZt+2XskLDHrwjQQzJShJanN1D2Q",
+     "size": 2151,
+     "src": "package/languages/groovy.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/haml.min.js",
+     "sha256": "c97eb0fc4702536f0d7e3e729442dc2eb5526ba93412eac3e32b30fd3b409a35",
+     "sha384": "sha384-6N2TCpz6V/kvbDp6AsMV6xOcyY4+1J/z6iBFw6a405Mfv1eEiOgRrfaw1IEFRchr",
+     "size": 1171,
+     "src": "package/languages/haml.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/handlebars.min.js",
+     "sha256": "451d19972cedba023cddb1d597b0c71bf35284caeedf490fe9ecc21bf8cfe372",
+     "sha384": "sha384-OOl6xUfRcwlzD1VVtlM2i4n1wVh5jG7PQu0yVmLHoIPNE4U2YaQas5gz7Pc3n5qP",
+     "size": 2322,
+     "src": "package/languages/handlebars.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/haskell.min.js",
+     "sha256": "1410ffe7480a489e5efa668b58fcef5ab6cc3439df587e6919936d0a6365c02b",
+     "sha384": "sha384-L8WB9gHpfiTBWE1ygjEnc4V2QF5dazO17LzcqDfOFEmJeRo5udFESxWTuGIlURhX",
+     "size": 2271,
+     "src": "package/languages/haskell.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/haxe.min.js",
+     "sha256": "ac95e71f3d553ffabbb4f65adefbd1286d18a277666e5b04403d03cde516e87e",
+     "sha384": "sha384-N9gjEANo1hbrQIHo0/+VvK31tqQZ1TilMvHNBOpev/J9MP+d/3Yx3p/IKYnHwYVG",
+     "size": 2228,
+     "src": "package/languages/haxe.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/hsp.min.js",
+     "sha256": "2efbd8b4afe1900e9bd453ddd5e919fadee4058867fcf5f157bb2d9c278ba7ba",
+     "sha384": "sha384-JOONVydeQKsz5MvrjkYiDqrOZI0ZZegI7tf+TxfQDh8yOUawZd03iNh1D9gur9wh",
+     "size": 3452,
+     "src": "package/languages/hsp.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/http.min.js",
+     "sha256": "b09b4afc1ce71f37f4434baccae5800e0812c6eb1db2cb8978fe9e4d668f45a6",
+     "sha384": "sha384-L0lAPMci4/TxXazgm0dJIgX9udJzIJf78sk4o9v5sYuRVYJSjymFXF13LmyCU3L0",
+     "size": 914,
+     "src": "package/languages/http.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/hy.min.js",
+     "sha256": "0445dba1f597645cbc742ad2624a7de83bd9c881a3995dbbeff416a498418172",
+     "sha384": "sha384-PETjfN6FFVKh5dCnompPmM3BX85AQsr+LsGj0wLt0JfQ8vaU/Gob3U8ODe1YOZ10",
+     "size": 3040,
+     "src": "package/languages/hy.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/inform7.min.js",
+     "sha256": "3e0af13df0aec29ee46b5effd36117bcd9fa90b21ca90c137be5bed6cc213335",
+     "sha384": "sha384-0Jt2EHtMk2AjX/t2Kg9LXGP+TJ2AOa6VygjjvFjpm2rnav6tEx7cWspEi4uYBOfs",
+     "size": 754,
+     "src": "package/languages/inform7.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/irpf90.min.js",
+     "sha256": "7ceaa56a70b034c41fba3ed4e19f4f6f43911687d91b9308464b79eaa387aafd",
+     "sha384": "sha384-/WBL0JdxWFJEQfGEvaTX3uVHjN1JUD5SFh0o+w3iTRmn+bt9dJA8qywuaO8Svu18",
+     "size": 4827,
+     "src": "package/languages/irpf90.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/isbl.min.js",
+     "sha256": "164150d13da1020b2b1110c0d9dac9c34bb2e33ed5bae085041c90754be44a81",
+     "sha384": "sha384-bx8TUVAa2+3UQu+xFm4+xAaFFbJg13ysCPhvepwlmEDwhuZst/tHlv9p+tLOWq9I",
+     "size": 83271,
+     "src": "package/languages/isbl.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/jboss-cli.min.js",
+     "sha256": "685e5d352217d21298ff68be2f3150c52ce27a8fbd87663b70a3aed03c0e4719",
+     "sha384": "sha384-1E3U2kengWtJ4opeOFUfh76gobcyLmJ7DzFkfwDjA8ycIO4t+0Hx/vDVpHL9o+2d",
+     "size": 953,
+     "src": "package/languages/jboss-cli.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/julia.min.js",
+     "sha256": "fc613061cb53008f24164512da3f6d6817c4b248ae227dc8233108c7fb704728",
+     "sha384": "sha384-v2gCXTWc4kL+pNpB1AA9sem3usnVLY2uTl7/sWrQpMYl4FKFUECFCrHFo8WNPz43",
+     "size": 4081,
+     "src": "package/languages/julia.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/julia-repl.min.js",
+     "sha256": "5e164cad34d30598a9bb70bd336d4d203dcc042c2914f86ee0a604e131ab0913",
+     "sha384": "sha384-2qpW1IcQCJpwQyZ6Ksmy/LuTAG6Q6R1NLf++Dt1+IHUw1Vl0wcf+pKW3nSyMVBai",
+     "size": 309,
+     "src": "package/languages/julia-repl.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/lasso.min.js",
+     "sha256": "edfe61c3e2eead34fafedd65bb47186acbd90277cbed3937ebf8fb314aaa9554",
+     "sha384": "sha384-e+176D/Jphp5ob9A7r0l4X2d3vO2B+ElFHrSAzcQsXODzAv04Osjm/VVBEI3iJsk",
+     "size": 3054,
+     "src": "package/languages/lasso.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/latex.min.js",
+     "sha256": "12c8743607535b327bcebd954b0228cf39b7844704123319a7fb594a7db94ce7",
+     "sha384": "sha384-wHW9Hcxw0oenHF2z8fGo1rhAe1jZwnp35Z6xzC29Vj/O+toSfBY9+7TrUfUnwFMD",
+     "size": 3476,
+     "src": "package/languages/latex.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/ldif.min.js",
+     "sha256": "4eff77dc5289010e97847547dadb92e3a5f1016c2513e2db03f39d517f043720",
+     "sha384": "sha384-EH87aPFtrH+4fMdID3GC+9RbcRmuvMSF8ElVi6kitt9mmOAsUI8sLA0B3JGIrb3R",
+     "size": 317,
+     "src": "package/languages/ldif.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/leaf.min.js",
+     "sha256": "be236c25c8811ae6a51488e084d004dcb8e6c32539a0a618e5005f9d79f5358f",
+     "sha384": "sha384-sjsb15sfgYtysTYuoD8z9EQSXx3jWkTFMk+mSC3MJTZ8wLkWeQKGwhKzwZ/7FEPg",
+     "size": 805,
+     "src": "package/languages/leaf.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/lisp.min.js",
+     "sha256": "ffdeab1afc214245015ef80500e4831712700d98c81c55e391325f39e01edc98",
+     "sha384": "sha384-JPkK+3oG1Os0vhKRFRZnvEH6NeoWJn8y9pDddmqFOOMjNV+Y4BEB4WtG9Yf2/JG7",
+     "size": 1247,
+     "src": "package/languages/lisp.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/livecodeserver.min.js",
+     "sha256": "46709f72225371f2e7822a1d56eed855130946b618cecc0ee85d04cf8b20251a",
+     "sha384": "sha384-IR2nBcj8QxkSj7T6fDmcvKiJYBeF1t6b5BDPVc2G5iAPsaBC0ooO2qGfj8j8tBbs",
+     "size": 8325,
+     "src": "package/languages/livecodeserver.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/livescript.min.js",
+     "sha256": "24e98a61cec41151abc0af05177733d631c32f94c61a6ccb27e6750dfb280b4f",
+     "sha384": "sha384-kpBBD3YO57PPpg+jmPy9NSlDETByiBAACqrf2njpF2m6vMtCvEL0IMDeKftnxZcH",
+     "size": 3487,
+     "src": "package/languages/livescript.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/llvm.min.js",
+     "sha256": "1af3fb2e13927833fc4d761d3623ab05e839a240e4352400143bcb569d30959f",
+     "sha384": "sha384-Sjmz0kyLR+Sa04KhOZIdr2mgpISO5awi4vjMFx1YJWYM2nTDkqGVLowiK4eBbzvB",
+     "size": 2838,
+     "src": "package/languages/llvm.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/lsl.min.js",
+     "sha256": "ec9144a3f3670dc0cdd7f239854ed4ad3a953625839fea9ff23d88e417688ade",
+     "sha384": "sha384-lXxJYwHPcbBA/BVinPI0ggMvTpPxZdX73ISlerBKfXPHMdUAtIinHpBdj1wUwrY2",
+     "size": 11972,
+     "src": "package/languages/lsl.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/mathematica.min.js",
+     "sha256": "59b747b3fbbddb8ca5195bb5089fb79501f17e64f3ead5de64443386032e345b",
+     "sha384": "sha384-SkgIDZle1CBMv93kQr+lZMbPfOz3ODJ2S1PY0d8o5zgYSk/ZUabNDieQ2Qwf7/hk",
+     "size": 124428,
+     "src": "package/languages/mathematica.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/matlab.min.js",
+     "sha256": "d3dd55e6d0d59699082e01350250ddd790f065d158739ca3fd78c7dea6f443dd",
+     "sha384": "sha384-bzbYzqp5kO+6yS3NUZAEd8SfG2UtZyk9yuhsZ9233T1+Cps0iE9rEW2fQ1IaeMfw",
+     "size": 2355,
+     "src": "package/languages/matlab.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/maxima.min.js",
+     "sha256": "cb2004cd06bfacb4945fdd9b1a23566b3a78e966d733bfeaf9577895e88dab3c",
+     "sha384": "sha384-z3QbRfMZ8TX+9PGiTX637SbBlWZ0Nf0JvYbAi8gevbSl2AOD4N4ffirIN4GLZASo",
+     "size": 28787,
+     "src": "package/languages/maxima.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/mel.min.js",
+     "sha256": "7a95f27645329e65fda5c59d6520a0c92692689c17cfe35a5de43e06b91782b6",
+     "sha384": "sha384-1TV4fzcJtpgmlP8TF+/74SRmhH/rNrxGzk61e+kJGbE5FivBfs7kaoMutK4yIMx0",
+     "size": 16604,
+     "src": "package/languages/mel.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/mercury.min.js",
+     "sha256": "2d7964e76f7a8ad63b949f603392a11ba130712ed0c90fcdd2f31b8b0cd7449b",
+     "sha384": "sha384-R/v9nikFWXUdx8sHGGGPTpY48ehSgytKVrNJgPpDEOVcITGi7aLFPI7L2nrfn83A",
+     "size": 2146,
+     "src": "package/languages/mercury.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/mipsasm.min.js",
+     "sha256": "ff52b7ced13609565d133a089a4a412af2a58308a145f0333353462ab8e8edb6",
+     "sha384": "sha384-g8wYLhH4oM5Lg288Gd8otNCsksUqJlmvOOIY04zO9ozZtGXXWz/y9D/SDul0e0ki",
+     "size": 2540,
+     "src": "package/languages/mipsasm.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/mizar.min.js",
+     "sha256": "c383a4a213b3ab93280d822374e1d00c1f8690d8867b540033a15f876b6f8206",
+     "sha384": "sha384-3gUbMR6+YiCxSWc52LfpvL1CYbYX7t39nSaEfV8HwJMiedGLSSvKrrZAtHTkAITg",
+     "size": 799,
+     "src": "package/languages/mizar.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/mojolicious.min.js",
+     "sha256": "60a993e4cd8411ea2422b3f74791e6a8b3df40e066507302448b446529733071",
+     "sha384": "sha384-bVi9YbphtOq8GZWk0oA4rIjAaK/l68uVRiFE2VJT4IcM6EJhfW+0YvFJyFMahHz3",
+     "size": 394,
+     "src": "package/languages/mojolicious.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/monkey.min.js",
+     "sha256": "26f492fdb03b298d838b09ab256da210524b6daf55965bdeb7c78312f2d4cb7e",
+     "sha384": "sha384-8OYsUrCQU5pgSZ9x0mASwrMMt3bl2nwUvV4uE/5VkFsh5vt3iKhGvwug4Jr+A0Yc",
+     "size": 1591,
+     "src": "package/languages/monkey.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/moonscript.min.js",
+     "sha256": "f6e63bf0225b8ca99b8a604f5fc8275a2b928bac968230179101688f7a5466bb",
+     "sha384": "sha384-B4d7ivaqTmb0QYUbwMSXyqaWtImzix+UNLdDLjb47CGT4qesOjEchIvQS9eeFOpl",
+     "size": 1803,
+     "src": "package/languages/moonscript.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/n1ql.min.js",
+     "sha256": "57fc96a90f90486bb5021d4adc28df4d881e8810821176f75d54b7e2563f7f70",
+     "sha384": "sha384-1yjhp01gETUG4Q8Efxo79JxMbqN4w7NAC9JmrJHlCvhpMIx0ZmlnmVdwo0ZCBCBT",
+     "size": 3650,
+     "src": "package/languages/n1ql.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/nestedtext.min.js",
+     "sha256": "b48609c557ed9240ef0be6400d0ef7f3a8f85c679d29ca1c5c41cc8863f2452f",
+     "sha384": "sha384-11xZ6kUS6tgp9zbTyxbxs+6ejsUtN4YElJ0u1bpRmnnK+pNsT8NR+Xs7QC+2qp4/",
+     "size": 639,
+     "src": "package/languages/nestedtext.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/nginx.min.js",
+     "sha256": "8c53cc63ce0cf4ec0ad80b77273de23dec6974ab069d46d14d5c75febe880e1f",
+     "sha384": "sha384-fTqzvE/t2lypa5UdKpG8P3qlAUy1xlle9ZtJj8r+9V9aRP/ePjUW7IWAHlU8phrY",
+     "size": 1622,
+     "src": "package/languages/nginx.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/nim.min.js",
+     "sha256": "a70ccfae244bb61b79d05ddfd4051ce12e95b65574bba8029d94a32bf598c9c9",
+     "sha384": "sha384-/esAhw2CBNyggVNEgyR9miFl8F5Z1KHbvUskNou3t5UjM50M3te71zsSwHUCFwIX",
+     "size": 1768,
+     "src": "package/languages/nim.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/nix.min.js",
+     "sha256": "b3fb414b263a3e7c3c493a49da2e9f1aacbc06248f4cbf5c6247c338caafdf3a",
+     "sha384": "sha384-9VYvb3RrbMDUx+Q/q8C9UVFF8yptNO5ShBGaKg11bpzI6hfy3G8cEQ7m1zciLjR5",
+     "size": 3478,
+     "src": "package/languages/nix.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/node-repl.min.js",
+     "sha256": "49dbb35d034a4d1d2cd039dd5b6a586641e219f06f163958e7d5fafad23a93fc",
+     "sha384": "sha384-gjlmsDX+YwpYnPwAHr1v12+ljEPGwTHc9fpuImOXysDmu6wYpnGaWZFEIrv8uXaS",
+     "size": 329,
+     "src": "package/languages/node-repl.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/nsis.min.js",
+     "sha256": "ad368cf34189a07b8a4de5b6da3f370ed144c1111995f3464877d23cf9571699",
+     "sha384": "sha384-B061gU7v5RmwkwcDwAVb7BoMySU5vvn5mdHrP60WNIAO4QbVEm6cBHzH34EBJVS4",
+     "size": 6895,
+     "src": "package/languages/nsis.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/ocaml.min.js",
+     "sha256": "8ac1edaa65626ef2390d321c1c17342702658bcccc7913b4b6d47cd1edb817d2",
+     "sha384": "sha384-74s/hsaCRSaXFO4K7hl5vtCAx390VPb1iovzm5RrDuHzsbD78KWUJAVtny1kKcfi",
+     "size": 1331,
+     "src": "package/languages/ocaml.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/openscad.min.js",
+     "sha256": "133b9c4a6aa17bf7a6aa1b0156247063132292af246ea588ba0da0098737e2cc",
+     "sha384": "sha384-yqtSBCDG7NhqBcgbadg2zPcgF5bQLiO+U+/t7/De7GxTBbfVNii5VbP9fRS+K9mk",
+     "size": 1375,
+     "src": "package/languages/openscad.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/oxygene.min.js",
+     "sha256": "96e85e7120caf54ed8c5f190eb94925e255a2100d0bf9661506c26c226794b84",
+     "sha384": "sha384-IEnT+s4LC6SXYN5/+7QBS5aRe7Xy7nzOAjtwJwwmC7wLckcOmA+PwPN2duSzc9Du",
+     "size": 1980,
+     "src": "package/languages/oxygene.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/parser3.min.js",
+     "sha256": "93c33821a0df591c404ba77448de213f6a3aa964bdf3be0cca365bc29955c5f9",
+     "sha384": "sha384-X8XvkxduxrgcMxdn3soh3eNDlkdIXzWY1DCvxnCGyobf+Ll6bIXwDhajC6zkGVcu",
+     "size": 648,
+     "src": "package/languages/parser3.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/pf.min.js",
+     "sha256": "794b461ea7b163e3ea379f4902219b72079b4246b262ddf36c85fcb1f7e9a845",
+     "sha384": "sha384-wzYeNpgfadnWIjjJ5olZjtDvficoGZKk+75OBv7In1icOtPUkU0N8e7ihDN0hp2f",
+     "size": 1355,
+     "src": "package/languages/pf.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/pgsql.min.js",
+     "sha256": "b9e677ac2c95ceab84ab6017b74309cb77c3acc0e685c3d5296ebd93bd8a61d6",
+     "sha384": "sha384-9rdIc+nt3LnsQUdyROz7e1pHsM27CXAhtRaGo0AhyHxGCsSCRLE64xeMNrpcASNy",
+     "size": 18979,
+     "src": "package/languages/pgsql.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/pony.min.js",
+     "sha256": "0d959c703323ac70a21ec360a796fcfa9bb85a45733e5797633f3a71bfa34f30",
+     "sha384": "sha384-Ncu/rD2poreNtDp6nlOO3YAXqttpv2Qh8Wp4ye3oeL3PUq+4WfGm8f9LMTVTWB1e",
+     "size": 1031,
+     "src": "package/languages/pony.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/powershell.min.js",
+     "sha256": "fc298b3e0db362e531e6d58988b7a78f83da19df6b5d74db75bc961b2bfbfd3d",
+     "sha384": "sha384-jigawbLJjSW9uklht6/lvMBC7b00t25Id0RQW+qORcsF6B+LARvlTLfzyIaNolYG",
+     "size": 4448,
+     "src": "package/languages/powershell.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/processing.min.js",
+     "sha256": "6098e3e0fc4c4c77e1cff1b331489fe357c7af636b51fd8e5cf5c50a4ed5199a",
+     "sha384": "sha384-I34lXT06xntDsynPnzg0T2QTEntKhyxGm/2H52WezVbz1nQtEv44wi+YxDJSZWLc",
+     "size": 4414,
+     "src": "package/languages/processing.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/profile.min.js",
+     "sha256": "716b1a34022b2d2a73ace0bcebb2fb0113dca7fc971bd2add49ee1a5ec969c31",
+     "sha384": "sha384-Y3cXEtElZcbKVMFgbXHjz9uuiW2GUl4imkasPyME+ri6E6aW/DoXVxzSqgnUfVfv",
+     "size": 582,
+     "src": "package/languages/profile.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/prolog.min.js",
+     "sha256": "0d92db64efc685031a3a16663fcbf6109cc42393697fb623b112464c221288e6",
+     "sha384": "sha384-AM7OGQmAMFXlV/dGATlR5DpUaO22ei6nU7SqwpChP3gzsWXQu0RiuNa0NG4hwV9T",
+     "size": 763,
+     "src": "package/languages/prolog.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/properties.min.js",
+     "sha256": "8a987022cc566fa5bfcd79058ec4ba010920d576fff809b92317295827402590",
+     "sha384": "sha384-xHbFPM8P0rCZ1js6aFBqwyDdUMK35/FEbVS6ZSdPtDjssqs17QJ2/M9kWJJUbm3D",
+     "size": 638,
+     "src": "package/languages/properties.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/protobuf.min.js",
+     "sha256": "67f3f53b99c3c6e9b393cf95d164632ccebaf0ec8a7f1f1f896edf259496b784",
+     "sha384": "sha384-+0RAXIR4LRTtbuX1B+TJHkhS4Id4ro/sNetpSgoMpx4Q8gR/sadGTftPY3PcIi2U",
+     "size": 785,
+     "src": "package/languages/protobuf.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/puppet.min.js",
+     "sha256": "3581fe4e00b8ed4e143a3e59dd39745fe2e42c0f42d50f794980283123c218c8",
+     "sha384": "sha384-GSQqBjn2Rhf/9jdAw6FHxoug5rHjxY2t7PA3k0pnziwD4KENqmFluLFl84WKkCtx",
+     "size": 4193,
+     "src": "package/languages/puppet.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/purebasic.min.js",
+     "sha256": "128d585274061f5ebb4dc89dbd2435363f10e0fc5d26144cd83074af66476929",
+     "sha384": "sha384-35FCiDO28KyogL+RV6G8ensBJkwr0WACujMaemdmoeQjaD9Mh3YWy/ucRIMkewK0",
+     "size": 1681,
+     "src": "package/languages/purebasic.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/q.min.js",
+     "sha256": "4a7632655cc3e88edc4252456badaf9a5859f6ff7f928f7fdb8ea1e921fc9fad",
+     "sha384": "sha384-53GmvnPKSHpVvnv0FpCVKE1frddMLt7iZ0s/Tby/ZlSkYHCUUHVi0JQUwH8BW4vi",
+     "size": 1225,
+     "src": "package/languages/q.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/qml.min.js",
+     "sha256": "f8cf9ce8ea907b0f025557e0edad65c909c64ac6f9adf657ecbd69b00465166a",
+     "sha384": "sha384-uO/9qnqAnQ2HsnBXg5YK8VsPDbPTFI50fAtp9Z8tAe1aKeJvlTDCdNqzvIuGjh1y",
+     "size": 2782,
+     "src": "package/languages/qml.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/reasonml.min.js",
+     "sha256": "0ed4152646cfb936e86c1f6a41b123a230b21c4733cef55cf4b73e8e16db0a4e",
+     "sha384": "sha384-sFdZmXaDI+Al/KDi/9vanieo8MOzI6xtA+AeGsX8q46a/vi56Q2n1UxEfBq3f2Z2",
+     "size": 1559,
+     "src": "package/languages/reasonml.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/rib.min.js",
+     "sha256": "8e34e969ef6f2ea9c2ad064b264e7e36c4e5a52037c16e608a463c278b540b84",
+     "sha384": "sha384-Y9PAHBriWK3thU5RP5tkTneEVzAH3qcP4ldvzgqA205+7U/nZaC/GSXFGR6ybCyq",
+     "size": 1378,
+     "src": "package/languages/rib.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/roboconf.min.js",
+     "sha256": "7e0928c257d25c100706c5b3ea10b09746a0585c825fcc92558cd86149316344",
+     "sha384": "sha384-Kg18whNRcEq0eoI3MF84wTO0/46d2Pq9l1auOhpsPxIbiGdSHZGgKdLO1od2jb2/",
+     "size": 810,
+     "src": "package/languages/roboconf.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/routeros.min.js",
+     "sha256": "1b959438a203cbd5c97dedecccaa8dc47691ecd8b8436915ccf89bc803a27948",
+     "sha384": "sha384-ajuBxp0NtXDv1Xdjv989GfmK+uavoptlyYIXEg966ePWjVbMXbgZ0bChnpyMiRC8",
+     "size": 2559,
+     "src": "package/languages/routeros.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/rsl.min.js",
+     "sha256": "d791740cb123e36329732370ec5806b4168b99325ec0151319841f46ad25c362",
+     "sha384": "sha384-jatQBVf5nbsaP5/qJ9Bdp4zWs6TotMw3hmoQirXbZDEAxFXU9IFaWdMVYuMKG5z2",
+     "size": 1372,
+     "src": "package/languages/rsl.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/ruleslanguage.min.js",
+     "sha256": "25313c758ac09f53c6c784c3ac677c58892d5c822b1cc71ceda67c9c87e2c9b8",
+     "sha384": "sha384-CvTzW8GurTTZFukdcSTU+4fJzmJoJwPOl/W9UnfF8qM7ErYA6yf6aGHbe1u+X2nj",
+     "size": 3934,
+     "src": "package/languages/ruleslanguage.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/sas.min.js",
+     "sha256": "fa8ed66cdec670b1a4df9670400c003669afe6571274bf9d87bc38504d786ae8",
+     "sha384": "sha384-cEGk4Mfg6EneDDCpBHTOJ4r9jfWL7RppF+K5mhKTCG73v0rvwVeUwHVlm50tPI4B",
+     "size": 4832,
+     "src": "package/languages/sas.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/scala.min.js",
+     "sha256": "2d70612619556e1d39566e9d23bc0e890a75ec027911eca0d6ab7987430b201a",
+     "sha384": "sha384-VG8NRHHYMlILj7B8QIlb/1n4TKGng3TJrMaQMl9nzBwjaDyItiwrn73r4C5UKCIa",
+     "size": 2155,
+     "src": "package/languages/scala.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/scheme.min.js",
+     "sha256": "60bbf1b62f2ef7769a90e5210e23ce7a7ed095e976aeb7f882e3f842fdde4686",
+     "sha384": "sha384-MAbum4IyUmlGkScyApilwRqISD/a/teYmeh67/ohQqHHwY0FlkeIvxWLxwdNXM2p",
+     "size": 3372,
+     "src": "package/languages/scheme.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/scilab.min.js",
+     "sha256": "37b900dc1811d4baa57d7f138e29fd08c3401a70b81addcfdc4e50ca6017c944",
+     "sha384": "sha384-Q82i1VlFmTjhf383c6yY9OEgeOwjUJtvEenN+Lk8Dc4SP7s/UHEJghxeczwKsza1",
+     "size": 1295,
+     "src": "package/languages/scilab.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/smali.min.js",
+     "sha256": "d2a97a7aab8ce2608ef20984b80e4a4de744f75cf8022de203f40da70872d7e5",
+     "sha384": "sha384-SwP9+7tfjY6eaDJx5cXBonHlYLgei8KYrvymAZwyNJpMleNf32L+nfzx8S9Q1dqE",
+     "size": 1096,
+     "src": "package/languages/smali.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/smalltalk.min.js",
+     "sha256": "3342de5e79ba7b3c006890fb5208f4a44d84f393304709057ce0e7f104b19696",
+     "sha384": "sha384-O4jTNymoATmEaHXHatbt13fCiMA/teGzscJqFqR4te/q18s4nvEA20LFu67APL6D",
+     "size": 726,
+     "src": "package/languages/smalltalk.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/sml.min.js",
+     "sha256": "651d59cec62a6322bda10be535d67d87bb6401d17141f21ccdf12f630ab3eadf",
+     "sha384": "sha384-br+dVIPmU7ygGUY9pPc4K6Yg8PMCmMiM9z8CJIZXIDJ/ZkH3lJT3Lv251+9hvLdY",
+     "size": 1226,
+     "src": "package/languages/sml.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/sqf.min.js",
+     "sha256": "8aeda58af9f93790bd7d87c42472759a1cde420e70381d27639f25a168587c4e",
+     "sha384": "sha384-LTi0wQ266XZXzauBrIPAm7jXQKv1q3aCJmHZae8hC9ocKs58mkFVjQYZy+HwRule",
+     "size": 46266,
+     "src": "package/languages/sqf.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/stan.min.js",
+     "sha256": "ef1f9c32fb3d32ba3d2d68126be5b2311b79e4ce70597acbf70d5cf46d8ca00d",
+     "sha384": "sha384-Jp/Tby/bTJcbJQVsA5KSc8xRzeoZtyJ1staguX4TIUUjNoKX0vzGtAHQpp9wD+Oh",
+     "size": 6283,
+     "src": "package/languages/stan.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/stata.min.js",
+     "sha256": "d49a65574a61034941c8389e395e26838d567345439923ed0bd12ff6dd6920ed",
+     "sha384": "sha384-gtPcLINB+T6I86+WPtzxHKRfZIoSZ57oMCSSPxKHGkbAJxf1Ej/UmpZcr1zbvRi0",
+     "size": 16802,
+     "src": "package/languages/stata.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/step21.min.js",
+     "sha256": "81b6bf0c2cdedd475c43f1b23cf45eea51439574c07ddbc9f11548b17df05f40",
+     "sha384": "sha384-BZ+EzK6BnRM2IgBQaheAPi9q3GbfTCBrd8tJspHOupr8tgNVEJsxC9ZhKkQFfz+b",
+     "size": 709,
+     "src": "package/languages/step21.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/stylus.min.js",
+     "sha256": "cabc9f399c8b248b6efbd3dda51f47fe0565a8bce5df6e9cc2b41102bae9c8db",
+     "sha384": "sha384-x/TbqfrW7rPeTk96dpU4gyJjGbUM5W4Cv3WUg9Ny8RWAbdz7pVIkj/irin942SF0",
+     "size": 13843,
+     "src": "package/languages/stylus.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/subunit.min.js",
+     "sha256": "d8b3dc32bd6e7cf5b67cafcf4ec4c75f73c992103c7f4ea4b763260545015c67",
+     "sha384": "sha384-F12qqtW6Uta1QV3OjdiyN4uNdUT65eiEHJ3Dsth5jVODAvia09WSn8ZvgF12cWNl",
+     "size": 599,
+     "src": "package/languages/subunit.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/taggerscript.min.js",
+     "sha256": "80974d1a5c7ddb8a9705b92ee5129702611807fcbe3a6fbd06fc8425f4f237ec",
+     "sha384": "sha384-Of+aTNxM1JBT0lUQz02y/6mtoNpdZ+AHfgrJx2TZCTo7iMs2KzOU/kUaCsnSJ+wg",
+     "size": 531,
+     "src": "package/languages/taggerscript.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/tap.min.js",
+     "sha256": "1014d0987a032ed118bd69fbe0f49157575425a2fd6fa8d0bf2787208fd36fe0",
+     "sha384": "sha384-THv8RzHRGsPVkm5Aosm8PlZENAnOI2tSFMPp+v1EmdPwP1i8IgTygrDIRiGmDbgZ",
+     "size": 477,
+     "src": "package/languages/tap.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/tcl.min.js",
+     "sha256": "89a8e0224e469bc904818156fa0178da291e312ff5e4c579aa424e797dcf2f66",
+     "sha384": "sha384-gaTSb3tfBt1vHxiMbZMGtmjN3+VGzkxZ8+XJWUhKAaV2DU1lSkpDYyCijPTEah6W",
+     "size": 2011,
+     "src": "package/languages/tcl.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/thrift.min.js",
+     "sha256": "c264748be6de8ccb41c617afca217469efe55736144f32c0e0424704b16b7a61",
+     "sha384": "sha384-y0SHMEogDMR3L++Cf6bLZLAAzwEvLJbcfV/mUq5e8850okEbp8JBV6UpQlk4qdl7",
+     "size": 775,
+     "src": "package/languages/thrift.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/tp.min.js",
+     "sha256": "4cec35e463d2499f8df03da13bbb4b4e78ce7fd2f8c8b7cb0a7cb55e7f4c3b23",
+     "sha384": "sha384-E5rOF/NUGoswlHdqSJTi/H1MSFecY1dt1pil1Woze4I2SzVXPwD8VQ2B1NMy4M3D",
+     "size": 1707,
+     "src": "package/languages/tp.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/twig.min.js",
+     "sha256": "4065254ba0d6a6b5ab61c090f011d956d4f7827d6b652400ad0f55e6f5611a94",
+     "sha384": "sha384-ubjLrFvQnlhlpJroRe+CA9XzoS8SFRuzy6uuaXmK2B5Kjzo0qz22tHv+9fJeywtI",
+     "size": 2522,
+     "src": "package/languages/twig.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/vala.min.js",
+     "sha256": "220005829fd865ba3cffb17a00e167e7748c026959a77aeb6d7dc920650e0ae1",
+     "sha384": "sha384-b0NWkEk2UDHmLEy5ZzWOAcoC9XH2RJ6L++TKpUlKITDnjkMvwFdxuqQvmziae4nB",
+     "size": 991,
+     "src": "package/languages/vala.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/vbscript.min.js",
+     "sha256": "2bcde5a79ac8d9253b7455bac11a79288e3fc1594bc342d697048d65c2c14f38",
+     "sha384": "sha384-F3PdTu1H9EQbf9+kaCgXMsK9KatSzkU8gN5BlM6zw+NwiN5HaUmcEjs/fQlgUf8P",
+     "size": 1950,
+     "src": "package/languages/vbscript.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/vbscript-html.min.js",
+     "sha256": "4e3e63c5e0a110fb8b1bf67f06f6f02ecb8e97ff19b523583117234708c96857",
+     "sha384": "sha384-L1GVKH/XONTx/Ax4PfPpugJAYv6Vboz6EJHm7eYBBu56lE97DJWzYnxkvEMbjiqo",
+     "size": 259,
+     "src": "package/languages/vbscript-html.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/verilog.min.js",
+     "sha256": "29eeb8cf321e47c3a4a2ac0cd98aa3c87ef6b4438eddd49915a10defa3649fbd",
+     "sha384": "sha384-5ZV59wbyJuAPCpav8ZuzEZk3cxvbd/S6gn2EAnH7ddWVUeZIvrZJxW0ha/I6w7qX",
+     "size": 6110,
+     "src": "package/languages/verilog.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/vhdl.min.js",
+     "sha256": "b55e52c3fe90b22451d6b956053834e59ef3c6093f2a1b88d5ffbb3fb2c8484d",
+     "sha384": "sha384-+sYu5GECN54s/Mp9gH1yXTbbJ+gnuWz4SS9x/gwcxQM2JxziMXL7/w3XBsqbdDpl",
+     "size": 2052,
+     "src": "package/languages/vhdl.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/vim.min.js",
+     "sha256": "5d2bed82834bb73d1a457ea5211f405bf59a0fc1cc150cd24d17dcc7a0e8023b",
+     "sha384": "sha384-DTGwkXgxP7GFYuQl4t3iMY6owPfm43tBw2AH4LerV9I5DFgSRSDzAueQvoSykx2S",
+     "size": 8690,
+     "src": "package/languages/vim.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/wren.min.js",
+     "sha256": "bf36908ee13018cd6c2bd72f7d25ff10b4fe862d6bfd7b25edfe040c1cc7e685",
+     "sha384": "sha384-Djdyfn6yiXDeNzomksrj7W2JUHC9nIKCxXXkc8sWARDrPKIPoro4mNfmjohwe0+g",
+     "size": 2344,
+     "src": "package/languages/wren.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/x86asm.min.js",
+     "sha256": "364f595481fbb9c75fcb0907c534f904aa9cbf5ec27b36f70addf4d54c0fcfcf",
+     "sha384": "sha384-Cf3xzgfOHCjwxHFvuO1cpP6GHSth3EMwNXmQ1fdOonZL5fHRQx6cICV3YkQ74oVu",
+     "size": 19126,
+     "src": "package/languages/x86asm.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/xl.min.js",
+     "sha256": "2bc244dc7a7e1f67d8a6b81e5e366ccbae0725d51c3d7532349378fb903f9e65",
+     "sha384": "sha384-u6Q+Pi3LdqRWgHdoXaOtnlJycAOOLQFVFtYUHQJeRxi9tAv2e9jx9Fbc4sp9lRlQ",
+     "size": 1971,
+     "src": "package/languages/xl.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/xquery.min.js",
+     "sha256": "3947d03bdbc3d326b80f0038ad518358b26cc6e27266a8ff41a86ea064f48e86",
+     "sha384": "sha384-IR0iQDtoTmp4mzKvzWSdhaICcHtYj6VxSAngMJNq0zTcuZYoCfy0V2sNIu1VfWN0",
+     "size": 5700,
+     "src": "package/languages/xquery.min.js"
+    },
+    {
+     "dest": "highlightjs-11.12.0/languages/zephir.min.js",
+     "sha256": "bfbf4d31da760f393d78273ed94f90f3dc7463ed5727ed8684f55ccaf41d1b3d",
+     "sha384": "sha384-yYqQucQ02nhy4/ZBpTPz5h4/tonIYvtpNYL/9k8r5gueXol8ecDZGNRH6KqjEiIm",
+     "size": 1680,
+     "src": "package/languages/zephir.min.js"
+    }
+   ],
+   "integrity": "sha512-KvOKXODaiFmId9xaq3xc5xCL66wVLUuOngDbO9B/kewbFTqdGbn2nJxNhN3H5R1cgDTVj6R8vH0zgiNDEGjpDw==",
+   "license": "BSD-3-Clause",
+   "name": "@highlightjs/cdn-assets",
+   "tarball": "https://registry.npmjs.org/@highlightjs/cdn-assets/-/cdn-assets-11.12.0.tgz",
+   "version": "11.12.0"
+  },
+  {
+   "files": [
+    {
+     "cdn": "https://cdn.jsdelivr.net/npm/cytoscape@3.34.3/dist/cytoscape.min.js",
+     "dest": "cytoscape-3.34.3/cytoscape.min.js",
+     "sha256": "5f3b5b529546d5af1fc5628590af033b74511a5b6f789f5f4682845863228b91",
+     "sha384": "sha384-qPKQxl9uMXOw7vSTUDAnpUilhLuulovw6P5Z4db4bqxW5VhumS7przEmHX0iM0Oc",
+     "size": 435503,
+     "src": "package/dist/cytoscape.min.js"
+    },
+    {
+     "dest": "cytoscape-3.34.3/LICENSE",
+     "sha256": "eb319c6e6f233607f71e8e2f450391751883cfc0eeb3ca7ef574c13d1d9c2203",
+     "sha384": "sha384-ogya2FUdP2TLy3LW3NOd95GAcEk1Y4qQaoibijMrKIya6tG+DMgLmd1QzfwuHM8K",
+     "size": 1082,
+     "src": "package/LICENSE"
+    }
+   ],
+   "integrity": "sha512-yfYGhRcGAntq6YBD583j4n0Eg3jIxvWmZtz/5uz9UYkeIStSlMxuUja+ec5j3iBD8nv1rwaOAYMW09tBdkSeaQ==",
+   "license": "MIT",
+   "name": "cytoscape",
+   "tarball": "https://registry.npmjs.org/cytoscape/-/cytoscape-3.34.3.tgz",
+   "version": "3.34.3"
+  },
+  {
+   "files": [
+    {
+     "cdn": "https://cdn.jsdelivr.net/npm/layout-base@2.0.1/layout-base.js",
+     "dest": "layout-base-2.0.1/layout-base.js",
+     "sha256": "ec15ab5df9af3f20708f4faab994accf91cda71848cd5bb10a23432cc50b6745",
+     "sha384": "sha384-5E2lB9AIGE6LRCnOOSTnZRlYZFZ01iMeN2fw97Z1r4Z/kXALxKw2AC+ZzQqoeDsG",
+     "size": 147958,
+     "src": "package/layout-base.js"
+    },
+    {
+     "dest": "layout-base-2.0.1/LICENSE",
+     "sha256": "eabb762d8a95109a39c9be3247325529a5239a7aca327d909c3ccdc41f3a06bf",
+     "sha384": "sha384-bSnLDf8xbeTNVQByR2oZYfM0KmLtC8IO5hGIy46pDFZ2dW0RFLNrhrqlNRrYw7UK",
+     "size": 1069,
+     "src": "package/LICENSE"
+    }
+   ],
+   "integrity": "sha512-dp3s92+uNI1hWIpPGH3jK2kxE2lMjdXdr+DH8ynZHpd6PUlH6x6cbuXnoMmiNumznqaNO31xu9e79F0uuZ0JFg==",
+   "license": "MIT",
+   "name": "layout-base",
+   "tarball": "https://registry.npmjs.org/layout-base/-/layout-base-2.0.1.tgz",
+   "version": "2.0.1"
+  },
+  {
+   "files": [
+    {
+     "cdn": "https://cdn.jsdelivr.net/npm/cose-base@2.2.0/cose-base.js",
+     "dest": "cose-base-2.2.0/cose-base.js",
+     "sha256": "7cae9509bd36235a63a85e71c8d9fa2cd0bc1d0c1ecc5b5a737976f39d040ddf",
+     "sha384": "sha384-RswRBkrMsPUYpJLbZ1CVA08zbNzAkykE2oGJTujBwfjWNdfxv2WVjLJNqv1LhAOp",
+     "size": 118906,
+     "src": "package/cose-base.js"
+    },
+    {
+     "dest": "cose-base-2.2.0/LICENSE",
+     "sha256": "5fb3cf4a14c3c5af6e473a192df8bca10c77754e3a0c6492c79fb92a76a5478a",
+     "sha384": "sha384-sdTneZwbmDrCUqf3ulxVDq0smcouUCqADX1720zUBF9xEvbrtILqfkWui1PgnY5G",
+     "size": 1081,
+     "src": "package/LICENSE"
+    }
+   ],
+   "integrity": "sha512-AzlgcsCbUMymkADOJtQm3wO9S3ltPfYOFD5033keQn9NJzIbtnZj+UdBJe7DYml/8TdbtHJW3j58SOnKhWY/5g==",
+   "license": "MIT",
+   "name": "cose-base",
+   "tarball": "https://registry.npmjs.org/cose-base/-/cose-base-2.2.0.tgz",
+   "version": "2.2.0"
+  },
+  {
+   "files": [
+    {
+     "cdn": "https://cdn.jsdelivr.net/npm/cytoscape-fcose@2.2.0/cytoscape-fcose.js",
+     "dest": "cytoscape-fcose-2.2.0/cytoscape-fcose.js",
+     "sha256": "4b1cab218d74996aa59cd8473f9239cc6398b8c1774d84d7e59ad9a68959cb57",
+     "sha384": "sha384-uk5Wbjq1+KqUdHO30w7N7GrEGdzBhaJeW9o/ANF6v9+yx3M/cBmoX51C000JNCUf",
+     "size": 57239,
+     "src": "package/cytoscape-fcose.js"
+    },
+    {
+     "dest": "cytoscape-fcose-2.2.0/LICENSE",
+     "sha256": "2837634f403949215760fcdd2fa1ed0c64875d02099ecc8318c704b852f1421d",
+     "sha384": "sha384-/axXADxRYuIHfbj37oTPQCHzgssDtrZSrxanS1zjKJZmKKjnjnLzVin54QgzRXK1",
+     "size": 1079,
+     "src": "package/LICENSE"
+    }
+   ],
+   "integrity": "sha512-ki1/VuRIHFCzxWNrsshHYPs6L7TvLu3DL+TyIGEsRcvVERmxokbf5Gdk7mFxZnTdiGtnA4cfSmjZJMviqSuZrQ==",
+   "license": "MIT",
+   "name": "cytoscape-fcose",
+   "tarball": "https://registry.npmjs.org/cytoscape-fcose/-/cytoscape-fcose-2.2.0.tgz",
+   "version": "2.2.0"
+  },
+  {
+   "files": [
+    {
+     "cdn": "https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js",
+     "dest": "dagre-0.8.5/dagre.min.js",
+     "sha256": "62eb9787ccfdbdf4148d4d99d31dbf9ee4770eafee81e637d759b52aac22cd51",
+     "sha384": "sha384-2IH3T69EIKYC4c+RXZifZRvaH5SRUdacJW7j6HtE5rQbvLhKKdawxq6vpIzJ7j9M",
+     "size": 283803,
+     "src": "package/dist/dagre.min.js"
+    },
+    {
+     "dest": "dagre-0.8.5/LICENSE",
+     "sha256": "6a349742a6cb219d5a2fc8d0844f6d89a6efc62e20c664450d884fc7ff2d6015",
+     "sha384": "sha384-Zfs8dAXS45vGY11CBm+WYmpQCzrb9PtKbNEb+G5il9W4rZ+NrqyMnfzKCtJrNM+7",
+     "size": 1062,
+     "src": "package/LICENSE"
+    }
+   ],
+   "integrity": "sha512-/aTqmnRta7x7MCCpExk7HQL2O4owCT2h8NT//9I1OQ9vt29Pa0BzSAkR5lwFUcQ7491yVi/3CXU9jQ5o0Mn2Sw==",
+   "license": "MIT",
+   "name": "dagre",
+   "tarball": "https://registry.npmjs.org/dagre/-/dagre-0.8.5.tgz",
+   "version": "0.8.5"
+  },
+  {
+   "files": [
+    {
+     "cdn": "https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.js",
+     "dest": "cytoscape-dagre-2.5.0/cytoscape-dagre.js",
+     "sha256": "bf70fe402991dcbff33e05a7e4a5271c78020bb75e85d1c80ab7538e4157112e",
+     "sha384": "sha384-u69h9ebXeSjlg6q/rb1zKTRAGu/h8deCl0409xpS/QJctMKnc4M9Fzkm01VOQdeF",
+     "size": 12665,
+     "src": "package/cytoscape-dagre.js"
+    },
+    {
+     "dest": "cytoscape-dagre-2.5.0/LICENSE",
+     "sha256": "fccef1f60ab551f032291912d77bb9e8cd98b99bd1cffe185062ac7216a36d5e",
+     "sha384": "sha384-0qfQ1PPV+1hcX9gIM0Rynm5FELahDU7kzj0HtG3PcqzgigK2hr7+TNuL+maT31OV",
+     "size": 1096,
+     "src": "package/LICENSE"
+    }
+   ],
+   "integrity": "sha512-VG2Knemmshop4kh5fpLO27rYcyUaaDkRw+6PiX4bstpB+QFt0p2oauMrsjVbUamGWQ6YNavh7x2em2uZlzV44g==",
+   "license": "MIT",
+   "name": "cytoscape-dagre",
+   "tarball": "https://registry.npmjs.org/cytoscape-dagre/-/cytoscape-dagre-2.5.0.tgz",
+   "version": "2.5.0"
+  }
+ ],
+ "parity": {
+  "highlightjs_common": [
+   "bash",
+   "c",
+   "cpp",
+   "csharp",
+   "css",
+   "diff",
+   "go",
+   "graphql",
+   "ini",
+   "java",
+   "javascript",
+   "json",
+   "kotlin",
+   "less",
+   "lua",
+   "makefile",
+   "markdown",
+   "objectivec",
+   "perl",
+   "php",
+   "php-template",
+   "plaintext",
+   "python",
+   "python-repl",
+   "r",
+   "ruby",
+   "rust",
+   "scss",
+   "shell",
+   "sql",
+   "swift",
+   "typescript",
+   "vbnet",
+   "wasm",
+   "xml",
+   "yaml"
+  ],
+  "highlightjs_languages": [
+   "1c",
+   "abnf",
+   "accesslog",
+   "actionscript",
+   "ada",
+   "angelscript",
+   "apache",
+   "applescript",
+   "arcade",
+   "arduino",
+   "armasm",
+   "asciidoc",
+   "aspectj",
+   "autohotkey",
+   "autoit",
+   "avrasm",
+   "awk",
+   "axapta",
+   "bash",
+   "basic",
+   "bnf",
+   "brainfuck",
+   "c",
+   "cal",
+   "capnproto",
+   "ceylon",
+   "clean",
+   "clojure",
+   "clojure-repl",
+   "cmake",
+   "coffeescript",
+   "coq",
+   "cos",
+   "cpp",
+   "crmsh",
+   "crystal",
+   "csharp",
+   "csp",
+   "css",
+   "d",
+   "dart",
+   "delphi",
+   "diff",
+   "django",
+   "dns",
+   "dockerfile",
+   "dos",
+   "dsconfig",
+   "dts",
+   "dust",
+   "ebnf",
+   "elixir",
+   "elm",
+   "erb",
+   "erlang",
+   "erlang-repl",
+   "excel",
+   "fix",
+   "flix",
+   "fortran",
+   "freedesktop",
+   "fsharp",
+   "gams",
+   "gauss",
+   "gcode",
+   "gherkin",
+   "glsl",
+   "gml",
+   "go",
+   "golo",
+   "gradle",
+   "graphql",
+   "groovy",
+   "haml",
+   "handlebars",
+   "haskell",
+   "haxe",
+   "hsp",
+   "http",
+   "hy",
+   "inform7",
+   "ini",
+   "irpf90",
+   "isbl",
+   "java",
+   "javascript",
+   "jboss-cli",
+   "json",
+   "julia",
+   "julia-repl",
+   "kotlin",
+   "lasso",
+   "latex",
+   "ldif",
+   "leaf",
+   "less",
+   "lisp",
+   "livecodeserver",
+   "livescript",
+   "llvm",
+   "lsl",
+   "lua",
+   "makefile",
+   "markdown",
+   "mathematica",
+   "matlab",
+   "maxima",
+   "mel",
+   "mercury",
+   "mipsasm",
+   "mizar",
+   "mojolicious",
+   "monkey",
+   "moonscript",
+   "n1ql",
+   "nestedtext",
+   "nginx",
+   "nim",
+   "nix",
+   "node-repl",
+   "nsis",
+   "objectivec",
+   "ocaml",
+   "openscad",
+   "oxygene",
+   "parser3",
+   "perl",
+   "pf",
+   "pgsql",
+   "php",
+   "php-template",
+   "plaintext",
+   "pony",
+   "powershell",
+   "processing",
+   "profile",
+   "prolog",
+   "properties",
+   "protobuf",
+   "puppet",
+   "purebasic",
+   "python",
+   "python-repl",
+   "q",
+   "qml",
+   "r",
+   "reasonml",
+   "rib",
+   "roboconf",
+   "routeros",
+   "rsl",
+   "ruby",
+   "ruleslanguage",
+   "rust",
+   "sas",
+   "scala",
+   "scheme",
+   "scilab",
+   "scss",
+   "shell",
+   "smali",
+   "smalltalk",
+   "sml",
+   "sqf",
+   "sql",
+   "stan",
+   "stata",
+   "step21",
+   "stylus",
+   "subunit",
+   "swift",
+   "taggerscript",
+   "tap",
+   "tcl",
+   "thrift",
+   "tp",
+   "twig",
+   "typescript",
+   "vala",
+   "vbnet",
+   "vbscript",
+   "vbscript-html",
+   "verilog",
+   "vhdl",
+   "vim",
+   "wasm",
+   "wren",
+   "x86asm",
+   "xl",
+   "xml",
+   "xquery",
+   "yaml",
+   "zephir"
+  ]
+ },
+ "reference_packages": [
+  {
+   "integrity": "sha512-nbfWpyRMcMrPMmDwJB+dhX/eiaPKtc2RB+0QZskqJ3WjRA/FDS0e9hZrx8EC/lbEv8gXy98FcDbNa/dspAaJMg==",
+   "name": "highlight.js",
+   "tarball": "https://registry.npmjs.org/highlight.js/-/highlight.js-11.12.0.tgz",
+   "use": "language parity list (lib/index.js) and the common set (lib/common.js)",
+   "version": "11.12.0"
+  }
+ ],
+ "schema": 1
+}

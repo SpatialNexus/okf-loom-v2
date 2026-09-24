@@ -1,0 +1,9 @@
+# Developer tests only; not a runtime/package installation requirement.
+# Python 3.11/3.12 on Linux. Direct tools + their full active dependency closure.
+# pytest/PyYAML and pytest transitives match the verified maintenance environment.
+pytest==9.1.1
+PyYAML==6.0.3
+iniconfig==2.3.0
+packaging==26.0
+pluggy==1.6.0
+Pygments==2.19.2
