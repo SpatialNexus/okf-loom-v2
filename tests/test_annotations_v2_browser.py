@@ -2162,11 +2162,13 @@ def test_comments_drawer_reflows_as_rail_column_at_wide_viewport(server_url, pag
         };
     }""")
     assert geom["rail"], f"rail mode not active at 1280px: {geom}"
-    assert geom["panelW"] == 440, f"panel width changed: {geom}"
+    # Ledger Studio drawer: 320px, and the reserved rail matches it.
+    assert geom["panelW"] == 320, f"panel width changed: {geom}"
+    assert geom["paddingRight"] == "320px", f"rail reservation does not match the drawer: {geom}"
     assert geom["overlayDisplay"] == "none", f"scrim should be hidden in rail mode: {geom}"
-    # Authored body + topbar must reflow left of the 440px drawer (not clipped).
-    assert geom["bodyRight"] <= geom["vw"] - 440 + 2, f"body clipped under drawer: {geom}"
-    assert geom["topbarRight"] <= geom["vw"] - 440 + 2, f"topbar clipped under drawer: {geom}"
+    # Authored body + topbar must reflow left of the 320px drawer (not clipped).
+    assert geom["bodyRight"] <= geom["vw"] - 320 + 2, f"body clipped under drawer: {geom}"
+    assert geom["topbarRight"] <= geom["vw"] - 320 + 2, f"topbar clipped under drawer: {geom}"
 
 
 def test_comments_drawer_stays_overlay_at_narrow_viewport(server_url, page):

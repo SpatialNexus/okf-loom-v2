@@ -793,19 +793,38 @@ def test_graph_presence_halo(server_url: str, page) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_toast_has_no_sidestripe_border(server_url: str, page) -> None:
-    """A toast must not use a >1px border-left stripe (impeccable ban)."""
+_RESOLVED_TOKENS_JS = """(names) => { const probe = document.createElement('span');
+  document.body.appendChild(probe); const out = {};
+  for (const n of names) { probe.style.color = `var(${n})`; out[n] = getComputedStyle(probe).color; }
+  probe.remove(); return out; }"""
+
+
+def test_toast_tone_is_a_status_bar_not_a_wash(server_url: str, page) -> None:
+    """Ledger: a toast's tone is a 2px status bar down its left edge plus a
+    status-hued glyph — never a tinted wash or a tinted frame. The toast is
+    a floating layer: panel surface, square, the --shadow-pop ring."""
     page.goto(f"{server_url}/tables/orders", wait_until="load")
     _wait_for_studio(page)
-    page.evaluate("window.okfLoomStudio._toast('test toast', { tone: 'success' })")
-    toast = page.locator(".okf-toast").first
-    expect(toast).to_be_visible(timeout=3000)
-    bw = toast.evaluate("el => parseFloat(getComputedStyle(el).borderLeftWidth)")
-    assert bw <= 1.0, f"toast border-left-width is {bw}px (>1px side-stripe)"
+    tokens = page.evaluate(_RESOLVED_TOKENS_JS, ["--status-ok", "--status-error", "--surface"])
+    for tone, status in (("success", "--status-ok"), ("error", "--status-error")):
+        page.evaluate(f"window.okfLoomStudio._toast('{tone} toast', {{ tone: '{tone}' }})")
+        toast = page.locator(f".okf-toast[data-tone='{tone}']").first
+        expect(toast).to_be_visible(timeout=3000)
+        s = toast.evaluate("""el => { const s = getComputedStyle(el), i = getComputedStyle(el.querySelector('.okf-toast__icon'));
+          return {bl: parseFloat(s.borderLeftWidth), blc: s.borderLeftColor, bt: parseFloat(s.borderTopWidth),
+                  bg: s.backgroundColor, radius: s.borderTopLeftRadius, shadow: s.boxShadow,
+                  icon: i.color, iconBg: i.backgroundColor}; }""")
+        assert s["bl"] == 2 and s["blc"] == tokens[status], (tone, s, tokens)
+        assert s["bt"] == 0, f"{tone} toast regained a tinted frame: {s}"
+        assert s["bg"] == tokens["--surface"], f"{tone} toast is washed with a tint: {s}"
+        assert s["icon"] == tokens[status] and s["iconBg"] in ("rgba(0, 0, 0, 0)", "transparent"), (tone, s)
+        assert s["radius"] == "0px" and s["shadow"].startswith("rgb") and "0px 0px 0px 1px" in s["shadow"], (tone, s)
 
 
 def test_claimed_comment_has_no_sidestripe(server_url: str, page) -> None:
-    """A claimed comment card must not use a >1px border-left stripe."""
+    """A claimed thread is a record row, not a tinted card: no thick left
+    border frame and no warn wash. Its state is the outlined micro-label plus
+    a 2px warn status bar (painted inset, so the row geometry never shifts)."""
     page.goto(f"{server_url}/tables/orders", wait_until="load")
     _wait_for_studio(page)
     page.evaluate(
@@ -827,6 +846,10 @@ def test_claimed_comment_has_no_sidestripe(server_url: str, page) -> None:
     assert bw <= 1.0 or bw == rw, (
         f"claimed comment has a thick left stripe (left={bw}, right={rw})"
     )
+    tokens = page.evaluate(_RESOLVED_TOKENS_JS, ["--status-warn"])
+    cue = card.evaluate("el => ({bg: getComputedStyle(el).backgroundColor, shadow: getComputedStyle(el).boxShadow})")
+    assert cue["bg"] in ("rgba(0, 0, 0, 0)", "transparent"), f"claimed thread is washed with a tint: {cue}"
+    assert tokens["--status-warn"] in cue["shadow"] and "inset" in cue["shadow"], (cue, tokens)
 
 
 # ---------------------------------------------------------------------------
