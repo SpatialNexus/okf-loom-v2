@@ -8,8 +8,9 @@ with its provenance to ``tests/fixtures/offline_parity/cdn_render_golden.json``.
 The committed tests compare the offline renders with it and never touch the
 network.
 
-Run it in the same reviewed change as a version bump (after
-``scripts/fetch_vendor_assets.py --init-lock``), then review the diff:
+Run it in the same reviewed change as a renderer/theme update or vendor
+version bump (after ``scripts/fetch_vendor_assets.py --init-lock`` for a
+vendor update), then review the diff:
 
     python tests/regenerate_offline_cdn_golden.py [--check]
 
@@ -89,7 +90,7 @@ def render_cdn_golden(work: Path) -> dict:
             "generated": datetime.datetime.now(datetime.timezone.utc).date().isoformat(),
             "source": ("default CDN build (`build --target static --assets cdn`) of the "
                        "write_offline_fixture bundle in tests/test_offline_assets.py; page rich.html, "
-                       f"scope {SCOPE}, theme technical-light, viewport {VIEWPORT['width']}x{VIEWPORT['height']}"),
+                       f"scope {SCOPE}, theme bone, viewport {VIEWPORT['width']}x{VIEWPORT['height']}"),
             "browser": f"Chromium {browser.version} (Playwright)",
             "versions": dict(sorted(versions.items())),
             "cdn_requests": cdn,

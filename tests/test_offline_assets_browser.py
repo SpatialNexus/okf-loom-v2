@@ -232,12 +232,57 @@ def _assert_rich_rendered(page, scope: str) -> None:
 
 
 def _assert_theme_swap_is_local(page, guard) -> None:
-    before = len(guard.requests)
-    page.evaluate("window.OKFLoomTheme.setTheme('slate')")
-    page.wait_for_function("""() => [...document.querySelectorAll('[data-okf-renderer-resource="stylesheet"]')]
-        .some(el => el.media === 'all' && /github-dark|okf-vendor-hljs-dark/.test(el.href || el.getAttribute('data-okf-href') || ''))
-        && document.documentElement.dataset.okfRenderersStatus === 'ready'""", timeout=15000)
-    assert all(guard.local(url) for url in guard.requests[before:])
+    # Ledger syntax is painted by wiki.css, not a light/dark vendor sheet.
+    # Also exercise a same-scheme swap: Mermaid embeds palette colours and
+    # must repaint Slate -> Clay even though both palettes are dark.
+    previous_colours = None
+    for palette in ("slate", "clay"):
+        before = len(guard.requests)
+        generation = page.evaluate("() => window.okfRendererReadiness.generation")
+        page.evaluate("palette => window.OKFLoomTheme.setTheme(palette)", palette)
+        page.wait_for_function("""({palette, generation}) => {
+            const state = window.okfRendererReadiness;
+            return document.documentElement.dataset.theme === palette
+                && state.status === 'ready' && state.themeName === palette
+                && state.generation > generation;
+        }""", arg={"palette": palette, "generation": generation}, timeout=15000)
+        colours = page.evaluate("""() => {
+            const root = getComputedStyle(document.documentElement);
+            const probe = document.createElement('span');
+            document.body.appendChild(probe);
+            const resolved = token => {
+                probe.style.color = root.getPropertyValue(token);
+                return getComputedStyle(probe).color;
+            };
+            const roles = ['.hljs-keyword', '.hljs-string', '.hljs-punctuation'];
+            const colours = roles.map((selector, i) => {
+                // The fixture has keys and strings. A punctuation probe
+                // inside real highlighted code covers the third role too.
+                let node = document.querySelector('code.hljs ' + selector);
+                const synthetic = !node;
+                if (synthetic) {
+                    node = document.createElement('span');
+                    node.className = selector.slice(1);
+                    document.querySelector('code.hljs').appendChild(node);
+                }
+                const pair = [getComputedStyle(node).color, resolved('--syn-' + (i + 1))];
+                if (synthetic) node.remove();
+                return pair;
+            });
+            const diagram = document.querySelector('div.mermaid svg .node rect');
+            const diagramColours = [getComputedStyle(diagram).fill, resolved('--surface-2')];
+            probe.remove();
+            return {syntax: colours, diagram: diagramColours};
+        }""")
+        assert all(actual == token for actual, token in colours["syntax"]), colours
+        assert colours["diagram"][0] == colours["diagram"][1], colours
+        if previous_colours is not None:
+            assert colours != previous_colours, "same-scheme palette swap did not repaint"
+        previous_colours = colours
+        assert all(guard.local(url) for url in guard.requests[before:])
+        assert page.locator('[data-okf-renderer-resource="stylesheet"]').evaluate_all("""nodes =>
+            nodes.every(el => !/github(?:-dark)?|okf-vendor-hljs-(?:light|dark)/.test(
+                el.href || el.getAttribute('data-okf-href') || ''))""")
 
 
 def _assert_graph_renders(page) -> None:
