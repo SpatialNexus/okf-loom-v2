@@ -372,16 +372,25 @@
     } catch (e) { return String(ts); }
   }
   // Phase 5: human relative time for the index recency rail ("4m ago").
-  function fmtAgo(ts) {
-    try {
-      const d = new Date(ts);
-      if (isNaN(d.getTime())) return "";
-      const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
-      if (s < 60) return "just now";
-      if (s < 3600) return Math.round(s / 60) + "m ago";
-      if (s < 86400) return Math.round(s / 3600) + "h ago";
-      return Math.round(s / 86400) + "d ago";
-    } catch (e) { return ""; }
+  // "Recently changed" rows (render.py SSR and the live rail below) share
+  // one format: whole elapsed units, floored ("just now", "Nm ago",
+  // "Nh ago", "Nd ago"), with the full UTC timestamp in the <time> title
+  // for hover and assistive tech.
+  function fmtRecentAgo(ts) {
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return "";
+    const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
+    if (s < 60) return "just now";
+    if (s < 3600) return Math.floor(s / 60) + "m ago";
+    if (s < 86400) return Math.floor(s / 3600) + "h ago";
+    return Math.floor(s / 86400) + "d ago";
+  }
+  function fmtUtcStamp(ts) {
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return "";
+    const p = (n) => String(n).padStart(2, "0");
+    return d.getUTCFullYear() + "-" + p(d.getUTCMonth() + 1) + "-" + p(d.getUTCDate()) +
+      " " + p(d.getUTCHours()) + ":" + p(d.getUTCMinutes()) + " UTC";
   }
   function shortId(id) { return id ? id.slice(-6) : ""; }
 
@@ -7217,7 +7226,10 @@
       // node would become an anonymous item in the row's two-column grid,
       // painting a stray dot and wrapping the time onto a second line.
       link.appendChild(el("span", { class: "sr-only", text: " \u00b7 " }));
-      link.appendChild(el("time", { class: "okf-recent__time", datetime: latest[id].ts, text: fmtAgo(latest[id].ts) }));
+      const stamp = fmtUtcStamp(latest[id].ts);
+      const time = el("time", { class: "okf-recent__time", datetime: latest[id].ts, text: fmtRecentAgo(latest[id].ts) || stamp });
+      if (stamp) time.setAttribute("title", stamp);
+      link.appendChild(time);
       li.appendChild(link); list.appendChild(li);
     });
     rail.appendChild(list); hero.appendChild(rail);
