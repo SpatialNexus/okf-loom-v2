@@ -99,11 +99,11 @@ function element(tag, text) {
   return node;
 }
 
-function sandbox() {
+function sandbox(tokens) {
   const root = element("html");
   const body = element("body");
   const head = element("head");
-  root.setAttribute("data-theme", "technical-light");
+  root.setAttribute("data-theme", "bone");
   const nodes = { mermaid: [] };
   const documentListeners = {};
   const windowListeners = {};
@@ -139,7 +139,8 @@ function sandbox() {
   const mermaid = {
     initialize(options) { initializations.push(options); },
     render(id, source) {
-      renderCalls.push({id, source, theme: initializations.at(-1).theme});
+      const init = initializations.at(-1);
+      renderCalls.push({id, source, theme: init.theme, variables: init.themeVariables || null, security: init.securityLevel});
       if (source === "graph A") {
         return new Promise(resolve => { oldRenderResolve = () => resolve({svg: '<svg data-render="A"></svg>'}); });
       }
@@ -154,7 +155,9 @@ function sandbox() {
     dispatchEvent(event) { (windowListeners[event.type] || []).slice().forEach(fn => fn(event)); },
     setTimeout, clearTimeout, requestAnimationFrame: fn => setTimeout(fn, 0),
     cancelAnimationFrame: clearTimeout,
-    getComputedStyle: () => ({display: "block", visibility: "visible", opacity: "1"}),
+    getComputedStyle: tokens
+      ? () => ({display: "block", visibility: "visible", opacity: "1", getPropertyValue: name => tokens[root.getAttribute("data-theme")][name] || ""})
+      : () => ({display: "block", visibility: "visible", opacity: "1"}),
     CustomEvent: function(name, init) { this.type = name; this.detail = (init || {}).detail; },
   };
   win.window = win;
@@ -198,18 +201,28 @@ async function raceProof() {
   if (s.win.okfRendererReadiness.generation !== winningGeneration) throw new Error("late renderer changed readiness");
   if (second.innerHTML.indexOf('data-render="B"') < 0) throw new Error("late old render changed the new body");
 
-  // A resolved light/dark transition restores source and renders once; a
-  // family-only change in the same resolved mode must not render again.
-  s.root.setAttribute("data-theme", "technical-dark");
-  s.win.dispatchEvent(new s.win.CustomEvent("okf-loom:themeChanged", {detail: {previousResolvedMode: "light", resolvedMode: "dark"}}));
+  // Bone -> Slate (light -> dark) restores the source and renders once. This
+  // VM host exposes no CSS tokens, so Mermaid falls back to its own scheme
+  // theme; the security level is strict on every render.
+  s.root.setAttribute("data-theme", "slate");
+  s.win.dispatchEvent(new s.win.CustomEvent("okf-loom:themeChanged", {detail: {theme: "slate", previous: "bone", scheme: "dark"}}));
   await settle();
   const afterDark = s.renderCalls.length;
-  if (afterDark !== 3 || s.renderCalls.at(-1).theme !== "dark") throw new Error("dark theme did not rerender Mermaid: " + JSON.stringify({afterDark, calls: s.renderCalls, state: s.win.okfRendererReadiness}));
-  s.root.setAttribute("data-theme", "swiss-dark");
-  s.win.dispatchEvent(new s.win.CustomEvent("okf-loom:themeChanged", {detail: {previousResolvedMode: "dark", resolvedMode: "dark"}}));
+  if (afterDark !== 3 || s.renderCalls.at(-1).theme !== "dark") throw new Error("dark palette did not rerender Mermaid: " + JSON.stringify({afterDark, calls: s.renderCalls, state: s.win.okfRendererReadiness}));
+  // Slate -> Clay keeps the dark scheme but changes every colour: Ledger
+  // re-renders on EVERY palette change, not only on a scheme change.
+  s.root.setAttribute("data-theme", "clay");
+  s.win.dispatchEvent(new s.win.CustomEvent("okf-loom:themeChanged", {detail: {theme: "clay", previous: "slate", scheme: "dark"}}));
   await settle();
-  if (s.renderCalls.length !== afterDark) throw new Error("family-only theme change rerendered Mermaid");
-  return {status: s.win.okfRendererReadiness.status, generation: s.win.okfRendererReadiness.generation, bodyGeneration: s.win.okfRendererReadiness.bodyGeneration, themeGeneration: s.win.okfRendererReadiness.themeGeneration, renderCalls: s.renderCalls.length};
+  const afterClay = s.renderCalls.length;
+  if (afterClay !== afterDark + 1) throw new Error("same-scheme palette change did not rerender Mermaid: " + JSON.stringify(s.renderCalls));
+  // A repeated event for the palette already painted fences a new cycle but
+  // does not re-render the diagram.
+  s.win.dispatchEvent(new s.win.CustomEvent("okf-loom:themeChanged", {detail: {theme: "clay", previous: "clay", scheme: "dark"}}));
+  await settle();
+  if (s.renderCalls.length !== afterClay) throw new Error("repeated palette event rerendered Mermaid");
+  if (s.renderCalls.some(call => call.security !== "strict")) throw new Error("Mermaid security level changed");
+  return {status: s.win.okfRendererReadiness.status, generation: s.win.okfRendererReadiness.generation, bodyGeneration: s.win.okfRendererReadiness.bodyGeneration, themeGeneration: s.win.okfRendererReadiness.themeGeneration, themeName: s.win.okfRendererReadiness.themeName, renderCalls: s.renderCalls.length};
 }
 
 async function failureProof() {
@@ -224,10 +237,47 @@ async function failureProof() {
   return {status: s.win.okfRendererReadiness.status, code: s.win.okfRendererReadiness.code};
 }
 
+const TOKEN_NAMES = ["--bg", "--bg-2", "--surface", "--surface-2", "--border", "--border-strong",
+  "--text", "--text-2", "--graph-edge", "--status-error"];
+function palette(seed) {
+  const out = {"--font-body": '"Public Sans", sans-serif'};
+  TOKEN_NAMES.forEach((name, i) => { out[name] = "#" + (seed + i).toString(16).padStart(6, "0"); });
+  return out;
+}
+
+async function tokenProof() {
+  // Real hosts expose the palette tokens: Mermaid gets the "base" theme with
+  // variables read from the ACTIVE palette, re-derived after a palette change.
+  const tokens = {bone: palette(0x101010), plum: palette(0x202020), broken: {...palette(0x303030), "--surface-2": "var(--missing)"}};
+  const s = sandbox(tokens);
+  const diagram = element("div", "graph T"); diagram.classList.add("mermaid"); s.nodes.mermaid = [diagram];
+  vm.runInNewContext(SOURCE, s.context, {filename: "renderers.js"});
+  s.document.fire("DOMContentLoaded");
+  s.moduleGate.resolve({default: s.mermaid});
+  await settle();
+  const bone = s.renderCalls.at(-1);
+  s.root.setAttribute("data-theme", "plum");
+  s.win.dispatchEvent(new s.win.CustomEvent("okf-loom:themeChanged", {detail: {theme: "plum", previous: "bone", scheme: "dark"}}));
+  await settle();
+  const plum = s.renderCalls.at(-1);
+  s.root.setAttribute("data-theme", "broken");
+  s.win.dispatchEvent(new s.win.CustomEvent("okf-loom:themeChanged", {detail: {theme: "broken", previous: "plum", scheme: "light"}}));
+  await settle();
+  const broken = s.renderCalls.at(-1);
+  return {
+    calls: s.renderCalls.length,
+    bone: {theme: bone.theme, primary: bone.variables.primaryColor, line: bone.variables.lineColor, dark: bone.variables.darkMode, font: bone.variables.fontFamily, security: bone.security},
+    plum: {theme: plum.theme, primary: plum.variables.primaryColor, background: plum.variables.background, dark: plum.variables.darkMode},
+    broken: {theme: broken.theme, variables: broken.variables},
+    expected: {bone: tokens.bone["--surface-2"], boneLine: tokens.bone["--graph-edge"], plum: tokens.plum["--surface-2"], plumBg: tokens.plum["--bg"]},
+  };
+}
+
 (async () => {
   const race = await raceProof();
   const failure = await failureProof();
-  console.log(JSON.stringify({race, failure}));
+  const tokens = await tokenProof();
+  console.log(JSON.stringify({race, failure, tokens}));
 })().catch(error => { console.error(error.stack || error); process.exit(1); });
 """
 
@@ -236,8 +286,22 @@ def test_renderer_generation_fence_and_theme_mode_policy() -> None:
     result = _run_node(_RENDERER_HARNESS.replace("__SOURCE__", json.dumps(RENDERERS)))
     assert result["race"]["status"] == "ready"
     assert result["race"]["bodyGeneration"] == 1
-    assert result["race"]["renderCalls"] == 3
+    assert result["race"]["themeName"] == "clay"
+    assert result["race"]["renderCalls"] == 4
     assert result["failure"] == {"status": "failed", "code": "blocked-script"}
+    tokens = result["tokens"]
+    assert tokens["calls"] == 3, tokens
+    assert tokens["bone"] == {
+        "theme": "base", "primary": tokens["expected"]["bone"],
+        "line": tokens["expected"]["boneLine"], "dark": False,
+        "font": '"Public Sans", sans-serif', "security": "strict",
+    }
+    assert tokens["plum"] == {
+        "theme": "base", "primary": tokens["expected"]["plum"],
+        "background": tokens["expected"]["plumBg"], "dark": True,
+    }
+    # An unresolved token never reaches Mermaid: its own scheme theme is used.
+    assert tokens["broken"] == {"theme": "default", "variables": None}
 
 
 _CAPTURE_HARNESS = r"""

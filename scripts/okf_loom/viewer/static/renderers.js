@@ -228,6 +228,11 @@
     // ran). +esm serves a self-contained ESM bundle with hljs as the
     // default export, still pinned to the exact version.
     hljsEsm: "https://cdn.jsdelivr.net/npm/highlight.js@11.12.0/+esm",
+    // The GitHub light/dark sheets stay pinned (and vendored) for vendor
+    // parity, but the viewer no longer loads either: Ledger code wells are
+    // dark in every palette and wiki.css paints every highlight.js token from
+    // the three syntax roles (--syn-1 keys, --syn-2 strings, --syn-3
+    // punctuation/comments), so there is no per-scheme sheet to switch.
     hljsThemeLight: {
       href: "https://cdn.jsdelivr.net/npm/highlight.js@11.12.0/styles/github.min.css",
       integrity: "sha384-eFTL69TLRZTkNfYZOLM+G04821K1qZao/4QLJbet1pP4tcF+fdXq/9CdqAbWRl/L",
@@ -328,8 +333,6 @@
   var activeToken = null;
   var currentThemeName = themeName();
   var currentResolvedMode = resolvedMode(currentThemeName);
-  var hljsThemeLink = null;
-  var hljsThemeRequest = null;
   var hljsModulePromise = null;
   var katexAssetsPromise = null;
   var mermaidModulePromise = null;
@@ -341,15 +344,80 @@
   }
 
   // Ledger palettes carry their scheme by name, not by a "-dark" suffix:
-  // Bone is light; Slate, Clay and Plum are dark. Mermaid diagrams and the
-  // highlight.js base sheet follow the page scheme (code wells are always
-  // dark and wiki.css paints syntax from the --syn-* roles on top).
+  // Bone is light; Slate, Clay and Plum are dark. Mermaid's darkMode flag
+  // follows it; its colours come from the palette tokens (mermaidTheme).
   function resolvedMode(name) {
     return name === "slate" || name === "clay" || name === "plum" ? "dark" : "light";
   }
 
-  function isDark() {
-    return resolvedMode(themeName()) === "dark";
+  // Mermaid theme variables derived from the ACTIVE palette's tokens, read
+  // from the root's computed style at the start of each render cycle (so a
+  // palette change always re-derives them). Mermaid's "base" theme computes
+  // its remaining shades from these. Hosts that cannot expose tokens (no
+  // getComputedStyle / getPropertyValue, or an unthemed embed) fall back to
+  // Mermaid's own default/dark theme for the resolved scheme.
+  var MERMAID_TOKEN_MAP = {
+    background: "--bg",
+    mainBkg: "--surface-2",
+    primaryColor: "--surface-2",
+    primaryTextColor: "--text",
+    primaryBorderColor: "--border-strong",
+    secondaryColor: "--bg-2",
+    secondaryTextColor: "--text",
+    secondaryBorderColor: "--border-strong",
+    tertiaryColor: "--surface",
+    tertiaryTextColor: "--text",
+    tertiaryBorderColor: "--border",
+    nodeBorder: "--border-strong",
+    nodeTextColor: "--text",
+    textColor: "--text",
+    titleColor: "--text",
+    lineColor: "--graph-edge",
+    defaultLinkColor: "--graph-edge",
+    edgeLabelBackground: "--bg",
+    clusterBkg: "--bg-2",
+    clusterBorder: "--border",
+    noteBkgColor: "--bg-2",
+    noteTextColor: "--text",
+    noteBorderColor: "--border-strong",
+    actorBkg: "--surface-2",
+    actorBorder: "--border-strong",
+    actorTextColor: "--text",
+    actorLineColor: "--border-strong",
+    signalColor: "--text-2",
+    signalTextColor: "--text",
+    labelBoxBkgColor: "--bg-2",
+    labelBoxBorderColor: "--border-strong",
+    labelTextColor: "--text",
+    loopTextColor: "--text",
+    activationBkgColor: "--bg-2",
+    activationBorderColor: "--border-strong",
+    sequenceNumberColor: "--bg",
+    errorBkgColor: "--bg-2",
+    errorTextColor: "--status-error",
+  };
+
+  function mermaidTheme(mode) {
+    var fallback = { theme: mode === "dark" ? "dark" : "default", themeVariables: null };
+    var root = document.documentElement;
+    var view = typeof window.getComputedStyle === "function" ? window : null;
+    if (!root || !view) return fallback;
+    var style;
+    try { style = view.getComputedStyle(root); } catch (error) { return fallback; }
+    if (!style || typeof style.getPropertyValue !== "function") return fallback;
+    var vars = { darkMode: mode === "dark" };
+    var keys = Object.keys(MERMAID_TOKEN_MAP);
+    for (var i = 0; i < keys.length; i++) {
+      var value = String(style.getPropertyValue(MERMAID_TOKEN_MAP[keys[i]]) || "").trim();
+      // Mermaid derives shades from real colours; never pass it an unresolved
+      // var() or an empty token.
+      if (!/^(#[0-9a-f]{3,8}|rgba?\([^)]*\))$/i.test(value)) return fallback;
+      vars[keys[i]] = value;
+    }
+    var font = String(style.getPropertyValue("--font-body") || "").trim();
+    if (font) vars.fontFamily = font;
+    vars.fontSize = "14px";
+    return { theme: "base", themeVariables: vars };
   }
 
   function rendererError(code, message, cause) {
@@ -587,7 +655,10 @@
       if (!mermaid || typeof mermaid.initialize !== "function" || typeof mermaid.render !== "function") {
         throw rendererError(LOAD_FAILURE, "Mermaid did not expose its renderer API.");
       }
-      mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: token.resolvedMode === "dark" ? "dark" : "default" });
+      var themed = mermaidTheme(token.resolvedMode);
+      var options = { startOnLoad: false, securityLevel: "strict", theme: themed.theme };
+      if (themed.themeVariables) options.themeVariables = themed.themeVariables;
+      mermaid.initialize(options);
       return Promise.all(mermaidDivs.map(function (el) {
         if (!currentToken(token)) return Promise.resolve();
         var source = el.getAttribute("data-source") || "";
@@ -617,40 +688,9 @@
   }
 
   // --- Syntax highlighting (highlight.js) -----------------------------
-  function cssHref(link) {
-    return link && (link.href || (link.getAttribute &&
-      (link.getAttribute("href") || link.getAttribute("data-okf-href")))) || "";
-  }
-
-  function ensureHljsTheme(token) {
-    var pin = token.resolvedMode === "dark" ? PINS.hljsThemeDark : PINS.hljsThemeLight;
-    if (hljsThemeLink && cssHref(hljsThemeLink) === pin.href) return Promise.resolve(hljsThemeLink);
-    if (hljsThemeRequest && hljsThemeRequest.href === pin.href && hljsThemeRequest.removed) {
-      hljsThemeRequest = null;
-    }
-    if (!hljsThemeRequest || hljsThemeRequest.href !== pin.href) {
-      hljsThemeRequest = { href: pin.href, promise: loadCSS(pin) };
-    }
-    var request = hljsThemeRequest;
-    return request.promise.then(function (link) {
-      if (!currentToken(token)) {
-        // A newer mode will either adopt the same request or remove this
-        // inert sheet. It is never promoted to active CSS by this completion.
-        if (currentResolvedMode !== token.resolvedMode && link !== hljsThemeLink) {
-          request.removed = true;
-          removeNode(link);
-        }
-        return link;
-      }
-      request.removed = false;
-      link.media = "all";
-      var old = hljsThemeLink;
-      hljsThemeLink = link;
-      if (old && old !== link) removeNode(old);
-      return link;
-    });
-  }
-
+  // highlight.js only tokenises (adds hljs-* classes); wiki.css owns every
+  // colour through the three Ledger syntax roles on the dark code well, so a
+  // palette change needs no stylesheet swap and no re-highlight.
   function getHljsModule() {
     if (!hljsModulePromise) {
       hljsModulePromise = OFFLINE
@@ -664,8 +704,8 @@
     var allBlocks = Array.prototype.slice.call(document.querySelectorAll("pre > code[class*='language-']"));
     if (!allBlocks.length) return Promise.resolve();
     var codeBlocks = allBlocks.filter(function (el) { return !el.dataset.highlighted; });
-    var tasks = [ensureHljsTheme(token)];
-    if (!codeBlocks.length) return Promise.all(tasks);
+    if (!codeBlocks.length) return Promise.resolve();
+    var tasks = [];
     tasks.push(getHljsModule().then(function (mod) {
       if (!currentToken(token)) return;
       var hljs = (mod && mod.default) || (mod && mod.hljs) || window.hljs;
@@ -710,7 +750,9 @@
         if (!currentToken(token) || el.dataset.mathRendered) return;
         var tex = el.textContent;
         el.id = el.id || ("okf-math-" + i);
-        window.katex.render(tex, el, { throwOnError: false, displayMode: true });
+        // Math inherits the text colour (wiki.css); an error keeps its source
+        // readable in the palette's status-error hue, live across palettes.
+        window.katex.render(tex, el, { throwOnError: false, displayMode: true, errorColor: "var(--status-error)" });
         if (currentToken(token)) el.dataset.mathRendered = "true";
       });
     }).catch(function (error) {
@@ -1393,17 +1435,15 @@
     var detail = event && event.detail;
     currentThemeName = nextName;
     currentResolvedMode = resolvedMode(nextName);
-    // A real theme event, including a family-only or modifier-only change,
-    // revokes every older renderer token. Mermaid receives force=true only
-    // when the resolved light/dark mode changed; family-only changes therefore
-    // do not rerender an already-rendered diagram.
+    // A real theme event revokes every older renderer token. Mermaid SVGs
+    // embed palette colours, so ANY palette change (Slate -> Clay keeps the
+    // dark scheme but not the colours) restores the authored source and
+    // re-renders with the new palette's variables. A repeated event for the
+    // palette already painted starts a fenced cycle without re-rendering.
     if (nextName === previousName && !detail) return;
     themeGeneration += 1;
-    var resolvedModeChanged = previousMode !== currentResolvedMode;
-    if (detail && detail.previousResolvedMode === detail.resolvedMode) {
-      resolvedModeChanged = false;
-    }
-    initAll("theme", resolvedModeChanged);
+    var paletteChanged = nextName !== previousName || previousMode !== currentResolvedMode;
+    initAll("theme", paletteChanged);
   }
 
   // theme.js dispatches the semantic event. The observer is only a defensive
