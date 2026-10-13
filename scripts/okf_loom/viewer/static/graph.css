@@ -1977,6 +1977,9 @@ body.okf-viewer--graph[data-okf-single-destination="index"] {
 /* graph.js retires the legacy type select (and its label) once the lens
  * panel owns type filtering; the grid display must not resurrect it. */
 .okf-graph-tools label[hidden] { display: none !important; }
+/* An empty match-count note must not add a grid row under the field (it
+ * pushed the field off the heading's centre line). */
+.okf-viewer--graph .okf-graph-search-status:empty { display: none; }
 
 /* Floating layers over the canvas: panel surface, no border, the 1px
  * --shadow-pop ring as their only elevation. */

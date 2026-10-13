@@ -136,6 +136,16 @@
     return fromOklab([L, 0, 0]) || [L * 255, L * 255, L * 255];
   }
 
+  // Mix `from` toward `toward` (in sRGB steps of 5%) until it reaches
+  // `ratio` against `bg`; returns `from` unchanged when it already does.
+  function liftToContrast(from, toward, bg, ratio) {
+    for (var t = 0; t <= 1.0001; t += 0.05) {
+      var mixed = [0, 1, 2].map(function (i) { return Math.round(from[i] + (toward[i] - from[i]) * t); });
+      if (contrastRatio(mixed, bg) >= ratio) return mixed;
+    }
+    return toward.slice(0, 3);
+  }
+
   // The lens ramp: a MUTED colour set derived from the active palette, so a
   // lens keeps its meaning without breaking the one-accent rule.
   //   categorical  8 low-chroma hues stepped by the golden angle from the
@@ -163,7 +173,7 @@
     var categorical = [], relation = [];
     for (var k = 0; k < 8; k++) {
       categorical.push(colourHex(legible(catL, catC, accH + k * GOLDEN_ANGLE)));
-      relation.push(colourHex(oklchRgb(edge[0], 0.07, accH + k * GOLDEN_ANGLE)));
+      relation.push(colourHex(liftToContrast(oklchRgb(edge[0], 0.07, accH + k * GOLDEN_ANGLE), pal.rgb.muted, pal.rgb.canvas, 3.05)));
     }
     var hiL = node[0] + (dark ? 0.16 : -0.11), hiC = Math.min(accC * 0.75, 0.09);
     var lo = node, hi = [hiL, hiC * Math.cos(accH), hiC * Math.sin(accH)];
@@ -194,6 +204,12 @@
       pal[name] = colourHex(rgb);
     });
     pal.dark = luminance(pal.rgb.canvas) < 0.2;
+    // Edges are meaningful graphics (WCAG 1.4.11): keep --graph-edge's hue
+    // but lift it toward --text-3 until it clears 3:1 on the canvas. The
+    // Ledger edge tokens sit near 2.5:1, so every palette takes a small,
+    // palette-derived lift rather than a hard-coded colour.
+    pal.rgb.edge = liftToContrast(pal.rgb.edge, pal.rgb.muted, pal.rgb.canvas, 3.05);
+    pal.edge = colourHex(pal.rgb.edge);
     pal.font = (cs && cs.getPropertyValue("--font-body").trim()) || "\"Public Sans\", sans-serif";
     pal.mono = (cs && cs.getPropertyValue("--font-mono").trim()) || "\"Azeret Mono\", monospace";
     // Stateful-cue names shared with the synchronisers below.
@@ -1076,7 +1092,7 @@
       var width = 26;
       var badgePalette = graphPalette();
       var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="18" viewBox="0 0 ' + width + ' 18">' +
-        '<rect x="1" y="1" width="' + (width - 2) + '" height="16" fill="' + badgePalette.chip + '" stroke="' + badgePalette.nodeBorder + '" stroke-width="1.2"/>' +
+        '<path d="M1 1H' + (width - 1) + 'V17H1Z" fill="' + badgePalette.chip + '" stroke="' + badgePalette.nodeBorder + '" stroke-width="1.2"/>' +
         '<text x="' + (width / 2) + '" y="12.6" text-anchor="middle" font-family="Azeret Mono,ui-monospace,monospace" font-size="9.5" font-weight="500" fill="' + badgePalette.nodeText + '">' + text + '</text></svg>';
       return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
     }
@@ -1727,7 +1743,10 @@
             // Neutral round record: 1.5px --border-strong stroke.
             "border-width": 1.5,
               "border-color": INITIAL_GRAPH_PALETTE.nodeBorder,
-            "underlay-shape": "rectangle",
+            // Cytoscape underlays are round-rectangles; a zero corner radius
+            // makes every halo (hub, hover, search, path, bridge) square.
+            "underlay-shape": "round-rectangle",
+            "underlay-corner-radius": 0,
           },
         },
         {
@@ -1858,7 +1877,7 @@
                 "underlay-color": INITIAL_GRAPH_PALETTE.raised,
             "underlay-opacity": 1,
             "underlay-padding": 7,
-            "underlay-shape": "rectangle",
+            "underlay-corner-radius": 0,
         } },
         // Phase 3: broken-link indicator. Nodes whose outgoing links
         // include unresolved targets (broken/missing per SPEC §5.3, as
@@ -2031,12 +2050,14 @@
         "color": pal.nodeText,
         "border-color": pal.nodeBorder,
         // Ledger labels: --graph-label on a --graph-halo outline in every
-        // palette; the square plate only appears behind the selected,
-        // hovered or toured node's name (below).
+        // palette. Light palettes need nothing more; on the dark palettes
+        // light labels crossing light edges also get a square --graph-halo
+        // plate at 0.85 so they stay crisp at high spread. The selected,
+        // hovered or toured node's name gets an opaque plate (below).
         "text-outline-color": pal.halo,
         "text-outline-width": 2,
         "text-background-color": pal.edgeLabelBg,
-        "text-background-opacity": 0
+        "text-background-opacity": pal.dark ? 0.85 : 0
       }).update();
       cy.style().selector("node:selected, node.okf-hover, node.okf-tour-target").style({
         "color": pal.nodeText,
