@@ -17,8 +17,8 @@
  *   - Extension API (§13.6): okfLoomStudio.register(kind, impl). Wired kinds:
  *     {panel, viewMode}. Reserved (forward-compat, accepted + warned):
  *     {toolbar, graphDecorator, suggestionRenderer}.
- *   - Themes (§13.5): owned entirely by viewer/static/theme.js (family x
- *     mode: swiss/technical x auto/light/dark). This file only calls the
+ *   - Themes (§13.5): owned entirely by viewer/static/theme.js (Ledger
+ *     palettes bone/slate/clay/plum + system). This file only calls the
  *     theme.js API and registers its own overlays into the shared
  *     window.OKFOverlayStack so the theme Appearance menu can yield Escape
  *     to the actually-topmost studio modal.
@@ -372,20 +372,30 @@
     } catch (e) { return String(ts); }
   }
   // Phase 5: human relative time for the index recency rail ("4m ago").
-  function fmtAgo(ts) {
-    try {
-      const d = new Date(ts);
-      if (isNaN(d.getTime())) return "";
-      const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
-      if (s < 60) return "just now";
-      if (s < 3600) return Math.round(s / 60) + "m ago";
-      if (s < 86400) return Math.round(s / 3600) + "h ago";
-      return Math.round(s / 86400) + "d ago";
-    } catch (e) { return ""; }
+  // "Recently changed" rows (render.py SSR and the live rail below) share
+  // one format: whole elapsed units, floored ("just now", "Nm ago",
+  // "Nh ago", "Nd ago"), with the full UTC timestamp in the <time> title
+  // for hover and assistive tech.
+  function fmtRecentAgo(ts) {
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return "";
+    const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
+    if (s < 60) return "just now";
+    if (s < 3600) return Math.floor(s / 60) + "m ago";
+    if (s < 86400) return Math.floor(s / 3600) + "h ago";
+    return Math.floor(s / 86400) + "d ago";
+  }
+  function fmtUtcStamp(ts) {
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return "";
+    const p = (n) => String(n).padStart(2, "0");
+    return d.getUTCFullYear() + "-" + p(d.getUTCMonth() + 1) + "-" + p(d.getUTCDate()) +
+      " " + p(d.getUTCHours()) + ":" + p(d.getUTCMinutes()) + " UTC";
   }
   function shortId(id) { return id ? id.slice(-6) : ""; }
 
   // ---- toast region ----------------------------------------------------
+  const TOAST_GLYPHS = { success: "OK", error: "!", warn: "?" };
   let toastRegion;
   function toast(msg, opts) {
     opts = opts || {};
@@ -394,6 +404,10 @@
       document.body.appendChild(toastRegion);
     }
     const node = el("div", { class: "okf-toast", dataset: { tone: opts.tone || "" } });
+    // A toned toast carries a glyph beside its 2px status bar so the tone is
+    // never colour-only (WCAG 1.4.1). Decorative: the message says it.
+    const glyph = TOAST_GLYPHS[opts.tone];
+    if (glyph) node.appendChild(el("span", { class: "okf-toast__icon", "aria-hidden": "true", text: glyph }));
     node.appendChild(el("span", { class: "okf-toast__msg" }));
     node.querySelector(".okf-toast__msg").innerHTML = ""; // safety
     if (typeof msg === "string") {
@@ -486,7 +500,7 @@
   // ====================================================================
   // 2. Themes (§13.5) — state ownership delegated to theme.js
   // ====================================================================
-  // Theme state (family/mode/Auto/OS, persistence, the Appearance popover)
+  // Theme state (palette choice incl. System/OS, persistence, the Appearance popover)
   // is owned ENTIRELY by viewer/static/theme.js, which loads before this
   // module and resolves data-theme before first paint. The studio NEVER
   // reads/writes localStorage for theme and never sets data-theme; command
@@ -1256,8 +1270,12 @@
           console.debug("[okf-studio] source load superseded by a newer owner (expected)", e);
           return;
         }
-        setSourceState("error");
         console.error("[okf-studio] source load failed", e);
+        // H3: a failed read whose pane another canonical publication has
+        // already filled reports nothing false: the pane shows committed
+        // bytes, so "Source could not be loaded" would be untrue there.
+        if (sourcePre && sourcePre.dataset.loaded === "1") { setSourceState(null); return; }
+        setSourceState("error");
       });
   }
 
@@ -1450,6 +1468,17 @@
     // the button reflects the current canonical rev even when the composer
     // zone is preserved across the rebuild.
     _refreshComposerSubmitState();
+    // H3: the Source pane's loading/unavailable notice describes the PANE,
+    // not one request. Every successful canonical publication writes the
+    // committed source into the pane (above), so it settles the notice here.
+    // Before, only the lazy Source read itself cleared it: when the boot
+    // comments/document read, the live "ready" refetch or a live patch
+    // filled the pane first, Split showed the loaded source under a stale
+    // "Loading source…" line until the redundant read landed (seconds on a
+    // loaded host). The read in flight is not cancelled: it may carry a
+    // newer revision, and its own admission fences still decide whether it
+    // commits.
+    if (sourcePre && sourcePre.dataset.loaded === "1" && sourceStateMode) setSourceState(null);
     if (opts.pulse && changedBlocks.length) pulseBlocks(changedBlocks);
     if (changedBlocks.length > 0) {
       try { window.dispatchEvent(new CustomEvent("okf-loom:bodyPatched")); } catch (e) {}
@@ -7202,7 +7231,10 @@
       // node would become an anonymous item in the row's two-column grid,
       // painting a stray dot and wrapping the time onto a second line.
       link.appendChild(el("span", { class: "sr-only", text: " \u00b7 " }));
-      link.appendChild(el("time", { class: "okf-recent__time", datetime: latest[id].ts, text: fmtAgo(latest[id].ts) }));
+      const stamp = fmtUtcStamp(latest[id].ts);
+      const time = el("time", { class: "okf-recent__time", datetime: latest[id].ts, text: fmtRecentAgo(latest[id].ts) || stamp });
+      if (stamp) time.setAttribute("title", stamp);
+      link.appendChild(time);
       li.appendChild(link); list.appendChild(li);
     });
     rail.appendChild(list); hero.appendChild(rail);
