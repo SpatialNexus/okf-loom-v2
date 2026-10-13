@@ -1098,6 +1098,53 @@ def test_cold_source_first_publication_fences_stale_lazy_response(studio, page):
     page.unroute("**/__data/doc*")
 
 
+def test_split_loading_notice_settles_when_another_publication_fills_source(studio, page):
+    """H3: in Split, "Loading source…" describes the Source pane, not one
+    request. When another canonical publication (here a live patch; on a
+    cold boot the comments/document read) fills the pane while the lazy
+    Source read is still in flight, the notice must settle at once instead of
+    sitting above the loaded panes until the redundant read lands."""
+    base, bundle = studio
+    held = []
+    armed = {"on": True}
+
+    def hold_while_armed(route):
+        if not armed["on"] or route.request.method != "GET":
+            return route.continue_()
+        held.append(route)
+
+    page.route("**/__data/doc*", hold_while_armed)
+    page.goto(f"{base}/{TARGET}?view=split", wait_until="load")
+    page.wait_for_function("() => typeof window.okfLoomStudio === 'object'")
+    _wait_for(lambda: len(held) >= 2, message="the held boot doc reads (incl. the lazy Source read)",
+              sleep=lambda: page.wait_for_timeout(100))
+    assert page.evaluate("document.querySelector('.okf-view').dataset.okfView") == "split"
+    notice = page.locator(".okf-source-state")
+    expect(notice).to_be_visible()
+    expect(notice).to_have_text("Loading source…")
+
+    # A live patch publishes revision B through the canonical commit owner
+    # while every earlier doc read (including the lazy Source read) stays held.
+    armed["on"] = False
+    _cli("replace-text", "--bundle", str(bundle), "--id", TARGET,
+         "--old", "Alpha paragraph", "--new", "Alpha paragraph SPLITMARK")
+    expect(page.locator(".okf-source")).to_contain_text("SPLITMARK", timeout=15000)
+    assert held, "the lazy Source read must still be in flight for this check"
+    expect(notice).to_be_hidden()
+    assert page.evaluate("document.querySelector('.okf-view').dataset.okfView") == "split"
+
+    # The held reads then land (same revision): nothing false reappears.
+    for route in held:
+        route.fulfill(response=route.fetch())
+    held.clear()
+    page.wait_for_timeout(500)
+    expect(notice).to_be_hidden()
+    assert page.locator(".okf-source-state--error").count() == 0
+    expect(page.locator(".okf-source")).to_contain_text("SPLITMARK")
+    expect(page.locator(".okf-page__body")).to_contain_text("SPLITMARK")
+    page.unroute("**/__data/doc*")
+
+
 def test_cold_source_failure_is_explicit_and_retryable(studio, page):
     """F6: a cold ?view=source boot whose document fetch fails shows the
     explicit unavailable state (never a fake-empty source pane) with Retry."""

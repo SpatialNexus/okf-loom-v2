@@ -1256,8 +1256,12 @@
           console.debug("[okf-studio] source load superseded by a newer owner (expected)", e);
           return;
         }
-        setSourceState("error");
         console.error("[okf-studio] source load failed", e);
+        // H3: a failed read whose pane another canonical publication has
+        // already filled reports nothing false: the pane shows committed
+        // bytes, so "Source could not be loaded" would be untrue there.
+        if (sourcePre && sourcePre.dataset.loaded === "1") { setSourceState(null); return; }
+        setSourceState("error");
       });
   }
 
@@ -1450,6 +1454,17 @@
     // the button reflects the current canonical rev even when the composer
     // zone is preserved across the rebuild.
     _refreshComposerSubmitState();
+    // H3: the Source pane's loading/unavailable notice describes the PANE,
+    // not one request. Every successful canonical publication writes the
+    // committed source into the pane (above), so it settles the notice here.
+    // Before, only the lazy Source read itself cleared it: when the boot
+    // comments/document read, the live "ready" refetch or a live patch
+    // filled the pane first, Split showed the loaded source under a stale
+    // "Loading source…" line until the redundant read landed (seconds on a
+    // loaded host). The read in flight is not cancelled: it may carry a
+    // newer revision, and its own admission fences still decide whether it
+    // commits.
+    if (sourcePre && sourcePre.dataset.loaded === "1" && sourceStateMode) setSourceState(null);
     if (opts.pulse && changedBlocks.length) pulseBlocks(changedBlocks);
     if (changedBlocks.length > 0) {
       try { window.dispatchEvent(new CustomEvent("okf-loom:bodyPatched")); } catch (e) {}
