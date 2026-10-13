@@ -535,8 +535,13 @@ def test_cdn_render_golden_provenance_matches_the_pinned_versions():
                                       "katex": versions["katex"], "mermaid": versions["mermaid"]}
     renderers = (TOOLKIT_ROOT / "scripts" / "okf_loom" / "viewer" / "static" / "renderers.js").read_text(encoding="utf-8")
     pins = set(re.findall(r'"(https://cdn\.jsdelivr\.net/npm/[^"]+)"', renderers))
-    light_mode_pins = {url for url in pins if "github-dark" not in url}
-    assert light_mode_pins and light_mode_pins <= set(provenance["cdn_requests"])
+    # GitHub sheets remain locked for vendor parity but neither is loaded:
+    # Ledger paints syntax locally from palette tokens in every scheme.
+    retired_sheets = {url for url in pins if re.search(r"/styles/github(?:-dark)?\.min\.css$", url)}
+    active_pins = pins - retired_sheets
+    requests = set(provenance["cdn_requests"])
+    assert active_pins and active_pins <= requests
+    assert not retired_sheets & requests
     assert all(url.startswith("https://cdn.jsdelivr.net/npm/") for url in provenance["cdn_requests"])
     assert provenance["generated"] and provenance["browser"].startswith("Chromium ")
     assert len(golden["mermaid"]) == 2 and len(golden["hljs"]) == 2 and len(golden["katex"]) == 1
