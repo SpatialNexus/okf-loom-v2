@@ -218,8 +218,7 @@ def test_shell_search_current_destination_and_query_escaping(
     shell = _application_shell_html(
         name="tiny_good", bundle_href="/", search_href="/__search", index_href="/",
         graph_href="/__graph", current="search", mode="serve",
-        initial_theme="okf-loom", initial_mode="auto", initial_contrast="normal",
-        initial_border="subtle", search_query=hostile_query,
+        appearance_choice="bone", search_query=hostile_query,
     )
     probe = _ShellProbe()
     probe.feed(shell)
@@ -234,8 +233,7 @@ def test_shell_search_current_destination_and_query_escaping(
     plain = _application_shell_html(
         name="tiny_good", bundle_href="/", search_href="/__search", index_href="/",
         graph_href="/__graph", current=None, mode="serve",
-        initial_theme="okf-loom", initial_mode="auto", initial_contrast="normal",
-        initial_border="subtle",
+        appearance_choice="bone",
     )
     plain_probe = _ShellProbe()
     plain_probe.feed(plain)

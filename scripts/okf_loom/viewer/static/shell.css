@@ -1,5 +1,8 @@
-/* Shared application shell. Loaded after wiki.css so every route keeps one
- * navigation hierarchy even where older route-specific chrome rules exist. */
+/* Shared application shell (Ledger top bar). Loaded after wiki.css so every
+ * route keeps one navigation hierarchy even where route-specific chrome
+ * rules exist. Canvas-coloured bar with a 1px bottom rule; destinations are
+ * text controls; the current page is marked by a 2px accent bar under its
+ * label, never a fill; the search field and its button are joined. */
 .okf-shell {
   display: grid;
   grid-template-columns: minmax(10rem, 1fr) auto;
@@ -11,8 +14,67 @@
 .okf-topbar.okf-shell {
   box-sizing: border-box;
   height: auto;
-  min-height: var(--okf-topbar-h);
+  min-height: var(--nav-h);
+  padding: 0 20px;
   flex-shrink: 0;
+  border-bottom: 1px solid var(--nav-border);
+  background: var(--nav-bg);
+  color: var(--nav-text);
+}
+.okf-shell .okf-brand-link:hover { color: var(--nav-text); text-decoration: none; }
+/* WCAG 2.5.8: the brand is the bar's only text-link target; a 24px line box
+ * keeps it at the 24px minimum at every width (Ledger's 14px brand face
+ * alone measures ~17-22px). */
+.okf-shell .okf-topbar__brand strong { line-height: 24px; }
+/* Destinations: transparent text controls (no outline) at nav size. */
+.okf-shell__nav .okf-btn {
+  min-height: var(--ctl-h);
+  padding-inline: 13px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--nav-text);
+  font-size: var(--nav-size);
+  font-weight: var(--nav-weight);
+}
+.okf-shell__nav .okf-btn:hover { border-color: transparent; background: var(--surface-2); color: var(--nav-text); }
+/* Search: one joined control — the field on the band surface, its button
+ * on the raised surface, sharing a border. */
+.okf-shell__search-form { gap: 0; align-items: stretch; }
+.okf-shell__search-form input {
+  min-height: var(--ctl-h);
+  padding: 0 10px;
+  border: 1px solid var(--input-border);
+  border-radius: 0;
+  background: var(--input-bg);
+  color: var(--input-text);
+  font: 400 13px/1.25 var(--font-body);
+}
+.okf-shell__search-form button {
+  min-height: var(--ctl-h);
+  margin-left: -1px;
+  padding: 0 13px;
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
+  background: var(--surface-2);
+  color: var(--text);
+  font: var(--btn-weight) var(--btn-size)/1 var(--font-body);
+  letter-spacing: var(--btn-track);
+  cursor: pointer;
+}
+.okf-shell__search-form button:hover { background: var(--border); }
+/* The Studio launcher (studio.css owns its states) sits in the nav as one
+ * more text destination; the appearance trigger shows the palette swatch. */
+body.okf-viewer .okf-shell .okf-studio-launcher {
+  border-color: transparent;
+  background: transparent;
+  color: var(--nav-text);
+  font-size: var(--nav-size);
+}
+body.okf-viewer .okf-shell .okf-studio-launcher:hover { background: var(--surface-2); }
+.okf-shell .okf-appearance-trigger[aria-expanded="true"] { background: var(--surface-2); }
+@media (min-width: 641px) {
+  .okf-shell__nav { gap: 4px; }
+  .okf-shell [data-okf-shell-item="search"] { margin-right: 6px; }
 }
 .okf-shell__nav {
   position: static;
@@ -26,21 +88,24 @@
   overflow: visible;
 }
 .okf-shell [data-okf-shell-item] > [aria-current="page"] {
-  background: var(--okf-accent-bg);
-  color: var(--okf-accent);
-  box-shadow: inset 0 -2px 0 var(--okf-accent);
+  background: transparent;
+  color: var(--nav-text);
+  box-shadow: inset 0 -2px 0 0 var(--accent);
   font-weight: 700;
 }
-/* The search route's current-destination marker lives on the search form
- * itself (the form replaced the former Search shortcut link), so translate
- * the shared active affordance into an underline around the whole control
- * instead of tinting the field's background. */
+/* The search route's current destination is the search FORM (it replaced
+ * the former Search shortcut link and keeps aria-current for assistive
+ * tech). Its visible label is the Search button, so the 2px accent bar sits
+ * under that label — not under the whole field, never as a fill. */
 .okf-shell__nav > form[data-okf-shell-item="search"][aria-current="page"] {
   background: transparent;
   color: inherit;
-  box-shadow: inset 0 -2px 0 var(--okf-accent);
-  padding-bottom: 2px;
+  box-shadow: none;
   font-weight: 400;
+}
+.okf-shell__nav > form[data-okf-shell-item="search"][aria-current="page"] .okf-shell__search-submit {
+  box-shadow: inset 0 -2px 0 0 var(--accent);
+  font-weight: 700;
 }
 .okf-shell__search-form { display: flex; min-width: 0; }
 .okf-shell__search-form input { min-width: 7rem; width: clamp(7rem, 15vw, 13rem); }
@@ -50,7 +115,7 @@ html:not([data-okf-js="1"]) #okf-theme { display: none !important; }
 .okf-shell__studio-slot[hidden] { display: none; }
 .okf-shell :is(a, button):focus-visible,
 [data-okf-route-heading]:focus-visible {
-  outline: 2px solid var(--okf-focus-ring, var(--okf-accent));
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 .okf-graph-route-title {
@@ -58,10 +123,13 @@ html:not([data-okf-js="1"]) #okf-theme { display: none !important; }
   flex: 0 0 auto;
   width: 100%;
   margin: 0;
-  padding: var(--okf-space-2) var(--okf-space-4);
-  font-size: var(--okf-text-xl);
+  padding: 12px 20px;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
   line-height: 1.2;
-  border-bottom: 1px solid var(--okf-border);
+  border-bottom: 1px solid var(--border);
 }
 @media (max-width: 640px) {
   .okf-graph-route-title {
@@ -130,6 +198,8 @@ html:not([data-okf-js="1"]) #okf-theme { display: none !important; }
      * inline-block enabler): with wrapping they only shatter the name into
      * a 70px column ("18vw" at 390px). */
     max-width: none;
+    /* Inline-block so the 24px line box (above) sizes each wrapped line. */
+    display: inline-block;
   }
   .okf-shell .okf-topbar__brand .okf-muted { display: none; }
   /* Compact but complete appearance label: keep "Appearance" and the current
@@ -147,6 +217,11 @@ html:not([data-okf-js="1"]) #okf-theme { display: none !important; }
   /* Links are inline by default; make the nav controls real flex boxes so
    * the 44px touch height actually applies. */
   .okf-shell__nav .okf-btn { display: inline-flex; align-items: center; min-height: 44px; }
+  /* Phone rows run on a tight linear budget (search basis + Index + Graph +
+   * Studio must share ~366px at 390px): destinations take 10px inline
+   * padding here instead of the desktop 13px, so Studio stays on row 2. */
+  .okf-shell__nav .okf-btn,
+  body.okf-viewer .okf-shell .okf-studio-launcher { padding-inline: 10px; }
   .okf-shell__nav .okf-studiobtn { min-height: 44px; }
   /* Same studio.css graph-chrome defeat as the 641–900px band below: at
    * <=640px on the graph route the launcher would otherwise compute 40px
@@ -176,13 +251,16 @@ html:not([data-okf-js="1"]) #okf-theme { display: none !important; }
   .okf-topbar.okf-shell { position: static; }
 }
 @media (forced-colors: active) {
-  .okf-shell [data-okf-shell-item] > [aria-current="page"] {
-    border-color: Highlight;
-    box-shadow: inset 0 -3px 0 Highlight;
+  /* Box shadows drop out in forced colours: the bar becomes a real border. */
+  .okf-shell [data-okf-shell-item] > [aria-current="page"],
+  .okf-shell__nav > form[data-okf-shell-item="search"][aria-current="page"] .okf-shell__search-submit {
+    border-bottom: 3px solid Highlight;
   }
-  .okf-shell__nav > form[data-okf-shell-item="search"][aria-current="page"] {
-    box-shadow: inset 0 -3px 0 Highlight;
-  }
+}
+/* Coarse pointers keep 44px targets whatever the chrome density. */
+@media (pointer: coarse) {
+  .okf-shell__nav .okf-btn,
+  .okf-shell__search-form :is(input, button) { min-height: 44px; }
 }
 
 /* Mid-size documents keep the full destination set without allowing the nav
@@ -271,9 +349,9 @@ body.okf-viewer { container: okf-page / inline-size; }
     white-space: nowrap;
   }
   body.okf-viewer .okf-shell .okf-studio-launcher[data-attention="pending"]::after {
-    content: "\25CF" / " · Needs attention";
+    content: "\25A0" / " · Needs attention";
     font-size: 0.7em;
-    color: var(--okf-accent);
+    color: var(--status-warn);
   }
   @container okf-page (max-width: 1079.98px) {
     /* body > shell (0,2,1) also outranks the graph route's desktop header
@@ -290,8 +368,8 @@ body.okf-viewer { container: okf-page / inline-size; }
       overflow-wrap: break-word;
       line-height: 1.2;
     }
-    /* wiki.css floors the topbar search at 200px (0,2,1); the condensed
-     * masthead re-owns it one step higher. */
+    /* The condensed masthead narrows the field (one step above the
+     * generic .okf-topbar__controls rule in wiki.css). */
     .okf-shell__nav .okf-shell__search-form input[type="search"] {
       min-width: 6rem;
       width: clamp(6rem, 13cqw, 10rem);

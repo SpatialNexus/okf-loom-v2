@@ -30,6 +30,7 @@ from .portable_feedback_export import (
     single_file_bootstrap_script as single_file_portable_feedback_script,
 )
 
+import functools
 import json
 import hashlib
 import base64
@@ -39,7 +40,7 @@ import os
 import posixpath
 import re
 import tempfile
-from datetime import timezone
+from datetime import datetime, timezone
 from html.parser import HTMLParser
 from html.entities import html5 as _html5_entities
 from urllib.parse import quote as _url_quote, urlencode, unquote as _url_unquote
@@ -2731,13 +2732,14 @@ def _render_not_found_page(*, name: str, path: str, config: dict[str, Any]) -> s
         '<link rel="stylesheet" href="/__static/ledger-fonts.css">'
         '<link rel="stylesheet" href="/__static/wiki.css">'
         '<link rel="stylesheet" href="/__static/shell.css">'
-        '</head><body data-okf-mode="serve">'
+        '</head><body class="okf-viewer okf-viewer--notfound" data-okf-mode="serve">'
         '<a class="okf-skip-link" href="#okf-main">Skip to content</a>'
         + shell
-        + '<main id="okf-main" class="okf-index" tabindex="-1">'
+        + '<main id="okf-main" class="okf-index okf-notfound" tabindex="-1">'
+        '<p class="okf-notfound__code">404 · Not found</p>'
         '<h1>Page not found</h1>'
         f'<p>The requested page <code>/{_esc(path)}</code> is not available.</p>'
-        '<p><a class="okf-btn" href="/">Home · Browse the index</a> '
+        '<p class="okf-notfound__actions"><a class="okf-btn" href="/">Home · Browse the index</a> '
         '<a class="okf-btn" href="/__search">Search this bundle</a></p>'
         '</main><script src="/__static/wiki.js" defer></script></body></html>'
     )
@@ -3057,17 +3059,42 @@ def _recent_row_reader_text(row: dict[str, str]) -> str:
     return f"{actor} {verb or action}".strip()
 
 
-def _recent_time_text(ts: str) -> str:
-    """Deterministic human time text for a recent row (build-time safe).
+def _recent_time_title(ts: str) -> str:
+    """Full UTC instant for a recent row (``title`` / assistive text).
 
-    Relative phrasing would go stale in static builds, so the visible text is
-    the event's real instant in UTC; the authored ``ts`` stays on the
-    ``datetime`` attribute. Unparseable values show the raw record.
+    ``YYYY-MM-DD HH:MM UTC``; unparseable values show the raw record.
     """
     instant = parse_instant(ts)
     if instant is None:
         return ts
     return instant.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+
+def _recent_time_text(ts: str, now: datetime | None = None) -> str:
+    """Relative time text for a recent row: the Ledger recency contract.
+
+    ``just now`` under a minute, then whole elapsed units rounded DOWN:
+    ``Nm ago`` (< 1 hour), ``Nh ago`` (< 1 day), ``Nd ago``. Future instants
+    (clock skew) read ``just now``. The exact instant stays on the
+    ``<time datetime>`` attribute and, as ``YYYY-MM-DD HH:MM UTC``, on its
+    ``title`` (:func:`_recent_time_title`). wiki.js re-renders the same text
+    against the reader's clock (``okfRelativeTime``), and the live Studio
+    rail uses the same format, so a static build never shows stale
+    build-time phrasing once scripts run. Unparseable values show the raw
+    record (nothing invented).
+    """
+    instant = parse_instant(ts)
+    if instant is None:
+        return ts
+    reference = now if now is not None else datetime.now(timezone.utc)
+    seconds = max(0.0, (reference - instant).total_seconds())
+    if seconds < 60:
+        return "just now"
+    if seconds < 3600:
+        return f"{int(seconds // 60)}m ago"
+    if seconds < 86400:
+        return f"{int(seconds // 3600)}h ago"
+    return f"{int(seconds // 86400)}d ago"
 
 
 def graph_export_svg(graph_data: dict[str, Any], *, title_id: str = "okf-graph-export-title", limit: int = 24) -> str:
@@ -3130,9 +3157,155 @@ def graph_export_svg(graph_data: dict[str, Any], *, title_id: str = "okf-graph-e
             f'<g class="okf-graph-thumb__edges">{"".join(edge_svg)}</g><g class="okf-graph-thumb__nodes">{"".join(node_svg)}</g></svg>')
 
 
+# The index hero's graph preview is a decorative miniature drawn ONLY for that
+# preview: an organic, deterministic force layout of the same graph payload,
+# rendered as Ledger records (neutral square dots sized by degree, hairline
+# edges, no type colour, icons, labels, count chips or arrowheads). The shared
+# canonical export (``graph_export_svg``) and its fixed layout are untouched.
+_PREVIEW_W = 560.0
+_PREVIEW_H = 250.0
+_PREVIEW_PAD = 12.0
+_PREVIEW_NODE_LIMIT = 80
+
+
+@functools.lru_cache(maxsize=16)
+def _organic_preview_layout(
+    ids: tuple[str, ...], pairs: tuple[tuple[int, int], ...],
+) -> tuple[tuple[float, float], ...]:
+    """Deterministic Fruchterman–Reingold layout fitted to the preview box.
+
+    Seeded on a golden-angle spiral with the best-connected records at the
+    centre (no randomness), so the same graph always yields the same picture
+    in every process. Cached: the index is re-rendered often in serve mode.
+    """
+    n = len(ids)
+    if n == 0:
+        return ()
+    if n == 1:
+        return ((_PREVIEW_W / 2, _PREVIEW_H / 2),)
+    half_w = _PREVIEW_W / 2 - _PREVIEW_PAD
+    half_h = _PREVIEW_H / 2 - _PREVIEW_PAD
+    degree = [0] * n
+    for a, b in pairs:
+        degree[a] += 1
+        degree[b] += 1
+    order = sorted(range(n), key=lambda i: (-degree[i], ids[i]))
+    golden = math.pi * (3 - math.sqrt(5))
+    pos = [[0.0, 0.0] for _ in range(n)]
+    for rank, i in enumerate(order):
+        radius = math.sqrt((rank + 0.5) / n)
+        angle = rank * golden
+        pos[i] = [radius * math.cos(angle) * half_w, radius * math.sin(angle) * half_h]
+    k = math.sqrt((4 * half_w * half_h) / n) * 0.8
+    k2 = k * k
+    temperature = half_w / 4
+    for _ in range(150):
+        disp = [[0.0, 0.0] for _ in range(n)]
+        for i in range(n):
+            xi, yi = pos[i]
+            di = disp[i]
+            for j in range(i + 1, n):
+                dx = xi - pos[j][0]
+                dy = yi - pos[j][1]
+                d2 = dx * dx + dy * dy
+                if d2 < 1e-4:
+                    dx, dy, d2 = 0.01 * (j - i), 0.01, 1e-4 * (1 + (j - i) ** 2)
+                force = k2 / d2
+                di[0] += dx * force
+                di[1] += dy * force
+                disp[j][0] -= dx * force
+                disp[j][1] -= dy * force
+        for a, b in pairs:
+            dx = pos[a][0] - pos[b][0]
+            dy = pos[a][1] - pos[b][1]
+            dist = math.hypot(dx, dy) or 1e-3
+            force = dist / k
+            disp[a][0] -= dx * force
+            disp[a][1] -= dy * force
+            disp[b][0] += dx * force
+            disp[b][1] += dy * force
+        for i in range(n):
+            # Weak gravity keeps isolated records near the cluster.
+            dx = disp[i][0] - pos[i][0] * 0.05
+            dy = disp[i][1] - pos[i][1] * 0.05 * (half_w / half_h)
+            length = math.hypot(dx, dy)
+            if length > temperature:
+                dx, dy = dx / length * temperature, dy / length * temperature
+            pos[i][0] = max(-half_w, min(half_w, pos[i][0] + dx))
+            pos[i][1] = max(-half_h, min(half_h, pos[i][1] + dy))
+        temperature = max(0.5, temperature * 0.96)
+    xs = [p[0] for p in pos]
+    ys = [p[1] for p in pos]
+    span_x = (max(xs) - min(xs)) or 1.0
+    span_y = (max(ys) - min(ys)) or 1.0
+    mid_x = (max(xs) + min(xs)) / 2
+    mid_y = (max(ys) + min(ys)) / 2
+    scale_x = (2 * half_w) / span_x
+    scale_y = (2 * half_h) / span_y
+    return tuple(
+        (round(_PREVIEW_W / 2 + (x - mid_x) * scale_x, 1),
+         round(_PREVIEW_H / 2 + (y - mid_y) * scale_y, 1))
+        for x, y in pos
+    )
+
+
+def _index_graph_preview_svg(graph_data: dict[str, Any]) -> str:
+    """Decorative organic miniature of the graph for the index hero only."""
+    raw_nodes = [n for n in graph_data.get("nodes", []) if isinstance(n, dict)]
+    seen: set[str] = set()
+    all_ids: list[str] = []
+    for node in raw_nodes:
+        node_id = str((node.get("data") or {}).get("id", ""))
+        if node_id and node_id not in seen:
+            seen.add(node_id)
+            all_ids.append(node_id)
+    if not all_ids:
+        return ""
+    neighbours: dict[str, set[str]] = {node_id: set() for node_id in all_ids}
+    for edge in graph_data.get("edges", []):
+        data = edge.get("data", {}) if isinstance(edge, dict) else {}
+        source, target = str(data.get("source", "")), str(data.get("target", ""))
+        if source in neighbours and target in neighbours and source != target:
+            neighbours[source].add(target)
+            neighbours[target].add(source)
+    kept = sorted(all_ids, key=lambda i: (-len(neighbours[i]), i))[:_PREVIEW_NODE_LIMIT]
+    ids = tuple(sorted(kept))
+    index = {node_id: i for i, node_id in enumerate(ids)}
+    pairs = tuple(sorted({
+        (min(index[a], index[b]), max(index[a], index[b]))
+        for a in ids for b in neighbours[a] if b in index
+    }))
+    positions = _organic_preview_layout(ids, pairs)
+    degree = [0] * len(ids)
+    for a, b in pairs:
+        degree[a] += 1
+        degree[b] += 1
+    edge_svg = "".join(
+        f'<line x1="{positions[a][0]}" y1="{positions[a][1]}" '
+        f'x2="{positions[b][0]}" y2="{positions[b][1]}"/>'
+        for a, b in pairs
+    )
+    # Dot size reads relative connectedness (4px leaf .. 11px best-connected).
+    max_degree = max(degree) or 1
+    node_svg = []
+    for i, node_id in enumerate(ids):
+        side = round(4.0 + 7.0 * (degree[i] / max_degree) ** 0.8, 1)
+        x, y = positions[i]
+        node_svg.append(
+            f'<rect class="okf-graph-thumb__dot" data-concept-id="{_esc_attr_qs(node_id)}" '
+            f'x="{x - side / 2:.1f}" y="{y - side / 2:.1f}" width="{side}" height="{side}"/>'
+        )
+    return (
+        '<svg class="okf-graph-preview" data-okf-graph-preview="organic-v1" '
+        f'viewBox="0 0 {_PREVIEW_W:.0f} {_PREVIEW_H:.0f}" aria-hidden="true" focusable="false">'
+        f'<g class="okf-graph-thumb__edges">{edge_svg}</g>'
+        f'<g class="okf-graph-thumb__nodes">{"".join(node_svg)}</g></svg>'
+    )
+
+
 def _graph_thumbnail_html(graph_data: dict[str, Any], href: str) -> str:
-    """Wrap the shared canonical graph export for the index hero."""
-    svg = graph_export_svg(graph_data)
+    """The index hero's graph preview link (organic Ledger miniature)."""
+    svg = _index_graph_preview_svg(graph_data)
     if not svg:
         return ('<aside class="okf-graph-thumb okf-graph-thumb--empty" aria-label="Knowledge graph overview">'
                 f'<p>No concepts are available to map yet. <a href="{_esc_attr_qs(href)}">Open the graph</a>.</p></aside>')
@@ -3142,33 +3315,13 @@ def _graph_thumbnail_html(graph_data: dict[str, Any], href: str) -> str:
         for edge in graph_data.get("edges", [])
     ))
     relationship_label = "relationship" if relationship_count == 1 else "relationships"
-    # The canonical export remains a meaningful image everywhere else.  Only
-    # the copy nested inside the already-named preview link is decorative, so
-    # its title/description cannot pollute the link's computed name.
-    decorative_svg = re.sub(
-        r"<svg\b[^>]*>",
-        lambda match: re.sub(
-            r'\s(?:role|aria-labelledby)="[^"]*"', "", match.group(0)
-        )[:-1] + ' aria-hidden="true" focusable="false">',
-        svg,
-        count=1,
-    )
-    # Ledger draws the hero preview's records as square dots (sized by the
-    # export's degree-based radius) on the export's own layout; the canonical
-    # export elsewhere keeps its round, type-coloured nodes.
-    def _square(match: re.Match[str]) -> str:
-        cx, cy, r = (float(match.group(i)) for i in (1, 2, 3))
-        side = round(max(4.0, r * 0.9 - 4), 1)
-        return (f'<rect class="okf-graph-thumb__dot" x="{cx - side / 2:.1f}" '
-                f'y="{cy - side / 2:.1f}" width="{side}" height="{side}"{match.group(4)}/>')
-    decorative_svg = re.sub(
-        r'<circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"((?: fill="[^"]*")?)/>',
-        _square, decorative_svg,
-    )
+    # The miniature is decorative (aria-hidden, no title/description) because
+    # it sits inside the already-named preview link; the canonical export
+    # stays the meaningful image on every other static graph surface.
     return ('<figure class="okf-graph-thumb"><a class="okf-graph-thumb__link" '
             f'href="{_esc_attr_qs(href)}">'
             '<span class="sr-only">Open knowledge graph — </span>'
-            f'{decorative_svg}'
+            f'{svg}'
             f'<figcaption><strong>Explore connections</strong><span>{concept_count} concepts · {relationship_count} {relationship_label}</span></figcaption></a></figure>')
 
 
@@ -4331,8 +4484,9 @@ def _render_concept_page(
             concept_content_rev(concept.raw_text.replace("\r\n", "\n")))
         + '</head>', 1)
 
-    palette_for = palette
-    type_color = palette_for.get(concept.type or "", type_color_for(concept.type))
+    # Ledger: content types are not colour-coded on the document surfaces.
+    # ``palette`` stays in the signature for callers (the full graph still
+    # reads it) but is not projected into the page.
 
     # Frontmatter table (exclude governed keys that get dedicated sections).
     _GOVERNED_KEYS = frozenset({"aliases", "entities", "provenance", "citations", "relations"})
@@ -4410,7 +4564,6 @@ def _render_concept_page(
         "id": concept_id_to_str(concept.id),
         "label": concept.title,
         "type": concept.type or "concept",
-        "color": palette_for.get(concept.type or "", type_color_for(concept.type)),
         "is_center": True,
     }
     neighbour_nodes = [
@@ -4418,7 +4571,6 @@ def _render_concept_page(
             "id": concept_id_to_str(c.id),
             "label": c.title,
             "type": c.type or "concept",
-            "color": palette_for.get(c.type or "", type_color_for(c.type)),
             "is_center": False,
         }
         for c in sorted(bundle.concepts.values(), key=lambda c: c.id)
@@ -4544,7 +4696,6 @@ def _render_concept_page(
     long_document = len(_ONTHISPAGE_HEADING_RE.findall(body_html)) >= 8
     infobox_html = _render_infobox(
         concept,
-        type_color=type_color,
         revision=revision,
         tags_html=tags_html,
         frontmatter_html=frontmatter_html,
@@ -4595,8 +4746,11 @@ def _render_concept_page(
         .replace("__CONCEPT_ID__", _esc(cid_str))
         .replace("__BREADCRUMB_HTML__", breadcrumb_html)
         .replace("__CONCEPT_TYPE__", _esc(concept.type or "concept"))
-        .replace("__CONCEPT_TYPE_COLOR__", _esc(type_color))
-        .replace("__CONCEPT_TYPE_FG__", _esc(_chip_fg(type_color)))
+        # Legacy override templates may still carry the retired type-colour
+        # placeholders; they resolve to neutral Ledger tokens (the label on
+        # --text-3 reuses the canvas, which clears AA by construction).
+        .replace("__CONCEPT_TYPE_COLOR__", "var(--text-3)")
+        .replace("__CONCEPT_TYPE_FG__", "var(--bg)")
         .replace("__TYPE_ICON__", type_icon_svg(concept.type, size=18))
         .replace("__READTIME_HTML__", _readtime_html(concept.body))
         # P1-1 (iter-2): the subtitle is a SIBLING <p> after the h1, not a
@@ -4693,21 +4847,15 @@ def _render_link_list(
     # backlinks/outlinks list is deterministic (§3.2), not relying on
     # items[] insertion order (which mirrors graph.edges order, masked
     # by Bundle.load's sorted rglob for disk-loaded bundles).
-    # Phase 2: connection CARDS — each target renders with its type icon,
-    # a type-tinted accent, title + id, and the typed-relation chip with a
-    # direction arrow. The palette is resolved once per call (cached
-    # override read; cheap at page-render granularity).
-    try:
-        palette = resolve_palette(bundle)
-    except Exception:  # noqa: BLE001 — cards degrade to accentless
-        palette = {}
+    # Connection rows — each target renders with its type icon, title + id,
+    # and the typed-relation chip with a direction arrow. Ledger: no type
+    # colour is emitted; the icon and the id carry identity.
     arrow = "→" if kind == "out" else "←"
     comment_counts = comment_summary.get("counts", {}) if comment_summary else None
     for target_cid, rel_label in sorted(seen_targets.items()):
         concept = bundle.concepts.get(target_cid)
         title = concept.title if concept else concept_id_to_str(target_cid)
         ctype = concept.type if concept else None
-        color = palette.get(ctype or "", type_color_for(ctype))
         icon = type_icon_svg(ctype, size=16, cls="okf-type-icon")
         url = url_for_concept(target_cid, mode, source_cid=items[0][3])
         # P2-57: emit ``okf-rel-type`` (the chip class defined in wiki.css)
@@ -4728,8 +4876,8 @@ def _render_link_list(
                 f'aria-label="{_esc_attr_qs(label_text + " on " + title)}">{_esc(label_text)}</a>'
             )
         out.append(
-            f'<li class="okf-conn" data-concept-id="{_esc_attr_qs(cid_text)}" style="--okf-type-accent:{_esc(color)}">'
-            f'<span class="okf-conn__icon" style="color:{_esc(color)}" aria-hidden="true">{icon}</span>'
+            f'<li class="okf-conn" data-concept-id="{_esc_attr_qs(cid_text)}">'
+            f'<span class="okf-conn__icon" aria-hidden="true">{icon}</span>'
             f'<span class="okf-conn__body">'
             f'<a href="{_esc(url)}" class="okf-internal okf-conn__title">{_esc(title)}</a>'
             f' <span class="okf-muted okf-conn__id">{_esc(concept_id_to_str(target_cid))}</span>'
@@ -5021,10 +5169,6 @@ def _render_governed_keys(
     relations = concept.frontmatter.get("relations")
     if relations and isinstance(relations, list):
         from .paths import concept_id_from_str as _cid_from_str, ConceptIdError as _CidErr
-        try:
-            palette = resolve_palette(bundle)
-        except Exception:  # noqa: BLE001 — rows degrade to accentless
-            palette = {}
         rel_rows: list[str] = []
         for rel in relations:
             if not isinstance(rel, dict):
@@ -5047,13 +5191,10 @@ def _render_governed_keys(
                 tid = concept_id_to_str(target_concept.id)
                 ttype = target_concept.type
                 turl = url_for_concept(target_concept.id, mode, source_cid=concept.id)
-                tcolor = palette.get(ttype or "", type_color_for(ttype))
                 ticon = type_icon_svg(ttype, size=14, cls="okf-type-icon")
                 target_html = (
-                    f'<a class="okf-relation__target" href="{_esc(turl)}" '
-                    f'style="--okf-type-accent:{_esc(tcolor)}">'
-                    f'<span class="okf-relation__icon" style="color:{_esc(tcolor)}" '
-                    f'aria-hidden="true">{ticon}</span>'
+                    f'<a class="okf-relation__target" href="{_esc(turl)}">'
+                    f'<span class="okf-relation__icon" aria-hidden="true">{ticon}</span>'
                     f'<span class="okf-relation__title">{_esc(ttitle)}</span>'
                     f'<span class="okf-muted okf-relation__id">{_esc(tid)}</span>'
                     f'</a>'
@@ -5411,7 +5552,6 @@ _ONTHISPAGE_HEADING_RE = re.compile(
 def _render_infobox(
     concept: Concept,
     *,
-    type_color: str,
     revision: str,
     tags_html: str,
     frontmatter_html: str,
@@ -5434,21 +5574,13 @@ def _render_infobox(
     About/Classification retain explicit labels even when their values are
     sparse so the disclosure anatomy stays stable across concepts.
 
-    Type tint (layout-graph / contract-runtime parity): ``--okf-type-accent``
-    is set on the ``<details>`` itself (not only on the inline type label) so
-    the infobox's tinted left border and the governed relation rows resolve
-    to the concept's actual type colour. The header band sets the same var
-    on ``.okf-page__header``; because the infobox is a sibling (not a
-    descendant) it must carry its own declaration or it would silently fall
-    back to the generic ``--okf-accent``.
+    Ledger: content types are not colour-coded. The type is named in text
+    beside its icon; no per-type colour is emitted.
     """
     icon = type_icon_svg(concept.type, size=16, cls="okf-type-icon")
     rev_short = revision[:8] if revision else ""
     summary = (
         f'<summary class="okf-infobox__summary">'
-        # The type NAME is text in the theme ink (wiki.css); the type colour
-        # stays on the icon through the infobox's --okf-type-accent. Type
-        # colours are mid-tone fills: as text they fell to 2.3:1.
         f'<span class="okf-infobox__type">'
         f'{icon} {_esc(concept.type or "concept")}</span>'
         f'<span class="okf-infobox__rev" title="Content revision {_esc(revision)}">'
@@ -5500,8 +5632,7 @@ def _render_infobox(
     return (
         '<details class="okf-page__infobox" id="okf-document-details" aria-labelledby="okf-infobox-label" '
         f'data-okf-long-document="{("true" if long_document else "false")}" data-okf-heading-threshold="8" '
-        f'data-okf-type-icon="{_esc(icon_key)}" '
-        f'style="--okf-type-accent:{_esc(type_color)}">'
+        f'data-okf-type-icon="{_esc(icon_key)}">'
         + summary.replace(
             '<span class="okf-infobox__type"',
             '<span class="okf-infobox__label" id="okf-infobox-label">Document details</span>'
@@ -5880,7 +6011,8 @@ def _render_index_page(
                 f'<span><strong>{_esc(row["title"])}</strong> — '
                 f'{_esc(_recent_row_reader_text(row))}</span>'
                 '<span class="sr-only"> · </span>'
-                f'<time class="okf-recent__time" datetime="{_esc_attr_qs(row["ts"])}">'
+                f'<time class="okf-recent__time" datetime="{_esc_attr_qs(row["ts"])}" '
+                f'title="{_esc_attr_qs(_recent_time_title(row["ts"]))}">'
                 f'{_esc(_recent_time_text(row["ts"]))}</time></a></li>'
             )
         engagement_html = (
@@ -5927,7 +6059,8 @@ def _render_index_page(
                 c.title.lower(), c.id,
             ),
         )
-        color = palette.get(t, type_color_for(t))
+        # Ledger: content types are not colour-coded. The group head names the
+        # type (and keeps its icon); no per-type colour is emitted.
         icon = type_icon_svg(t, size=15, cls="okf-type-icon")
         section_id = f"okf-type-{section_ids[t]}"
         type_nav_entries.append((section_id, icon, t, str(len(items))))
@@ -5971,11 +6104,9 @@ def _render_index_page(
                     meta_html = f'<span class="okf-card__meta">{comment_link}</span>'
             # The li keeps the .okf-concept-list li a contract (first anchor
             # = concept link; studio.js stampConceptIds + presence rely on
-            # it) — the card look is CSS on top. The type chip (icon +
-            # textual label) is a <span>, NOT an <a>, so the first <a>
-            # remains the concept link. The icon inherits the type accent
-            # colour via a wrapper span; the textual label uses the AA-safe
-            # muted text token (not the raw accent — small text needs 4.5:1).
+            # it) — the inventory row look is CSS on top. The type chip (icon
+            # + textual label) is a <span>, NOT an <a>, so the first <a>
+            # remains the concept link. No type colour is emitted (Ledger).
             description_html = f' <span class="okf-concept-desc okf-card__desc">{desc}</span>' if desc else ""
             rows.append(
                 f'<li class="okf-card" data-concept-id="{_esc_attr_qs(cid_str)}" '
@@ -5983,9 +6114,9 @@ def _render_index_page(
                 # F7: the client recency sort reads the metadata owner's
                 # effective instant (canonical UTC), not the raw legacy key.
                 f'data-index-instant="{_esc_attr_qs(effective_instant_key(c.frontmatter))}" '
-                f'data-index-recommended="{recommended_ids.get(cid_str, 100)}" style="--okf-type-accent:{_esc(color)}">'
+                f'data-index-recommended="{recommended_ids.get(cid_str, 100)}">'
                 f'<span class="okf-card__type">'
-                f'<span class="okf-card__type-icon" style="color:{_esc(color)}">{type_icon_svg(t, size=13, cls="okf-type-icon")}</span>'
+                f'<span class="okf-card__type-icon">{type_icon_svg(t, size=13, cls="okf-type-icon")}</span>'
                 f'<span class="okf-card__type-label">{_esc(t)}</span>'
                 f'</span>'
                 f'<a href="{_esc(url)}" class="okf-internal okf-card__link">{_esc(c.title)}</a>'
@@ -5995,9 +6126,9 @@ def _render_index_page(
                 f'</li>'
             )
         groups_parts.append(
-            f'<section class="okf-section" id="{section_id}" data-index-section data-index-type="{_esc_attr_qs(t)}" style="--okf-type-accent:{_esc(color)}">'
-            f'<h2 class="okf-section__title"><span class="okf-section__icon" style="color:{_esc(color)}">{icon}</span>'
-            f'{_esc(t)} <span class="okf-section__count">{len(items)}</span></h2>'
+            f'<section class="okf-section" id="{section_id}" data-index-section data-index-type="{_esc_attr_qs(t)}">'
+            f'<h2 class="okf-section__title"><span class="okf-section__icon" aria-hidden="true">{icon}</span>'
+            f'<span class="okf-section__label">{_esc(t)}</span> <span class="okf-section__count">{len(items)}</span></h2>'
             f'<ul class="okf-concept-list okf-cardgrid">{"".join(rows)}</ul>'
             f'</section>'
         )
@@ -6059,7 +6190,7 @@ def _render_index_page(
     # type-nav is prepended to the groups so it sits between hero and cards.
     if type_nav_entries:
         nav_links = "".join(
-            f'<a href="#{_esc(sid)}" class="okf-type-nav__link">'
+            f'<a href="#{_esc(sid)}" class="okf-type-nav__link" data-index-type="{_esc_attr_qs(label)}">'
             f'{icon}<span class="okf-type-nav__label">{_esc(label)}</span>'
             f'<span class="okf-type-nav__count">{count}</span>'
             f'</a>'
@@ -6439,10 +6570,6 @@ def _render_search_page(
         f'{datalist("okf-search-concepts", concept_values)}</form>'
     )
 
-    try:
-        palette = resolve_palette(bundle)
-    except Exception:  # noqa: BLE001 — results degrade to accentless
-        palette = {}
     result_parts: list[str] = []
     for r in results:
         cid = r.get("concept_id") or r.get("id") or ""
@@ -6461,10 +6588,9 @@ def _render_search_page(
                 ctype = (c.type or "") if c else ""
             except Exception:  # noqa: BLE001 — type chip is decorative
                 ctype = ""
-        color = palette.get(ctype, type_color_for(ctype))
         icon = type_icon_svg(ctype, size=14, cls="okf-type-icon")
         type_chip = (
-            f'<span class="okf-search-result__type" style="--okf-type-accent:{_esc(color)}">'
+            f'<span class="okf-search-result__type">'
             f'{icon} {_esc(ctype)}</span>' if ctype else ""
         )
         heading_suffix = f' <span class="okf-muted">{_esc(passage.get("heading"))}</span>' if passage.get("heading") else ""
@@ -6541,7 +6667,7 @@ def _render_search_page(
             if section_href else ""
         )
         result_parts.append(
-            f'<li><article class="okf-search-result" style="--okf-type-accent:{_esc(color)}" data-concept-id="{_esc_attr_qs(cid)}">'
+            f'<li><article class="okf-search-result" data-concept-id="{_esc_attr_qs(cid)}">'
             f'<h3><a href="{_esc(url)}" class="okf-internal">{_esc(title)}</a>{heading_suffix}</h3>'
             # iter1 P3-13: concept-id moved OUT of the <h3> so the heading
             # outline announces only the title (screen-reader heading-list
@@ -6550,7 +6676,9 @@ def _render_search_page(
             f'{passage_preview}'
             f'<p class="okf-search-evidence-summary">{_esc(evidence_summary)}</p>'
             '<div class="okf-search-result__actions">'
-              f'<a class="okf-btn okf-btn--primary okf-search-open" href="{_esc(url)}">Open</a>'
+              # Ledger: one filled primary per view (the Search submit); every
+              # row's Open is an outlined button.
+              f'<a class="okf-btn okf-search-open" href="{_esc(url)}">Open</a>'
               f'{section_action}'
               f'{cited_action}'
             f'</div>{passage_scope}'
