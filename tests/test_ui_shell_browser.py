@@ -373,7 +373,8 @@ def test_concept_shell_and_local_viewbar_follow_normal_flow_without_overflow(pag
         destinations:[...shell.querySelectorAll('[data-okf-shell-item]')].filter(visible).map(el=>el.dataset.okfShellItem),
         modes:[...bar.querySelectorAll('button')].filter(visible).map(el=>el.textContent.trim())};
     }""")
-    assert metrics["shellHeight"] >= 52 and metrics["barTop"] >= metrics["shellBottom"] - 1, metrics
+    # Ledger top bar: 50px (DESIGN.md nav-height), the view bar in flow below.
+    assert metrics["shellHeight"] >= 50 and metrics["barTop"] >= metrics["shellBottom"] - 1, metrics
     assert metrics["overflow"] is False, metrics
     assert set(("search", "index", "graph", "studio", "appearance")).issubset(metrics["destinations"]), metrics
     assert {"Rendered", "Source", "Split", "Focus view"}.issubset(metrics["modes"]), metrics
@@ -1323,7 +1324,10 @@ def test_tablet_floor_stops_at_the_900px_edge(page, server_url: str) -> None:
     assert not metrics["overflow"] and metrics["shellHeight"] <= 110, metrics
 
 
-@pytest.mark.parametrize("width,rail", [(900, False), (901, False), (1024, False), (1100, False), (1280, True), (1440, True)])
+# Ledger's 20px page gutters leave a 620px authored column beside the 440px
+# drawer at 1100px (the old 32px gutters did not), so 1100 is a rail width;
+# the readable-minimum invariant asserted below is unchanged.
+@pytest.mark.parametrize("width,rail", [(900, False), (901, False), (1024, False), (1100, True), (1280, True), (1440, True)])
 def test_studio_rail_requires_usable_document_width(page, server_url: str, width: int, rail: bool) -> None:
     page.set_viewport_size({"width": width, "height": 900})
     page.goto(server_url + "/tables/orders")

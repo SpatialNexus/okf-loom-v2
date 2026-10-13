@@ -194,6 +194,11 @@ html:not([data-okf-js="1"]) #okf-theme { display: none !important; }
      * inline-block enabler): with wrapping they only shatter the name into
      * a 70px column ("18vw" at 390px). */
     max-width: none;
+    /* WCAG 2.5.8: the brand is the only text-link target in the bar; an
+     * inline-block 24px line box gives each wrapped line a 24px target
+     * (Ledger's 14px brand face alone measures ~17px). */
+    display: inline-block;
+    line-height: 24px;
   }
   .okf-shell .okf-topbar__brand .okf-muted { display: none; }
   /* Compact but complete appearance label: keep "Appearance" and the current
@@ -211,6 +216,11 @@ html:not([data-okf-js="1"]) #okf-theme { display: none !important; }
   /* Links are inline by default; make the nav controls real flex boxes so
    * the 44px touch height actually applies. */
   .okf-shell__nav .okf-btn { display: inline-flex; align-items: center; min-height: 44px; }
+  /* Phone rows run on a tight linear budget (search basis + Index + Graph +
+   * Studio must share ~366px at 390px): destinations take 10px inline
+   * padding here instead of the desktop 13px, so Studio stays on row 2. */
+  .okf-shell__nav .okf-btn,
+  body.okf-viewer .okf-shell .okf-studio-launcher { padding-inline: 10px; }
   .okf-shell__nav .okf-studiobtn { min-height: 44px; }
   /* Same studio.css graph-chrome defeat as the 641–900px band below: at
    * <=640px on the graph route the launcher would otherwise compute 40px
