@@ -70,13 +70,13 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   left: 10px;
   background: var(--okf-bg-elev);
   border: 1px solid var(--okf-border);
-  border-radius: var(--okf-radius-sm);
+  border-radius: 0;
   padding: 4px 8px;
   font-size: 0.75rem;
   max-width: 220px;
   max-height: 40vh;
   overflow-y: auto;
-  box-shadow: var(--okf-shadow);
+  box-shadow: var(--shadow-pop);
   z-index: 18;
 }
 /* The graph key now belongs to the Lenses/Advanced region, never the canvas.
@@ -115,7 +115,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   font-size: var(--okf-text-xs);
   text-align: left;
   cursor: pointer;
-  border-radius: var(--okf-radius-sm);
+  border-radius: 0;
 }
 .okf-graph-legend__toggle:focus-visible {
   outline: 2px solid var(--okf-accent);
@@ -139,7 +139,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   display: inline-block;
   width: 10px;
   height: 10px;
-  border-radius: 2px;
+  border-radius: 0;
   border: 1px solid var(--okf-border-strong);
 }
 /* P1 graph/type collision fix: type-filter chips use a type ICON (inherits
@@ -160,7 +160,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   left: 12px;
   background: var(--okf-bg-elev);
   border: 1px solid var(--okf-border);
-  border-radius: var(--okf-radius-sm);
+  border-radius: 0;
   padding: 6px 10px;
   font-size: 0.78rem;
   color: var(--okf-fg-muted);
@@ -175,8 +175,8 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
 .okf-presence-ghost--flip-y .okf-presence-ghost__label { align-self: flex-end; }
 .okf-presence-ghost--compact .okf-presence-ghost__marker { display: none; }
 .okf-presence-ghost--compact .okf-presence-ghost__label { max-width: none; padding: 3px 5px; text-overflow: clip; }
-.okf-presence-ghost__marker { width: 0; height: 0; border-top: 11px solid var(--okf-accent); border-right: 7px solid transparent; filter: drop-shadow(0 0 0 var(--okf-bg)); }
-.okf-presence-ghost__label { overflow: hidden; padding: 2px 5px; border: 1px solid var(--okf-border-strong); background: var(--okf-bg); box-shadow: 0 0 0 1px var(--okf-bg); font-size: var(--okf-text-xs); font-weight: 700; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.okf-presence-ghost__marker { width: 0; height: 0; border-top: 11px solid var(--okf-accent); border-right: 7px solid transparent; }
+.okf-presence-ghost__label { overflow: hidden; padding: 2px 5px; border: 1px solid var(--okf-border-strong); background: var(--okf-bg); font-size: var(--okf-text-xs); font-weight: 700; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
 .okf-collaborator-region { padding: var(--okf-space-2) 0; margin-top: var(--okf-space-3); border-block: 1px solid var(--okf-border); }
 .okf-collaborators { margin: 0; }
 .okf-collaborators__compact { margin: 0; color: var(--okf-fg); font-size: var(--okf-text-sm); font-weight: 650; overflow-wrap: anywhere; }
@@ -252,8 +252,8 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   max-height: calc(100% - 20px);
   background: var(--okf-bg-elev);
   border: 1px solid var(--okf-border);
-  border-radius: var(--okf-radius-sm);
-  box-shadow: var(--okf-shadow);
+  border-radius: 0;
+  box-shadow: var(--shadow-pop);
   font-size: var(--okf-text-sm);
 }
 .okf-node-index > summary {
@@ -281,7 +281,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   align-items: center;
   gap: var(--okf-space-2);
   padding: var(--okf-space-1) var(--okf-space-2);
-  border-radius: var(--okf-radius-sm);
+  border-radius: 0;
   border: 1px solid transparent;
   background: transparent;
   color: var(--okf-fg);
@@ -299,7 +299,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   display: inline-block;
   width: 10px;
   height: 10px;
-  border-radius: var(--okf-radius-pill);
+  border-radius: 0;
   flex-shrink: 0;
   border: 1px solid var(--okf-border-strong);
 }
@@ -319,7 +319,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   padding: 0 0.3rem;
   flex-shrink: 0;
   border: 1px solid var(--okf-accent);
-  border-radius: var(--okf-radius-sm);
+  border-radius: 0;
   background: var(--okf-bg-elev);
   color: var(--okf-fg);
   font-size: var(--okf-text-xs);
@@ -353,13 +353,13 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   max-width: calc(100% - 20px);
   background: var(--okf-bg-elev);
   border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-pill);
+  border-radius: 0;
   padding: 6px 14px;
   font: inherit;
   font-size: var(--okf-text-sm);
   color: var(--okf-fg);
   cursor: pointer;
-  box-shadow: var(--okf-shadow);
+  box-shadow: var(--shadow-pop);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -494,23 +494,27 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   display: inline-block;
   padding: 3px var(--okf-space-2);
   border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-pill);
+  border-radius: 0;
   font-size: var(--okf-text-xs);
   cursor: pointer;
   user-select: none;
 }
-.okf-signal__seg-item span:hover { border-color: var(--okf-accent); color: var(--okf-accent); }
+.okf-signal__seg-item span:hover { background: var(--okf-hover-fill); }
+/* Ledger pressed chip: ink, bold, and a 2px accent bar down the left edge;
+ * never an accent fill. */
 .okf-signal__seg-item input:checked + span {
-  background: var(--okf-accent);
-  color: var(--okf-accent-on);
-  border-color: var(--okf-accent);
+  background: transparent;
+  color: var(--okf-fg);
+  border-color: var(--okf-border-strong);
+  border-inline-start: 2px solid var(--accent);
+  font-weight: 700;
 }
 .okf-signal__seg-item input:focus-visible + span {
   outline: 2px solid var(--okf-accent);
   outline-offset: 2px;
 }
-.okf-lens-choice{display:grid!important;grid-template-columns:60px minmax(0,1fr);grid-template-rows:auto auto;align-items:center;gap:2px var(--okf-space-2);min-height:52px;padding:5px 7px!important;text-align:left!important;border-radius:var(--okf-radius-sm)!important}.okf-lens-choice .okf-lens-preview{grid-row:1/3;display:block;color:currentColor;background:var(--okf-bg-inset);border:1px solid currentColor;border-radius:3px}.okf-lens-preview line{stroke:currentColor;stroke-width:1.8;opacity:.8}.okf-lens-preview circle{fill:currentColor;stroke:var(--okf-bg-elev);stroke-width:1.5}.okf-lens-preview .okf-preview-arrow{fill:none;stroke:currentColor;stroke-width:1.8}.okf-lens-preview .okf-preview-hull,.okf-lens-preview .okf-preview-ring{fill:none;stroke:currentColor;stroke-width:1.5;stroke-dasharray:3 2}.okf-lens-preview--bridges line:nth-of-type(2),.okf-lens-preview--bridges line:nth-of-type(3){stroke-width:4}.okf-lens-preview--recent line{stroke-dasharray:2 2}.okf-lens-choice b{display:block;font-size:var(--okf-text-sm);line-height:1.1}.okf-lens-choice small{display:block;font-size:.68rem;line-height:1.2;color:var(--okf-fg-muted);font-weight:500;overflow-wrap:anywhere}.okf-signal__seg-item input:checked+.okf-lens-choice small{color:inherit;opacity:1}
-.okf-filter-chips{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}.okf-filter-chip-group{display:inline-flex;min-width:0}.okf-filter-chip,.okf-filter-solo,.okf-filter-showall{min-height:36px;padding:5px 10px;background:var(--okf-bg-elev);color:var(--okf-fg);border:1px solid var(--okf-border-strong);font:inherit;font-size:var(--okf-text-xs);font-weight:650;cursor:pointer}.okf-filter-chip{border-radius:var(--okf-radius-sm) 0 0 var(--okf-radius-sm)}.okf-filter-solo{border-left:0;border-radius:0 var(--okf-radius-sm) var(--okf-radius-sm) 0;color:var(--okf-fg-muted);font-weight:500}.okf-filter-showall{flex-basis:100%;width:max-content;max-width:max-content;border-radius:var(--okf-radius-sm);color:var(--okf-accent)}.okf-filter-chip.is-off{border-style:dashed;text-decoration:line-through;text-decoration-thickness:2px;opacity:.72}.okf-filter-chip.is-off::after{content:" · off";font-weight:500}.okf-filter-chip[aria-pressed=true]{background:var(--okf-bg-inset);box-shadow:inset 0 -2px 0 var(--okf-accent)}.okf-filter-chips button:focus-visible{outline:2px solid var(--okf-accent);outline-offset:2px}
+.okf-lens-choice{display:grid!important;grid-template-columns:60px minmax(0,1fr);grid-template-rows:auto auto;align-items:center;gap:2px var(--okf-space-2);min-height:52px;padding:5px 7px!important;text-align:left!important;border-radius:0!important}.okf-lens-choice .okf-lens-preview{grid-row:1/3;display:block;color:currentColor;background:var(--okf-bg-inset);border:1px solid currentColor;border-radius:0}.okf-lens-preview line{stroke:currentColor;stroke-width:1.8;opacity:.8}.okf-lens-preview circle{fill:currentColor;stroke:var(--okf-bg-elev);stroke-width:1.5}.okf-lens-preview .okf-preview-arrow{fill:none;stroke:currentColor;stroke-width:1.8}.okf-lens-preview .okf-preview-hull,.okf-lens-preview .okf-preview-ring{fill:none;stroke:currentColor;stroke-width:1.5;stroke-dasharray:3 2}.okf-lens-preview--bridges line:nth-of-type(2),.okf-lens-preview--bridges line:nth-of-type(3){stroke-width:4}.okf-lens-preview--recent line{stroke-dasharray:2 2}.okf-lens-choice b{display:block;font-size:var(--okf-text-sm);line-height:1.1}.okf-lens-choice small{display:block;font-size:.68rem;line-height:1.2;color:var(--okf-fg-muted);font-weight:500;overflow-wrap:anywhere}.okf-signal__seg-item input:checked+.okf-lens-choice small{color:inherit;opacity:1}
+.okf-filter-chips{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}.okf-filter-chip-group{display:inline-flex;min-width:0}.okf-filter-chip,.okf-filter-solo,.okf-filter-showall{min-height:36px;padding:5px 10px;background:var(--okf-bg-elev);color:var(--okf-fg);border:1px solid var(--okf-border-strong);font:inherit;font-size:var(--okf-text-xs);font-weight:650;cursor:pointer}.okf-filter-chip{border-radius:0}.okf-filter-solo{border-left:0;border-radius:0;color:var(--okf-fg-muted);font-weight:500}.okf-filter-showall{flex-basis:100%;width:max-content;max-width:max-content;border-radius:0;color:var(--okf-accent)}.okf-filter-chip.is-off{border-style:dashed;text-decoration:line-through;text-decoration-thickness:2px;opacity:.72}.okf-filter-chip.is-off::after{content:" · off";font-weight:500}.okf-filter-chip[aria-pressed=true]{background:transparent}.okf-filter-chips button:focus-visible{outline:2px solid var(--okf-accent);outline-offset:2px}
 .okf-signal__row {
   display: flex;
   flex-direction: column;
@@ -536,7 +540,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   align-self: flex-start;
   padding: 3px var(--okf-space-3);
   border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-sm);
+  border-radius: 0;
   background: var(--okf-bg-inset);
   color: var(--okf-fg);
   font: inherit;
@@ -587,18 +591,24 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   color: var(--okf-fg);
   line-height: 1.5;
 }
+/* Ranked rows are hairline records: label, mono figure, and the score as a
+ * 2px bar along the foot (never a filled bar). The current starting point
+ * carries the 2px accent bar down its left edge. */
 .okf-lens-summary__row {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--okf-space-2);
+  gap: var(--okf-space-3);
   width: 100%;
-  padding: 6px 10px;
-  margin: 0 0 4px;
-  background: var(--okf-bg-inset);
-  border: 1px solid var(--okf-border);
-  border-radius: var(--okf-radius-sm);
+  min-height: 40px;
+  padding: 9px 10px 11px;
+  margin: 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--okf-border);
+  border-inline-start: 2px solid transparent;
+  border-radius: 0;
   cursor: pointer;
   font: inherit;
   font-size: var(--okf-text-sm);
@@ -609,12 +619,19 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   min-width: 0;
   max-width: 100%;
 }
-.okf-lens-summary__row:hover { border-color: var(--okf-accent); }
+.okf-lens-summary__title + .okf-lens-summary__row,
+.okf-lens-summary__verdict + .okf-lens-summary__row,
+summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summary__row { border-top: 1px solid var(--okf-border-strong); }
+.okf-lens-summary__row:hover { background: var(--okf-hover-fill); }
+.okf-lens-summary__row:active,
+.okf-lens-summary__row[aria-current="true"] { border-inline-start-color: var(--accent); }
+.okf-lens-summary__row[aria-current="true"] .okf-lens-summary__label { font-weight: 700; }
+.okf-lens-summary__row:focus-visible { outline: 2px solid var(--okf-focus-ring); outline-offset: -2px; }
 .okf-lens-summary__bar {
   position: absolute;
-  left: 0; top: 0; bottom: 0;
-  background: var(--okf-accent);
-  opacity: 0.16;
+  left: 0; bottom: 0;
+  height: 2px;
+  background: var(--okf-border-strong);
   pointer-events: none;
 }
 .okf-lens-summary__label {
@@ -667,7 +684,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   position: absolute; z-index: 12; right: .75rem; top: 4.5rem;
   max-width: min(22rem, calc(100% - 1.5rem));
   padding: .45rem .6rem; border: 1px solid var(--okf-border-strong);
-  background: var(--okf-bg-elev); box-shadow: var(--okf-shadow);
+  background: var(--okf-bg-elev); box-shadow: var(--shadow-pop);
 }
 .okf-edge-bundle-index summary { cursor: pointer; font-weight: 700; }
 .okf-edge-bundle-index__list { display: grid; gap: .35rem; max-height: 12rem; overflow: auto; margin-top: .5rem; }
@@ -742,8 +759,8 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   padding: 6px 10px;
   background: var(--okf-bg-elev);
   border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-sm);
-  box-shadow: var(--okf-shadow);
+  border-radius: 0;
+  box-shadow: var(--shadow-pop);
   font-size: var(--okf-text-sm);
   max-height: 40vh;
   overflow-y: auto;
@@ -783,7 +800,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   width: 16px;
   height: 16px;
   flex-shrink: 0;
-  border-radius: var(--okf-radius-pill);
+  border-radius: 0;
   background: var(--okf-error);
   color: var(--okf-error-on);
   font-size: var(--okf-text-xs);
@@ -799,7 +816,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   padding: 3px 6px;
   background: var(--okf-error-bg);
   border: 1px solid var(--okf-error);
-  border-radius: var(--okf-radius-sm);
+  border-radius: 0;
   color: var(--okf-error);
   font-size: var(--okf-text-xs);
   font-weight: 600;
@@ -813,8 +830,8 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   padding: 10px 12px;
   background: var(--okf-bg-elev);
   border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+  border-radius: 0;
+  box-shadow: var(--shadow-pop);
   pointer-events: none;
   font-size: var(--okf-text-sm);
   line-height: 1.4;
@@ -838,12 +855,12 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   margin-top: 6px;
   font-variant-numeric: tabular-nums;
 }
-.okf-graph-canvas-proxy{position:absolute;inset:8px;z-index:1;pointer-events:none;border:2px solid transparent;border-radius:var(--okf-radius)}
+.okf-graph-canvas-proxy{position:absolute;inset:8px;z-index:1;pointer-events:none;border:2px solid transparent;border-radius:0}
 .okf-graph-canvas-proxy:focus-visible{outline:3px solid var(--okf-select,var(--okf-accent));outline-offset:-3px}
-.okf-node-index__item.is-active{box-shadow:inset 3px 0 0 var(--okf-select,var(--okf-accent));font-weight:700}
-.okf-graph-actions{position:absolute;z-index:32;display:flex;gap:2px;max-width:calc(100% - 16px);padding:4px;background:var(--okf-bg-elev);border:1px solid var(--okf-border-strong);border-radius:var(--okf-radius-sm);box-shadow:var(--okf-shadow)}
+.okf-node-index__item.is-active{border-inline-start:2px solid var(--accent);font-weight:700}
+.okf-graph-actions{position:absolute;z-index:32;display:flex;gap:2px;max-width:calc(100% - 16px);padding:4px;background:var(--okf-bg-elev);border:1px solid var(--okf-border-strong);border-radius:0;box-shadow:var(--shadow-pop)}
 .okf-graph-actions[hidden]{display:none}
-.okf-graph-actions button{min-height:32px;padding:4px 8px;color:var(--okf-fg);background:transparent;border:0;border-radius:var(--okf-radius-sm);white-space:nowrap;cursor:pointer}
+.okf-graph-actions button{min-height:32px;padding:4px 8px;color:var(--okf-fg);background:transparent;border:0;border-radius:0;white-space:nowrap;cursor:pointer}
 .okf-graph-actions button:hover{background:var(--okf-bg-inset)}
 .okf-graph-actions button:focus-visible{outline:2px solid var(--okf-accent);outline-offset:1px}
 @media (max-width:480px){
@@ -865,12 +882,12 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   }
   .okf-detail__header > .okf-graph-actions button:first-child { display: none; }
 }
-.okf-graph-focusbar{position:absolute;top:56px;left:50%;z-index:31;display:flex;align-items:center;gap:var(--okf-space-2);max-width:calc(100% - 32px);padding:6px 8px;background:var(--okf-bg-elev);border:2px solid var(--okf-accent);border-radius:var(--okf-radius-sm);box-shadow:var(--okf-shadow);font-size:var(--okf-text-sm);transform:translateX(-50%)}
-.okf-graph-focusbar[hidden]{display:none}.okf-graph-focusbar label{display:flex;align-items:center;gap:4px;white-space:nowrap}.okf-graph-focusbar select,.okf-graph-focusbar button{min-height:32px;color:var(--okf-fg);background:var(--okf-bg-elev);border:1px solid var(--okf-border-strong);border-radius:var(--okf-radius-sm)}
+.okf-graph-focusbar{position:absolute;top:56px;left:50%;z-index:31;display:flex;align-items:center;gap:var(--okf-space-2);max-width:calc(100% - 32px);padding:6px 8px;background:var(--okf-bg-elev);border:2px solid var(--okf-accent);border-radius:0;box-shadow:var(--shadow-pop);font-size:var(--okf-text-sm);transform:translateX(-50%)}
+.okf-graph-focusbar[hidden]{display:none}.okf-graph-focusbar label{display:flex;align-items:center;gap:4px;white-space:nowrap}.okf-graph-focusbar select,.okf-graph-focusbar button{min-height:32px;color:var(--okf-fg);background:var(--okf-bg-elev);border:1px solid var(--okf-border-strong);border-radius:0}
 .okf-detail-path{margin:0 0 var(--okf-space-4);padding:var(--okf-space-3) 0;border-block:1px solid var(--okf-border)}.okf-detail-path h3,.okf-detail-path p{margin-block:0 var(--okf-space-2)}
 .okf-detail-path__chain{display:flex;align-items:center;gap:var(--okf-space-2);padding:0;margin:0 0 var(--okf-space-3);list-style:none;overflow-x:auto}.okf-detail-path__chain li{display:flex;align-items:center;gap:var(--okf-space-2)}
-.okf-detail-path__node{color:var(--okf-accent);background:transparent;border:0;padding:4px;font-weight:700;cursor:pointer}.okf-detail-path__relation{display:inline-flex;padding:2px 6px;background:var(--okf-bg-inset);border-radius:var(--okf-radius-pill);color:var(--okf-fg-muted);font-size:var(--okf-text-xs);white-space:nowrap}.okf-detail-path__relation--reverse{border:1px dashed var(--okf-border-strong);color:var(--okf-fg)}
-.okf-detail-relationships{margin-block:0 var(--okf-space-4);padding-block:0 var(--okf-space-3);border-bottom:1px solid var(--okf-border)}.okf-detail-relationships h3{margin:0 0 var(--okf-space-2)}.okf-detail-selected-status{margin:0 0 var(--okf-space-2);font-weight:750}.okf-detail-relationships__list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,15rem),1fr));gap:var(--okf-space-2);width:100%;margin:0;padding:0 0 var(--okf-space-2);list-style:none;overflow-x:visible}.okf-detail-relationships__list li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 8px;width:100%;min-width:0;max-width:100%;padding:8px;border:2px solid var(--okf-border-strong);border-radius:var(--okf-radius-sm);background:var(--okf-bg-inset)}.okf-detail-relationships__key{color:var(--okf-fg-muted);font-size:var(--okf-text-xs);font-weight:700}.okf-detail-relationships__list button{min-height:36px;padding:3px 0;border:0;background:transparent;color:var(--okf-accent);font:inherit;font-weight:650;text-align:left;white-space:normal}.okf-detail-relationships__list button:focus-visible{outline:2px solid var(--okf-accent);outline-offset:2px}
+.okf-detail-path__node{color:var(--okf-accent);background:transparent;border:0;padding:4px;font-weight:700;cursor:pointer}.okf-detail-path__relation{display:inline-flex;padding:2px 6px;background:var(--okf-bg-inset);border-radius:0;color:var(--okf-fg-muted);font-size:var(--okf-text-xs);white-space:nowrap}.okf-detail-path__relation--reverse{border:1px dashed var(--okf-border-strong);color:var(--okf-fg)}
+.okf-detail-relationships{margin-block:0 var(--okf-space-4);padding-block:0 var(--okf-space-3);border-bottom:1px solid var(--okf-border)}.okf-detail-relationships h3{margin:0 0 var(--okf-space-2)}.okf-detail-selected-status{margin:0 0 var(--okf-space-2);font-weight:750}.okf-detail-relationships__list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,15rem),1fr));gap:var(--okf-space-2);width:100%;margin:0;padding:0 0 var(--okf-space-2);list-style:none;overflow-x:visible}.okf-detail-relationships__list li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 8px;width:100%;min-width:0;max-width:100%;padding:8px;border:2px solid var(--okf-border-strong);border-radius:0;background:var(--okf-bg-inset)}.okf-detail-relationships__key{color:var(--okf-fg-muted);font-size:var(--okf-text-xs);font-weight:700}.okf-detail-relationships__list button{min-height:36px;padding:3px 0;border:0;background:transparent;color:var(--okf-accent);font:inherit;font-weight:650;text-align:left;white-space:normal}.okf-detail-relationships__list button:focus-visible{outline:2px solid var(--okf-accent);outline-offset:2px}
 @media(max-width:640px){.okf-graph-focusbar{left:8px;right:8px;max-width:none;transform:none;flex-wrap:wrap}.okf-graph-focusbar select,.okf-graph-focusbar button{min-height:44px}}
 @media(prefers-reduced-motion:reduce){.okf-graph-focusbar,.okf-detail-path{transition:none!important}}
 
@@ -892,12 +909,12 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   justify-content: center;
   background: var(--okf-bg-elev);
   border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-sm);
+  border-radius: 0;
   color: var(--okf-fg);
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
-  box-shadow: var(--okf-shadow);
+  box-shadow: var(--shadow-pop);
 }
 .okf-graph-zoom button:hover {
   border-color: var(--okf-accent);
@@ -905,7 +922,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
 }
 .okf-viewport-icon{width:20px;height:20px;display:block}.okf-graph-zoom button.is-running .okf-viewport-icon{animation:okf-viewport-spin .8s linear infinite}.okf-graph-zoom button.is-failed{border-width:2px;border-color:var(--okf-error);color:var(--okf-error)}@keyframes okf-viewport-spin{to{transform:rotate(360deg)}}
 .okf-viewport-label{display:none}
-.okf-graph-minimap{position:absolute;right:58px;bottom:14px;z-index:24;width:160px;height:116px;background:var(--okf-bg-elev);border:2px solid var(--okf-border-strong);border-radius:var(--okf-radius-sm);box-shadow:var(--okf-shadow);overflow:hidden;pointer-events:none}.okf-graph-minimap[hidden]{display:none}.okf-graph-minimap>span{display:block;height:16px;padding-inline:5px;color:var(--okf-fg);font-size:10px;font-weight:700;line-height:16px;background:var(--okf-bg-inset)}.okf-graph-minimap canvas{display:block;width:160px;height:100px}
+.okf-graph-minimap{position:absolute;right:58px;bottom:14px;z-index:24;width:160px;height:116px;background:var(--okf-bg-elev);border:2px solid var(--okf-border-strong);border-radius:0;box-shadow:var(--shadow-pop);overflow:hidden;pointer-events:none}.okf-graph-minimap[hidden]{display:none}.okf-graph-minimap>span{display:block;height:16px;padding-inline:5px;color:var(--okf-fg);font-size:10px;font-weight:700;line-height:16px;background:var(--okf-bg-inset)}.okf-graph-minimap canvas{display:block;width:160px;height:100px}
 .okf-graph-search-status{margin-inline-start:6px;color:var(--okf-fg-muted);font-size:var(--okf-text-xs)}.okf-graph-search-clear{min-height:32px;margin-inline-start:4px;background:transparent;color:var(--okf-accent);border:0;cursor:pointer}.okf-graph-search-clear[hidden]{display:none}
 @media(max-width:640px){html,body,.okf-viewer--graph,.okf-layout,.okf-layout>.okf-graph,.okf-layout>.okf-detail{box-sizing:border-box;max-width:100%;min-width:0;overflow-x:hidden}.okf-graph-zoom{right:8px;bottom:8px}.okf-graph-zoom button,.okf-filter-chips button,.okf-graph-search-clear{min-width:44px;min-height:44px}.okf-graph-minimap{right:60px;bottom:8px;width:120px;height:92px}.okf-graph-minimap canvas{width:120px;height:76px}.okf-signal__seg{grid-template-columns:1fr}.okf-lens-choice{grid-template-columns:44px minmax(0,1fr)}.okf-lens-preview{width:44px;height:32px}.okf-filter-chip-group{max-width:100%}.okf-filter-chip{min-width:0;overflow-wrap:anywhere}.okf-filter-showall{min-width:88px}.okf-graph-focusbar{top:8px;max-width:calc(100% - 16px)}.okf-graph-actions{max-width:calc(100% - 16px)}.okf-detail-relationships__list{display:grid;grid-template-columns:minmax(0,1fr);width:100%;overflow-x:visible;overscroll-behavior-inline:auto}.okf-detail-relationships__list li{width:100%;max-width:100%;min-width:0;grid-template-columns:minmax(4.5rem,auto) minmax(0,1fr);flex:none}.okf-detail-relationships__list button{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:break-word}}
 @media(max-width:360px){.okf-detail-relationships__list li{grid-template-columns:minmax(0,1fr)}.okf-detail-relationships__key{margin-top:4px}.okf-detail-relationships__key:first-child{margin-top:0}}
@@ -925,8 +942,8 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   padding: 6px 12px;
   background: var(--okf-bg-elev);
   border: 1px solid var(--okf-accent);
-  border-radius: var(--okf-radius-pill);
-  box-shadow: var(--okf-shadow);
+  border-radius: 0;
+  box-shadow: var(--shadow-pop);
   font-size: var(--okf-text-sm);
 }
 .okf-graph-updated button {
@@ -949,8 +966,8 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   padding: 18px;
   background: var(--okf-bg-elev);
   border: 1px solid var(--okf-accent);
-  border-radius: var(--okf-radius);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+  border-radius: 0;
+  box-shadow: var(--shadow-pop);
   font-size: var(--okf-text-sm);
   line-height: 1.5;
 }
@@ -976,11 +993,12 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
 .okf-graph-tour p { margin: 0 0 10px; color: var(--okf-fg-muted); }
 .okf-graph-tour__nav { display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: var(--okf-space-2); }
 .okf-graph-tour__dots { color: var(--okf-fg-muted); font-size: var(--okf-text-xs); }
+/* The tour's Next is the view's one filled primary action. */
 .okf-graph-tour__nav button, .okf-graph-tour__close {
-  background: var(--okf-accent);
-  color: var(--okf-accent-on);
+  background: var(--okf-action-primary-bg);
+  color: var(--okf-action-primary-fg);
   border: none;
-  border-radius: var(--okf-radius-sm);
+  border-radius: 0;
   min-width: 44px;
   min-height: 44px;
   padding: 8px 12px;
@@ -1003,36 +1021,31 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
 .okf-graph-tour-replay { min-height: 44px; }
 [data-tour-anchor="true"] { outline: 3px solid var(--okf-accent); outline-offset: 3px; }
 [data-tour-anchor="true"] { position: relative; }
-[data-tour-anchor="true"]::after { content: ""; position: absolute; z-index: 45; width: 10px; height: 10px; right: 8px; top: 8px; border-radius: 50%; background: var(--okf-accent); box-shadow: 0 0 0 4px var(--okf-bg-elev); pointer-events: none; }
+[data-tour-anchor="true"]::after { content: ""; position: absolute; z-index: 45; width: 10px; height: 10px; right: 8px; top: 8px; border-radius: 0; background: var(--okf-accent); border: 3px solid var(--okf-bg-elev); box-sizing: content-box; pointer-events: none; }
 .okf-graph-tour__handle { display: none; }
 .okf-graph-tour__peek { display: none; }
-.okf-signal__seg-item input:checked + .okf-lens-choice { background: var(--okf-accent); color: var(--okf-accent-on); }
-.okf-signal__seg-item input:checked + .okf-lens-choice b,
-.okf-signal__seg-item input:checked + .okf-lens-choice small { color: var(--okf-accent-on); opacity: 1; }
-/* The lens preview is a miniature canvas that keeps its own inset surface in
- * every state, so its ink must not inherit the selected row's accent-on text
- * colour: that is white on the light inset and near-black on the dark inset
- * (about 1.1:1 in every family and mode), so the selected picture vanished.
- * The selected preview draws in the accent at full opacity, which reads on
- * the inset in all eight family/mode themes and both contrast settings.
+/* The selected lens is a pressed record: ink text, the 2px accent bar down
+ * its left edge, no fill. */
+.okf-signal__seg-item input:checked + .okf-lens-choice { background: transparent; color: var(--okf-fg); }
+.okf-signal__seg-item input:checked + .okf-lens-choice b { color: var(--okf-fg); }
+.okf-signal__seg-item input:checked + .okf-lens-choice small { color: var(--okf-fg-muted); opacity: 1; }
+/* The lens preview is a miniature canvas with its own band inset in every
+ * state. Unselected pictures draw in --text-2 and the selected one in ink
+ * (--text); both are gated to >= 4.5:1 on --bg-2 in every Ledger palette.
  * Forced colours repaint it in CanvasText. */
-.okf-signal__seg-item input:checked + .okf-lens-choice .okf-lens-preview { color: var(--okf-accent); }
+.okf-lens-choice .okf-lens-preview { color: var(--okf-fg-muted); }
+.okf-signal__seg-item input:checked + .okf-lens-choice .okf-lens-preview { color: var(--okf-fg); }
 .okf-signal__seg-item input:checked + .okf-lens-choice .okf-lens-preview line { opacity: 1; }
 
-/* Family-aware graph chrome. Semantic node type/community colours are not
- * touched: these rules frame active lenses, selection, tools, and detail UI. */
-.okf-signal__seg-item input:checked + .okf-lens-choice {
-  box-shadow: inset 0 0 0 2px var(--okf-active-border), var(--okf-shadow-hover);
-}
+/* Palette-aware graph chrome: these rules frame active lenses, selection,
+ * tools, and detail UI; the canvas itself is painted by graph.js. */
 .okf-graph-canvas-proxy:focus-visible {
   outline-color: var(--okf-focus-color);
-  box-shadow: inset 0 0 0 5px color-mix(in srgb, var(--okf-selection-cue) 22%, transparent);
 }
 .okf-detail__header { padding-bottom: var(--okf-space-3); border-bottom: 2px solid var(--okf-accent-bg); }
 .okf-detail__connection-summary { padding-block: var(--okf-space-3); border-block: 1px solid var(--okf-border); }
-.okf-graph-zoom button:hover, .okf-graph-actions button:hover { box-shadow: var(--okf-shadow-hover); }
-.okf-graph-tip, .okf-graph-tour, .okf-graph-actions { box-shadow: var(--okf-shadow-overlay); }
-[data-theme^="swiss-"] :is(.okf-graph-tip, .okf-graph-tour, .okf-graph-actions) { box-shadow: var(--okf-shadow-overlay); }
+.okf-graph-zoom button:hover, .okf-graph-actions button:hover { box-shadow: none; }
+.okf-graph-tip, .okf-graph-tour, .okf-graph-actions { box-shadow: var(--shadow-pop); }
 @media (forced-colors: active) {
   .okf-graph-canvas-proxy:focus-visible,
   .okf-signal__seg-item input:checked + .okf-lens-choice,
@@ -1047,8 +1060,8 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   margin: var(--okf-space-3) var(--okf-space-3) 0;
   padding: 6px 10px;
   border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-sm);
-  background: color-mix(in srgb, var(--okf-bg-elev) 94%, transparent);
+  border-radius: 0;
+  background: var(--okf-bg-inset);
   color: var(--okf-fg-muted);
   font-size: var(--okf-text-xs);
   line-height: 1.25;
@@ -1057,7 +1070,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
 .okf-graph-density--detail { border-color: var(--okf-accent); color: var(--okf-fg); }
 
 /* ---- Phase 4: legend rows as type filter chips -------------------------- */
-.okf-graph-legend__item--chip { cursor: pointer; border-radius: var(--okf-radius-sm); padding: 1px 4px; }
+.okf-graph-legend__item--chip { cursor: pointer; border-radius: 0; padding: 1px 4px; }
 .okf-graph-legend__item--chip:hover { background: var(--okf-bg-inset); }
 .okf-graph-legend__item--chip:focus-visible { outline: 2px solid var(--okf-accent); outline-offset: 1px; }
 .okf-graph-legend__item--off { opacity: 0.45; }
@@ -1082,13 +1095,13 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
 .okf-single-search__form, .okf-single-search__status, .okf-single-search__summary,
 .okf-single-search > .okf-search-results-list, .okf-single-search > .okf-copy-fallback { max-width: var(--okf-maxw); margin-left: auto; margin-right: auto; }
 .okf-single-search__query { display: flex; gap: var(--okf-space-2); }
-.okf-single-search__query input { flex: 1; min-width: 0; min-height: 44px; padding: var(--okf-space-2); border: 1px solid var(--okf-border-strong); border-radius: var(--okf-radius-sm); background: var(--okf-bg-elev); color: var(--okf-fg); font: inherit; }
+.okf-single-search__query input { flex: 1; min-width: 0; min-height: 44px; padding: var(--okf-space-2); border: 1px solid var(--okf-border-strong); border-radius: 0; background: var(--okf-bg-elev); color: var(--okf-fg); font: inherit; }
 .okf-single-search__status { min-height: 1.5em; color: var(--okf-fg-muted); }
 .okf-single-search__summary { padding-top: var(--okf-space-3); border-top: 1px solid var(--okf-border); }
 .okf-single-search [data-mode-field][hidden] { display: none; }
 .okf-single-search .okf-search-result h4 { margin: 0 0 var(--okf-space-1); font-size: var(--okf-text-md); }
 .okf-graph-context-actions { margin-top: var(--okf-space-2); }
-.okf-graph-copy-fallback { position: fixed; right: var(--okf-space-4); bottom: var(--okf-space-4); z-index: 70; width: min(34rem, calc(100vw - 2 * var(--okf-space-4))); padding: var(--okf-space-3); background: var(--okf-bg-elev); border: 1px solid var(--okf-border-strong); box-shadow: var(--okf-shadow); }
+.okf-graph-copy-fallback { position: fixed; right: var(--okf-space-4); bottom: var(--okf-space-4); z-index: 70; width: min(34rem, calc(100vw - 2 * var(--okf-space-4))); padding: var(--okf-space-3); background: var(--okf-bg-elev); border: 1px solid var(--okf-border-strong); box-shadow: var(--shadow-pop); }
 
 @media (max-width: 900px) {
   .okf-viewer--graph .okf-topbar { height: auto; min-height: var(--okf-topbar-h); padding: var(--okf-space-2) var(--okf-space-3); flex-wrap: wrap; align-items: center; }
@@ -1199,9 +1212,9 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   .okf-mobile-secondary__summary [aria-label*="command palette" i]{white-space:nowrap!important}
   .okf-mobile-secondary__summary [aria-label*="command palette" i] kbd{display:none}
   .okf-mobile-secondary__summary [aria-label^="Live updates connection"]{width:auto!important;min-width:64px;overflow:visible;white-space:nowrap!important;font-size:var(--okf-text-sm);color:var(--okf-fg)}
-  .okf-mobile-mode{display:inline-flex;align-items:center;min-height:32px!important;padding:3px 7px;border:1px solid var(--okf-border-strong);border-radius:var(--okf-radius-pill);font-size:11px;font-weight:750;line-height:1.15;white-space:normal;text-align:end}
+  .okf-mobile-mode{display:inline-flex;align-items:center;min-height:32px!important;padding:3px 7px;border:1px solid var(--okf-border-strong);border-radius:0;font-size:11px;font-weight:750;line-height:1.15;white-space:normal;text-align:end}
   .okf-live-label{margin-inline-start:5px;font-weight:700;color:currentColor}
-  .okf-mobile-secondary__toggle{display:block;width:auto;min-width:44px;padding:6px 8px;color:var(--okf-fg);background:transparent;border:1px solid var(--okf-border-strong);border-radius:var(--okf-radius-sm);font:inherit;font-weight:600;white-space:nowrap!important;overflow-wrap:normal!important}
+  .okf-mobile-secondary__toggle{display:block;width:auto;min-width:44px;padding:6px 8px;color:var(--okf-fg);background:transparent;border:1px solid var(--okf-border-strong);border-radius:0;font:inherit;font-weight:600;white-space:nowrap!important;overflow-wrap:normal!important}
   .okf-mobile-secondary__toggle:focus-visible{outline:2px solid var(--okf-accent);outline-offset:2px}
   .okf-mobile-secondary__controls{display:block;width:100%}
   .okf-mobile-secondary__controls[hidden]{display:none!important}
@@ -1238,15 +1251,15 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
     border-width: 2px 0 0;
     border-radius: 0;
     background: var(--okf-bg-elev);
-    box-shadow: 0 -12px 36px rgba(0, 0, 0, 0.28);
+    box-shadow: var(--shadow-pop);
     display: flex;
     flex-direction: column;
   }
   .okf-graph-tour--sheet p { max-width: 34rem; }
-  .okf-graph-tour__handle { display: block; width: 42px; height: 4px; margin: -16px auto 12px; border-radius: 2px; background: var(--okf-separator); }
+  .okf-graph-tour__handle { display: block; width: 42px; height: 4px; margin: -16px auto 12px; border-radius: 0; background: var(--okf-separator); }
   .okf-graph-tour__peek { display: inline-flex; align-items: center; justify-content: center; align-self: flex-start; min-height: 44px; margin-bottom: var(--okf-space-2); padding: 7px 12px; color: var(--okf-fg); background: var(--okf-bg-inset); border: 1px solid var(--okf-border-strong); }
   .okf-graph-tour--sheet.is-collapsed > :not(.okf-graph-tour__handle):not(.okf-graph-tour__peek) { display: none; }
-  .okf-graph-tour--sheet.is-collapsed { width: auto; margin: 0 var(--okf-space-2) var(--okf-space-2) auto; padding: 18px 12px 10px; border: 2px solid var(--okf-border-strong); border-radius: var(--okf-radius-sm); }
+  .okf-graph-tour--sheet.is-collapsed { width: auto; margin: 0 var(--okf-space-2) var(--okf-space-2) auto; padding: 18px 12px 10px; border: 2px solid var(--okf-border-strong); border-radius: 0; }
   .okf-graph-tour--sheet.is-collapsed .okf-graph-tour__handle { margin-top: -10px; }
   .okf-graph-tour--sheet .okf-graph-tour__nav { margin-top: var(--okf-space-3); }
   .okf-graph-tour--sheet .okf-graph-tour__close { top: 6px; right: 6px; min-width: 44px; min-height: 44px; }
@@ -1262,23 +1275,26 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
     height:44px;
     min-height: 44px;
     border: 1px solid var(--okf-border-strong);
-    border-radius: var(--okf-radius-sm);
+    border-radius: 0;
     background: transparent;
     color: var(--okf-fg);
     font: inherit;
     font-weight: 600;
   }
+  /* The current pane is a tab: bold ink over a 2px accent underline. */
   .okf-graph-mobile-nav button[aria-pressed="true"] {
-    border-color: var(--okf-accent);
-    background: var(--okf-accent);
-    color: var(--okf-accent-on);
+    border-color: var(--okf-border-strong);
+    border-bottom: 2px solid var(--accent);
+    background: transparent;
+    color: var(--okf-fg);
+    font-weight: 700;
   }
   .okf-layout[data-mobile-pane="graph"] > .okf-detail,
   .okf-layout[data-mobile-pane="concepts"] > .okf-detail,
   .okf-layout[data-mobile-pane="details"] > .okf-graph { display: none; }
   .okf-mobile-overview{display:flex;grid-column:1/-1;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;border-top:1px solid var(--okf-border);background:var(--okf-bg-elev);color:var(--okf-fg-muted);font-size:12px;line-height:1.3}
   .okf-mobile-overview__status{min-width:0}
-  .okf-mobile-overview__all{flex:0 0 auto;min-height:44px;padding:6px 9px;border:1px solid var(--okf-border-strong);border-radius:var(--okf-radius-sm);background:transparent;color:var(--okf-fg);font:inherit;font-weight:700}
+  .okf-mobile-overview__all{flex:0 0 auto;min-height:44px;padding:6px 9px;border:1px solid var(--okf-border-strong);border-radius:0;background:transparent;color:var(--okf-fg);font:inherit;font-weight:700}
   .okf-mobile-overview__all:focus-visible{outline:2px solid var(--okf-accent);outline-offset:2px}
   .okf-layout[data-mobile-pane="concepts"]>.okf-mobile-overview,.okf-layout[data-mobile-pane="details"]>.okf-mobile-overview{display:none}
   .okf-layout[data-mobile-pane="graph"] .okf-node-index { display: none; }
@@ -1380,10 +1396,10 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   .okf-layout[data-mobile-pane="details"] .okf-detail-view-only {
     margin-block: 0 12px;
     padding: 10px 12px;
-    border: 1px solid var(--okf-accent);
-    border-inline-start-width: 4px;
-    border-radius: var(--okf-radius-sm);
-    background: color-mix(in srgb, var(--okf-accent) 9%, var(--okf-bg-elev));
+    border: 1px solid var(--okf-border);
+    border-inline-start: 2px solid var(--status-info);
+    border-radius: 0;
+    background: var(--okf-bg-elev);
   }
   .okf-detail-relationships { margin-bottom: 12px; padding-top: 0; }
   .okf-detail-relationships__list { gap: 10px; padding-bottom: 10px; }
@@ -1422,8 +1438,8 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
     line-height: 1.2;
   }
   .okf-mobile-mode {
-    border-color: var(--okf-accent);
-    background: color-mix(in srgb, var(--okf-accent) 10%, var(--okf-bg-elev));
+    border-color: var(--okf-border-strong);
+    background: transparent;
   }
   .okf-mobile-secondary__toggle { background: var(--okf-bg-inset); }
 }
@@ -1512,7 +1528,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom { z-index: 40 !im
 .okf-detail-relationships__list [role="option"] { cursor: pointer; }
 .okf-detail-relationships__list [role="option"].is-active,
 .okf-edge-bundle-index__list [role="option"].is-active {
-  box-shadow: inset 4px 0 0 var(--okf-select, var(--okf-accent));
+  border-inline-start: 2px solid var(--accent);
 }
 .okf-detail-relationships__empty { margin: 0 0 var(--okf-space-3); }
 .okf-graph-zoom[role="toolbar"] { gap: 4px; }
@@ -1533,10 +1549,10 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom { z-index: 40 !im
   padding: 5px 8px;
   transform: translateY(-50%);
   border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-sm);
+  border-radius: 0;
   background: var(--okf-bg-elev);
   color: var(--okf-fg);
-  box-shadow: var(--okf-shadow);
+  box-shadow: var(--shadow-pop);
   font-size: var(--okf-text-xs);
   font-weight: 600;
   line-height: 1.25;
@@ -1546,17 +1562,10 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom { z-index: 40 !im
 }
 .okf-graph-zoom button[data-tooltip]:is(:hover, :focus-visible)::after { opacity: 1; visibility: visible; }
 
-html[data-okf-density="compact"] :is(.okf-detail, .okf-node-index, .okf-graph-legend, .okf-signal) { padding-block: var(--okf-space-2); }
-html[data-okf-density="compact"] :is(.okf-node-index__item, .okf-edge-bundle-index__item) { padding-block: 4px; }
-html[data-okf-density="compact"] :is(.okf-filter-chips, .okf-signal__lenses, .okf-graph-tools) { gap: 4px; }
-html[data-okf-density="compact"] .okf-lens-choice { min-height: 44px; padding-block: 3px !important; }
 .okf-node-index__item.is-active::before { content: "Active · "; font-weight: 700; }
 
 @media (max-width: 640px) {
   .okf-graph-zoom button[data-tooltip]::after { display: none; }
-  html[data-okf-density="compact"] :is(.okf-graph-zoom button, .okf-filter-chips button, .okf-graph-search-clear) {
-    min-width: 44px; min-height: 44px;
-  }
 }
 @media (forced-colors: active) {
   .okf-graph-zoom button[data-tooltip]::after { border: 1px solid CanvasText; background: Canvas; color: CanvasText; }
@@ -1628,7 +1637,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
   min-height: 40px;
   padding: 6px 10px;
   border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-sm);
+  border-radius: 0;
   background: var(--okf-bg-elev);
   color: var(--okf-fg);
   font: inherit;
@@ -1890,4 +1899,364 @@ body.okf-viewer--graph[data-okf-single-destination="index"] {
   min-height: 100vh;
   min-height: 100dvh;
   overflow-y: visible;
+}
+
+/* ==== Ledger graph structure ===========================================
+ * The graph page in the Ledger system (DESIGN.md "Graph"). graph.js paints
+ * the canvas from the palette tokens: neutral round nodes, --graph-edge
+ * edges, --graph-label names on a --graph-halo outline, and a muted ramp
+ * only while a colour lens is on. Around it the chrome is square and
+ * hairline-ruled, figures are mono, floating layers take --shadow-pop (the
+ * only elevation), and the accent marks state only: the selected node's
+ * stroke, the info panel's left edge, the current starting point and 2px
+ * state bars. Every colour below is a token. */
+:root { --okf-graph-field-h: 34px; }
+@media (pointer: coarse) { :root { --okf-graph-field-h: 44px; } }
+
+#okf-graph,
+.okf-viewer--graph .okf-layout > .okf-graph { background: var(--graph-bg); }
+.okf-graph-orphans[hidden] { display: none; }
+
+/* Route heading: a record title over a hairline, not a page title. */
+.okf-viewer--graph .okf-graph-route-title {
+  padding: 12px 20px;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+}
+@media (max-width: 640px) {
+  .okf-viewer--graph .okf-graph-route-title { padding: 4px var(--okf-space-2); font-size: var(--okf-text-base); }
+}
+
+/* Find in graph: the heading sits on the field's centre line; the field's
+ * own label is a mono micro-label above it. */
+.okf-viewer--graph .okf-graph-tools {
+  align-items: end;
+  gap: 6px var(--okf-space-4);
+  padding-block: 10px 12px;
+  background: var(--okf-bg-inset);
+}
+.okf-viewer--graph .okf-graph-tools > h2 {
+  display: flex;
+  align-items: center;
+  align-self: end;
+  min-height: var(--okf-graph-field-h);
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--okf-fg);
+  white-space: nowrap;
+}
+.okf-viewer--graph .okf-graph-tools label { gap: 5px; }
+.okf-viewer--graph .okf-graph-tools label > span {
+  font-family: var(--font-label);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-track);
+  text-transform: uppercase;
+  line-height: 1.3;
+  color: var(--label-color);
+}
+.okf-viewer--graph .okf-graph-tools input,
+.okf-viewer--graph .okf-graph-tools select {
+  min-height: var(--okf-graph-field-h);
+  padding: 5px 10px;
+  border: 1px solid var(--input-border);
+  border-radius: 0;
+  background: var(--input-bg);
+  color: var(--input-text);
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+.okf-viewer--graph .okf-graph-tools input::placeholder { color: var(--okf-fg-subtle); opacity: 1; }
+.okf-viewer--graph .okf-graph-tools__reset { min-height: var(--okf-graph-field-h); }
+/* graph.js retires the legacy type select (and its label) once the lens
+ * panel owns type filtering; the grid display must not resurrect it. */
+.okf-graph-tools label[hidden] { display: none !important; }
+
+/* Floating layers over the canvas: panel surface, no border, the 1px
+ * --shadow-pop ring as their only elevation. */
+.okf-node-index,
+.okf-graph-tip,
+.okf-graph-tour,
+.okf-graph-actions,
+.okf-graph-focusbar,
+.okf-graph-minimap,
+.okf-graph-lod-pill,
+.okf-graph-updated,
+.okf-graph-orphans,
+.okf-graph-copy-fallback,
+#okf-graph > .okf-graph-legend,
+#okf-graph > .okf-edge-bundle-index,
+.okf-graph-zoom button[data-tooltip]::after {
+  border: 0;
+  border-radius: 0;
+  background: var(--okf-bg-elev);
+  box-shadow: var(--shadow-pop);
+}
+.okf-graph-tour { border-top: 2px solid var(--okf-border-strong); }
+.okf-graph-tour.okf-graph-tour--detail { box-shadow: none; border: 1px solid var(--okf-border); border-top: 2px solid var(--okf-border-strong); }
+.okf-graph-tour__dots,
+.okf-graph-orphans__title,
+.okf-node-index__count,
+.okf-graph-tip__meta { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+[data-tour-anchor="true"] { outline: 2px solid var(--okf-focus-ring); outline-offset: 3px; }
+.okf-graph-lod-pill:hover { border-color: transparent; background: var(--okf-hover-fill); color: var(--okf-fg); }
+.okf-graph-updated button { color: var(--okf-accent); text-decoration: underline; text-underline-offset: 2px; }
+.okf-graph-actions button:hover,
+.okf-signal__btn:hover:not(:disabled) { background: var(--okf-hover-fill); border-color: var(--okf-border-strong); color: var(--okf-fg); }
+
+/* Viewport controls: outlined squares, no shadow, neutral hover. */
+.okf-graph-zoom button {
+  border: 1px solid var(--okf-border-strong);
+  border-radius: 0;
+  background: var(--okf-bg-elev);
+  color: var(--okf-fg);
+  box-shadow: none;
+}
+.okf-graph-zoom button:hover { border-color: var(--okf-border-strong); background: var(--okf-hover-fill); color: var(--okf-fg); }
+.okf-graph-zoom button:focus-visible { outline: 2px solid var(--okf-focus-ring); outline-offset: 2px; }
+.okf-graph-zoom button.is-failed { border-color: var(--okf-error); color: var(--okf-error); }
+
+/* Overview map: micro-label head on the band. */
+.okf-graph-minimap > span {
+  font-family: var(--font-label);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-track);
+  text-transform: uppercase;
+  color: var(--label-color);
+  background: var(--okf-bg-inset);
+  border-bottom: 1px solid var(--okf-border);
+}
+
+/* All concepts index: a floating record list. */
+.okf-node-index > summary { font-size: 13px; }
+.okf-node-index__item { border: 0; border-inline-start: 2px solid transparent; border-radius: 0; }
+.okf-node-index__item:hover { background: var(--okf-hover-fill); border-color: transparent; }
+.okf-node-index__item.is-active { border-inline-start-color: var(--accent); }
+.okf-node-index__swatch { width: 9px; height: 9px; border-radius: 0; border: 1px solid var(--okf-border-strong); }
+.okf-node-index__comments {
+  border: 1px solid var(--okf-border-strong);
+  border-radius: 0;
+  background: var(--okf-bg-inset);
+  color: var(--okf-fg);
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+.okf-node-index__comments::after { display: none; }
+/* Broken links: the muted error hue on the glyph and its outline only. */
+.okf-node-index__warn {
+  border: 1px solid var(--okf-error);
+  border-radius: 0;
+  background: transparent;
+  color: var(--okf-error);
+  font-family: var(--font-mono);
+}
+
+/* Hover card: the type as a mono micro-label beside a 2px stripe in the
+ * node's canvas fill; the broken-link row is a 2px status bar. */
+.okf-graph-tip__type {
+  font-family: var(--font-label);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-track);
+  color: var(--label-color);
+  border-inline-start-width: 2px;
+}
+.okf-graph-tip__warn {
+  border: 0;
+  border-inline-start: 2px solid var(--okf-error);
+  border-radius: 0;
+  background: transparent;
+  color: var(--okf-error);
+}
+
+/* Info panel (detail density notice): a band with the accent's left edge. */
+.okf-graph-density,
+.okf-graph-density--detail {
+  border: 1px solid var(--okf-border);
+  border-inline-start: 2px solid var(--accent);
+  border-radius: 0;
+  background: var(--okf-bg-inset);
+  color: var(--okf-fg-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* Lens summary: micro-label heads, hairline ranked rows, mono figures. */
+.okf-lens-summary__title {
+  margin: var(--okf-space-4) 0 var(--okf-space-2);
+  font-family: var(--font-label);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-track);
+  text-transform: uppercase;
+  color: var(--label-color);
+}
+.okf-lens-summary__verdict { font-size: 14.5px; line-height: 1.55; }
+.okf-lens-summary__label { font-size: 13.5px; font-weight: 500; }
+.okf-lens-summary__note {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--okf-fg-subtle);
+  font-variant-numeric: tabular-nums;
+}
+.okf-graph-theme-digest { margin-top: var(--okf-space-3); }
+
+/* Lens and graph settings: mono micro-label heads, square outlined choices. */
+.okf-signal__advanced > summary,
+.okf-signal__group > legend,
+.okf-graph-legend__title,
+.okf-collaborators__title {
+  font-family: var(--font-label);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-track);
+  text-transform: uppercase;
+  color: var(--label-color);
+}
+.okf-collaborators__title { font-size: 11px; }
+.okf-signal__row-value { color: var(--okf-fg); font-family: var(--font-mono); font-weight: 500; }
+.okf-signal__seg-item span,
+.okf-lens-choice { border: 1px solid var(--okf-border-strong); border-inline-start-width: 2px; border-inline-start-color: transparent; border-radius: 0; }
+.okf-signal__seg-item input:checked + span,
+.okf-signal__seg-item input:checked + .okf-lens-choice { border-inline-start-color: var(--accent); }
+.okf-lens-choice .okf-lens-preview { background: var(--okf-bg-inset); border: 1px solid var(--okf-border); }
+.okf-filter-showall { color: var(--okf-fg); }
+.okf-filter-chip:hover,
+.okf-filter-solo:hover,
+.okf-filter-showall:hover { background: var(--okf-hover-fill); }
+
+/* Legend swatches are squares in the canvas colour they explain. */
+.okf-graph-legend__swatch { width: 10px; height: 10px; flex: 0 0 auto; border: 1px solid var(--okf-border-strong); }
+.okf-graph-legend__swatch--hollow { background: var(--graph-bg); }
+.okf-graph-legend__swatch--none { visibility: hidden; }
+
+/* Selected concept: the record opens on a 2px --border-strong rule; the
+ * type is an outlined mono micro-label, never a colour. */
+.okf-detail #detail-content > .okf-detail__header {
+  padding-top: var(--okf-space-3);
+  border-top: 2px solid var(--okf-border-strong);
+  border-bottom: 1px solid var(--okf-border);
+}
+.okf-detail #detail-type.okf-type-chip {
+  display: inline-block;
+  padding: 3px 7px;
+  border: 1px solid var(--okf-border-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--okf-fg-muted);
+  font-family: var(--font-label);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-track);
+  text-transform: uppercase;
+}
+.okf-detail #detail-id { font-family: var(--font-mono); font-size: 11.5px; color: var(--okf-fg-subtle); }
+
+/* Single-file Index: the Ledger inventory ruler on the portable list —
+ * row number / record (title over mono type and id) / summary, hairline
+ * rows, ink titles. Row numbers are CSS counters, so they follow the list. */
+.okf-viewer--singlefile .okf-single-index__list {
+  display: block;
+  margin: var(--okf-space-5) 0 0;
+  padding: 0;
+  border-top: 1px solid var(--okf-border-strong);
+  counter-reset: okf-single-row;
+}
+.okf-viewer--singlefile .okf-single-index__list > li {
+  display: grid;
+  grid-template-columns: var(--ledger-col-n, 42px) minmax(0, 1.05fr) minmax(0, 1.9fr);
+  grid-template-areas: "n title summary" "n meta summary";
+  grid-template-rows: auto 1fr;
+  column-gap: var(--ledger-col-gap, 22px);
+  align-items: start;
+  padding: 12px 0;
+  border-top: 0;
+  border-bottom: 1px solid var(--okf-border);
+  counter-increment: okf-single-row;
+}
+.okf-viewer--singlefile .okf-single-index__list > li::before {
+  content: counter(okf-single-row, decimal-leading-zero);
+  grid-area: n;
+  padding-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--okf-fg-subtle);
+}
+.okf-viewer--singlefile .okf-single-index__entry { grid-area: title; border-radius: 0; }
+.okf-viewer--singlefile .okf-single-index__entry > strong {
+  color: var(--card-title-color);
+  font-size: var(--card-title-size);
+  font-weight: var(--card-title-weight);
+  letter-spacing: var(--card-title-track);
+}
+.okf-viewer--singlefile .okf-single-index__list > li > span {
+  grid-area: meta;
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--okf-fg-subtle);
+  overflow-wrap: anywhere;
+}
+.okf-viewer--singlefile .okf-single-index__list > li > p {
+  grid-area: summary;
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--okf-fg-muted);
+}
+@media (max-width: 900px) {
+  .okf-viewer--singlefile .okf-single-index__list > li {
+    grid-template-columns: var(--ledger-col-n, 42px) minmax(0, 1fr);
+    grid-template-areas: "n title" "n meta" "n summary";
+    grid-template-rows: auto auto auto;
+  }
+  .okf-viewer--singlefile .okf-single-index__list > li > p { margin-top: 6px; }
+}
+
+/* Single-file Search & context drawer: a band with a 2px record rule. */
+.okf-single-search { background: var(--okf-bg); border-top: 2px solid var(--okf-border-strong); }
+.okf-single-search__head h2 { font-size: 20px; letter-spacing: -0.015em; }
+.okf-single-search__form .okf-field > span,
+.okf-single-search .okf-search-modes > legend {
+  font-family: var(--font-label);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-track);
+  text-transform: uppercase;
+  color: var(--label-color);
+}
+.okf-single-search__query input {
+  min-height: var(--okf-graph-field-h);
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--input-text);
+}
+.okf-single-search__status { font-family: var(--font-mono); font-size: 11.5px; color: var(--okf-fg-subtle); }
+
+@media (forced-colors: active) {
+  .okf-node-index,
+  .okf-graph-tip,
+  .okf-graph-tour,
+  .okf-graph-actions,
+  .okf-graph-focusbar,
+  .okf-graph-lod-pill,
+  .okf-graph-updated,
+  .okf-graph-orphans,
+  .okf-graph-copy-fallback,
+  #okf-graph > .okf-graph-legend,
+  #okf-graph > .okf-edge-bundle-index { border: 1px solid CanvasText; box-shadow: none; }
+  .okf-graph-density,
+  .okf-lens-summary__row[aria-current="true"],
+  .okf-signal__seg-item input:checked + span,
+  .okf-signal__seg-item input:checked + .okf-lens-choice { border-inline-start-color: Highlight; }
+  .okf-lens-summary__bar { background: CanvasText; }
+  .okf-node-index__warn { color: CanvasText; border-color: CanvasText; }
 }
