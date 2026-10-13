@@ -48,6 +48,25 @@ def test_graph_thumbnail_is_deterministic_safe_and_order_independent() -> None:
     assert '<figcaption><strong>Explore connections</strong><span>2 concepts · 1 relationship</span>' in first
 
 
+def test_recent_time_text_floors_units_like_the_live_rail() -> None:
+    """Server-rendered "Recently changed" rows use the exact format of the
+    live Studio rail (studio.js fmtRecentAgo) and wiki.js OKFLoomRecency:
+    whole elapsed units rounded DOWN, so it never prints "60m ago" or
+    "24h ago"; future instants read "just now"; the title is the UTC minute."""
+    from datetime import datetime, timedelta, timezone
+    from okf_loom.render import _recent_time_text, _recent_time_title
+    now = datetime(2026, 10, 13, 12, 0, 0, tzinfo=timezone.utc)
+    ts = lambda seconds: (now - timedelta(seconds=seconds)).isoformat()
+    cases = {0: "just now", 59: "just now", 60: "1m ago", 3599: "59m ago",
+             3600: "1h ago", 86399: "23h ago", 86400: "1d ago",
+             9 * 86400 + 86399: "9d ago", -300: "just now"}
+    for seconds, expected in cases.items():
+        assert _recent_time_text(ts(seconds), now=now) == expected, (seconds, expected)
+    assert _recent_time_title("2026-10-13T13:59:59+02:00") == "2026-10-13 11:59 UTC"
+    assert _recent_time_text("not a time", now=now) == "not a time"
+    assert _recent_time_title("not a time") == "not a time"
+
+
 def test_graph_thumbnail_empty_is_semantic_link() -> None:
     html = _graph_thumbnail_html({"nodes": [], "edges": []}, "/__graph")
     assert "No concepts are available" in html
