@@ -127,6 +127,59 @@
     });
   }
 
+  // ---- Recency: relative time text (Ledger) ------------------------------
+  // One format for every "Recently changed" row, shared with render.py
+  // (_recent_time_text / _recent_time_title) and published for the live
+  // Studio rail as window.OKFLoomRecency:
+  //   text  = "just now" (< 1 min), else whole elapsed units rounded DOWN:
+  //           "Nm ago" (< 1 h), "Nh ago" (< 1 day), "Nd ago"; future
+  //           instants (clock skew) read "just now"; unparseable "" (callers
+  //           keep the raw record).
+  //   title = the instant in UTC as "YYYY-MM-DD HH:MM UTC".
+  // The <time datetime> attribute keeps the authored instant. Server text is
+  // relative to the render; this re-renders it against the reader's clock
+  // (static builds never show stale build-time phrasing once scripts run).
+  function okfRelativeTime(ts, now) {
+    var then = Date.parse(ts);
+    if (typeof ts !== "string" || isNaN(then)) return "";
+    var reference = typeof now === "number" ? now : Date.now();
+    var seconds = Math.max(0, (reference - then) / 1000);
+    if (seconds < 60) return "just now";
+    if (seconds < 3600) return Math.floor(seconds / 60) + "m ago";
+    if (seconds < 86400) return Math.floor(seconds / 3600) + "h ago";
+    return Math.floor(seconds / 86400) + "d ago";
+  }
+  function okfUtcTitle(ts) {
+    var then = Date.parse(ts);
+    if (typeof ts !== "string" || isNaN(then)) return "";
+    return new Date(then).toISOString().slice(0, 16).replace("T", " ") + " UTC";
+  }
+  function refreshRecencyTimes() {
+    var now = Date.now();
+    Array.prototype.forEach.call(
+      document.querySelectorAll("time.okf-recent__time[datetime]"),
+      function (node) {
+        var ts = node.getAttribute("datetime");
+        var text = okfRelativeTime(ts, now);
+        if (!text) return;
+        if (node.textContent !== text) node.textContent = text;
+        var title = okfUtcTitle(ts);
+        if (title && node.getAttribute("title") !== title) node.setAttribute("title", title);
+      }
+    );
+  }
+  try {
+    window.OKFLoomRecency = Object.freeze({
+      relativeTime: okfRelativeTime,
+      utcTitle: okfUtcTitle,
+      refresh: refreshRecencyTimes
+    });
+  } catch (e) { /* frozen/locked window: the page still refreshes itself */ }
+  refreshRecencyTimes();
+  if (document.querySelector(".okf-viewer--index")) {
+    window.setInterval(refreshRecencyTimes, 60000);
+  }
+
   // ---- Static/live concept-URL parity (P1 recent-pages navigation) -----
   // Mirrors the established P1-9 convention in renderLocalGraph below: the
   // server emits data-okf-portable-root on <body> = the relative path from
@@ -146,9 +199,9 @@
   }
 
   // ---- Local graph widget (concept page sidebar) -----------------------
-  // P2-62: previously rendered unlabeled coloured dots (decorative). Now
-  // renders a vertical pill list of 1-hop neighbour titles, each coloured
-  // by type, with a colour swatch + truncated label. Keyboard accessible.
+  // P2-62: a vertical list of 1-hop neighbour titles, each with a neutral
+  // square marker + truncated label (Ledger: types are not colour-coded).
+  // Keyboard accessible.
   // The data is embedded by the server in <div id="okf-local-graph" data-graph="...">.
   function renderLocalGraph() {
     var container = document.getElementById("okf-local-graph");
@@ -207,7 +260,7 @@
 
       var swatch = document.createElement("span");
       swatch.className = "okf-local-graph__swatch";
-      swatch.style.background = n.color || "var(--okf-accent)";
+      swatch.setAttribute("aria-hidden", "true");
       btn.appendChild(swatch);
 
       var lbl = document.createElement("span");
@@ -435,9 +488,11 @@
     try { localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, RECENT_MAX))); }
     catch (e) { /* private mode / quota — recent pages is a nicety, not critical */ }
   }
-  function recordRecent(id, title, type, typeColor, iconKey) {
+  function recordRecent(id, title, type, iconKey) {
     if (!id || !title) return;
-    var entry = { id: id, title: title, type: type || "", type_color: typeColor || "", icon: iconKey || "" };
+    // type_color stays in the stored shape (always empty) so entries written
+    // by older builds and by this one share one schema.
+    var entry = { id: id, title: title, type: type || "", type_color: "", icon: iconKey || "" };
     var list = loadRecent().filter(function (e) { return e.id !== id; });
     list.unshift(entry);
     saveRecent(list);
@@ -450,12 +505,9 @@
     var h1 = document.querySelector(".okf-page__title");
     var title = h1 ? (h1.textContent || "").trim() : "";
     if (!title) title = cid;
-    var typeColor = "";
     var iconKey = "";
     var infobox = document.querySelector(".okf-page__infobox");
     if (infobox) {
-      var accent = infobox.style.getPropertyValue("--okf-type-accent");
-      if (accent) typeColor = accent.trim();
       // The renderer emits the resolved icon key on the infobox element so
       // the recent-page entry can carry the same icon as a fresh search hit.
       if (infobox.dataset.okfTypeIcon) iconKey = infobox.dataset.okfTypeIcon;
@@ -463,24 +515,13 @@
     var type = "";
     var typeEl = document.querySelector(".okf-infobox__type");
     if (typeEl) type = (typeEl.textContent || "").trim();
-    recordRecent(cid, title, type, typeColor, iconKey);
+    recordRecent(cid, title, type, iconKey);
   })();
 
-  // Build a tinted type chip element from a result's type/type_color. The
-  // chip reuses the .okf-type-chip base shape via .okf-search-live__type; the
-  // colour is applied as an opaque tint background + type-colour text. Safe:
-  // only hex/rgb from the server payload are accepted (the regex gate keeps
-  // arbitrary CSS / url() out of the inline style), and the type name is
-  // rendered via textContent.
-  var _SAFE_COLOR = /^(#[0-9a-fA-F]{3,8}|rgb\([^)]*\)|rgba\([^)]*\)|oklch\([^)]*\)|hsl\([^)]*\)|[a-z]+)$/i;
-  function safeColor(c) { return typeof c === "string" && _SAFE_COLOR.test(c.trim()) ? c.trim() : ""; }
-  function tintFor(color) {
-    // A readable translucent tint background for a solid type colour; falls
-    // back to the muted inset chip when no colour is available.
-    var c = safeColor(color);
-    if (!c) return null;
-    return "color-mix(in srgb, " + c + " 16%, var(--okf-bg-inset))";
-  }
+  // Type chips (search suggestions, recent pages, link popover) carry the
+  // type ICON + NAME only. Ledger does not colour-code content types, so a
+  // payload's type_color is deliberately ignored and never reaches an inline
+  // style; the chip's neutral outlined look is wiki.css.
   // Phase 2 search-chip type-icon parity (plan §3.4): the chip must carry
   // the SAME type icon the rest of the UI uses, not text/colour only. The
   // icon-key → SVG-inner-markup map is shipped once per page by the server
@@ -533,7 +574,7 @@
     svg.appendChild(wrapper);
     return svg;
   }
-  function makeTypeChip(typeName, typeColor, iconKey) {
+  function makeTypeChip(typeName, iconKey) {
     var chip = document.createElement("span");
     chip.className = "okf-search-live__type";
     var label = typeName || "concept";
@@ -547,11 +588,6 @@
     labelNode.className = "okf-search-live__type-label";
     labelNode.textContent = label;
     chip.appendChild(labelNode);
-    var tint = tintFor(typeColor);
-    if (tint) {
-      chip.style.background = tint;
-      chip.style.color = safeColor(typeColor);
-    }
     return chip;
   }
 
@@ -673,7 +709,7 @@
     opt.setAttribute("aria-label", (it.title || cid) + (it.type ? ", " + it.type : "") + (cid ? ", " + cid : ""));
     var head = document.createElement("span");
     head.className = "okf-search-live__head";
-    head.appendChild(makeTypeChip(it.type, it.type_color, it.icon));
+    head.appendChild(makeTypeChip(it.type, it.icon));
     var title = document.createElement("span");
     title.className = "okf-search-live__title";
     appendHighlighted(title, it.title || cid, query);
@@ -1419,22 +1455,14 @@
         // only (never innerHTML from fetched/server data). A hostile
         // summary response cannot inject markup or script.
         p.textContent = "";
-        // Type band: tinted chip in the concept's type colour (deterministic
-        // crc32->hue fallback mirrors server stable_hue so the band reads as
-        // type identity; the icon/name disambiguate curated hues). Colour is
-        // gated by safeColor before it reaches the inline style.
+        // Type band: the type icon + name as a neutral outlined micro-label
+        // (Ledger: content types are not colour-coded).
         var typeEl = document.createElement("span");
         typeEl.className = "okf-popover__type";
         var typeName = typeof fm.type === "string" && fm.type ? fm.type : "concept";
         var typeIcon = makeTypeIconSvg(fm.icon);
         if (typeIcon) typeEl.appendChild(typeIcon);
         typeEl.appendChild(document.createTextNode(typeName));
-        var tColor = safeColor(fm.type_color) || typeColorJs(typeName);
-        // Only the tint takes the type colour; the name keeps the theme ink
-        // (wiki.css), because a mid-tone type colour as text fails 4.5:1.
-        if (tColor) {
-          typeEl.style.background = "color-mix(in srgb, " + tColor + " 16%, var(--okf-bg-inset))";
-        }
         var titleEl = document.createElement("h4");
         titleEl.textContent = typeof fm.title === "string" && fm.title ? fm.title : target;
         p.appendChild(typeEl);
@@ -1481,43 +1509,6 @@
         p.style.top = Math.max(12, py) + "px";
       })
       .catch(function () {});
-  }
-
-  // Deterministic type colour for the popover band, mirroring the server's
-  // stable_hue fallback (crc32(name) % 360 -> hsl). Used ONLY for the hover
-  // preview tint (the type name + concept icon carry identity); it never
-  // reaches the search-suggestion chips (those use the server type_color).
-  function typeColorJs(typeName) {
-    var name = String(typeName || "concept");
-    var crc = crc32Str(name) >>> 0;
-    var hue = crc % 360;
-    return "hsl(" + hue + ", 62%, 48%)";
-  }
-  function crc32Str(str) {
-    var table = crc32Str._t;
-    if (!table) {
-      table = new Uint32Array(256);
-      for (var n = 0; n < 256; n++) {
-        var c = n;
-        for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-        table[n] = c >>> 0;
-      }
-      crc32Str._t = table;
-    }
-    var crc = 0xFFFFFFFF;
-    for (var i = 0; i < str.length; i++) {
-      var code = str.charCodeAt(i);
-      if (code > 0xFF) {
-        // utf-8 encode codepoints > 255 (mirror zlib.crc32 over utf-8 bytes)
-        var bytes = unescape(encodeURIComponent(String.fromCharCode(code)));
-        for (var j = 0; j < bytes.length; j++) {
-          crc = (crc >>> 8) ^ table[(crc ^ bytes.charCodeAt(j)) & 0xFF];
-        }
-      } else {
-        crc = (crc >>> 8) ^ table[(crc ^ code) & 0xFF];
-      }
-    }
-    return (crc ^ 0xFFFFFFFF) >>> 0;
   }
 
   function hidePopover() {
