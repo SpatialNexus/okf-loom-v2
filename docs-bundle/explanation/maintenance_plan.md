@@ -287,7 +287,7 @@ publication/reporting destinations remain separate, honestly stated limits.
 ### Previous Studio closeout (2026-09-17; superseded for live-review readiness)
 
 The selected reading hierarchy, native search
-adapter, exact context previews, graph geometry, and progressive Appearance
+adapter, exact context previews, graph geometry, and Ledger Appearance
 controls are implemented and locally verified. `ui-patch` remains the supported
 consolidation target. Public read-only/local comparisons informed this work
 without widening authorization. The search-timeout recovery form avoids the
