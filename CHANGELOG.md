@@ -10,6 +10,10 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Split view now clears the "Loading source…" notice whenever the source pane
+  is populated, including by a concurrent document or live-update load. A
+  redundant request no longer leaves a loading or failure notice above source
+  that has already loaded.
 - A v1 `presence.json` in the Studio session no longer stops `serve`. It is
   normalised to the v2 format (unknown actors become `agent`, unknown states
   `idle`) instead of being rejected with a bare `error:`.
