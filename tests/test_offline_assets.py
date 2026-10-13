@@ -409,6 +409,58 @@ def test_bundled_notices_are_locked_and_embeddable():
     assert "</script" not in text.lower() and "<!--" not in text
 
 
+def test_ledger_notice_generator_reproduces_the_locked_ofl_appendices():
+    import generate_bundled_notices as generator
+
+    entries = generator.ledger_fonts_entries(vendor.load_lock())
+    notices, _blocks, inventory = _bundled_notices()
+    assert inventory["ledger_fonts"] == [{k: v for k, v in entry.items() if k != "text"}
+                                        for entry in entries]
+    assert [entry["name"] for entry in entries] == ["Public Sans", "Azeret Mono"]
+    # Minimal renderer inputs isolate the appendix renderer without network use.
+    package = {"id": "fixture@1", "name": "fixture", "license": "MIT", "included_in": [],
+               "evidence": [], "tarball": None, "licence_files": []}
+    fonts = {"id": "fixture-fonts@1", "license": "OFL-1.1", "included_in": [], "evidence": [],
+             "tarball": "fixture", "integrity": "fixture", "notices": [],
+             "terms_source": "fixture", "terms_text": "fixture"}
+    rendered = generator.render_notices([package], [], fonts, {}, entries)
+    marker = "===== Ledger font: Public Sans (OFL-1.1) ====="
+    appendix = rendered[rendered.index(marker):]
+    assert appendix == notices[notices.index(marker):]
+    primary = vendor.read_vendor_bytes(vendor.NOTICES_NAME).decode("utf-8")
+    assert appendix == primary[primary.index(marker):]
+    for entry in entries:
+        assert entry["version"] == "ledger-snapshot" and entry["provenance"]
+        assert "tarball" not in entry and "integrity" not in entry
+        licence = entry["licence_files"][0]
+        assert vendor.sha256_hex(entry["text"].encode("utf-8")) == licence["sha256"]
+        assert vendor.sha256_hex(generator.as_quoted(entry["text"]).encode("utf-8")) == \
+            licence["quoted_sha256"]
+
+
+@pytest.mark.parametrize("damage", ["flip", "missing", "symlink"])
+def test_notice_regeneration_refuses_damaged_local_licences_before_network(vendor_copy, monkeypatch,
+                                                                        tmp_path, damage):
+    import generate_bundled_notices as generator
+
+    victim = vendor_copy / vendor.LEDGER_LICENSES[0]
+    if damage == "flip":
+        _flip_byte(victim)
+    elif damage == "missing":
+        victim.unlink()
+    else:
+        real = tmp_path / "licence.txt"
+        victim.rename(real)
+        victim.symlink_to(real)
+
+    def no_network():
+        pytest.fail("local licence damage must fail before upstream regeneration")
+
+    monkeypatch.setattr(generator, "mermaid_inventory", no_network)
+    with pytest.raises(SystemExit, match="local Ledger snapshot verification failed"):
+        generator.build()
+
+
 def test_bundled_notices_quote_every_inventoried_licence_in_full():
     text, blocks, inventory = _bundled_notices()
     packages = [ident for kind, ident in blocks if kind == "PACKAGE"]
