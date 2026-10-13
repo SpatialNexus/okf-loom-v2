@@ -168,3 +168,9 @@ remain operator-owned host dependencies; no dependency is installed or fetched
 by this opt-in. Existing headed-zoom admission remains required. Unit fixtures
 prove dispatch and failure fences, not real-browser compatibility or human
 accessibility acceptance.
+
+Live served-byte provenance admits generated `ledger-fonts.css` only after the
+immutable runtime's vendor loader verifies its locked WOFF2/OFL inputs and
+derived size/SHA-256 pin. The loader runs from that snapshot, never the caller's
+checkout. Raw inputs remain in the inventory; sealed static outputs (including
+derived KaTeX CSS) remain bound to their separate build inventory.

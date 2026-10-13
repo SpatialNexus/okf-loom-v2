@@ -1144,19 +1144,59 @@ def _static_served_proof(base: str, root: Path, probe: str) -> list[dict[str, ob
     return proof
 
 
+def _live_runtime_assets(
+    runtime: "ImmutableRuntimeWorkspace", paths: list[str],
+) -> set[tuple[str, str, int]]:
+    """Raw assets plus the pinned font CSS derived from this immutable tree.
+
+    Unlike sealed-build assets (including offline KaTeX CSS), live generated
+    assets have no output file in the raw input inventory. Never admit a lock
+    hash alone: the selected runtime's vendor loader verifies every font/OFL
+    input and the derived size/hash before we can compare the served bytes.
+    """
+    assets = {(Path(str(row["path"])).name, str(row["sha256"]), int(row["bytes"]))
+              for row in runtime.inventory}
+    name = "ledger-fonts.css"
+    if not any(Path(urllib.parse.urlparse(path).path).name == name for path in paths):
+        return assets
+    runtime.verify()
+    vendor_module = runtime.root / "scripts/okf_loom/viewer/vendor.py"
+    vendor_root = vendor_module.with_suffix("")
+    runtime.audit("derive-live-asset", inputs=(vendor_module, vendor_root))
+    # An isolated process avoids importing the caller's checkout or cached
+    # modules when a different commit owns the materialized runtime.
+    code = (
+        "import runpy,sys\n"
+        "vendor=runpy.run_path(sys.argv[1])\n"
+        "sys.stdout.buffer.write(vendor['load_ledger_css']().encode('utf-8'))\n"
+    )
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", code, str(vendor_module)], cwd=runtime.root,
+            env=_env(runtime=runtime), capture_output=True, timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise CapturePreconditionError("derived live asset verification failed") from exc
+    if result.returncode:
+        raise CapturePreconditionError("derived live asset does not match the immutable runtime")
+    runtime.verify()
+    assets.add((name, hashlib.sha256(result.stdout).hexdigest(), len(result.stdout)))
+    return assets
+
+
 def _live_served_proof(base: str, runtime: "ImmutableRuntimeWorkspace") -> list[dict[str, object]]:
     entrypoint = _fetch_bytes(base + "/")
     rows = [{"path": "/", "role": "entrypoint", "bytes": len(entrypoint),
              "sha256": hashlib.sha256(entrypoint).hexdigest()}]
     urls = sorted(set(match.decode("utf-8") for match in re.findall(
         rb'(?:src|href)="([^"?#]+\.(?:css|js)(?:\?[^"#]*)?)"', entrypoint)))
-    runtime_hashes = {(Path(str(row["path"])).name, str(row["sha256"])) for row in runtime.inventory}
+    runtime_assets = _live_runtime_assets(runtime, urls)
     for relative in urls:
         url = urllib.parse.urljoin(base + "/", relative)
         data = _fetch_bytes(url)
         digest = hashlib.sha256(data).hexdigest()
         name = Path(urllib.parse.urlparse(url).path).name
-        if (name, digest) not in runtime_hashes:
+        if (name, digest, len(data)) not in runtime_assets:
             raise CapturePreconditionError("served live asset does not match the immutable runtime")
         rows.append({"path": urllib.parse.urlparse(url).path, "role": "critical-asset",
                      "bytes": len(data), "sha256": digest})
@@ -1187,8 +1227,10 @@ def _verify_server_provenance(record: dict[str, Any], *, runtime: "ImmutableRunt
                for row in record["served_bytes"]):
             raise CapturePreconditionError("served static assets do not match the sealed build inventory")
     else:
-        runtime_assets = {(Path(str(row["path"])).name, str(row["sha256"]), int(row["bytes"]))
-                          for row in runtime.inventory}
+        runtime_assets = _live_runtime_assets(
+            runtime, [str(row["path"]) for row in record["served_bytes"]
+                      if row.get("role") == "critical-asset"],
+        )
         for row in record["served_bytes"]:
             if row.get("role") == "critical-asset" and (
                 Path(str(row["path"])).name, str(row["sha256"]), int(row["bytes"])

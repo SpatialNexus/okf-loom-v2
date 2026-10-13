@@ -574,6 +574,103 @@ def test_server_provenance_rejects_wrong_cwd_and_wrong_assets(tmp_path: Path) ->
         capture._verify_server_provenance(wrong_asset, runtime=runtime)
 
 
+@pytest.fixture
+def ledger_runtime(tmp_path: Path):
+    from okf_loom.viewer import vendor
+
+    root = tmp_path / "runtime"
+    vendor_root = root / "scripts/okf_loom/viewer/vendor"
+    inputs = (vendor.LOCK_NAME, *vendor.LEDGER_LICENSES,
+              *(face[2] for face in vendor.LEDGER_FACES))
+    for relative in inputs:
+        target = vendor_root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(vendor.VENDOR_ROOT / relative, target)
+    shutil.copy2(ROOT / "scripts/okf_loom/viewer/vendor.py", vendor_root.with_suffix(".py"))
+    css = vendor.load_ledger_css(vendor_root).encode("utf-8")
+    runtime = capture.ImmutableRuntimeWorkspace.for_test(root, tmp_path)
+    return runtime, vendor_root, css
+
+
+def _ledger_served_record(runtime, css: bytes) -> dict:
+    return {
+        "id": "live-font-test", "kind": "sealed-live-studio", "started_by_runner": True,
+        "cwd": str(runtime.root), "pid": 123, "head": runtime.head, "tree": runtime.tree,
+        "readiness": "http-200-owned-process", "served_bytes": [
+            {"path": "/", "role": "entrypoint", "bytes": 10, "sha256": "a" * 64},
+            {"path": "/__static/ledger-fonts.css", "role": "critical-asset",
+             "bytes": len(css), "sha256": hashlib.sha256(css).hexdigest()},
+        ],
+    }
+
+
+def test_live_font_provenance_derives_only_from_immutable_inputs(ledger_runtime, monkeypatch) -> None:
+    from okf_loom.viewer import vendor
+
+    runtime, vendor_root, css = ledger_runtime
+    assert all(Path(str(row["path"])).name != "ledger-fonts.css" for row in runtime.inventory)
+    # The physical caller and any process-cached loader are not the authority.
+    monkeypatch.setattr(vendor, "load_ledger_css", lambda *_a: pytest.fail("used caller's loader"))
+    entrypoint = b'<link href="/__static/ledger-fonts.css" rel="stylesheet">'
+    monkeypatch.setattr(capture, "_fetch_bytes", lambda url: entrypoint if url.endswith("/") else css)
+    proof = capture._live_served_proof("http://127.0.0.1:1", runtime)
+    record = _ledger_served_record(runtime, css)
+    assert proof[1] == record["served_bytes"][1]
+    capture._verify_server_provenance({**record, "served_bytes": proof}, runtime=runtime)
+    assert runtime.accesses[-1]["inputs"] == [str(vendor_root.with_suffix(".py")), str(vendor_root)]
+
+
+@pytest.mark.parametrize("damage", [
+    "served-bytes", "served-size", "unknown-asset", "missing-font", "missing-ofl",
+    "changed-font", "changed-ofl", "derived-pin", "missing-pin", "missing-lock",
+    "unlisted-input", "input-drift", "symlink-input",
+])
+def test_live_font_provenance_fails_closed(ledger_runtime, monkeypatch, damage: str) -> None:
+    runtime, vendor_root, css = ledger_runtime
+    font = vendor_root / "ledger-public-sans/PublicSans-Variable.woff2"
+    ofl = vendor_root / "ledger-public-sans/LICENSE"
+    lock_path = vendor_root / "vendor.lock.json"
+    if damage in {"missing-font", "missing-ofl", "missing-lock"}:
+        {"missing-font": font, "missing-ofl": ofl, "missing-lock": lock_path}[damage].unlink()
+    elif damage in {"changed-font", "changed-ofl", "input-drift"}:
+        target = ofl if damage == "changed-ofl" else font
+        data = target.read_bytes()
+        target.write_bytes(bytes([data[0] ^ 1]) + data[1:])
+    elif damage in {"derived-pin", "missing-pin"}:
+        lock = json.loads(lock_path.read_bytes())
+        if damage == "missing-pin":
+            del lock["derived"]["ledger-fonts.css"]
+        else:
+            lock["derived"]["ledger-fonts.css"]["sha256"] = "0" * 64
+        lock_path.write_text(json.dumps(lock))
+    elif damage == "symlink-input":
+        target = vendor_root.parent / "linked-font"
+        font.rename(target)
+        font.symlink_to(target)
+    if damage not in {"unlisted-input", "input-drift"}:
+        # Admit the damaged tree itself: vendor pins must independently fail,
+        # rather than relying only on detection of post-admission mutation.
+        runtime = capture.ImmutableRuntimeWorkspace.for_test(runtime.root, runtime.source_root)
+    elif damage == "unlisted-input":
+        runtime.inventory = tuple(row for row in runtime.inventory
+                                  if row["path"] != font.relative_to(runtime.root).as_posix())
+    record = _ledger_served_record(runtime, css)
+    if damage == "served-bytes":
+        css = b"!" + css[1:]
+        record = _ledger_served_record(runtime, css)
+    elif damage == "served-size":
+        record["served_bytes"][1]["bytes"] += 1
+    elif damage == "unknown-asset":
+        record["served_bytes"][1]["path"] = "/__static/unpinned-fonts.css"
+    entrypoint = ('<link href="' + record["served_bytes"][1]["path"] + '" rel="stylesheet">').encode()
+    monkeypatch.setattr(capture, "_fetch_bytes", lambda url: entrypoint if url.endswith("/") else css)
+    if damage != "served-size":
+        with pytest.raises(capture.CapturePreconditionError):
+            capture._live_served_proof("http://127.0.0.1:1", runtime)
+    with pytest.raises(capture.CapturePreconditionError):
+        capture._verify_server_provenance(record, runtime=runtime)
+
+
 def test_server_readiness_reports_owned_process_failure() -> None:
     class Failed:
         returncode = 73
