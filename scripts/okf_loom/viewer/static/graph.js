@@ -4260,7 +4260,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
       typeRow.textContent = d.type || "concept";
       // The node's canvas fill is a stripe beside the name (graph.css), not
       // the name's ink: neutral by default, the muted lens colour otherwise.
-      typeRow.style.setProperty("--okf-type-accent", d.color || d.baseColor || "");
+      typeRow.style.setProperty("--okf-graph-tip-fill", d.color || d.baseColor || "");
       tip.appendChild(typeRow);
       var title = document.createElement("div");
       title.className = "okf-graph-tip__title";
