@@ -2134,8 +2134,15 @@
     // swatches and the theme-digest bars, so a lens keeps its meaning in the
     // new palette instead of keeping the previous palette's ramp.
     var lensPaintReady = false;
+    // elemFor() already stamped every node with this palette's glyph and
+    // neutral fill, so first paint skips the per-node pass; it runs only once
+    // a palette change resolves a new token set.
+    var glyphsPaintedFor = graphPalette();
     function refreshNodeGlyphs() {
-      var neutral = graphPalette().node;
+      var pal = graphPalette();
+      if (pal === glyphsPaintedFor) return;
+      glyphsPaintedFor = pal;
+      var neutral = pal.node;
       cy.batch(function () {
         cy.nodes().forEach(function (node) {
           node.data("iconUrl", iconDataUri(node.data("icon") || "file"));
