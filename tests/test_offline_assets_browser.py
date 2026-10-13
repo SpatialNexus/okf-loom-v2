@@ -191,6 +191,7 @@ def _assert_matches_cdn_golden(page, scope: str) -> None:
 
 def _assert_rich_rendered(page, scope: str) -> None:
     """Mermaid, KaTeX (with fonts) and highlight.js inside ``scope``."""
+    _assert_ledger_fonts(page)
     page.wait_for_function(
         """(scope) => {
           const root = document.querySelector(scope);
@@ -232,7 +233,7 @@ def _assert_rich_rendered(page, scope: str) -> None:
 
 def _assert_theme_swap_is_local(page, guard) -> None:
     before = len(guard.requests)
-    page.evaluate("document.documentElement.setAttribute('data-theme', 'technical-dark')")
+    page.evaluate("window.OKFLoomTheme.setTheme('slate')")
     page.wait_for_function("""() => [...document.querySelectorAll('[data-okf-renderer-resource="stylesheet"]')]
         .some(el => el.media === 'all' && /github-dark|okf-vendor-hljs-dark/.test(el.href || el.getAttribute('data-okf-href') || ''))
         && document.documentElement.dataset.okfRenderersStatus === 'ready'""", timeout=15000)
@@ -482,3 +483,57 @@ def test_guard_catches_the_default_cdn_build(tmp_path):
                                timeout=30000)
         assert any("cdn.jsdelivr.net" in url for url in guard.blocked)
         assert page.locator("div.mermaid svg").count() == 0
+
+
+def _assert_ledger_fonts(page):
+    # FontFaceSet.check alone can succeed with a fallback; require one loaded
+    # registered face per requested family/style as well as the browser check.
+    result = page.evaluate('''async () => {
+      const results = [];
+      for (const family of ['Public Sans', 'Azeret Mono']) {
+        for (const style of ['normal', 'italic']) {
+          const query = `${style} 400 16px "${family}"`;
+          const faces = await document.fonts.load(query, 'Ledger 012345');
+          results.push({family, style, loaded: faces.length,
+            check: document.fonts.check(query, 'Ledger 012345'),
+            match: faces.some(f => f.family.replaceAll('"', '') === family && f.style === style && f.status === 'loaded')});
+        }
+      }
+      return results;
+    }''')
+    assert len(result) == 4
+    assert all(row['loaded'] > 0 and row['check'] and row['match'] for row in result), result
+
+
+@pytest.mark.parametrize("target,assets", [("static", "offline"), ("spa", "offline"),
+                                           ("single-file", "offline"), ("static", "cdn"),
+                                           ("single-file", "cdn")])
+def test_ledger_fonts_without_network(tmp_path, target, assets):
+    out = _build(tmp_path, target, assets)
+    with ExitStack() as stack:
+        # The single-file proof explicitly uses file://; CDN script requests
+        # may be attempted in CDN mode but must not be needed for any font.
+        base = None if target == "single-file" else _host(stack, tmp_path, out)
+        session = _session(stack, base)
+        url = (out / "index.html").as_uri() if base is None else base + "/rich.html"
+        session.goto(url)
+        _assert_ledger_fonts(session.page)
+        session.assert_no_csp_violation()
+        assert not any('font' in url or 'woff' in url for url in session.guard.blocked)
+        if assets == "offline":
+            session.guard.assert_offline()
+
+
+def test_served_ledger_fonts_without_network(tmp_path):
+    bundle = write_offline_fixture(tmp_path / "bundle")
+    port = free_port()
+    base = f"http://127.0.0.1:{port}"
+    with ExitStack() as stack:
+        stack.enter_context(managed_server(
+            [sys.executable, "-m", "okf_loom", "serve", str(bundle), "--no-open", "--port", str(port)],
+            base, tmp_path / "serve.log"))
+        session = _session(stack, base)
+        session.goto(base + "/other")
+        _assert_ledger_fonts(session.page)
+        session.assert_no_csp_violation()
+        session.guard.assert_offline()

@@ -107,9 +107,9 @@ def test_substituted_tree_is_self_consistent_as_a_real_directory(substituted_tre
 def test_symlinked_vendor_root_is_refused(tmp_path, monkeypatch, capsys, substituted_tree, verb):
     link = tmp_path / "vendor-link"
     link.symlink_to(substituted_tree, target_is_directory=True)
-    monkeypatch.setattr(vendor, "VENDOR_ROOT", link)
     bundle = write_offline_fixture(tmp_path / "bundle")
     out = _previous_output(tmp_path, verb, bundle)
+    monkeypatch.setattr(vendor, "VENDOR_ROOT", link)
     capsys.readouterr()
     before = _snapshot(out)
     code, err = _cli(capsys, verb, bundle, out)

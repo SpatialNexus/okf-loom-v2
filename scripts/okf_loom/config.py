@@ -857,6 +857,6 @@ studio:                             # Live collaborative studio (all ON by defau
   log_edits: true                   # append a SPEC §7 log.md entry per agent write / resolved comment
   max_sse_clients: 32
   allowed_hosts: [127.0.0.1, localhost]   # invisible cross-origin guard (§15)
-  theme: bone                       # bone | slate | clay | plum | system (Bone in OS light mode, Slate in dark)
+  theme: bone                       # bone | slate | clay | plum | system
                                     # retired names (auto, technical-dark, coffee-dark, v1 light/dark, ...) still load, mapped to the nearest palette
 """

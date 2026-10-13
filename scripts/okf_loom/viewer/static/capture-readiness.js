@@ -29,7 +29,7 @@
       cssViewport: { width: innerWidth, height: innerHeight },
       dpr: Number(window.devicePixelRatio || 1),
       browserZoomEvidence: { visualViewportScale: vv ? Number(vv.scale || 1) : null, source: "visualViewport.scale; not a text-only zoom claim" },
-      theme: document.documentElement.dataset.theme || (document.body && document.body.dataset.theme) || "light",
+      theme: document.documentElement.dataset.theme || (document.body && document.body.dataset.theme) || "bone",
       javascript: true,
       readinessPhase: phase,
       generation: own,
