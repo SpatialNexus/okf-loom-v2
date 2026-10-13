@@ -2245,52 +2245,23 @@ def test_ledger_conn_is_a_hairline_row() -> None:
     assert "color-mix" not in conn_block, ".okf-conn still has a color-mix wash"
 
 
-def test_phase1_graph_js_type_fallback_is_deterministic_not_gray() -> None:
-    """P1 #2 (contract-runtime-parity): graph.js must NOT use the fixed gray
-    ``#94a3b8`` as a type/palette fallback at node-rendering, group-color,
-    or detail-chip sites. Instead it uses ``typeColorFor(typeName)`` — a
-    deterministic hash-based HSL colour matching the server's ``stable_hue``
-    HSL format ``hsl(hue, 62%, 48%)``. The only remaining ``#94a3b8`` in
-    graph.js is the staleness/undated ramp (not type identity)."""
+@pytest.mark.xfail(strict=False, reason=(
+    "needs lane C graph.js (Ledger token-driven canvas); fails on lane B only "
+    "because the old graph.js is still here. The integrator removes this "
+    "xfail once lane C merges"))
+def test_phase1_graph_js_paints_content_types_neutrally() -> None:
+    """Ledger: content types are not colour-coded on the canvas. graph.js has
+    no type-hash colour or grey fallback; every node starts on the resolved
+    --graph-node fill and lenses recolour from the palette-derived ramp."""
     js = _runtime_file("viewer", "static", "graph.js").read_text(encoding="utf-8")
-
-    # The typeColorFor helper exists and produces HSL (not gray).
-    assert "function typeColorFor(" in js, "graph.js missing typeColorFor helper"
-    # Verify it uses hashHue and the server-matching HSL sat/light.
-    tcf_block = js.split("function typeColorFor(", 1)[1].split("}", 1)[0]
-    assert "hashHue" in tcf_block, "typeColorFor does not reuse hashHue"
-    assert "62%" in tcf_block and "48%" in tcf_block, (
-        "typeColorFor HSL sat/light does not match server stable_hue (62%/48%)"
-    )
-
-    # The three type-identity fallback sites use typeColorFor, not #94a3b8.
-    # elemFor (node base color):
-    elemfor_line = [l for l in js.split("\n") if "palette[n.data.type]" in l]
-    assert elemfor_line, "elemFor node-color fallback line not found"
-    assert "typeColorFor" in elemfor_line[0], (
-        f"elemFor still uses gray fallback: {elemfor_line[0].strip()!r}"
-    )
-    # groupColor null fallback:
-    gc_line = [l for l in js.split("\n") if "if (!g)" in l and "return" in l]
-    assert gc_line, "groupColor null fallback line not found"
-    assert "typeColorFor" in gc_line[0], (
-        f"groupColor null fallback still uses gray: {gc_line[0].strip()!r}"
-    )
-    # showDetail type chip:
-    detail_lines = [l for l in js.split("\n") if "palette[data.type]" in l]
-    assert detail_lines, "detail-chip color fallback line not found"
-    assert "typeColorFor" in detail_lines[0], (
-        f"detail chip still uses gray fallback: {detail_lines[0].strip()!r}"
-    )
-
-    # The ONLY remaining #94a3b8 is the staleness/undated ramp (not type identity).
-    gray_lines = [l.strip() for l in js.split("\n") if "#94a3b8" in l]
-    assert len(gray_lines) == 1, (
-        f"expected exactly 1 remaining #94a3b8 (staleness ramp), got {len(gray_lines)}: {gray_lines}"
-    )
-    assert "isFinite(days)" in gray_lines[0] or "undated" in gray_lines[0], (
-        f"remaining #94a3b8 is not the staleness ramp: {gray_lines[0]!r}"
-    )
+    code = re.sub(r"/\*.*?\*/", "", js, flags=re.DOTALL)
+    code = re.sub(r"//[^\n]*", "", code)
+    assert "function typeColorFor(" not in code
+    assert "#94a3b8" not in code.lower()
+    assert "palette[n.data.type]" not in code and "palette[data.type]" not in code
+    elem_for = code.split("function elemFor(", 1)[1].split("return {", 1)[0]
+    assert "graphPalette().node" in elem_for
+    assert "function buildLensRamp(" in code and ".ramp.categorical" in code
 
 
 # ===========================================================================
@@ -2596,48 +2567,30 @@ def test_iter2_graph_node_index_css_comment_is_honest() -> None:
     )
 
 
+@pytest.mark.xfail(strict=False, reason=(
+    "needs lane C graph.js (Ledger token-driven canvas); fails on lane B only "
+    "because the old graph.js is still here. The integrator removes this "
+    "xfail once lane C merges"))
 def test_iter2_graph_selection_color_is_token_governed() -> None:
-    """P2-5 (iter-2): the amber #f59e0b selection border is gone (replaced
-    by the --okf-select token, mirrored in a GRAPH_COLORS JS constants
-    block). The 6 duplicated canvas color literals are consolidated there."""
+    """The selection stroke and every canvas colour come from the active
+    palette's tokens (getComputedStyle), not a per-theme JS table, and are
+    re-resolved on every okf-loom:themeChanged."""
     graph_js = _runtime_file("viewer", "static", "graph.js").read_text(encoding="utf-8")
-    # Strip comments to check the amber is not used as a STYLE value (it may
-    # survive in an explanatory comment, which is fine).
-    code_only = re.sub(r'/\*.*?\*/', '', graph_js, flags=re.DOTALL)
-    code_only = re.sub(r'//[^\n]*', '', code_only)
-    assert 'f59e0b' not in code_only.lower(), (
-        "amber #f59e0b still used as a style value in graph.js "
-        "(should be governed by --okf-select)"
-    )
-    # GRAPH_COLORS per-theme palette block exists and is referenced.
-    assert 'GRAPH_COLORS' in graph_js, "GRAPH_COLORS constants block missing"
-    # Every resolved family-mode theme ships a canvas palette (mirrors its
-    # wiki.css tokens). Both families share a palette within a mode; the
-    # value is a shared _LIGHT/_DARK constant, so match the quoted key.
-    for theme in (
-        "technical-light", "swiss-light", "technical-dark", "swiss-dark",
-        "purple-light", "purple-dark", "coffee-light", "coffee-dark",
-    ):
-        assert re.search(rf'"{theme}":\s*', graph_js), (
-            f"GRAPH_COLORS missing the {theme} palette"
-        )
-    # node:selected border reads from the resolved palette (not a literal).
-    assert re.search(
-        r'node:selected.*?border-color.*?pal\.select', graph_js, re.DOTALL
-    ), "node:selected border-color does not read from the resolved graph palette"
-    # syncLabelColour re-syncs the selection color on theme change.
-    sync_start = graph_js.find("function syncLabelColour()")
-    sync_end = graph_js.find("function ", sync_start + 1)
-    assert sync_start >= 0 and sync_end > sync_start, "syncLabelColour function missing"
-    sync_body = graph_js[sync_start:sync_end].replace("\n", " ")
-    # The palette is resolved from the active data-theme.
-    assert re.search(
-        r'var pal\s*=\s*graphPalette\(\)', sync_body,
-    ), "syncLabelColour does not resolve the active theme palette"
-    # node:selected re-syncs border-color from the palette on theme change.
-    assert re.search(
-        r'node:selected.*?border-color.*?pal\.select', sync_body
-    ), "syncLabelColour does not re-sync node:selected border-color"
+    code = re.sub(r"/\*.*?\*/", "", graph_js, flags=re.DOTALL)
+    code = re.sub(r"//[^\n]*", "", code)
+    assert "f59e0b" not in code.lower()
+    assert "GRAPH_COLORS" not in code
+    for old in ("technical-light", "swiss-dark", "purple-dark", "coffee-dark", "themeIsDark"):
+        assert old not in code, old
+    tokens = code.split("var GRAPH_TOKENS = {", 1)[1].split("};", 1)[0]
+    for role, token in (("select", "--accent"), ("node", "--graph-node"),
+                        ("edge", "--graph-edge"), ("nodeText", "--graph-label"),
+                        ("halo", "--graph-halo"), ("nodeIcon", "--graph-node-icon")):
+        assert re.search(rf'{role}:\s*"{token}"', tokens), (role, token)
+    assert "getComputedStyle(document.documentElement)" in code
+    assert re.search(r'node:selected.*?border-color.*?\.select', code, re.DOTALL)
+    sync = code.split("function syncGraphTheme(", 1)[1].split("window.addEventListener", 1)[0]
+    assert "invalidateGraphPalette()" in sync and "repaintLensColours()" in sync
 
 
 _LEDGER_PALETTES = ("bone", "slate", "clay", "plum")
@@ -2689,16 +2642,18 @@ def test_ledger_palettes_define_graph_roles() -> None:
 
 
 @pytest.mark.xfail(strict=False, reason=(
-    "lane C owns graph.js: GRAPH_COLORS moves from the retired "
-    "technical/swiss families to the Ledger palettes; the integrator "
-    "removes this xfail once lane C merges"))
-def test_graph_js_palettes_follow_the_ledger_palettes() -> None:
-    """graph.js resolves its canvas palette per Ledger palette (or from the
-    computed --graph-* roles), with no retired family keys left."""
+    "needs lane C graph.js (Ledger token-driven canvas); fails on lane B only "
+    "because the old graph.js is still here. The integrator removes this "
+    "xfail once lane C merges"))
+def test_graph_edge_colour_is_each_palette_graph_edge_token() -> None:
+    """Graph edges read the palette's own --graph-edge token, defined in
+    every Ledger palette block of wiki.css."""
     graph_js = _runtime_file("viewer", "static", "graph.js").read_text(encoding="utf-8")
-    for retired in ("technical-light", "technical-dark", "swiss-light", "swiss-dark"):
-        assert f'"{retired}"' not in graph_js, f"graph.js still keys {retired}"
-    assert "--graph-edge" in graph_js or all(f'"{p}"' in graph_js for p in _LEDGER_PALETTES)
+    css = _runtime_file("viewer", "static", "wiki.css").read_text(encoding="utf-8")
+    assert re.search(r'edge:\s*"--graph-edge"', graph_js)
+    for palette in ("bone", "slate", "clay", "plum"):
+        block = css.split(f'[data-theme="{palette}"]', 1)[1].split("}", 1)[0]
+        assert re.search(r"--graph-edge:\s*#[0-9a-fA-F]{6};", block), palette
 
 
 def test_iter2_select_token_defined_in_wiki_css() -> None:
