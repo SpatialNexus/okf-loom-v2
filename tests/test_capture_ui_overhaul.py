@@ -48,7 +48,7 @@ def _production_shaped_row(
     family, mode = capture._public_theme(spec)
     theme_state = {
         "resolved_theme": spec.resolved_theme, "runtime_resolved_theme": spec.resolved_theme,
-        "resolved_mode": (spec.resolved_theme or "").rsplit("-", 1)[-1],
+        "resolved_mode": capture._palette_scheme(spec.resolved_theme),
         "family": family, "mode": mode, "ready": True, "resolution": "resolved",
         "contrast": spec.contrast, "border": spec.border,
         "storageAccess": "denied" if spec.storage == "denied" else "available",
@@ -364,12 +364,11 @@ def test_release_scenario_manifest_covers_the_final_theme_and_surface_matrix() -
     scenarios = manifest["scenarios"]
     assert len(scenarios) == len({row["id"] for row in scenarios})
     assert {row["resolved_theme"] for row in scenarios if row["resolved_theme"]} >= {
-        "technical-light", "technical-dark", "swiss-light", "swiss-dark",
-        "purple-light", "purple-dark", "coffee-light", "coffee-dark",
+        "bone", "slate", "clay", "plum",
     }
     covered = {coverage for row in scenarios for coverage in row["coverage"]}
     assert {
-        "appearance-soft-contrast-border-off", "studio-rail", "studio-overlays",
+        "appearance-palettes", "studio-rail", "studio-overlays",
         "studio-focus", "studio-split", "studio-mobile",
         "graph-map", "graph-lenses", "graph-typed-path", "graph-focus", "graph-mobile",
         "search-result", "search-no-result", "search-error", "search-manual-copy",
@@ -391,7 +390,7 @@ def test_release_scenario_manifest_exposes_complete_f01_f24_capture_contract() -
     assert {
         "index-empty", "index-filter-mismatch", "concept-outline", "concept-rendered",
         "concept-source", "concept-split", "concept-focus-view", "search-expanded",
-        "graph-keyboard-journey", "coffee-showcase", "compact-density",
+        "graph-keyboard-journey", "clay-showcase", "ledger-spacing",
         "studio-idle", "studio-error", "studio-retry", "studio-read-only-authority",
         "studio-proposal-enabled", "studio-unavailable",
     } <= covered
@@ -1816,47 +1815,32 @@ def test_exact_clean_candidate_runner_uses_own_root_and_public_validation(tmp_pa
     ).stdout == primary_status
 
 
-def test_technical_auto_matrix_covers_public_auto_storage_and_os_for_every_target() -> None:
+def test_default_matrix_covers_storage_and_os_for_every_target() -> None:
     rows = capture.release_scenario_manifest()["scenarios"]
-    auto = [row for row in rows if row["theme_family"] == "technical" and row["theme_mode"] == "auto"]
-    assert len(auto) >= 16
-    assert {row["source"] for row in auto} >= {"live", "static", "spa", "single-file"}
-    assert {row["storage"] for row in auto} >= {"none", "denied"}
-    assert {row["color_scheme"] for row in auto} >= {"light", "dark"}
-    assert {row["resolved_theme"] for row in auto} >= {"technical-light", "technical-dark"}
-    assert all(row["theme_preference"] == "auto" for row in auto)
-    assert all("technical-auto" not in row["theme_preference"] for row in auto)
-    assert all(
-        capture._theme_seed_script(
-            next(item for item in capture.SCENARIO_SPECS if item.id == row["id"])
-        ) is None
-        for row in auto if row["storage"] in {"none", "denied"}
-    )
+    defaults = [row for row in rows if "bone-default" in row["coverage"]]
+    assert len(defaults) >= 16
+    assert {row["source"] for row in defaults} == {"live", "static", "spa", "single-file"}
+    assert {row["storage"] for row in defaults} == {"none", "denied"}
+    assert {row["color_scheme"] for row in defaults} == {"light", "dark"}
+    assert all(row["resolved_theme"] == "bone" for row in defaults)
+    for row in defaults:
+        spec = next(item for item in capture.SCENARIO_SPECS if item.id == row["id"])
+        assert capture._theme_seed_script(spec) is None
 
 
 @pytest.mark.parametrize("storage,os_mode", [("none", "light"), ("denied", "dark")])
-def test_technical_auto_runtime_assertion_checks_storage_and_resolved_os_theme(storage: str, os_mode: str) -> None:
-    spec = next(
-        item for item in capture.SCENARIO_SPECS
-        if item.source == "live" and item.storage == storage
-        and item.color_scheme == os_mode and item.theme_mode == "auto"
-    )
+def test_default_runtime_assertion_checks_storage_and_palette(storage: str, os_mode: str) -> None:
+    spec = capture._default_theme_scenario("live", os_mode, storage)
 
     class ThemePage:
         def evaluate(self, _script, *_args):
-            return {
-                "resolved_theme": f"technical-{os_mode}",
-                "runtime_resolved_theme": f"technical-{os_mode}",
-                "resolved_mode": os_mode,
-                "contrast": "normal", "border": "on",
-                "family": "technical", "mode": "auto", "ready": True,
-                "resolution": "resolved",
-                "storageAccess": "denied" if storage == "denied" else "available",
-                "storageKeys": [] if storage == "none" else None,
-            }
+            return {"resolved_theme": "bone", "runtime_resolved_theme": "bone",
+                    "resolved_mode": "light", "family": "bone", "mode": "light",
+                    "ready": True, "resolution": "resolved", "contrast": None, "border": None,
+                    "storageAccess": "denied" if storage == "denied" else "available",
+                    "storageKeys": [] if storage == "none" else None}
 
-    state = capture._assert_theme_state(ThemePage(), spec)
-    assert state["mode"] == "auto" and state["resolved_mode"] == os_mode
+    assert capture._assert_theme_state(ThemePage(), spec)["resolved_theme"] == "bone"
 
 
 def test_failure_matrix_routes_to_typed_fallback_and_success_never_downgrades(
@@ -1866,8 +1850,8 @@ def test_failure_matrix_routes_to_typed_fallback_and_success_never_downgrades(
     monkeypatch.setattr(
         capture, "_assert_theme_state",
         lambda _page, _spec: {
-            "resolved_theme": "technical-light", "resolution": "resolved",
-            "family": "technical", "mode": "auto", "contrast": "normal", "border": "on",
+            "resolved_theme": "bone", "resolution": "resolved",
+            "family": "bone", "mode": "auto", "contrast": "normal", "border": "on",
             "ready": True,
         },
     )
@@ -1904,9 +1888,9 @@ def test_release_bundle_precondition_rejects_historical_screenshot_inputs(tmp_pa
 
 
 def test_artifact_provenance_binds_revision_tree_inventory_viewport_target_theme_and_assertion(tmp_path: Path) -> None:
-    image = tmp_path / "theme-technical-light.png"
+    image = tmp_path / "theme-bone.png"
     image.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\0" * 8 + (1).to_bytes(4, "big") + (1).to_bytes(4, "big"))
-    spec = next(item for item in capture.SCENARIO_SPECS if item.id == "theme-technical-light")
+    spec = next(item for item in capture.SCENARIO_SPECS if item.id == "theme-bone")
     row = capture._artifact_record(
         image,
         spec,
@@ -1915,14 +1899,14 @@ def test_artifact_provenance_binds_revision_tree_inventory_viewport_target_theme
         input_inventory=[{"path": "scripts/capture_ui_overhaul.py", "type": "regular", "tracked": True}],
         input_inventory_digest="inventory-1",
         runtime={"generation": 4, "metadata": {"revision": "bundle-1", "pageRevision": "bundle-1", "readinessPhase": "ready"}},
-        theme_state={"resolved_theme": "technical-light", "contrast": "normal", "border": "on", "resolution": "resolved"},
+        theme_state={"resolved_theme": "bone", "contrast": "normal", "border": "on", "resolution": "resolved"},
         browser={"engine": "chromium", "javascript": True, "zoom_percent": 100},
     )
     assert row["head"] == "head-1" and row["tree"] == "tree-1" and row["clean"] is True
     assert row["input_inventory_digest"] == "inventory-1"
     assert row["viewport"] == {"width": 1440, "height": 1000}
     assert row["target"] == "document" and row["scenario"] == spec.id
-    assert row["resolved_theme"] == "technical-light"
+    assert row["resolved_theme"] == "bone"
     assert row["theme_resolution"] == "resolved"
     assert row["modifiers"] == {"contrast": "normal", "border": "on"}
     assert row["browser_assertion"] == spec.assertion
@@ -2087,7 +2071,7 @@ def test_authored_bundle_file_drift_remains_release_fatal(tmp_path: Path, monkey
 def test_final_capture_validation_rejects_missing_or_mismatched_expected_revision(tmp_path: Path) -> None:
     inventory = [{"path": "source.py", "type": "regular", "tracked": True}]
     digest = capture._digest(inventory)
-    spec = next(item for item in capture.SCENARIO_SPECS if item.id == "theme-technical-light")
+    spec = next(item for item in capture.SCENARIO_SPECS if item.id == "theme-bone")
     image = tmp_path / spec.artifact
     image.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\0" * 8 + (1).to_bytes(4, "big") + (1).to_bytes(4, "big"))
     row = capture._artifact_record(
@@ -2096,7 +2080,7 @@ def test_final_capture_validation_rejects_missing_or_mismatched_expected_revisio
         expected_revision="bundle-1", input_inventory=inventory,
         input_inventory_digest=digest,
             runtime={"generation": 1, "metadata": {"revision": "bundle-1", "pageRevision": "bundle-1"}},
-        theme_state={"resolved_theme": "technical-light", "resolution": "resolved", "contrast": "normal", "border": "on"},
+        theme_state={"resolved_theme": "bone", "resolution": "resolved", "contrast": "normal", "border": "on"},
         browser={"engine": "chromium", "javascript": True},
     )
     row["file"] = spec.artifact
@@ -2110,7 +2094,7 @@ def test_final_capture_validation_rejects_missing_or_mismatched_expected_revisio
         family, mode = capture._public_theme(scenario)
         clone["theme_family"] = family or "unresolved"
         clone["theme_mode"] = mode or "unresolved"
-        clone["theme_preference"] = mode or "unresolved"
+        clone["theme_preference"] = family or "unresolved"
         clone["runtime"] = dict(row["runtime"])
         if scenario.action in {"boot-blocked", "boot-failure"}:
             clone["readiness"] = "fallback-dom"
@@ -2342,7 +2326,7 @@ def test_graph_focus_preparation_is_action_only_and_reaches_capture_readiness(tm
 
 
 def test_capture_spec_preserves_production_typed_diagnostics(tmp_path: Path) -> None:
-    spec = next(item for item in capture.SCENARIO_SPECS if item.id == "theme-technical-light")
+    spec = next(item for item in capture.SCENARIO_SPECS if item.id == "theme-bone")
 
     class ProductionFailure(RuntimeError):
         diagnostic = {"code": "hidden", "phase": "readiness", "target": "document"}
@@ -2488,16 +2472,16 @@ def test_no_js_capture_rejects_missing_expected_source_revision(tmp_path: Path) 
 
 
 def test_js_capture_spec_passes_and_requires_expected_source_revision(tmp_path: Path) -> None:
-    spec = next(item for item in capture.SCENARIO_SPECS if item.id == "theme-technical-light")
+    spec = next(item for item in capture.SCENARIO_SPECS if item.id == "theme-bone")
 
     class RuntimePage:
         def evaluate(self, _script, *_args):
             if "okfCaptureRevision" in _script:
                 return {"body": "bundle-1", "root": "bundle-1"}
             return {
-                "resolved_theme": "technical-light", "contrast": "normal", "border": "on",
-                "runtime_resolved_theme": "technical-light", "resolved_mode": "light",
-                "family": "technical", "mode": "light", "ready": True,
+                "resolved_theme": "bone", "contrast": "normal", "border": "on",
+                "runtime_resolved_theme": "bone", "resolved_mode": "light",
+                "family": "bone", "mode": "light", "ready": True,
                 "resolution": "resolved", "storageAccess": "available", "storageKeys": [],
             }
 
@@ -2523,20 +2507,20 @@ def test_js_capture_spec_passes_and_requires_expected_source_revision(tmp_path: 
     assert seen["expected_revision"] == "bundle-1"
     assert row["runtime"]["revision"] == "bundle-1"
     assert row["theme_state"]["mode"] == "light"
-    assert row["theme_state"]["runtime_resolved_theme"] == "technical-light"
+    assert row["theme_state"]["runtime_resolved_theme"] == "bone"
 
 
 def test_js_capture_does_not_accept_recorded_revision_without_matching_runtime_page(tmp_path: Path) -> None:
-    spec = next(item for item in capture.SCENARIO_SPECS if item.id == "theme-technical-light")
+    spec = next(item for item in capture.SCENARIO_SPECS if item.id == "theme-bone")
 
     class WrongRuntimePage:
         def evaluate(self, script, *_args):
             if "okfCaptureRevision" in script:
                 return {"body": "bundle-other", "root": "bundle-other"}
             return {
-                "resolved_theme": "technical-light", "runtime_resolved_theme": "technical-light",
+                "resolved_theme": "bone", "runtime_resolved_theme": "bone",
                 "resolved_mode": "light", "contrast": "normal", "border": "on",
-                "family": "technical", "mode": "light", "ready": True,
+                "family": "bone", "mode": "light", "ready": True,
                 "resolution": "resolved", "storageAccess": "available", "storageKeys": [],
             }
 
@@ -2558,7 +2542,7 @@ def test_js_capture_does_not_accept_recorded_revision_without_matching_runtime_p
 
 
 def test_artifact_record_rejects_revision_that_was_only_recorded(tmp_path: Path) -> None:
-    spec = next(item for item in capture.SCENARIO_SPECS if item.id == "theme-technical-light")
+    spec = next(item for item in capture.SCENARIO_SPECS if item.id == "theme-bone")
     image = tmp_path / spec.artifact
     image.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\0" * 8 + (1).to_bytes(4, "big") + (1).to_bytes(4, "big"))
     with pytest.raises(capture.CaptureFailure) as caught:
@@ -2569,7 +2553,7 @@ def test_artifact_record_rejects_revision_that_was_only_recorded(tmp_path: Path)
             input_inventory=[{"path": "source.py", "type": "regular", "tracked": True}],
             input_inventory_digest="i",
             runtime={"generation": 1, "metadata": {"revision": "bundle-1"}},
-            theme_state={"resolved_theme": "technical-light", "resolution": "resolved", "contrast": "normal", "border": "on"},
+            theme_state={"resolved_theme": "bone", "resolution": "resolved", "contrast": "normal", "border": "on"},
             browser={"engine": "chromium", "javascript": True},
         )
     assert caught.value.diagnostic["code"] == "revision-missing"
@@ -3515,3 +3499,13 @@ def test_real_studio_retry_holds_stale_request_until_canonical_success_then_fenc
                 assert evidence["staleFenced"] and observed == persisted
             finally:
                 browser.close()
+
+
+def test_system_capture_matrix_uses_only_the_new_storage_choice():
+    rows = [spec for spec in capture.SCENARIO_SPECS if spec.theme_preference == "system"]
+    assert len(rows) == 8
+    for spec in rows:
+        script = capture._theme_seed_script(spec)
+        assert "okf-loom.appearance" in script and '"system"' in script
+        assert "okf-theme-family" not in script and "okf-theme-mode" not in script
+        assert spec.resolved_theme == ("slate" if spec.color_scheme == "dark" else "bone")

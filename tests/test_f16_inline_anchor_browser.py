@@ -131,7 +131,7 @@ def _comment_on_selection(page, body):
     expect(action).to_be_visible()
     # The affordance is a role="status" region; under the default Borders Off
     # appearance it must not paint a generated "Status" label beside Comment.
-    assert page.locator("html").get_attribute("data-okf-border") == "off"
+    assert page.locator("html").get_attribute("data-okf-border") is None
     assert action.evaluate("el => getComputedStyle(el, '::before').content") in ("none", "normal")
     assert "Status" not in action.inner_text()
     action.get_by_role("button").first.click()

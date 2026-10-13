@@ -9,6 +9,13 @@ from pathlib import Path
 import pytest
 from okf_loom.config import _LEGACY_THEME_MIGRATIONS
 
+EXPECTED_LEGACY = {
+    "auto": "system",
+    "technical-light": "bone", "swiss-light": "bone", "purple-light": "bone", "coffee-light": "bone",
+    "technical-dark": "slate", "swiss-dark": "slate", "coffee-dark": "clay", "purple-dark": "plum",
+    "light": "bone", "pastel": "bone", "sepia": "bone", "dark": "slate", "midnight": "slate",
+}
+
 THEME = Path(__file__).resolve().parents[1] / "scripts/okf_loom/viewer/static/theme.js"
 KEY = "okf-loom.appearance"
 HARNESS = r"""
@@ -82,11 +89,12 @@ def test_precedence(choice):
                storage={KEY: "plum"})[0]["choice"] == "plum"
 
 
-@pytest.mark.parametrize("legacy,expected", _LEGACY_THEME_MIGRATIONS.items())
+@pytest.mark.parametrize("legacy,expected", EXPECTED_LEGACY.items())
 @pytest.mark.parametrize("key", ["okf-theme", KEY])
 def test_every_legacy_name(legacy, expected, key):
     state = run(storage={key: legacy})[0]
     assert state["choice"] == expected
+    assert _LEGACY_THEME_MIGRATIONS == EXPECTED_LEGACY
     if key != KEY:
         assert state["storage"][KEY] == expected
 

@@ -208,8 +208,8 @@ def _new_page(browser, *, viewport: dict, dpr: int, color_scheme: str = "light",
     """Context+page for one capture.
 
     No appearance storage is written, so theme.js (the only owner of that
-    state) resolves the shipped defaults and ``color_scheme`` drives Auto
-    mode. The graph tour needs no pre-dismissal: the live graph only offers
+    state) resolves the shipped defaults. Explicit capture palettes are selected
+    through its public API by _settle, never by storage injection. The graph tour needs no pre-dismissal: the live graph only offers
     it behind an invitation button.
     """
     ctx = browser.new_context(viewport=viewport, device_scale_factor=dpr,
@@ -234,6 +234,7 @@ def _settle(page, *, theme: str) -> None:
     a capture taken before that shows a transient state, not the product.
     """
     page.wait_for_function(_STUDIO_SETTLED_JS, timeout=15_000)
+    page.evaluate("theme => window.OKFLoomTheme.setTheme(theme)", theme)
     resolved = page.evaluate("() => document.documentElement.dataset.theme")
     if resolved != theme:
         raise RuntimeError(f"expected resolved theme {theme!r}, got {resolved!r}")
@@ -383,7 +384,7 @@ def _stage_stills(browser, base: str, stage: Path,
                          diagnostics=diagnostics, label=label)
 
     def settled_light(p) -> None:
-        _settle(p, theme="technical-light")
+        _settle(p, theme="bone")
 
     # Dashboard index, once the studio launcher reports its session.
     ctx, page = page_for("studio-home", STILL_VIEWPORT)
@@ -431,7 +432,7 @@ def _stage_stills(browser, base: str, stage: Path,
     ctx.close()
 
     def bridges(p) -> None:
-        _settle(p, theme="technical-dark")
+        _settle(p, theme="slate")
         _click_lens(p, "Bridges")
     ctx, page = page_for("graph-bridges-dark", STILL_VIEWPORT, color_scheme="dark")
     capture_target(page, f"{base}/__graph", "graph", still("graph-bridges-dark.png"),
@@ -472,7 +473,7 @@ def _capture_stills(browser, base: str, out_dir: Path,
 # The card is plain HTML over the studio's own stylesheet, so its colours and
 # display face follow the shipped design tokens instead of hand-copied hex.
 _SOCIAL_CARD = string.Template("""<!doctype html>
-<html lang="en" data-theme="technical-dark">
+<html lang="en" data-theme="slate">
 <head>
 <meta charset="utf-8">
 <title>okf-loom</title>

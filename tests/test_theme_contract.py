@@ -97,3 +97,19 @@ def test_generated_config_and_docs_choices():
         text = (Path(assets.__file__).parent / "templates" / name).read_text()
         line = next(line for line in text.splitlines() if "__THEME_ATTR__" in line)
         assert all(p in line for p in PALETTES)
+
+
+@pytest.mark.parametrize("value,expected", [
+    *((choice, choice) for choice in CHOICES),
+    *config._LEGACY_THEME_MIGRATIONS.items(),
+    ("bogus", "bone"), ([], "bone"), (None, "bone"),
+])
+def test_viewer_json_normalizes_choices_and_ignores_corruption(tmp_path, value, expected):
+    from okf_loom.model import Bundle
+    (tmp_path / "index.md").write_text("# Example\n")
+    directory = tmp_path / ".okf-loom" / "viewer"
+    directory.mkdir(parents=True)
+    (directory / "config.json").write_text(json.dumps({"theme": value, "contrast": "soft", "border": "off"}))
+    loaded = assets.load_config(Bundle.load(tmp_path))
+    assert loaded["theme"] == expected
+    assert "contrast" not in loaded and "border" not in loaded
