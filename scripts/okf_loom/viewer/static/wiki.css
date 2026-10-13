@@ -680,6 +680,14 @@ a[data-okf-broken] { color: var(--status-error); text-decoration: line-through; 
 input::placeholder,
 textarea::placeholder { color: var(--text-3); opacity: 1; }
 
+/* Raised hover surfaces (--surface-2) lift tertiary text one step: --text-3
+ * clears AA on canvas, band and panel, but on Bone's raised surface it is
+ * 4.4:1, so any row or control that turns --surface-2 on hover re-maps it. */
+:is(.okf-card, .okf-search-results-list > li, .okf-type-nav__link, .okf-appearance__opt,
+  .okf-search-live__option, .okf-graph-thumb__link, .okf-subdirs a, .okf-conn,
+  .okf-prevnext__link, .okf-entity-chip, .okf-th-sortable, .okf-table tbody tr):hover,
+.okf-search-live__option[aria-selected="true"] { --text-3: var(--text-2); }
+
 /* ---- Labels and chips -------------------------------------------------------
  * The mono micro-label carries column heads, badges and eyebrows. Tags and
  * relation chips are outlined; no chip is filled with a colour. */
