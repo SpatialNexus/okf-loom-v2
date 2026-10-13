@@ -1694,11 +1694,16 @@ def test_phase1_wiki_css_has_76ch_measure_and_wide_escape() -> None:
     )
     # Wide blocks share the reading lane with text on concept pages: the
     # page-scoped alignment selector must include pre/table wrappers AND the
-    # renderers.js scrollport, capped by the same min(var(--okf-lane), ...)
-    # expression used for text elements.
+    # renderers.js scrollport, capped by the same min(var(--okf-lane), 100%)
+    # expression used for text elements. The body's padding IS the reading
+    # inset, so children cap at its content box (subtracting the inset again
+    # left code/tables short of the text edge).
+    assert re.search(
+        r"\.okf-page__body\.okf-prose \{ padding-inline: var\(--okf-reading-inset\);", css
+    ), "the prose body no longer carries the reading inset"
     lane_rule = re.compile(
         r"\.okf-page__body\.okf-prose > :is\(([^)]*)\)\s*\{\s*"
-        r"max-width:\s*min\(var\(--okf-lane\), 100% - 2 \* var\(--okf-reading-inset\)\);"
+        r"max-width:\s*min\(var\(--okf-lane\), 100%\);"
     )
     groups = lane_rule.findall(css)
     wide_group = next(

@@ -2154,13 +2154,16 @@ body.okf-viewer .okf-viewswitch__btn.okf-source-wrap[aria-pressed="true"]::befor
  * alike, so in Focus the workspace widens while the 55ch measure stays. */
 .okf-page__body.okf-prose { padding-inline: var(--okf-reading-inset); font-size: var(--prose-size); line-height: 1.72; }
 .okf-page__body.okf-prose > * { margin-left: 0; margin-right: 0; }
+/* The body's padding already IS the reading inset, so children cap at its
+ * content box (100%); subtracting the inset again left code and tables
+ * short of the text edge (28px at 390px). */
 .okf-page__body.okf-prose > :is(p, ul, ol, blockquote, h1, h2, h3, h4, h5, h6, hr, dl) {
-  max-width: min(var(--okf-lane), 100% - 2 * var(--okf-reading-inset));
+  max-width: min(var(--okf-lane), 100%);
 }
 .okf-page__body.okf-prose > :is(p, ul, ol, blockquote, dl, h2, h3, h4),
 .okf-page__body.okf-prose li { max-width: var(--okf-prose-maxw); }
 .okf-page__body.okf-prose > :is(pre, table, .okf-tablewrap, .okf-tablewrap-frame, figure, .okf-content-scrollport) {
-  max-width: min(var(--okf-lane), 100% - 2 * var(--okf-reading-inset));
+  max-width: min(var(--okf-lane), 100%);
 }
 /* The .okf-wide escape must survive the page-scoped caps above. */
 .okf-page__body.okf-prose > .okf-wide { max-width: none; }
