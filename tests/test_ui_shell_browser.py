@@ -660,13 +660,13 @@ def _assert_single_row_masthead(geometry: dict) -> None:
 def test_masthead_stays_one_row_beside_the_studio_rail_and_counts_do_not_move_it(
     page, server_url: str,
 ) -> None:
-    """At 1280 the open Comments rail leaves the masthead ~830px while every
+    """At 1200 the 320px Comments rail leaves the masthead ~880px while every
     viewport query still reads desktop; the former viewport guess wrapped it
     into two rows. The masthead now sizes from its real width, and the
     launcher keeps one width while unread counts arrive, so the destinations
     beside it never jump while an agent works."""
     failures = _install_error_probe(page)
-    page.set_viewport_size({"width": 1280, "height": 800})
+    page.set_viewport_size({"width": 1200, "height": 800})
     page.goto(server_url + "/tables/orders")
     page.wait_for_function("() => window.okfLoomStudio && window.okfLoomStudio.state.eventsReady")
     launcher = page.locator(".okf-studio-launcher")
@@ -691,7 +691,7 @@ def test_masthead_stays_one_row_beside_the_studio_rail_and_counts_do_not_move_it
     _assert_single_row_masthead(rail_pending)
     for key in ("launcher", "searchLeft", "graphLeft"):
         assert rail_pending[key] == rail_idle[key], (key, rail_idle, rail_pending)
-    _capture_evidence(page, "desktop-1280-rail-masthead-pending.png")
+    _capture_evidence(page, "desktop-1200-rail-masthead-pending.png")
 
     # Full-width masthead: the status is spelled out, in a reserved slot.
     page.get_by_role("button", name="Close panel").click()
@@ -1346,10 +1346,10 @@ def test_tablet_floor_stops_at_the_900px_edge(page, server_url: str) -> None:
     assert not metrics["overflow"] and metrics["shellHeight"] <= 110, metrics
 
 
-# Ledger's 20px page gutters leave a 620px authored column beside the 440px
-# drawer at 1100px (the old 32px gutters did not), so 1100 is a rail width;
-# the readable-minimum invariant asserted below is unchanged.
-@pytest.mark.parametrize("width,rail", [(900, False), (901, False), (1024, False), (1100, True), (1280, True), (1440, True)])
+# Ledger's 320px drawer and 20px page gutters leave the measured 600px prose
+# minimum at 960px. Test both sides of that boundary; the article's border
+# box includes the gutters, so it still clears the 620px invariant below.
+@pytest.mark.parametrize("width,rail", [(900, False), (901, False), (959, False), (960, True), (1024, True), (1100, True), (1280, True), (1440, True)])
 def test_studio_rail_requires_usable_document_width(page, server_url: str, width: int, rail: bool) -> None:
     page.set_viewport_size({"width": width, "height": 900})
     page.goto(server_url + "/tables/orders")
