@@ -1,9 +1,17 @@
-/* OKF Studio - live collaborative studio styles.
+/* OKF Studio - live collaborative studio styles (Ledger design system).
  *
- * Extends the existing wiki.css/graph.css token system; does NOT redefine
- * the base palette. All studio chrome reads --okf-* tokens so light/dark
- * themes + bundle overrides apply uniformly. Loaded on every served page
- * via /__static/studio.css (server._studio_bootstrap).
+ * Extends the wiki.css token system; does NOT redefine the base palette.
+ * Every colour is a Ledger token (--bg, --surface, --border, --text-2,
+ * --accent, --status-*) or the --okf-* bridge that resolves onto them, so
+ * Bone/Slate/Clay/Plum and bundle overrides apply uniformly. Loaded on every
+ * served page via /__static/studio.css (server._studio_bootstrap).
+ *
+ * Ledger rules applied here: square corners; hairlines carry structure;
+ * no shadows except --shadow-pop on floating layers (command palette,
+ * toasts, conflict dialog, selection affordance); no gradients; no tinted
+ * washes. The accent is only a 2px state bar, the focus ring, link text and
+ * the one filled primary action (Send / the active recovery action).
+ * Status hues (ok/warn/error/info) appear only as text, icons and 2px bars.
  *
  * Sections:
  *   1. Studio bar (experience bar §13)
@@ -18,21 +26,34 @@
  *  10. Responsive + reduced motion
  */
 
+/* Studio-local tokens, derived from Ledger tokens only (wiki.css owns the
+ * palettes). The scrim behind modal layers is the canvas itself, veiled, so
+ * Bone dims to paper and the dark palettes to their own ground; it is never
+ * a fixed slate tint. */
+:root {
+  --studio-scrim: color-mix(in srgb, var(--bg) 78%, transparent);
+  --studio-drawer-w: var(--studio-w, 320px);
+}
+
 /* ---- 1. Studio bar ---------------------------------------------------- */
 /* F01 shell consolidation: the persistent chrome owns one launcher. The
  * detailed controls below are reparented into the Studio rail/dialog. */
 .okf-studio-launcher {
-  min-height: 34px;
+  min-height: var(--ctl-h, 32px);
   gap: var(--okf-space-1);
 }
 .okf-studio-launcher__label { font-weight: 700; }
 .okf-studio-launcher__summary {
-  color: var(--okf-fg-muted);
-  font-size: var(--okf-text-xs);
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-weight: 500;
 }
-.okf-studio-launcher[data-attention="pending"] .okf-studio-launcher__summary,
-.okf-studio-launcher[data-attention="failure"] .okf-studio-launcher__summary {
+.okf-studio-launcher[data-attention="pending"] .okf-studio-launcher__summary {
   color: var(--okf-fg);
+  font-weight: 700;
+}
+.okf-studio-launcher[data-attention="failure"] .okf-studio-launcher__summary {
+  color: var(--status-error);
   font-weight: 700;
 }
 .okf-concept-viewbar {
@@ -53,6 +74,16 @@
   padding-block: var(--okf-space-3);
   border-top: 1px solid var(--okf-border);
 }
+.okf-studio-home__section > h3,
+.okf-studio-home__section > h2 {
+  margin: 0 0 var(--okf-space-2);
+  color: var(--text-2);
+  font-family: var(--font-label);
+  font-size: var(--label-size, 9.5px);
+  font-weight: var(--label-weight, 500);
+  letter-spacing: var(--label-track, 0.16em);
+  text-transform: uppercase;
+}
 .okf-studio-home__group {
   display: flex;
   flex-wrap: wrap;
@@ -61,23 +92,22 @@
 }
 .okf-studio-authority { margin: 0; color: var(--okf-fg-muted); }
 /* The "← Studio" back control must LOOK as clickable as it is. It shares
- * the .okf-studiobtn control family (elevated surface, strong border, hover
- * wash, pressed state) instead of the former hairline transparent chip that
- * read as plain text. Escape/focus-restoration semantics live in studio.js
- * and are unchanged. */
+ * the outlined Ledger button (1px --btn-border, transparent, square) instead
+ * of the former hairline transparent chip that read as plain text.
+ * Escape/focus-restoration semantics live in studio.js and are unchanged. */
 .okf-panel__back {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 36px;
-  padding-inline: var(--okf-space-3);
-  border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-sm);
-  color: var(--okf-fg);
-  background: var(--okf-bg-elev);
+  min-height: var(--ctl-h, 32px);
+  padding-inline: 12px;
+  border: 1px solid var(--btn-border);
+  border-radius: 0;
+  color: var(--btn-text);
+  background: transparent;
   font: inherit;
-  font-size: var(--okf-text-sm);
-  font-weight: 650;
+  font-size: var(--btn-size, 12.5px);
+  font-weight: var(--btn-weight, 600);
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.12s ease, border-color 0.12s ease;
@@ -88,9 +118,9 @@
  * with no return target). Same guard as .okf-panel[hidden] above; hidden
  * must mean absent from paint, tab order and the accessibility tree. */
 .okf-panel__back[hidden] { display: none; }
-.okf-panel__back:hover { background: var(--okf-hover-fill); }
+.okf-panel__back:hover { background: var(--btn-hover-bg); }
 .okf-panel__back:active { background: var(--okf-press-fill); }
-.okf-panel__back:focus-visible { outline: 2px solid var(--okf-accent); outline-offset: 2px; }
+.okf-panel__back:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 /* Persistent document view controls. The viewbar is the only page-local
  * toolbar (Rendered / Source / Split / Wrap lines / Focus view), so it must
@@ -184,78 +214,123 @@ body.okf-focus-view .okf-concept-viewbar {
 .okf-studio-bar__group--right { flex-wrap: nowrap; }
 .okf-studio-bar[hidden] { display: none; }
 
-/* Studio buttons reuse the topbar control look but a touch denser. */
+/* Studio buttons are the Ledger button: transparent with a 1px --btn-border
+ * outline, square, 32px tall, 12.5px/600 label. Pressed is a 2px accent bar
+ * down the left edge plus accent-text (never an accent fill); the single
+ * filled control in a view is the primary action (.okf-studiobtn--primary,
+ * the composer's Send). */
 .okf-studiobtn {
   font: inherit;
-  font-size: var(--okf-text-sm);
-  padding: 4px 10px;
-  border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-sm);
-  background: var(--okf-bg-elev);
-  color: var(--okf-fg);
+  font-size: var(--btn-size, 12.5px);
+  font-weight: var(--btn-weight, 600);
+  letter-spacing: var(--btn-track, 0.01em);
+  min-height: var(--ctl-h, 32px);
+  padding: 5px 12px;
+  border: 1px solid var(--btn-border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--btn-text);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  line-height: 1.4;
+  line-height: 1.25;
   white-space: nowrap;
+  box-shadow: none;
   transition: background 0.12s ease, border-color 0.12s ease;
 }
-.okf-studiobtn:hover { background: var(--okf-hover-fill); }
-.okf-studiobtn:disabled { opacity: 0.5; cursor: not-allowed; }
+.okf-studiobtn:hover { background: var(--btn-hover-bg); }
+.okf-studiobtn:active { background: var(--okf-press-fill); }
+.okf-studiobtn:disabled,
+.okf-studiobtn[aria-disabled="true"] {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text-3);
+  cursor: not-allowed;
+}
 .okf-studiobtn[aria-pressed="true"] {
-  background: var(--okf-accent);
-  color: var(--okf-accent-on);
-  border-color: var(--okf-accent);
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--accent-text);
+  box-shadow: inset 2px 0 0 0 var(--accent);
+}
+/* The one filled action of a view: Send in the composer, Save / Retry in a
+ * recovery editor, Keep mine in the conflict dialog. */
+.okf-studiobtn--primary,
+.okf-composer__submit {
+  background: var(--primary-bg);
+  border-color: var(--primary-border);
+  color: var(--primary-text);
+}
+.okf-studiobtn--primary:hover:not(:disabled),
+.okf-composer__submit:hover:not(:disabled) {
+  background: var(--primary-hover-bg);
+  border-color: var(--primary-hover-bg);
+  color: var(--primary-text);
+}
+/* An open inline reply/edit form owns the view's primary action, so the
+ * composer's Send steps back to the outlined button while it is open. */
+.okf-panel:has(.okf-inline-reply, .okf-reanchor) .okf-composer__submit:not(:disabled) {
+  background: transparent;
+  border-color: var(--btn-border);
+  color: var(--btn-text);
 }
 .okf-studiobtn .okf-badge {
   display: inline-block;
   min-width: 16px;
-  padding: 0 5px;
-  border-radius: var(--okf-radius-pill);
-  background: var(--okf-accent-bg);
-  color: var(--okf-accent);
-  font-size: var(--okf-text-xs);
-  font-weight: 700;
+  padding: 0 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 10.5px;
+  font-weight: 500;
   text-align: center;
-  line-height: 16px;
+  line-height: 15px;
 }
 .okf-studiobtn .okf-badge[hidden] { display: none; }
 .okf-studiobtn[aria-pressed="true"] .okf-badge {
-  background: var(--okf-accent-on);
-  color: var(--okf-accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
 }
 .okf-iconbtn {
   font: inherit;
-  font-size: var(--okf-text-sm);
-  padding: 4px 8px;
+  font-size: var(--btn-size, 12.5px);
+  font-weight: var(--btn-weight, 600);
+  min-height: var(--ctl-h, 32px);
+  padding: 5px 10px;
   border: 1px solid transparent;
-  border-radius: var(--okf-radius-sm);
+  border-radius: 0;
   background: transparent;
-  color: var(--okf-fg);
+  color: var(--btn-text);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  line-height: 1.4;
+  line-height: 1.25;
 }
-.okf-iconbtn:hover { background: var(--okf-hover-fill); }
+.okf-iconbtn:hover { background: var(--btn-hover-bg); }
 .okf-iconbtn[aria-expanded="true"] {
-  background: var(--okf-accent-bg);
-  color: var(--okf-accent);
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--text);
+  box-shadow: inset 0 -2px 0 0 var(--accent);
 }
 /* The palette trigger is a labelled button ("Commands") with a
  * platform-correct <kbd> shortcut hint — not a bare mac glyph. */
 .okf-kbd {
   display: inline-block;
   padding: 0 5px;
-  border: 1px solid var(--okf-border-strong);
-  border-bottom-width: 2px;
-  border-radius: var(--okf-radius-sm);
-  background: var(--okf-bg-inset);
-  color: var(--okf-fg-muted);
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 0.72rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
+  background: var(--bg-2);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 10.5px;
+  font-weight: 500;
   line-height: 1.5;
 }
 
@@ -263,40 +338,39 @@ body.okf-focus-view .okf-concept-viewbar {
 .okf-presence {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
+  min-height: 28px;
   padding: 3px 10px 3px 8px;
-  border: 1px solid var(--okf-border);
-  border-radius: var(--okf-radius-pill);
-  background: var(--okf-bg-elev);
-  font-size: var(--okf-text-sm);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  font-size: 12.5px;
   line-height: 1.4;
   max-width: 46ch;
 }
+/* The live mark is a 6px square (Ledger's .o-live). Its hue is a status
+ * icon; the label text always carries the state as words too. */
 .okf-presence__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--okf-radius-pill);
-  background: var(--okf-fg-muted);
+  width: 6px;
+  height: 6px;
+  border-radius: 0;
+  background: var(--text-3);
   flex-shrink: 0;
-  box-shadow: 0 0 0 0 currentColor;
 }
-/* State colours carry a non-colour cue via the label text too.
- * iter1 CRI-011: migrated from hardcoded #10b981 / #f59e0b to the
- * theme-aware --okf-ok / --okf-warn tokens so dark-mode contrast holds. */
-.okf-presence[data-state="idle"] .okf-presence__dot { background: var(--okf-fg-muted); }
+.okf-presence[data-state="idle"] .okf-presence__dot { background: var(--text-3); }
 .okf-presence[data-state="watching"] .okf-presence__dot { background: var(--okf-ok); }
 .okf-presence[data-state="thinking"] .okf-presence__dot {
   background: var(--okf-warn);
   animation: okf-pulse 1.6s ease-in-out infinite;
 }
 .okf-presence[data-state="editing"] .okf-presence__dot {
-  background: var(--okf-accent);
+  background: var(--accent);
   animation: okf-pulse 1.1s ease-in-out infinite;
 }
 .okf-presence__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .okf-presence__actor { font-weight: 600; }
 /* Free-text progress line ("linking 3 of 7 tables…") beside the state. */
-.okf-presence__message { color: var(--okf-fg-muted); font-style: italic; }
+.okf-presence__message { color: var(--text-2); font-style: italic; }
 
 /* iter2 G13: Agent-activity panel presence-history log. A compact transition
  * list (state + focus + time) the presence chip can't show. Reads as a small
@@ -306,68 +380,80 @@ body.okf-focus-view .okf-concept-viewbar {
   display: flex;
   align-items: baseline;
   gap: var(--okf-space-2);
-  font-size: var(--okf-text-sm);
-  padding: 2px 0;
+  font-size: 12.5px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
 }
 .okf-presence-log__state {
-  font-size: var(--okf-text-xs);
+  font-family: var(--font-label);
+  font-size: var(--label-size, 9.5px);
+  font-weight: var(--label-weight, 500);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--okf-fg);
-  background: var(--okf-bg-inset);
-  border: 1px solid var(--okf-border);
-  border-radius: var(--okf-radius-pill);
-  padding: 1px 8px;
-  min-width: 4.5em;
+  letter-spacing: var(--label-track, 0.16em);
+  color: var(--text-2);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
+  padding: 1px 6px;
+  min-width: 5.5em;
   text-align: center;
 }
-.okf-presence-log__item[data-state="editing"] .okf-presence-log__state { border-color: var(--okf-accent); color: var(--okf-accent); }
-.okf-presence-log__item[data-state="watching"] .okf-presence-log__state { border-color: var(--okf-ok); color: var(--okf-ok); }
+.okf-presence-log__item[data-state="editing"] .okf-presence-log__state { color: var(--accent-text); }
+.okf-presence-log__item[data-state="watching"] .okf-presence-log__state { color: var(--okf-ok); }
 .okf-presence-log__focus { color: var(--okf-fg); flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.okf-presence-log__message { color: var(--okf-fg-muted); font-style: italic; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.okf-presence-log__ts { color: var(--okf-fg-muted); font-size: var(--okf-text-xs); white-space: nowrap; }
+.okf-presence-log__message { color: var(--text-2); font-style: italic; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.okf-presence-log__ts { color: var(--text-3); font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 10.5px; white-space: nowrap; }
 
 /* iter2 G11 (§3): the "Agent watching" switch. A toggle button (aria-pressed)
- * styled as a studiobtn; the pressed (on) state reads as the accent so the
- * "agent is watching" intent is unambiguous. The eye glyph + visible label
- * carry the meaning (not colour alone, WCAG 1.4.1). */
+ * styled as a studiobtn; the pressed (on) state is the 2px accent bar plus
+ * accent-text, like every other pressed Ledger control. The eye glyph +
+ * visible label carry the meaning (not colour alone, WCAG 1.4.1). */
 .okf-watch-toggle { gap: 6px; }
 .okf-watch-toggle__icon { font-size: var(--okf-text-sm); line-height: 1; }
 .okf-watch-toggle[aria-pressed="true"] {
-  background: var(--okf-accent-bg);
-  border-color: var(--okf-accent);
-  color: var(--okf-accent);
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--accent-text);
+  box-shadow: inset 2px 0 0 0 var(--accent);
 }
-.okf-watch-toggle[aria-pressed="true"] .okf-watch-toggle__icon { color: var(--okf-accent); }
+.okf-watch-toggle[aria-pressed="true"] .okf-watch-toggle__icon { color: var(--accent-text); }
 /* F12: a write is awaiting its acknowledgement (aria-busy mirrors the state
- * for assistive tech; the dimmed control is the sighted pending cue). */
-.okf-watch-toggle[aria-busy="true"] { opacity: 0.7; }
+ * for assistive tech; the dashed outline is the sighted pending cue). */
+.okf-watch-toggle[aria-busy="true"] { border-style: dashed; cursor: progress; }
 
 /* ---- 3. View-mode switch (§8) ---------------------------------------- */
+/* Text tabs: the selected view is bold with a 2px accent underline. wiki.css
+ * carries the same rules at page scope; these keep the switch correct on
+ * any surface that mounts it. Wrap lines is a neutral toggle (wiki.css). */
 .okf-viewswitch {
   display: inline-flex;
-  border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-sm);
-  overflow: hidden;
-  background: var(--okf-bg-elev);
+  align-items: stretch;
+  gap: 18px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 .okf-viewswitch__btn {
   font: inherit;
-  font-size: var(--okf-text-sm);
-  padding: 4px 12px;
-  border: none;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  padding: 9px 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
   background: transparent;
-  color: var(--okf-fg);
+  color: var(--text-2);
   cursor: pointer;
-  border-right: 1px solid var(--okf-border);
   line-height: 1.4;
 }
-.okf-viewswitch__btn:last-child { border-right: none; }
 .okf-viewswitch__btn[aria-pressed="true"] {
-  background: var(--okf-accent);
-  color: var(--okf-accent-on);
+  background: transparent;
+  color: var(--text);
+  font-weight: 700;
+  border-bottom-color: var(--accent);
 }
-.okf-viewswitch__btn:hover:not([aria-pressed="true"]) { background: var(--okf-bg-inset); }
+.okf-viewswitch__btn:hover:not([aria-pressed="true"]) { background: transparent; color: var(--text); }
 
 /* View layout: wraps .okf-page__body so source/split don't disturb the
  * page header, frontmatter details, or relations. */
@@ -377,20 +463,30 @@ body.okf-focus-view .okf-concept-viewbar {
  * is a sibling ABOVE the view wrap (never a split-grid item). */
 .okf-source-state {
   padding: var(--okf-space-3) 0;
-  color: var(--okf-fg-muted);
+  color: var(--text-2);
+  font-size: 13px;
 }
 .okf-source-state[hidden] { display: none; }
-.okf-source-state--error { color: var(--okf-fg); }
+.okf-source-state--error {
+  margin-block: var(--okf-space-2);
+  padding: var(--okf-space-2) 0 var(--okf-space-2) 12px;
+  border-left: 2px solid var(--okf-error);
+  color: var(--okf-fg);
+}
 .okf-source-state--error p { margin: 0 0 var(--okf-space-2); }
+/* Source is a code well: --code-bg (dark on every palette), 12.5px/1.68
+ * Azeret Mono, square. */
 .okf-view > .okf-source {
   display: none;
   background: var(--okf-pre-bg);
   color: var(--okf-pre-fg);
-  padding: var(--okf-space-3) 14px;
-  border-radius: var(--okf-radius);
+  padding: 16px;
+  border: 0;
+  border-radius: 0;
   overflow-x: auto;
-  font-size: var(--okf-text-sm);
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.68;
+  font-family: var(--font-mono);
   white-space: pre-wrap;
   word-break: break-word;
   margin: 0;
@@ -409,7 +505,7 @@ body.okf-focus-view .okf-concept-viewbar {
   outline-offset: -2px;
 }
 .okf-viewswitch__btn[hidden] { display: none; }
-.okf-viewswitch__btn[aria-disabled="true"] { color: var(--okf-fg-muted); cursor: not-allowed; }
+.okf-viewswitch__btn[aria-disabled="true"] { color: var(--text-3); cursor: not-allowed; }
 .okf-view[data-okf-view="source"] > .okf-page__body { display: none; }
 .okf-view[data-okf-view="source"] > .okf-source { display: block; }
 /* iter2 G8 (§8 split niceties): the split view is now a three-track grid
@@ -449,12 +545,16 @@ body.okf-focus-view .okf-concept-viewbar {
 /* Draggable divider. role="separator" + aria-orientation + aria-valuenow
  * (kept in sync by studio.js) so assistive tech + keyboard users can resize
  * with Arrow Left / Right. The grab cursor + 7px hit area make pointer
- * dragging forgiving without a fat visual bar. */
+ * dragging forgiving; the visible mark is a 1px hairline centred in the
+ * track (content-box background), not a fat bar. */
 .okf-split__divider {
-  background: var(--okf-separator-subtle);
+  box-sizing: border-box;
+  padding: 0 3px;
+  background: var(--border);
+  background-clip: content-box;
   cursor: col-resize;
   position: relative;
-  border-radius: 3px;
+  border-radius: 0;
   min-width: 7px;
 }
 .okf-split__divider::before {
@@ -467,11 +567,13 @@ body.okf-focus-view .okf-concept-viewbar {
   bottom: 0;
 }
 .okf-split__divider:hover, .okf-split__divider:focus-visible {
-  background: var(--okf-accent);
+  padding: 0 2px;
+  background: var(--border-strong);
+  background-clip: content-box;
   outline: none;
 }
 .okf-split__divider:focus-visible {
-  outline: 2px solid var(--okf-accent);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -479,21 +581,25 @@ body.okf-focus-view .okf-concept-viewbar {
 .okf-conn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   padding: 3px 10px;
-  border-radius: var(--okf-radius-pill);
-  font-size: var(--okf-text-xs);
-  color: var(--okf-fg-muted);
+  border-radius: 0;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-2);
   background: transparent;
 }
+/* 6px square live mark; the word beside it names the state. */
 .okf-conn__dot {
-  width: 8px; height: 8px; border-radius: var(--okf-radius-pill);
+  width: 6px; height: 6px; border-radius: 0;
   background: var(--okf-ok);
 }
-.okf-conn[data-state="connecting"] .okf-conn__dot { background: var(--okf-fg-muted); }
+.okf-conn[data-state="connecting"] .okf-conn__dot { background: var(--text-3); }
 .okf-conn[data-state="reconnecting"] .okf-conn__dot { background: var(--okf-warn); }
 .okf-conn[data-state="offline"] .okf-conn__dot { background: var(--okf-error); }
-.okf-conn[data-state="online"] { color: var(--okf-fg-muted); }
+.okf-conn[data-state="reconnecting"] { color: var(--okf-warn); }
+.okf-conn[data-state="offline"] { color: var(--okf-error); }
+.okf-conn[data-state="online"] { color: var(--text-2); }
 
 .okf-toast-region {
   position: fixed;
@@ -506,74 +612,78 @@ body.okf-focus-view .okf-concept-viewbar {
   max-width: min(420px, calc(100vw - 32px));
   pointer-events: none;
 }
+/* A toast is a floating layer: the panel surface with the --shadow-pop
+ * ring, square. Its tone is a 2px status bar down the left edge plus a
+ * status-hued glyph (never a tinted wash); the message text stays ink. */
 .okf-toast {
   pointer-events: auto;
-  background: var(--okf-bg-elev);
-  border: 1px solid var(--okf-border-strong);
-  /* iter1 CRI-008: the impeccable ban on side-stripe borders removes the
-   * prior 3px coloured left accent stripe. The tone now travels on a
-   * full 1px border tinted to the role colour plus a leading icon glyph
-   * in .okf-toast__icon, so state is not communicated by the stripe alone. */
-  border-radius: var(--okf-radius);
-  padding: var(--okf-space-2) var(--okf-space-3);
-  box-shadow: var(--okf-shadow-overlay);
-  font-size: var(--okf-text-sm);
+  background: var(--surface);
+  border: 0;
+  border-left: 2px solid var(--border-strong);
+  border-radius: 0;
+  padding: 10px 12px;
+  box-shadow: var(--shadow-pop);
+  font-size: 13px;
+  line-height: 1.45;
   color: var(--okf-fg);
   display: flex;
   align-items: flex-start;
   gap: var(--okf-space-2);
   animation: okf-toast-in 0.18s ease;
 }
-.okf-toast[data-tone="error"]   { border-color: var(--okf-error); background: var(--okf-error-bg); }
-.okf-toast[data-tone="success"] { border-color: var(--okf-ok);    background: var(--okf-ok-bg); }
-/* Caution/non-fatal outcomes (uncertain, accepted-refresh-needed) reuse the
-   existing amber --okf-warn token; red stays reserved for genuine rejection,
-   green for success. */
-.okf-toast[data-tone="warn"]    { border-color: var(--okf-warn);  background: var(--okf-warn-bg); }
+.okf-toast[data-tone="error"]   { border-left-color: var(--okf-error); }
+.okf-toast[data-tone="success"] { border-left-color: var(--okf-ok); }
+/* Caution/non-fatal outcomes (uncertain, accepted-refresh-needed) use the
+   warn role; error stays reserved for genuine rejection, ok for success. */
+.okf-toast[data-tone="warn"]    { border-left-color: var(--okf-warn); }
 .okf-toast__icon {
   flex-shrink: 0;
-  width: 18px; height: 18px;
+  min-width: 18px; height: 18px;
+  padding: 0 3px;
+  box-sizing: border-box;
   display: inline-flex; align-items: center; justify-content: center;
-  border-radius: var(--okf-radius-pill);
-  font-size: 11px; font-weight: 700; line-height: 1;
-  background: var(--okf-accent);
-  color: var(--okf-accent-on);
+  border: 1px solid currentColor;
+  border-radius: 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px; font-weight: 600; line-height: 1;
+  background: transparent;
+  color: var(--text-2);
 }
-.okf-toast[data-tone="error"]   .okf-toast__icon { background: var(--okf-error); color: var(--okf-error-on); }
-.okf-toast[data-tone="success"] .okf-toast__icon { background: var(--okf-ok);    color: var(--okf-ok-on); }
-.okf-toast[data-tone="warn"]    .okf-toast__icon { background: var(--okf-warn);  color: var(--okf-warn-on); }
+.okf-toast[data-tone="error"]   .okf-toast__icon { color: var(--okf-error); }
+.okf-toast[data-tone="success"] .okf-toast__icon { color: var(--okf-ok); }
+.okf-toast[data-tone="warn"]    .okf-toast__icon { color: var(--okf-warn); }
 .okf-toast__msg { flex: 1 1 auto; min-width: 0; }
 .okf-toast__close {
   font: inherit;
   font-size: var(--okf-text-xs);
   border: 1px solid transparent;
   background: transparent;
-  color: var(--okf-fg-muted);
+  color: var(--text-2);
   cursor: pointer;
   /* iter1 CRI-016 audit: was ~20px, below the WCAG 2.5.8 24px minimum. */
   padding: 4px 8px;
-  border-radius: var(--okf-radius-sm);
+  border-radius: 0;
   min-width: 28px;
   min-height: 28px;
 }
-.okf-toast__close:hover { color: var(--okf-fg); background: var(--okf-bg-inset); }
-.okf-toast a { color: var(--okf-accent); }
+.okf-toast__close:hover { color: var(--okf-fg); background: var(--surface-2); }
+.okf-toast a { color: var(--link); }
 /* iter1 CRI-018: inline Undo / View action rendered as a button inside the
  * toast. Styled as a quiet text link so it reads as part of the message. */
 .okf-toast__action {
   font: inherit;
-  font-size: var(--okf-text-sm);
+  font-size: 13px;
   font-weight: 600;
   border: none;
   background: transparent;
-  color: var(--okf-accent);
+  color: var(--link);
   cursor: pointer;
   padding: 0;
   text-decoration: underline;
-  text-underline-offset: 2px;
+  text-underline-offset: 3px;
 }
-.okf-toast__action:hover { color: var(--okf-accent-hover); }
-.okf-toast__action:disabled { opacity: 0.5; cursor: not-allowed; }
+.okf-toast__action:hover { color: var(--accent-hover); }
+.okf-toast__action:disabled { color: var(--text-3); text-decoration-style: dotted; cursor: not-allowed; }
 
 /* ---- 5. Comments: rail + composer + panel (§9) ----------------------- */
 /* iter1 CRI-002/CRI-014: margin rail for comment markers anchored to the
@@ -589,34 +699,38 @@ body.okf-focus-view .okf-concept-viewbar {
   width: 24px;
   pointer-events: none;
 }
+/* Margin markers: square mono count tiles on the panel surface. State is
+ * the tile's 2px left bar plus the status-hued count (never a filled tile). */
 .okf-comment-marker {
   position: absolute;
   pointer-events: auto;
   width: 24px;
   height: 24px;
-  border-radius: var(--okf-radius-pill);
-  border: 1px solid var(--okf-border-strong);
-  background: var(--okf-bg-elev);
-  color: var(--okf-accent);
+  border-radius: 0;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--accent-text);
   font: inherit;
-  font-size: 12px;
-  font-weight: 700;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  font-weight: 600;
   line-height: 22px;
   text-align: center;
   cursor: pointer;
   padding: 0;
-  box-shadow: var(--okf-shadow);
+  box-shadow: none;
   /* Marker centre aligns to the mark's left edge (the rail's left). */
   left: 0;
 }
+.okf-comment-marker:hover { background: var(--surface-2); }
 .okf-comment-marker:hover, .okf-comment-marker:focus-visible {
-  outline: 2px solid var(--okf-accent);
+  outline: 2px solid var(--focus);
   outline-offset: 1px;
 }
-/* iter1 CRI-011: marker state colours now theme-aware tokens. */
-.okf-comment-marker[data-state="resolved"] { background: var(--okf-ok); color: var(--okf-ok-on); border-color: var(--okf-ok); }
-.okf-comment-marker[data-state="claimed"]  { background: var(--okf-warn); color: var(--okf-warn-on); border-color: var(--okf-warn); }
-.okf-comment-marker[data-state="dismissed"] { opacity: 0.5; }
+.okf-comment-marker[data-state="resolved"] { color: var(--okf-ok); box-shadow: inset 2px 0 0 0 var(--okf-ok); }
+.okf-comment-marker[data-state="claimed"]  { color: var(--okf-warn); box-shadow: inset 2px 0 0 0 var(--okf-warn); }
+.okf-comment-marker[data-state="dismissed"] { color: var(--text-3); border-style: dashed; }
 /* A small "resolved" stub for collapsed resolved marks (no count). iter2
  * CRI2-010: 16×16 is below the 24×24 AA target but stubs were claimed to
  * be non-essential. iter3 CRI3-002: that exception does not cleanly apply
@@ -648,28 +762,34 @@ body.okf-focus-view .okf-concept-viewbar {
 
 /* iter1 CRI-002: the <mark> wrapping the commented text. Persistent
  * across block patches (studio.js re-applies marks after applyDoc).
- * Carries a data-comment-state so resolved marks style muted. */
+ * Ledger: an annotation is a 2px underline, never a tinted wash — accent
+ * for open threads, status hue for claimed/resolved, dotted for stale. */
 .okf-comment-mark {
-  background: var(--okf-accent-bg);
+  background: transparent;
   color: inherit;
-  border-radius: 3px;
-  padding: 0 2px;
+  border-radius: 0;
+  padding: 0;
+  border-bottom: 2px solid var(--accent);
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
   cursor: help;
 }
+.okf-comment-mark:hover { background: var(--surface-2); }
 .okf-comment-mark[data-comment-state="resolved"] {
-  background: var(--okf-ok-bg);
+  background: transparent;
   border-bottom: 2px solid var(--okf-ok);
   text-decoration: none;
 }
 .okf-comment-mark[data-comment-state="claimed"] {
-  background: var(--okf-warn-bg);
+  background: transparent;
+  border-bottom-color: var(--okf-warn);
 }
 .okf-comment-mark--stale {
   background: transparent;
-  text-decoration: underline dotted var(--okf-fg-muted);
-  text-underline-offset: 2px;
+  border-bottom: 0;
+  text-decoration: underline dotted var(--text-3);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
 }
 .okf-comment-mark.okf-pulse, .okf-comment-marker.okf-pulse {
   animation: okf-pulse-highlight 1.4s ease-out 1;
@@ -682,25 +802,29 @@ body.okf-focus-view .okf-concept-viewbar {
   pointer-events: auto;
 }
 .okf-comment-afford[hidden] { display: none; }
+/* The selection affordance floats over prose: panel surface + --shadow-pop
+ * ring, outlined label (the filled primary belongs to the composer). */
 .okf-comment-afford > .okf-studiobtn {
-  box-shadow: var(--okf-shadow);
-  background: var(--okf-accent);
-  color: var(--okf-accent-on);
-  border-color: var(--okf-accent);
+  box-shadow: var(--shadow-pop);
+  background: var(--surface);
+  color: var(--text);
+  border-color: transparent;
 }
+.okf-comment-afford > .okf-studiobtn:hover { background: var(--surface-2); }
 .okf-comment-afford--keyboard > .okf-studiobtn {
-  outline: 2px solid var(--okf-focus-ring, var(--okf-accent));
+  outline: 2px solid var(--focus);
   outline-offset: 3px;
 }
 
 /* Composer */
 .okf-composer { display: flex; flex-direction: column; gap: var(--okf-space-2); }
 .okf-composer__anchor {
-  font-size: var(--okf-text-xs);
-  color: var(--okf-fg-muted);
-  background: var(--okf-bg-inset);
-  border-radius: var(--okf-radius-sm);
-  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--text-2);
+  background: transparent;
+  border-left: 2px solid var(--border-strong);
+  border-radius: 0;
+  padding: 4px 0 4px 10px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -716,10 +840,11 @@ body.okf-focus-view .okf-concept-viewbar {
 }
 .okf-composer__anchor-note[hidden] { display: none; }
 .okf-composer__anchor code {
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  background: var(--okf-bg-elev);
-  border: 1px solid var(--okf-border);
-  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 0;
   padding: 0 4px;
   max-width: 32ch;
   overflow: hidden;
@@ -729,34 +854,42 @@ body.okf-focus-view .okf-concept-viewbar {
 /* R3: what a comment is, under the anchor row. Quiet, static, muted. */
 .okf-composer__purpose {
   margin: 0;
-  color: var(--okf-fg-muted);
-  font-size: var(--okf-text-xs);
-  line-height: 1.4;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.45;
   overflow-wrap: anywhere;
 }
+/* Ledger field: --input-bg fill, 1px --input-border outline, square. */
 .okf-composer__textarea {
   font: inherit;
-  font-size: var(--okf-text-sm);
+  font-size: 13px;
   line-height: 1.5;
-  padding: var(--okf-space-2) var(--okf-space-3);
-  border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-sm);
-  background: var(--okf-bg-elev);
-  color: var(--okf-fg);
+  padding: 8px 10px;
+  border: 1px solid var(--input-border);
+  border-radius: 0;
+  background: var(--input-bg);
+  color: var(--input-text);
   resize: vertical;
   min-height: 84px;
   width: 100%;
 }
+.okf-composer__textarea::placeholder { color: var(--text-3); }
 .okf-composer__textarea:focus-visible {
-  outline: 2px solid var(--okf-accent);
+  outline: 2px solid var(--focus);
   outline-offset: 1px;
-  border-color: var(--okf-accent);
+  border-color: var(--border-strong);
 }
-.okf-composer__textarea[aria-invalid="true"] { border-color: var(--okf-danger, #b42318); }
+/* Invalid: the 2px status bar on the field's leading edge plus the error
+ * sentence below (aria-describedby); the field itself is never tinted. */
+.okf-composer__textarea[aria-invalid="true"] {
+  border-color: var(--okf-error);
+  box-shadow: inset 2px 0 0 0 var(--okf-error);
+}
 .okf-composer__error {
   margin: 0;
-  color: var(--okf-danger, #b42318);
-  font-size: var(--okf-text-xs);
+  color: var(--okf-error);
+  font-size: 12px;
+  font-weight: 600;
   line-height: 1.4;
 }
 .okf-composer__error[hidden] { display: none; }
@@ -769,9 +902,9 @@ body.okf-focus-view .okf-concept-viewbar {
   align-items: center;
   gap: var(--okf-space-2);
   padding: 6px 10px;
-  background: var(--okf-bg-inset);
-  border-left: 3px solid var(--okf-warn);
-  border-radius: var(--okf-radius-sm);
+  background: transparent;
+  border-left: 2px solid var(--okf-warn);
+  border-radius: 0;
 }
 .okf-composer__ownership[hidden], .okf-composer__move[hidden] { display: none; }
 .okf-composer__ownership-note {
@@ -785,7 +918,7 @@ body.okf-focus-view .okf-concept-viewbar {
 .okf-composer__move {
   flex: 0 1 auto;
   max-width: 100%;
-  background: var(--okf-bg-elev);
+  background: transparent;
   text-align: start;
   overflow-wrap: anywhere;
 }
@@ -793,61 +926,67 @@ body.okf-focus-view .okf-concept-viewbar {
   outline: var(--okf-focus-width) solid var(--okf-focus-color);
   outline-offset: var(--okf-focus-offset);
 }
+/* Scoped to the composer so it outranks wiki.css's page-level
+ * `body.okf-viewer .okf-btn` 32px control height (Move is an .okf-btn). */
 @media (max-width: 900px), (pointer: coarse) {
-  .okf-composer__move { min-height: 44px; }
+  .okf-composer .okf-composer__ownership .okf-composer__move { min-height: 44px; }
 }
 .okf-composer__actions { display: flex; align-items: center; gap: var(--okf-space-2); justify-content: flex-end; }
-.okf-composer__hint { font-size: var(--okf-text-xs); color: var(--okf-fg-muted); margin-right: auto; }
+.okf-composer__hint { font-size: 11.5px; color: var(--text-2); margin-right: auto; }
 /* iter3 CRI3-011: <kbd> key caps inside the composer hint. Replaces the
  * inconsistent ⏎ emoji with a conventional kbd treatment. Border + subtle
  * background echo the physical-key-cap affordance without competing with
  * the Send button's primary weight. */
 .okf-composer__kbd {
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 0.92em;
-  background: var(--okf-bg-inset);
-  border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-sm);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  background: var(--bg-2);
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
   padding: 0 4px;
   color: var(--okf-fg);
 }
 
-/* Comment thread cards (inside the comments panel) */
+/* Comment threads (inside the comments panel). Every thread is a record:
+ * hairline-divided rows on the panel surface, no card chrome. State is the
+ * mono micro-label plus, for claimed/resolved, a 2px status bar down the
+ * thread's left edge — never a tinted card. */
 .okf-comment {
-  border: 1px solid var(--okf-border);
-  border-radius: var(--okf-radius-sm);
-  background: var(--okf-bg-elev);
-  padding: var(--okf-space-2) var(--okf-space-3);
-  margin-bottom: var(--okf-space-2);
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  padding: 10px 0 10px 12px;
+  margin-bottom: 0;
+  box-shadow: inset 2px 0 0 0 transparent;
 }
-.okf-comment[data-state="resolved"] { border-color: var(--okf-border); background: var(--okf-bg-inset); }
-/* iter1 CRI-008: claimed comments no longer use a 3px border-left stripe.
-   A full 1px border in the warn token + a leading "claimed" state chip
-   (rendered in commentCard) carry the state without the banned accent. */
-.okf-comment[data-state="claimed"] { border-color: var(--okf-warn); background: var(--okf-warn-bg); }
+.okf-comment[data-state="resolved"] { box-shadow: inset 2px 0 0 0 var(--okf-ok); }
+.okf-comment[data-state="claimed"] { box-shadow: inset 2px 0 0 0 var(--okf-warn); }
 .okf-comment__meta {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: var(--okf-text-xs);
-  color: var(--okf-fg-muted);
+  font-size: 11.5px;
+  color: var(--text-2);
   margin-bottom: 4px;
   flex-wrap: wrap;
 }
+/* State word as a mono micro-label: outlined, status-hued text. */
 .okf-comment__state {
-  padding: 1px 7px;
-  border-radius: var(--okf-radius-pill);
-  font-size: var(--okf-text-xs);
-  font-weight: 700;
+  padding: 1px 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
+  font-family: var(--font-label);
+  font-size: var(--label-size, 9.5px);
+  font-weight: var(--label-weight, 500);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  background: var(--okf-bg-inset);
-  color: var(--okf-fg-muted);
+  letter-spacing: var(--label-track, 0.16em);
+  background: transparent;
+  color: var(--text-2);
 }
-/* iter1 CRI-011: comment state chips now use theme-aware tokens. */
-.okf-comment[data-state="open"] .okf-comment__state     { background: var(--okf-accent-bg); color: var(--okf-accent); }
-.okf-comment[data-state="claimed"] .okf-comment__state  { background: var(--okf-warn-bg);    color: var(--okf-warn); }
-.okf-comment[data-state="resolved"] .okf-comment__state { background: var(--okf-ok-bg);      color: var(--okf-ok); }
+.okf-comment[data-state="open"] .okf-comment__state     { color: var(--accent-text); }
+.okf-comment[data-state="claimed"] .okf-comment__state  { color: var(--okf-warn); }
+.okf-comment[data-state="resolved"] .okf-comment__state { color: var(--okf-ok); }
 .okf-anchor-row {
   display: flex;
   align-items: center;
@@ -858,44 +997,45 @@ body.okf-focus-view .okf-concept-viewbar {
 }
 .okf-anchor-row__status {
   flex: 0 0 auto;
-  border: 1px solid var(--okf-border);
-  border-radius: var(--okf-radius-pill);
-  background: var(--okf-bg-inset);
-  color: var(--okf-fg-muted);
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-2);
   padding: 2px 8px;
-  font-size: var(--okf-text-xs);
-  font-weight: 700;
+  font-size: 11.5px;
+  font-weight: 600;
 }
 .okf-anchor-row__status-icon {
   display: inline-grid;
   place-items: center;
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.1rem;
+  height: 1.1rem;
   margin-right: 5px;
   border: 1px solid currentColor;
-  border-radius: 50%;
-  font-size: 0.72rem;
+  border-radius: 0;
+  font-size: 0.68rem;
   line-height: 1;
 }
-.okf-anchor-row__cause { flex: 1 1 100%; color: var(--okf-fg-muted); font-size: var(--okf-text-xs); }
+.okf-anchor-row__cause { flex: 1 1 100%; color: var(--text-2); font-size: 12px; }
 .okf-anchor-row--recovering {
   padding: var(--okf-space-3);
-  border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-sm);
-  background: var(--okf-bg-inset);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--okf-warn);
+  border-radius: 0;
+  background: transparent;
 }
-.okf-anchor-row[data-anchor-status="resolved"] .okf-anchor-row__status { color: var(--okf-ok); border-color: var(--okf-ok); }
+.okf-anchor-row[data-anchor-status="resolved"] .okf-anchor-row__status { color: var(--okf-ok); }
 .okf-anchor-row[data-anchor-status="stale"] .okf-anchor-row__status,
-.okf-anchor-row[data-anchor-status="ambiguous"] .okf-anchor-row__status { color: var(--okf-warn); border-color: var(--okf-warn); }
-.okf-anchor-row[data-anchor-status="invalid"] .okf-anchor-row__status { color: var(--okf-error); border-color: var(--okf-error); }
+.okf-anchor-row[data-anchor-status="ambiguous"] .okf-anchor-row__status { color: var(--okf-warn); }
+.okf-anchor-row[data-anchor-status="invalid"] .okf-anchor-row__status { color: var(--okf-error); }
 .okf-anchor-row__quote {
   min-width: 0;
   max-width: 34ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--okf-fg-muted);
-  font-size: var(--okf-text-xs);
+  color: var(--text-2);
+  font-size: 12px;
 }
 .okf-anchor-row__action { margin-left: auto; }
 .okf-reanchor {
@@ -907,23 +1047,32 @@ body.okf-focus-view .okf-concept-viewbar {
 }
 .okf-reanchor__instruction { margin: 0; font-size: var(--okf-text-sm); font-weight: 600; }
 .okf-reanchor__instruction:focus-visible,
-.okf-reanchor__error:focus-visible { outline: 2px solid var(--okf-accent); outline-offset: 2px; }
+.okf-reanchor__error:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .okf-reanchor__preview {
   display: flex;
   align-items: baseline;
   gap: var(--okf-space-2);
   min-width: 0;
   padding: var(--okf-space-2);
-  border-radius: var(--okf-radius-sm);
-  background: var(--okf-bg-inset);
-  font-size: var(--okf-text-sm);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--bg-2);
+  font-size: 13px;
 }
-.okf-reanchor__preview-label { flex: 0 0 auto; color: var(--okf-fg-muted); font-size: var(--okf-text-xs); font-weight: 700; text-transform: uppercase; }
+.okf-reanchor__preview-label {
+  flex: 0 0 auto;
+  color: var(--text-2);
+  font-family: var(--font-label);
+  font-size: var(--label-size, 9.5px);
+  font-weight: var(--label-weight, 500);
+  letter-spacing: var(--label-track, 0.16em);
+  text-transform: uppercase;
+}
 .okf-reanchor__preview q { overflow-wrap: anywhere; }
-.okf-reanchor__error { color: var(--okf-error); font-size: var(--okf-text-sm); font-weight: 600; }
+.okf-reanchor__error { color: var(--okf-error); font-size: 13px; font-weight: 600; }
 .okf-reanchor__error::before { content: "Error: "; }
-.okf-reanchor__error { border: 1px solid var(--okf-error); border-radius: var(--okf-radius-sm); padding: var(--okf-space-2); }
-.okf-reanchor__cause { margin: 0; color: var(--okf-fg-muted); font-size: var(--okf-text-sm); }
+.okf-reanchor__error { border: 0; border-left: 2px solid var(--okf-error); border-radius: 0; padding: var(--okf-space-1) 0 var(--okf-space-1) 10px; }
+.okf-reanchor__cause { margin: 0; color: var(--text-2); font-size: 13px; }
 /* P1-4: consistent recovery anatomy. Each recovery state renders the same
  * ordered structure — status cause → primary action → secondary actions —
  * so stale/conflict/save-failure read as one component, not three. The
@@ -943,28 +1092,29 @@ body.okf-focus-view .okf-concept-viewbar {
   align-items: baseline;
   gap: var(--okf-space-2);
   margin: 0;
-  padding: var(--okf-space-1) var(--okf-space-2);
-  border-radius: var(--okf-radius-sm);
-  background: var(--okf-bg-inset);
-  font-size: var(--okf-text-xs);
-  color: var(--okf-fg-muted);
+  padding: var(--okf-space-1) 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  font-size: 12px;
+  color: var(--text-2);
   min-width: 0;
 }
-.okf-reanchor__context-label { flex: 0 0 auto; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; }
+.okf-reanchor__context-label { flex: 0 0 auto; font-family: var(--font-label); font-size: var(--label-size, 9.5px); text-transform: uppercase; letter-spacing: var(--label-track, 0.16em); font-weight: var(--label-weight, 500); }
 .okf-reanchor__context-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--okf-fg); font-weight: 600; }
 /* P1-4: the collapsed stale/ambiguous recovery action ("Re-anchor" /
  * "Choose text") is the key path off a broken anchor, so it carries primary
  * weight rather than reading as a quiet tertiary chip. */
 .okf-anchor-row__action--primary {
-  background: var(--okf-accent);
-  color: var(--okf-accent-on);
-  border-color: var(--okf-accent);
+  background: var(--primary-bg);
+  color: var(--primary-text);
+  border-color: var(--primary-border);
   font-weight: 600;
 }
 .okf-anchor-row__action--primary:hover {
-  background: var(--okf-accent-hover);
-  border-color: var(--okf-accent-hover);
-  color: var(--okf-accent-on);
+  background: var(--primary-hover-bg);
+  border-color: var(--primary-hover-bg);
+  color: var(--primary-text);
 }
 /* P1-3: narrow "Back to document" path. When the drawer covers the page
  * (mobile/full-width overlay) and the user is selecting a new anchor, a
@@ -983,15 +1133,16 @@ body.okf-focus-view .okf-concept-viewbar {
   gap: var(--okf-space-2);
   max-width: calc(100vw - var(--okf-space-4));
   padding: var(--okf-space-2) var(--okf-space-3);
-  border: 1px solid var(--okf-accent);
-  border-radius: var(--okf-radius-pill);
-  background: var(--okf-bg-elev);
-  box-shadow: var(--okf-shadow);
-  font-size: var(--okf-text-sm);
+  border: 0;
+  border-top: 2px solid var(--accent);
+  border-radius: 0;
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+  font-size: 13px;
 }
 .okf-reanchor-peek[hidden] { display: none; }
 .okf-reanchor-peek__text { min-width: 0; color: var(--okf-fg); }
-.okf-reanchor-peek__text strong { color: var(--okf-accent); }
+.okf-reanchor-peek__text strong { color: var(--accent-text); }
 .okf-reanchor-peek .okf-studiobtn--primary { white-space: nowrap; }
 @media (min-width: 901px) {
   /* Rail mode already shows the document beside the drawer, so the floating
@@ -1002,23 +1153,26 @@ body.okf-focus-view .okf-concept-viewbar {
 .okf-reanchor :is(button, [tabindex]):focus-visible,
 .okf-anchor-row__action:focus-visible,
 .okf-comment-mark:focus-visible {
-  outline: 3px solid var(--okf-accent);
+  outline: 3px solid var(--focus);
   outline-offset: 3px;
 }
+/* Selection mode is a state: the 2px accent bar on the banner's leading
+ * edge, on the neutral band (never an accent wash). */
 .okf-selection-mode-banner {
   margin: 0 0 var(--okf-space-3);
   padding: var(--okf-space-2) var(--okf-space-3);
-  border: 1px solid var(--okf-accent);
-  border-radius: var(--okf-radius-sm);
-  background: var(--okf-accent-bg);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--accent);
+  border-radius: 0;
+  background: var(--bg-2);
   color: var(--okf-fg);
-  font-size: var(--okf-text-sm);
+  font-size: 13px;
   font-weight: 600;
   /* When the comments panel is open, studio.js sets margin-right to the
      panel width so the banner text doesn't extend beneath the drawer. */
   overflow-wrap: break-word;
 }
-.okf-page__body--selecting-anchor { outline: 2px dashed var(--okf-accent); outline-offset: 4px; }
+.okf-page__body--selecting-anchor { outline: 1px dashed var(--border-strong); outline-offset: 6px; box-shadow: inset 2px 0 0 0 var(--accent); }
 .okf-sr-only {
   position: absolute;
   width: 1px;
@@ -1031,77 +1185,81 @@ body.okf-focus-view .okf-concept-viewbar {
   border: 0;
 }
 .okf-comment__anchor {
-  font-family: ui-monospace, monospace;
-  font-size: var(--okf-text-xs);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
   /* iter1 CRI-002: now a button (jump-to-mark). Reset button defaults. */
   font-weight: 400;
-  background: var(--okf-bg-inset);
-  border: 1px solid var(--okf-border);
-  border-radius: var(--okf-radius-sm);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 0;
   padding: 1px 6px;
-  color: var(--okf-fg-muted);
+  color: var(--text-2);
   cursor: pointer;
   max-width: 32ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.okf-comment__anchor:hover { color: var(--okf-accent); border-color: var(--okf-accent); }
-.okf-comment__body { color: var(--okf-fg); font-size: var(--okf-text-sm); white-space: pre-wrap; word-break: break-word; }
+.okf-comment__anchor:hover { color: var(--text); border-color: var(--border-strong); background: var(--surface-2); }
+.okf-comment__body { color: var(--okf-fg); font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
 .okf-comment__reply {
   margin-top: 6px;
   padding-top: 6px;
-  border-top: 1px dashed var(--okf-border-strong);
-  font-size: var(--okf-text-xs);
-  color: var(--okf-fg-muted);
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-2);
 }
-.okf-comment__reply strong { color: var(--okf-accent); }
-.okf-comment__posting { font-size: var(--okf-text-xs); color: var(--okf-fg-muted); font-style: italic; }
-.okf-comment details summary { cursor: pointer; font-size: var(--okf-text-xs); color: var(--okf-accent); }
+.okf-comment__reply strong { color: var(--text); }
+.okf-comment__posting { font-size: 12px; color: var(--text-2); font-style: italic; }
+.okf-comment details summary { cursor: pointer; font-size: 12px; color: var(--link); }
 
 /* ---- 6. Change list + undo (§12.2 / §12.5) --------------------------- */
 .okf-changes { display: flex; flex-direction: column; }
+/* History rows: hairline-divided records. The actor is a 6px square mark
+ * (agent = accent, you = warn, CLI = info) beside its written name. */
 .okf-change {
   display: grid;
   grid-template-columns: auto 1fr auto;
   gap: var(--okf-space-2);
   align-items: start;
-  padding: var(--okf-space-2) 0;
-  border-bottom: 1px solid var(--okf-border);
-  font-size: var(--okf-text-sm);
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
 }
 .okf-change:last-child { border-bottom: none; }
 .okf-change__icon {
-  width: 8px; height: 8px; border-radius: var(--okf-radius-pill);
+  width: 6px; height: 6px; border-radius: 0;
   margin-top: 7px;
-  background: var(--okf-fg-muted);
+  background: var(--text-3);
 }
-.okf-change[data-actor="agent"] .okf-change__icon { background: var(--okf-accent); }
+.okf-change[data-actor="agent"] .okf-change__icon { background: var(--accent); }
 .okf-change[data-actor="user"] .okf-change__icon  { background: var(--okf-warn); }
 .okf-change[data-actor="cli"] .okf-change__icon   { background: var(--okf-info); }
 .okf-change__body { min-width: 0; }
 .okf-change__summary { color: var(--okf-fg); }
-.okf-change__meta { font-size: var(--okf-text-xs); color: var(--okf-fg-muted); display: flex; flex-wrap: wrap; gap: 6px; }
-.okf-change__meta a { color: var(--okf-accent); }
+.okf-change__meta { font-size: 11.5px; color: var(--text-2); display: flex; flex-wrap: wrap; gap: 6px; font-variant-numeric: tabular-nums; }
+.okf-change__meta time { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-3); }
+.okf-change__meta a { color: var(--link); }
 .okf-change__actions { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
 .okf-change__undo {
   font: inherit;
-  font-size: var(--okf-text-xs);
+  font-size: 12px;
+  font-weight: 600;
   /* iter3 CRI3-006: was 2px 8px → 20.8px tall (12px text * 1.4 line-height
    * + 4px padding), under WCAG 2.5.8 AA 24×24 minimum. Bump the vertical
    * padding to 6px (→ ~25.6px tall) so the Undo safety-net verb clears
    * the target. Horizontal padding bumped to 10px for symmetry with the
    * sibling panel-close control. */
   padding: 6px 10px;
-  border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-sm);
-  background: var(--okf-bg-elev);
-  color: var(--okf-fg);
+  border: 1px solid var(--btn-border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--btn-text);
   cursor: pointer;
 }
-.okf-change__undo:hover:not(:disabled) { background: var(--okf-hover-fill); }
-.okf-change__undo:disabled { opacity: 0.5; cursor: not-allowed; }
-.okf-change--group { background: var(--okf-accent-bg); border-radius: var(--okf-radius-sm); padding: var(--okf-space-1) var(--okf-space-2); margin: var(--okf-space-1) 0; border: 1px solid var(--okf-accent); }
+.okf-change__undo:hover:not(:disabled) { background: var(--btn-hover-bg); }
+.okf-change__undo:disabled { border-color: var(--border); color: var(--text-3); cursor: not-allowed; }
+.okf-change--group { background: transparent; border-radius: 0; padding: var(--okf-space-1) 0 var(--okf-space-1) 10px; margin: 0; border: 0; border-bottom: 1px solid var(--border); box-shadow: inset 2px 0 0 0 var(--accent); }
 /* F10: a grouped pass renders as a native <details> (the burst pattern) so
  * an exact-identity reveal can expand it and focus the owning member row.
  * The disclosure styles mirror .okf-change--burst; the accent card identity
@@ -1121,119 +1279,138 @@ body.okf-focus-view .okf-concept-viewbar {
 .okf-change--group > summary::before {
   content: "\25B6";
   font-size: 0.7em;
-  color: var(--okf-fg-muted);
+  color: var(--text-3);
   transition: transform 0.1s ease;
   display: inline-block;
 }
 .okf-change--group[open] > summary::before { transform: rotate(90deg); }
-.okf-change__group-hint { color: var(--okf-fg-muted); font-size: var(--okf-text-xs); }
+.okf-change__group-hint { color: var(--text-2); font-size: 11.5px; }
 .okf-change__group-body { padding: var(--okf-space-1) 0 0 calc(var(--okf-space-3) + 0.7em); display: flex; flex-direction: column; gap: 1px; }
 .okf-change--group > summary .okf-change__actions { margin-left: auto; flex-direction: row; }
 /* F10: terminal outcome note for an exact-identity reveal whose record is
  * not in the retained history (or cannot be shown right now). Focused so
  * keyboard and screen-reader users receive the outcome. */
 .okf-panel-reveal-note {
-  font-size: var(--okf-text-sm);
-  color: var(--okf-fg-muted);
-  background: var(--okf-bg-elev);
-  border: 1px dashed var(--okf-border-strong);
-  border-radius: var(--okf-radius-sm);
-  padding: var(--okf-space-2);
+  font-size: 13px;
+  color: var(--text-2);
+  background: transparent;
+  border: 0;
+  border-left: 2px solid var(--okf-info);
+  border-radius: 0;
+  padding: var(--okf-space-2) var(--okf-space-2) var(--okf-space-2) 10px;
   margin: 0 0 var(--okf-space-2) 0;
 }
-.okf-panel-reveal-note:focus { outline: 2px solid var(--okf-accent); outline-offset: 2px; }
+.okf-panel-reveal-note:focus { outline: 2px solid var(--focus); outline-offset: 2px; }
 
-/* Comment actions + threading */
-.okf-comment__actions { display: flex; gap: var(--okf-space-1); margin-top: var(--okf-space-1); }
+/* Comment actions + threading. Thread actions are compact outlined
+ * buttons; hover lifts to the raised surface, never to the accent. */
+.okf-comment__actions { display: flex; flex-wrap: wrap; gap: var(--okf-space-1); margin-top: 6px; }
 .okf-comment__action {
-  font-size: var(--okf-text-xs);
-  padding: 2px 8px;
-  border: 1px solid var(--okf-border);
-  border-radius: var(--okf-radius-sm);
-  background: none;
-  color: var(--okf-fg-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  min-height: 26px;
+  padding: 3px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-2);
   cursor: pointer;
 }
-.okf-comment__action:hover { color: var(--okf-accent); border-color: var(--okf-accent); }
-.okf-comment--reply { margin-left: var(--okf-space-3); border-left: 2px solid var(--okf-border); padding-left: var(--okf-space-2); }
+.okf-comment__action:hover { color: var(--text); background: var(--surface-2); }
+.okf-comment--reply { margin-left: var(--okf-space-3); border-left: 1px solid var(--border-strong); padding-left: var(--okf-space-2); }
 .okf-composer__reply-context {
-  font-size: var(--okf-text-xs);
-  color: var(--okf-fg-muted);
-  padding: var(--okf-space-1) var(--okf-space-2);
-  background: var(--okf-bg-elev);
-  border-radius: var(--okf-radius-sm);
+  font-size: 12px;
+  color: var(--text-2);
+  padding: var(--okf-space-1) 0 var(--okf-space-1) 10px;
+  background: transparent;
+  border-left: 2px solid var(--border-strong);
+  border-radius: 0;
   margin-bottom: var(--okf-space-1);
 }
 /* Inline reply composer — appears where the Reply button is */
 .okf-inline-reply {
-  margin-top: var(--okf-space-1);
+  margin-top: var(--okf-space-2);
   margin-left: var(--okf-space-3);
-  padding: var(--okf-space-2);
-  background: var(--okf-bg-elev);
-  border: 1px solid var(--okf-border);
-  border-radius: var(--okf-radius);
+  padding: var(--okf-space-2) 0 var(--okf-space-2) var(--okf-space-2);
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--border-strong);
+  border-radius: 0;
 }
 .okf-inline-reply__textarea {
   width: 100%;
-  border: 1px solid var(--okf-border);
-  border-radius: var(--okf-radius-sm);
-  padding: var(--okf-space-1);
-  font-size: var(--okf-text-sm);
+  border: 1px solid var(--input-border);
+  border-radius: 0;
+  background: var(--input-bg);
+  color: var(--input-text);
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 13px;
   resize: vertical;
   margin-bottom: var(--okf-space-1);
 }
-/* Timestamps */
-.okf-comment__ts { font-size: var(--okf-text-xs); color: var(--okf-fg-muted); }
-.okf-comment__ts--updated { color: var(--okf-accent); }
+.okf-inline-reply__textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+/* Timestamps: figures in mono. */
+.okf-comment__ts { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 10.5px; color: var(--text-3); }
+.okf-comment__ts--updated { color: var(--text-2); }
 /* Archive chip — shown next to the state chip when the thread is archived */
 .okf-comment__archived-chip {
-  font-size: var(--okf-text-xs);
-  color: var(--okf-fg-muted);
-  background: var(--okf-bg-elev);
-  border: 1px solid var(--okf-border);
+  font-family: var(--font-label);
+  font-size: var(--label-size, 9.5px);
+  font-weight: var(--label-weight, 500);
+  letter-spacing: var(--label-track, 0.16em);
+  text-transform: uppercase;
+  color: var(--text-2);
+  background: transparent;
+  border: 1px dashed var(--border-strong);
   padding: 1px 6px;
-  border-radius: 999px;
+  border-radius: 0;
 }
 /* X2: a comment imported from a portable feedback note. Provenance only: the
  * claims beside it are explicitly unverified, never a trust signal. */
 .okf-comment__import-chip {
-  font-size: var(--okf-text-xs);
-  font-weight: 650;
+  font-family: var(--font-label);
+  font-size: var(--label-size, 9.5px);
+  font-weight: var(--label-weight, 500);
+  letter-spacing: var(--label-track, 0.16em);
+  text-transform: uppercase;
   color: var(--okf-info);
-  background: var(--okf-info-bg);
+  background: transparent;
   border: 1px solid currentColor;
   padding: 1px 6px;
-  border-radius: var(--okf-radius-pill);
+  border-radius: 0;
 }
 .okf-comment__import { margin: 0 0 var(--okf-space-1); min-width: 0; }
 .okf-comment__import-claims {
   margin: 0;
-  font-size: var(--okf-text-xs);
-  color: var(--okf-fg-muted);
+  font-size: 11.5px;
+  color: var(--text-2);
   overflow-wrap: anywhere;
 }
 /* R3: the imported quote is the note's unverified claim, not an annotation. */
 .okf-comment__import-quote-label {
   margin: var(--okf-space-1) 0 0;
-  font-size: var(--okf-text-xs);
-  color: var(--okf-fg-muted);
+  font-size: 11.5px;
+  color: var(--text-2);
   overflow-wrap: anywhere;
 }
 .okf-comment__import-quote-label + .okf-comment__import-quote { margin-top: 2px; }
 .okf-comment__import-quote {
   margin: var(--okf-space-1) 0 0;
   padding: 2px var(--okf-space-2);
-  border-left: 3px solid var(--okf-border-strong);
-  color: var(--okf-fg-muted);
-  font-size: var(--okf-text-sm);
+  border-left: 2px solid var(--border-strong);
+  color: var(--text-2);
+  font-size: 13px;
   font-style: italic;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 .okf-studio-import-link { justify-self: start; text-decoration: none; }
 .okf-studio-import-link[aria-current="page"] {
-  background: var(--okf-active-fill);
-  color: var(--okf-active-fg);
+  background: transparent;
+  color: var(--text);
+  box-shadow: inset 2px 0 0 0 var(--accent);
 }
 @media (forced-colors: active) {
   .okf-comment__import-chip { border-color: CanvasText; }
@@ -1244,43 +1421,46 @@ body.okf-focus-view .okf-concept-viewbar {
    expanded view; preview shows one or the other depending on what's
    set. */
 .okf-comment__summary {
-  font-size: var(--okf-text-sm);
+  font-size: 13px;
   color: var(--okf-fg);
-  background: var(--okf-bg-elev);
-  border-left: 3px solid var(--okf-accent);
+  background: transparent;
+  border-left: 2px solid var(--okf-ok);
   padding: var(--okf-space-1) var(--okf-space-2);
   margin: var(--okf-space-1) 0;
-  border-radius: var(--okf-radius-sm);
+  border-radius: 0;
 }
 .okf-comment__summary--ask {
-  border-left-color: var(--okf-fg-muted);
+  border-left-color: var(--border-strong);
 }
 .okf-comment__summary-label {
-  font-size: var(--okf-text-xs);
-  color: var(--okf-accent);
-  font-weight: 600;
+  font-family: var(--font-label);
+  font-size: var(--label-size, 9.5px);
+  color: var(--okf-ok);
+  font-weight: var(--label-weight, 500);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-right: 4px;
+  letter-spacing: var(--label-track, 0.16em);
+  margin-right: 6px;
 }
 .okf-comment__summary--ask .okf-comment__summary-label {
-  color: var(--okf-fg-muted);
+  color: var(--text-2);
 }
 .okf-comment__summary-chip {
   display: inline-block;
   margin-left: var(--okf-space-1);
-  padding: 1px 8px;
-  font-size: var(--okf-text-xs);
-  color: var(--okf-accent);
-  background: rgba(0, 0, 0, 0.04);
-  border: 1px solid var(--okf-accent);
-  border-radius: 999px;
+  padding: 1px 6px;
+  font-size: 11.5px;
+  color: var(--text-2);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
 }
 .okf-comment__preview-who { font-weight: 600; margin-right: 4px; }
 .okf-comment__action--disabled {
-  opacity: 0.4;
+  border-color: var(--border);
+  color: var(--text-3);
   cursor: not-allowed;
 }
+.okf-comment__action--disabled:hover { background: transparent; color: var(--text-3); }
 
 /* ---- 5b. Comment panel structure --------------------------------------
  * Toolbar (sort / time filter / show-archived / expand-all), per-thread
@@ -1298,11 +1478,12 @@ body.okf-focus-view .okf-concept-viewbar {
   align-items: center;
   gap: var(--okf-space-2);
   justify-content: space-between;
-  padding: var(--okf-space-2);
-  margin-bottom: var(--okf-space-3);
-  background: var(--okf-bg-inset);
-  border: 1px solid var(--okf-border);
-  border-radius: var(--okf-radius-sm);
+  padding: 0 0 var(--okf-space-2);
+  margin-bottom: var(--okf-space-2);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border-strong);
+  border-radius: 0;
 }
 .okf-comment-toolbar__group {
   display: flex;
@@ -1310,29 +1491,33 @@ body.okf-focus-view .okf-concept-viewbar {
   gap: var(--okf-space-2);
   flex-wrap: wrap;
 }
+/* Ledger select: --input-bg, 1px outline, square, 32px. */
 .okf-comment-toolbar__select {
   font: inherit;
-  font-size: var(--okf-text-xs);
+  font-size: 12.5px;
+  min-height: var(--ctl-h, 32px);
   padding: 4px 8px;
-  border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-sm);
-  background: var(--okf-bg-elev);
-  color: var(--okf-fg);
+  border: 1px solid var(--input-border);
+  border-radius: 0;
+  background-color: var(--input-bg);
+  color: var(--input-text);
   cursor: pointer;
   line-height: 1.4;
 }
 .okf-comment-toolbar__select:focus-visible {
-  outline: 2px solid var(--okf-accent);
+  outline: 2px solid var(--focus);
   outline-offset: 1px;
-  border-color: var(--okf-accent);
+  border-color: var(--border-strong);
 }
 .okf-comment-toolbar__toggle {
-  font-size: var(--okf-text-xs);
+  font-size: 12px;
   padding: 4px 10px;
 }
 .okf-comment-toolbar__count {
-  font-size: var(--okf-text-xs);
-  color: var(--okf-fg-muted);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 10.5px;
+  color: var(--text-2);
   margin-left: auto;
 }
 
@@ -1345,17 +1530,17 @@ body.okf-focus-view .okf-concept-viewbar {
   height: 24px;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: var(--okf-radius-sm);
+  border-radius: 0;
   background: transparent;
-  color: var(--okf-fg-muted);
+  color: var(--text-2);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
-.okf-comment__chevron:hover { color: var(--okf-accent); border-color: var(--okf-border); }
+.okf-comment__chevron:hover { color: var(--text); border-color: var(--border-strong); background: var(--surface-2); }
 .okf-comment__chevron:focus-visible {
-  outline: 2px solid var(--okf-accent);
+  outline: 2px solid var(--focus);
   outline-offset: 1px;
 }
 .okf-comment__chevron::before {
@@ -1381,8 +1566,8 @@ body.okf-focus-view .okf-concept-viewbar {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: var(--okf-text-xs);
-  color: var(--okf-fg-muted);
+  font-size: 11.5px;
+  color: var(--text-2);
   margin-bottom: 4px;
   flex-wrap: wrap;
 }
@@ -1392,33 +1577,36 @@ body.okf-focus-view .okf-concept-viewbar {
  * DOM by the renderer (display:none would leave them in the a11y tree). */
 .okf-comment--collapsed { padding-top: var(--okf-space-2); padding-bottom: var(--okf-space-2); }
 .okf-comment__preview {
-  color: var(--okf-fg-muted);
-  font-size: var(--okf-text-sm);
+  color: var(--text-2);
+  font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   margin: 0;
 }
-/* Agent-authored summary replaces the body slice in the
-   collapsed preview. Style it as a status tag — accent colour + italic
-   — so users can scan the panel as a quick status board. */
+/* Agent-authored summary replaces the body slice in the collapsed
+   preview: ink + italic so the panel scans as a status board without
+   spending the accent on text that is not a link. */
 .okf-comment__preview-summary {
-  color: var(--okf-accent);
+  color: var(--text);
   font-style: italic;
 }
 /* request_summary (the "what was asked" auto-derived short)
    shown when no explicit done-summary is set. Muted + italic — reads
    as a paraphrase, not the literal body. */
 .okf-comment__preview-ask {
-  color: var(--okf-fg-muted);
+  color: var(--text-2);
   font-style: italic;
 }
 .okf-comment__replies-count {
-  font-size: var(--okf-text-xs);
-  color: var(--okf-fg-muted);
-  background: var(--okf-bg-inset);
-  border-radius: var(--okf-radius-pill);
-  padding: 1px 7px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 10.5px;
+  color: var(--text-2);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  padding: 0 6px;
   margin-left: auto;
 }
 
@@ -1428,67 +1616,64 @@ body.okf-focus-view .okf-concept-viewbar {
  * that render cards outside the threaded list (agent-activity panel). */
 .okf-comment__children {
   margin-top: var(--okf-space-2);
-  margin-left: var(--okf-space-3);
+  margin-left: var(--okf-space-2);
   padding-left: var(--okf-space-2);
-  border-left: 2px solid var(--okf-border);
+  border-left: 1px solid var(--border-strong);
   display: flex;
   flex-direction: column;
-  gap: var(--okf-space-2);
+  gap: 0;
 }
 .okf-comment__children > .okf-comment { margin-bottom: 0; }
+.okf-comment__children > .okf-comment:last-child { border-bottom: 0; }
 .okf-comment__children .okf-comment__children {
   /* Nested children container for level-2 replies flatter the guide line
    * so the depth reads as "2" not "3+". The level-2 cards themselves are
    * direct children of this container. */
-  margin-top: var(--okf-space-2);
-  border-left-color: var(--okf-border-strong);
+  margin-top: var(--okf-space-1);
+  border-left-style: dashed;
 }
-.okf-comment--level-2 { background: var(--okf-bg-inset); }
+.okf-comment--level-2 { background: transparent; }
 
-/* "archived" state: muted chip + dimmed card. Distinct from dismissed
- * (which the user can dismiss without claiming) because archived threads
- * are deliberately hidden by default and surfaced only via the toolbar
- * toggle. The chip uses the same neutral pair as the default chip so it
- * doesn't compete with open/claimed. */
+/* "archived" state: dashed muted chip, secondary ink. Distinct from
+ * dismissed (which the user can dismiss without claiming) because archived
+ * threads are deliberately hidden by default and surfaced only via the
+ * toolbar toggle. Muting uses --text-2, never opacity. */
 .okf-comment[data-state="archived"] {
-  border-color: var(--okf-border);
-  background: var(--okf-bg-inset);
-  opacity: 0.85;
+  background: transparent;
+  color: var(--text-2);
 }
-.okf-comment[data-state="archived"] .okf-comment__state {
-  background: var(--okf-bg-elev);
-  color: var(--okf-fg-muted);
-  border: 1px solid var(--okf-border);
-}
+.okf-comment[data-state="archived"] .okf-comment__body { color: var(--text-2); }
+.okf-comment[data-state="archived"] .okf-comment__state,
 .okf-comment[data-state="dismissed"] .okf-comment__state {
-  background: var(--okf-bg-elev);
-  color: var(--okf-fg-muted);
-  border: 1px solid var(--okf-border);
+  background: transparent;
+  color: var(--text-2);
+  border: 1px dashed var(--border-strong);
 }
 
-/* The list wrapper lives below the toolbar; the empty state sits inside. */
-.okf-comment-list { display: flex; flex-direction: column; gap: var(--okf-space-2); }
+/* The list wrapper lives below the toolbar; the empty state sits inside.
+ * Threads are rows divided by their own hairlines, so no gutter. */
+.okf-comment-list { display: flex; flex-direction: column; gap: 0; }
 .okf-comment-list .okf-empty { padding: var(--okf-space-3) 0; }
 
 /* INTENT2-007 / INTENT4-002: comment_link back-link + pulse animation. */
-.okf-change__comment-link { margin-top: var(--okf-space-1); font-size: var(--okf-text-xs); color: var(--okf-fg-muted); }
-.okf-change__comment-link a { color: var(--okf-accent); text-decoration: none; font-weight: 600; }
-.okf-change__comment-link a:hover { text-decoration: underline; }
-@keyframes okf-pulse-highlight {
-  0% { box-shadow: 0 0 0 0 var(--okf-accent); }
-  50% { box-shadow: 0 0 0 4px transparent; }
-  100% { box-shadow: 0 0 0 0 transparent; }
+.okf-change__comment-link { margin-top: var(--okf-space-1); font-size: 11.5px; color: var(--text-2); }
+.okf-change__comment-link a { color: var(--link); text-decoration: underline; text-underline-offset: 3px; font-weight: 600; }
+.okf-change__comment-link a:hover { color: var(--accent-hover); }
+/* A revealed thread flashes its 2px accent bar, not a halo. */
+@keyframes okf-comment-pulse {
+  0%, 60% { box-shadow: inset 2px 0 0 0 var(--accent); background-color: var(--surface-2); }
+  100% { background-color: transparent; }
 }
-.okf-comment--pulse { animation: okf-pulse-highlight 1.5s ease-out; border-radius: var(--okf-radius-sm); }
+.okf-comment--pulse { animation: okf-comment-pulse 1.5s ease-out; border-radius: 0; }
 @media (prefers-reduced-motion: reduce) {
-  .okf-comment--pulse { animation: none; background: var(--okf-accent-bg); }
+  .okf-comment--pulse { animation: none; box-shadow: inset 2px 0 0 0 var(--accent); }
 }
 
 /* iter2 G12: burst coalescing. 10+ standalone events in 1s collapse into a
  * <details> whose summary is one "Agent made N changes" line. Native
  * <details> gives keyboard expand (Enter/Space) + the disclosure triangle
  * for free; we style the summary to match the group row + indent the body. */
-.okf-change--burst { background: var(--okf-bg-inset); border-radius: var(--okf-radius-sm); padding: var(--okf-space-1) var(--okf-space-2); margin: var(--okf-space-1) 0; border: 1px solid var(--okf-border-strong); }
+.okf-change--burst { background: transparent; border-radius: 0; padding: var(--okf-space-1) 0 var(--okf-space-1) 10px; margin: 0; border: 0; border-bottom: 1px solid var(--border); box-shadow: inset 2px 0 0 0 var(--border-strong); }
 .okf-change--burst > summary {
   cursor: pointer;
   list-style: none;
@@ -1502,38 +1687,40 @@ body.okf-focus-view .okf-concept-viewbar {
 .okf-change--burst > summary::before {
   content: "\25B6";
   font-size: 0.7em;
-  color: var(--okf-fg-muted);
+  color: var(--text-3);
   transition: transform 0.1s ease;
   display: inline-block;
 }
 .okf-change--burst[open] > summary::before { transform: rotate(90deg); }
-.okf-change__burst-hint { color: var(--okf-fg-muted); font-size: var(--okf-text-xs); }
+.okf-change__burst-hint { color: var(--text-2); font-size: 11.5px; }
 .okf-change__burst-body { padding: var(--okf-space-1) 0 0 calc(var(--okf-space-3) + 0.7em); display: flex; flex-direction: column; gap: 1px; }
 
 /* Filters */
 .okf-filters { display: flex; gap: var(--okf-space-2); flex-wrap: wrap; margin-bottom: var(--okf-space-3); }
 .okf-filters select, .okf-filters input {
   font: inherit;
-  font-size: var(--okf-text-xs);
-  padding: 3px 6px;
-  border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-sm);
-  background: var(--okf-bg-elev);
-  color: var(--okf-fg);
+  font-size: 12.5px;
+  min-height: var(--ctl-h, 32px);
+  padding: 3px 8px;
+  border: 1px solid var(--input-border);
+  border-radius: 0;
+  background-color: var(--input-bg);
+  color: var(--input-text);
   min-width: 0;
 }
-.okf-empty { color: var(--okf-fg-muted); font-size: var(--okf-text-sm); padding: var(--okf-space-4); text-align: center; }
+.okf-filters :is(select, input):focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.okf-empty { color: var(--text-2); font-size: 13px; padding: var(--okf-space-4); text-align: center; }
 .okf-empty-state {
   padding: var(--okf-space-5) 0;
-  border-block: 1px solid var(--okf-border);
+  border-block: 1px solid var(--border);
   text-align: left;
 }
 .okf-empty-state__title,
 .okf-empty-state__description { margin: 0 0 var(--okf-space-2); }
-.okf-empty-state__title { font-size: var(--okf-text-md); }
-.okf-empty-state__description { color: var(--okf-fg-muted); font-size: var(--okf-text-sm); }
-.okf-panel-state { padding: var(--okf-space-5) 0; color: var(--okf-fg-muted); }
-.okf-panel-state--error { color: var(--okf-fg); }
+.okf-empty-state__title { font-size: 15.5px; font-weight: 700; }
+.okf-empty-state__description { color: var(--text-2); font-size: 13px; }
+.okf-panel-state { padding: var(--okf-space-5) 0; color: var(--text-2); }
+.okf-panel-state--error { color: var(--okf-fg); padding-left: 10px; border-left: 2px solid var(--okf-error); }
 .okf-panel-state--error p { margin-top: 0; }
 .okf-studio-quick-action {
   display: grid;
@@ -1544,12 +1731,13 @@ body.okf-focus-view .okf-concept-viewbar {
   border-bottom: 1px solid var(--okf-border);
 }
 .okf-studio-quick-action:last-child { border-bottom: 0; }
-.okf-studio-quick-action__outcome { margin: 0; color: var(--okf-fg-muted); font-size: var(--okf-text-sm); }
+.okf-studio-quick-action__outcome { margin: 0; color: var(--text-2); font-size: 13px; }
 .okf-proposal-unavailable {
   padding: var(--okf-space-3);
-  border: 1px solid var(--okf-border);
-  border-radius: var(--okf-radius-sm);
-  background: var(--okf-bg-inset);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--okf-warn);
+  border-radius: 0;
+  background: transparent;
 }
 .okf-proposal-unavailable p { margin-top: 0; }
 .okf-proposal-unavailable__title { font-weight: 700; }
@@ -1561,7 +1749,7 @@ body.okf-focus-view .okf-concept-viewbar {
 .okf-palette-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: var(--studio-scrim);
   z-index: 90;
   display: flex;
   align-items: flex-start;
@@ -1569,12 +1757,15 @@ body.okf-focus-view .okf-concept-viewbar {
   padding-top: 12vh;
 }
 .okf-palette-overlay[hidden] { display: none; }
+/* The command palette is a floating layer: panel surface, square, the
+ * --shadow-pop ring and nothing else. Rows are hairline records; the
+ * keyboard cursor is the raised surface plus the 2px accent bar. */
 .okf-palette {
   width: min(640px, calc(100vw - 32px));
-  background: var(--okf-bg-elev);
-  border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  background: var(--surface);
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--shadow-pop);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -1582,58 +1773,57 @@ body.okf-focus-view .okf-concept-viewbar {
 }
 .okf-palette__input {
   font: inherit;
-  font-size: var(--okf-text-base);
-  padding: var(--okf-space-3) var(--okf-space-4);
+  font-size: 15px;
+  padding: 12px 16px;
   border: none;
-  border-bottom: 1px solid var(--okf-border);
+  border-bottom: 1px solid var(--border-strong);
+  border-radius: 0;
   background: transparent;
-  color: var(--okf-fg);
+  color: var(--text);
   width: 100%;
 }
-.okf-palette__input:focus-visible { outline: 2px solid var(--okf-accent); outline-offset: -2px; }
+.okf-palette__input::placeholder { color: var(--text-3); }
+/* The native search clear glyph paints an off-palette blue; Escape and the
+ * field's own text editing already clear and close the palette. */
+.okf-palette__input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+.okf-palette__input:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .okf-palette__list { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
 .okf-palette__item {
   display: flex;
   align-items: center;
   gap: var(--okf-space-2);
-  padding: var(--okf-space-2) var(--okf-space-4);
+  padding: 9px 16px;
   cursor: pointer;
-  border-bottom: 1px solid var(--okf-border);
-  color: var(--okf-fg);
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
   background: transparent;
   border-left: none; border-right: none; border-top: none;
+  border-radius: 0;
   width: 100%;
   text-align: left;
   font: inherit;
+  font-size: 13.5px;
 }
-/* Hover is a quiet translucent tint; the SELECTED (keyboard cursor / current)
- * item carries the family-distinguishing active treatment (Technical = tint +
- * no frame; Swiss = solid boxed accent + frame) so the family difference is
- * observable on this Studio active surface too. Kept distinct from :hover so
- * the active item keeps its treatment while pointed at. */
-.okf-palette__item:hover {
-  background: var(--okf-accent-bg);
-  color: var(--okf-accent);
-}
+.okf-palette__item:hover,
 .okf-palette__item[aria-selected="true"] {
-  background: var(--okf-active-fill);
-  color: var(--okf-active-fg);
-  box-shadow: inset 0 0 0 1px var(--okf-active-border);
+  background: var(--surface-2);
+  color: var(--text);
+  box-shadow: inset 2px 0 0 0 var(--accent);
 }
 .okf-palette__item[aria-selected="true"] .okf-palette__item-title::before { content: "Selected · "; font-weight: 700; }
 .okf-palette__item-kbd {
   margin-left: auto;
-  font-family: ui-monospace, monospace;
-  font-size: var(--okf-text-xs);
-  color: var(--okf-fg-muted);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-3);
 }
 .okf-palette__item-title { font-weight: 500; }
-.okf-palette__item-sub { font-size: var(--okf-text-xs); color: var(--okf-fg-muted); }
+.okf-palette__item-sub { font-size: 11.5px; color: var(--text-2); }
 .okf-palette__hint {
-  padding: var(--okf-space-2) var(--okf-space-4);
-  font-size: var(--okf-text-xs);
-  color: var(--okf-fg-muted);
-  border-top: 1px solid var(--okf-border);
+  padding: 8px 16px;
+  font-size: 11.5px;
+  color: var(--text-2);
+  border-top: 1px solid var(--border-strong);
   display: flex;
   gap: var(--okf-space-3);
   flex-wrap: wrap;
@@ -1643,19 +1833,23 @@ body.okf-focus-view .okf-concept-viewbar {
 .okf-panel-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.35);
+  background: var(--studio-scrim);
   z-index: 70;
 }
 .okf-panel-overlay[hidden] { display: none; }
+/* Ledger Studio drawer: --panel-bg, a 1px left edge, no shadow, 320px.
+ * studio.js measures the real width for the rail/overlay decision, so the
+ * wider Proposals workspace keeps its own measured width (below). */
 .okf-panel {
   position: fixed;
   top: 0;
   right: 0;
   height: 100vh;
-  width: min(440px, 100vw);
-  background: var(--okf-bg-elev);
-  border-left: 1px solid var(--okf-border-strong);
-  box-shadow: -12px 0 36px rgba(0, 0, 0, 0.18);
+  width: min(var(--studio-drawer-w), 100vw);
+  background: var(--panel-bg);
+  border-left: 1px solid var(--panel-border);
+  border-radius: 0;
+  box-shadow: none;
   z-index: 71;
   display: flex;
   flex-direction: column;
@@ -1671,15 +1865,15 @@ body.okf-focus-view .okf-concept-viewbar {
  * widths the panel stays a full-width overlay (see §10) so the rule is a
  * no-op there. */
 /* studio.js sets --okf-panel-rail-w to the measured drawer width (panels such
- * as Proposals are wider than 440px); 440px remains the default. */
-body.okf-panel-rail { padding-right: var(--okf-panel-rail-w, 440px); }
+ * as Proposals are wider than the 320px drawer); 320px remains the default. */
+body.okf-panel-rail { padding-right: var(--okf-panel-rail-w, var(--studio-drawer-w)); }
 body.okf-panel-rail .okf-panel-overlay { display: none; }
 /* Toasts belong to the reading column beside an open rail. Fixed to the
  * viewport corner they sat on the rail and covered the bottom of its last
  * card, the one a reader watches the agent claim, edit and resolve. */
 body.okf-panel-rail .okf-toast-region {
-  right: calc(var(--okf-panel-rail-w, 440px) + var(--okf-space-4));
-  max-width: min(420px, calc(100vw - var(--okf-panel-rail-w, 440px) - 2 * var(--okf-space-4)));
+  right: calc(var(--okf-panel-rail-w, var(--studio-drawer-w)) + var(--okf-space-4));
+  max-width: min(420px, calc(100vw - var(--okf-panel-rail-w, var(--studio-drawer-w)) - 2 * var(--okf-space-4)));
 }
 /* The rail narrows the masthead without changing the viewport, so none of
  * the shell's viewport media queries fire. The masthead therefore sizes
@@ -1688,28 +1882,32 @@ body.okf-panel-rail .okf-toast-region {
  * two-row masthead from that measured width ("Width-driven desktop
  * tiers"). The former viewport guess here (two rows whenever a rail was open
  * at <= 1540px) wrapped the header at 1280 even though a condensed single
- * row fits beside the 440px rail. */
+ * row fits beside the drawer rail. */
 @media (prefers-reduced-motion: no-preference) {
   html.okf-studio-booted { transition: padding-right 0.18s ease; }
 }
 .okf-panel[hidden] { display: none; }
+/* Drawer header and body are divided by hairlines: the header matches the
+ * 50px top bar, the title is a 15.5px sub-heading, the purpose line is
+ * secondary ink. */
 .okf-panel__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--okf-space-2);
-  padding: var(--okf-space-3) var(--okf-space-4);
-  border-bottom: 1px solid var(--okf-border);
+  min-height: var(--nav-h, 50px);
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-.okf-panel__title { font-size: var(--okf-text-base); font-weight: 600; margin: 0; }
+.okf-panel__title { font-size: 15.5px; font-weight: 700; letter-spacing: -0.005em; margin: 0; }
 /* R3: one sentence under a built-in panel title saying what it answers. */
 .okf-panel__purpose {
   margin: 0;
-  padding: var(--okf-space-2) var(--okf-space-4);
-  border-bottom: 1px solid var(--okf-border);
-  color: var(--okf-fg-muted);
-  font-size: var(--okf-text-sm);
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: 12.5px;
   line-height: 1.45;
   overflow-wrap: anywhere;
   flex-shrink: 0;
@@ -1718,21 +1916,9 @@ body.okf-panel-rail .okf-toast-region {
 .okf-panel__body {
   flex: 1 1 auto;
   overflow-y: auto;
-  padding: var(--okf-space-3) var(--okf-space-4);
+  padding: 14px 16px 24px;
   min-height: 0;
 }
-
-html[data-okf-density="compact"] :is(.okf-studio-rail__body, .okf-panel__body) { padding-block: var(--okf-space-2); }
-html[data-okf-density="compact"] :is(.okf-comment, .okf-change, .okf-activity-item, .okf-palette__item) {
-  padding-block: 6px;
-}
-html[data-okf-density="compact"] :is(.okf-studio-bar, .okf-studio-launcher) { gap: var(--okf-space-1); }
-/* Never compact action geometry below WCAG 2.2 target minima. This is a
- * floor, not a shrink: :where() keeps it at single-class specificity so the
- * larger phone, tablet and coarse-pointer touch floors declared later (40px
- * view bar actions at <=600px, 44px panel close, 40px graph chrome) still win
- * under Compact. Density never changes mobile touch geometry (wiki.css F23). */
-:where(html[data-okf-density="compact"]) :is(.okf-studiobtn, .okf-panel__close, .okf-comment__action) { min-height: 24px; }
 
 @media (forced-colors: active) {
   :is(.okf-studiobtn[aria-pressed="true"], .okf-viewswitch__btn[aria-pressed="true"], .okf-watch-toggle[aria-pressed="true"]) {
@@ -1748,34 +1934,40 @@ html[data-okf-density="compact"] :is(.okf-studio-bar, .okf-studio-launcher) { ga
 .okf-panel__section-link {
   margin-top: var(--okf-space-2);
   font: inherit;
-  font-size: var(--okf-text-xs);
+  font-size: 12px;
+  font-weight: 600;
   padding: 6px 10px;
-  border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-sm);
-  background: var(--okf-bg-elev);
-  color: var(--okf-accent);
+  border: 1px solid var(--btn-border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--btn-text);
   cursor: pointer;
   /* iter3 CRI3-006: 6px vertical padding clears the 24×24 target. */
 }
 .okf-panel__section-link:hover:not(:disabled) {
-  background: var(--okf-accent-bg);
-  border-color: var(--okf-accent);
+  background: var(--btn-hover-bg);
 }
+/* Section heads are mono micro-labels over a hairline. */
 .okf-panel__section-title {
-  font-size: var(--okf-text-xs);
+  font-family: var(--font-label);
+  font-size: var(--label-size, 9.5px);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--okf-fg-muted);
+  letter-spacing: var(--label-track, 0.16em);
+  color: var(--text-2);
   margin: 0 0 var(--okf-space-2);
-  font-weight: 700;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-strong);
+  font-weight: var(--label-weight, 500);
 }
 .okf-panel__close {
   font: inherit;
-  font-size: var(--okf-text-sm);
-  border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-sm);
-  background: var(--okf-bg-inset);
-  color: var(--okf-fg);
+  font-size: 12.5px;
+  font-weight: 600;
+  min-height: var(--ctl-h, 32px);
+  border: 1px solid var(--btn-border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--btn-text);
   cursor: pointer;
   /* iter3 CRI3-006: was 2px 10px → 23.6px tall (14px text * 1.4 line-height
    * + 4px padding), just under WCAG 2.5.8 AA 24×24. Bump to 4px vertical
@@ -1785,17 +1977,20 @@ html[data-okf-density="compact"] :is(.okf-studio-bar, .okf-studio-launcher) { ga
 }
 
 /* ---- 9. Live highlight pulse (§13.2) --------------------------------- */
+/* A changed block briefly shows the raised surface with the 2px accent bar
+ * on its leading edge, then settles. No halo, no accent wash. */
 @keyframes okf-pulse-highlight {
-  0%   { background-color: var(--okf-accent-bg); box-shadow: 0 0 0 0 var(--okf-accent-bg); }
-  100% { background-color: transparent; box-shadow: 0 0 0 0 transparent; }
+  0%, 55% { background-color: var(--surface-2); box-shadow: inset 2px 0 0 0 var(--accent); }
+  100% { background-color: transparent; box-shadow: inset 2px 0 0 0 transparent; }
 }
 .okf-pulse {
   animation: okf-pulse-highlight 1.4s ease-out 1;
-  border-radius: var(--okf-radius-sm);
+  border-radius: 0;
 }
+/* The presence mark breathes by opacity only. */
 @keyframes okf-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
-  50% { box-shadow: 0 0 0 4px transparent; opacity: 0.6; }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
 }
 @keyframes okf-toast-in {
   from { opacity: 0; transform: translateY(8px); }
@@ -1806,30 +2001,42 @@ html[data-okf-density="compact"] :is(.okf-studio-bar, .okf-studio-launcher) { ga
  * iter1 CRI-004: the highlight is also applied to matching list/search rows
  * via .okf-presence-focus (data-concept-id hook) so the agent feels spatially
  * present on index/search pages, not just on the open concept page. */
-.okf-focus-highlight {
-  outline: 2px dashed var(--okf-accent);
-  outline-offset: 4px;
-  border-radius: var(--okf-radius);
+/* The article the agent is on: a 2px accent bar just outside its leading
+ * edge (a selected record), never a box around the reading column and
+ * never over the text. The presence chip names the state in words. */
+.okf-focus-highlight { position: relative; }
+.okf-focus-highlight::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -10px;
+  width: 2px;
+  background: var(--accent);
+  pointer-events: none;
 }
+@media (forced-colors: active) {
+  .okf-focus-highlight::before { background: Highlight; forced-color-adjust: none; }
+}
+/* Ledger: a row the agent is on is a selected row — the 2px accent bar
+ * down its left edge plus the "agent here" mono micro-label, never a
+ * tinted fill (the label keeps the cue from being colour-only, WCAG
+ * 1.4.1). */
 .okf-presence-focus {
-  background: var(--okf-accent-bg);
-  /* The full-row tinted fill + the "AGENT HERE" ::after label below carry
-   * the entire presence cue. iter-1 closeout visual review caught that an
-   * earlier `box-shadow: inset 3px 0 0` here was a side-stripe re-created
-   * via a different property to dodge the border-left grep — exactly the
-   * impeccable-design ban in spirit. The stripe is removed; the fill +
-   * label remain the canonical cue (color-not-only, WCAG 1.4.1). */
+  background: transparent;
+  box-shadow: inset 2px 0 0 0 var(--accent);
 }
 /* Annotate presence-focused rows with a small leading label so the cue
  * is not colour-only (WCAG 1.4.1). Rendered by studio.js via ::after. */
 .okf-presence-focus::after {
   content: "agent here";
   margin-left: var(--okf-space-2);
-  font-size: var(--okf-text-xs);
-  font-weight: 600;
-  color: var(--okf-accent);
+  font-family: var(--font-label);
+  font-size: var(--label-size, 9.5px);
+  font-weight: var(--label-weight, 500);
+  color: var(--accent-text);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--label-track, 0.16em);
 }
 
 /* ---- 9b. Comment affordance (selection popover) --------------------- */
@@ -1841,13 +2048,7 @@ html[data-okf-density="compact"] :is(.okf-studio-bar, .okf-studio-launcher) { ga
   pointer-events: auto;
 }
 .okf-comment-afford[hidden] { display: none; }
-.okf-comment-afford > .okf-studiobtn {
-  box-shadow: var(--okf-shadow);
-  background: var(--okf-accent);
-  color: var(--okf-accent-on);
-  border-color: var(--okf-accent);
-}
-.okf-comment-afford__icon { width: 14px; height: 14px; flex-shrink: 0; }
+.okf-comment-afford__icon { width: 14px; height: 14px; flex-shrink: 0; color: var(--accent-text); }
 
 /* ---- 9c. SSR / no-JS fallback banner (§13.8) ------------------------ */
 /* iter1 CRI-019: visible by default in the template. studio.js hides it
@@ -1859,10 +2060,11 @@ html[data-okf-density="compact"] :is(.okf-studio-bar, .okf-studio-launcher) { ga
 .okf-studio-fallback-banner {
   margin: 0;
   padding: var(--okf-space-2) var(--okf-space-4);
-  background: var(--okf-warn-bg);
-  color: var(--okf-warn);
-  border-bottom: 1px solid var(--okf-warn);
-  font-size: var(--okf-text-sm);
+  background: var(--bg-2);
+  color: var(--okf-fg);
+  border-bottom: 1px solid var(--border);
+  box-shadow: inset 0 2px 0 0 var(--okf-warn);
+  font-size: 13px;
   text-align: center;
 }
 .okf-studio-fallback-banner a { color: inherit; font-weight: 600; }
@@ -1898,15 +2100,16 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
 /* ---- 9d. Change-list windowing sentinel (§13.7) --------------------- */
 .okf-changes__sentinel { height: 1px; }
 .okf-changes__cap-note {
-  padding: var(--okf-space-2) var(--okf-space-3);
-  font-size: var(--okf-text-xs);
-  color: var(--okf-fg-muted);
+  padding: var(--okf-space-2) 0;
+  font-size: 11.5px;
+  color: var(--text-2);
   text-align: center;
-  background: var(--okf-bg-inset);
-  border-radius: var(--okf-radius-sm);
+  background: transparent;
+  border-top: 1px solid var(--border-strong);
+  border-radius: 0;
   margin-top: var(--okf-space-2);
 }
-.okf-changes__cap-note button { font: inherit; color: var(--okf-accent); background: none; border: none; cursor: pointer; padding: 0; text-decoration: underline; }
+.okf-changes__cap-note button { font: inherit; color: var(--link); background: none; border: none; cursor: pointer; padding: 0; text-decoration: underline; text-underline-offset: 3px; }
 
 /* ---- 10. Responsive + reduced motion --------------------------------- */
 @media (max-width: 899px) {
@@ -2040,6 +2243,13 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
   .okf-comment__chevron { color: ButtonText; }
 }
 
+/* Ledger controls are 32px for fine pointers; touch keeps the 44px floor. */
+@media (pointer: coarse) {
+  :is(.okf-studiobtn, .okf-iconbtn, .okf-panel__back, .okf-panel__close, .okf-change__undo,
+    .okf-comment-toolbar__select, .okf-filters select, .okf-filters input) { min-height: 44px; }
+  .okf-comment__action { min-height: 44px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .okf-pulse { animation: none !important; }
   .okf-presence__dot { animation: none !important; }
@@ -2152,7 +2362,7 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
 .okf-conflict-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.5);
+  background: var(--studio-scrim);
   z-index: 95;  /* above the palette (90) so a conflict surfaces above it */
   display: flex;
   align-items: center;
@@ -2160,12 +2370,16 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
   padding: var(--okf-space-4);
 }
 .okf-conflict-overlay[hidden] { display: none; }
+/* The conflict dialog is a floating record: panel surface, the
+ * --shadow-pop ring, and a 2px warn rule across its top edge that marks it
+ * as needing a decision (the title says what). */
 .okf-conflict {
   width: min(640px, calc(100vw - 32px));
-  background: var(--okf-bg-elev);
-  border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  background: var(--surface);
+  border: 0;
+  border-top: 2px solid var(--okf-warn);
+  border-radius: 0;
+  box-shadow: var(--shadow-pop);
   padding: var(--okf-space-5);
   max-height: 80vh;
   overflow-y: auto;
@@ -2173,12 +2387,14 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
 .okf-conflict__title {
   margin: 0 0 var(--okf-space-2) 0;
   font-size: var(--okf-text-lg);
+  letter-spacing: -0.012em;
   color: var(--okf-fg);
 }
 .okf-conflict__lede {
   margin: 0 0 var(--okf-space-4) 0;
-  color: var(--okf-fg-muted);
-  font-size: var(--okf-text-sm);
+  color: var(--text-2);
+  font-size: 13.5px;
+  line-height: 1.55;
 }
 .okf-conflict__actions {
   display: flex;
@@ -2192,39 +2408,34 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
  * agent_conflict path's hidden "Take the agent's edit". Scope the fix to the
  * conflict actions, mirroring the [hidden] discipline used in wiki.css. */
 .okf-conflict__actions .okf-studiobtn[hidden] { display: none; }
-/* iter2 CRI2-008: "Keep mine" carries the primary weight now (it is the
+/* iter2 CRI2-008: "Keep mine" carries the primary weight (it is the
    non-destructive default; the user's edit stays). "Take the agent's"
-   discards the user's on-disk edit, so it is bordered + warn-toned to read
-   as visually distinct WITHOUT being the path of least visual resistance
-   (platform HIGs recommend destructive options not be the primary). The
-   title tooltip states the consequence on hover/focus.
-   iter3 CRI3-009: the iter-2 rule only added font-weight:600 — too weak
-   to read as the path of least visual resistance. Give it the accent
-   fill (--okf-accent background + --okf-accent-on foreground) so the
-   three-tier hierarchy is delivered: Keep mine = primary (accent fill),
-   View diff = quiet secondary (default studiobtn), Take the agent's =
-   warn-toned destructive (border-color: warn). The accent-on token is
-   documented at ≥5.65:1 contrast on accent in both themes (wiki.css
-   comment block), so the white-on-teal primary meets AA. */
+   discards the user's on-disk edit, so it reads as visually distinct
+   WITHOUT being the path of least visual resistance (platform HIGs
+   recommend destructive options not be the primary). The title tooltip
+   states the consequence on hover/focus.
+   Ledger three-tier hierarchy: Keep mine = the view's one filled primary
+   (--primary-bg / --primary-text, AA by construction in every palette);
+   View diff = outlined secondary; Take the agent's = outlined with
+   warn-hued text and a 2px warn bar (never a warn fill). */
 .okf-conflict__actions .okf-studiobtn--primary {
   font-weight: 600;
-  background: var(--okf-accent);
-  color: var(--okf-accent-on);
-  border-color: var(--okf-accent);
+  background: var(--primary-bg);
+  color: var(--primary-text);
+  border-color: var(--primary-border);
 }
 .okf-conflict__actions .okf-studiobtn--primary:hover {
-  background: var(--okf-accent-hover);
-  border-color: var(--okf-accent-hover);
+  background: var(--primary-hover-bg);
+  border-color: var(--primary-hover-bg);
 }
 .okf-conflict__take {
-  /* Destructive-but-not-primary: a warn-toned border so it stands apart
-     from the neutral secondary "View diff" without competing with the
-     primary "Keep mine". */
-  border-color: var(--okf-warn);
+  border-color: var(--btn-border);
   color: var(--okf-warn);
+  box-shadow: inset 2px 0 0 0 var(--okf-warn);
 }
 .okf-conflict__take:hover {
-  background: var(--okf-warn-bg);
+  background: var(--btn-hover-bg);
+  color: var(--okf-warn);
 }
 /* F9: shown in place of "View diff" where the session's bootstrap authority
  * cannot read /__diff (no token, or any public-ingress mode), so the
@@ -2232,8 +2443,8 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
 .okf-conflict__diff-na {
   margin: 0;
   align-self: center;
-  font-size: var(--okf-text-sm);
-  color: var(--okf-fg-muted);
+  font-size: 13px;
+  color: var(--text-2);
 }
 /* F9: labels the comparison as what it actually is — the retained BASELINE
  * revision the agent's edit was prepared against versus the retained
@@ -2252,21 +2463,21 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
   color: var(--okf-fg);
 }
 .okf-conflict__diff-caption code {
-  font-family: var(--okf-mono, ui-monospace, monospace);
-  font-size: var(--okf-text-xs);
-  background: var(--okf-bg-inset);
-  border: 1px solid var(--okf-border);
-  border-radius: var(--okf-radius-sm);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 0;
   padding: 0 4px;
 }
 .okf-conflict__diff-note {
   flex-basis: 100%;
-  color: var(--okf-fg-muted);
-  font-size: var(--okf-text-xs);
+  color: var(--text-2);
+  font-size: 11.5px;
 }
 .okf-conflict__diff {
   margin-top: var(--okf-space-2);
-  border-top: 1px solid var(--okf-border);
+  border-top: 1px solid var(--border-strong);
   padding-top: var(--okf-space-3);
   max-height: 40vh;
   overflow-y: auto;
@@ -2274,20 +2485,26 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
 .okf-conflict__diff[hidden] { display: none; }
 .okf-conflict__diff-loading,
 .okf-conflict__diff-empty {
-  color: var(--okf-fg-muted);
-  font-size: var(--okf-text-sm);
+  color: var(--text-2);
+  font-size: 13px;
   padding: var(--okf-space-2) 0;
 }
 .okf-conflict__diff-table {
   width: 100%;
   border-collapse: collapse;
-  font-family: var(--okf-mono, ui-monospace, monospace);
-  font-size: var(--okf-text-sm);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  line-height: 1.6;
 }
-.okf-conflict__diff-row--add { background: color-mix(in srgb, var(--okf-ok, #16a34a) 12%, transparent); }
-.okf-conflict__diff-row--del { background: color-mix(in srgb, var(--okf-error, #dc2626) 12%, transparent); }
+/* Diff direction is a 2px status bar in the line-number gutter plus the
+ * status-hued +/− marker; the line itself stays ink on the panel (no
+ * green/red washes). */
+.okf-conflict__diff-row--add > .okf-conflict__diff-num { box-shadow: inset -2px 0 0 0 var(--okf-ok); }
+.okf-conflict__diff-row--del > .okf-conflict__diff-num { box-shadow: inset -2px 0 0 0 var(--okf-error); }
+.okf-conflict__diff-row--del > .okf-conflict__diff-text { color: var(--text-2); }
 .okf-conflict__diff-num {
-  color: var(--okf-fg-muted);
+  color: var(--text-3);
   text-align: right;
   padding: 0 var(--okf-space-2);
   user-select: none;
@@ -2299,8 +2516,8 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
   font-weight: 600;
   width: 1.5rem;
 }
-.okf-conflict__diff-row--add .okf-conflict__diff-kind { color: var(--okf-ok, #16a34a); }
-.okf-conflict__diff-row--del .okf-conflict__diff-kind { color: var(--okf-error, #dc2626); }
+.okf-conflict__diff-row--add .okf-conflict__diff-kind { color: var(--okf-ok); }
+.okf-conflict__diff-row--del .okf-conflict__diff-kind { color: var(--okf-error); }
 .okf-conflict__diff-text {
   white-space: pre-wrap;
   word-break: break-word;
@@ -2330,10 +2547,15 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
 .okf-page-utilities .okf-page-feedback { display: contents; }
 .okf-page-feedback__note {
   flex-basis: 100%; max-width: 60ch; margin: 0;
-  color: var(--okf-fg-muted); font-size: var(--okf-text-sm);
+  color: var(--text-2); font-size: 12.5px;
 }
 .okf-page-utilities .okf-page-feedback__note { padding: 0 var(--okf-space-1) var(--okf-space-1); }
-.okf-page-feedback[data-state="error"] .okf-page-feedback__note { color: var(--okf-broken); }
+.okf-page-feedback[data-state="error"] .okf-page-feedback__note {
+  color: var(--okf-error);
+  font-weight: 600;
+  padding-left: 10px;
+  border-left: 2px solid var(--okf-error);
+}
 .okf-page-feedback .okf-btn:focus-visible {
   outline: var(--okf-focus-width) solid var(--okf-focus-color);
   outline-offset: var(--okf-focus-offset);
@@ -2346,15 +2568,15 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
    page-scoped list when the rest of the bundle has threads. */
 .okf-comment__target {
   margin: var(--okf-space-1) 0 0;
-  color: var(--okf-fg-muted);
-  font-size: var(--okf-text-xs);
+  color: var(--text-2);
+  font-size: 11.5px;
   overflow-wrap: anywhere;
 }
-.okf-comment__target-link { color: var(--okf-accent); text-underline-offset: 2px; }
+.okf-comment__target-link { color: var(--link); text-underline-offset: 3px; }
 .okf-comment__target-link:focus-visible {
-  outline: 2px solid var(--okf-accent);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
-  border-radius: var(--okf-radius-sm);
+  border-radius: 0;
 }
 .okf-comment-list__elsewhere {
   display: flex;
@@ -2363,9 +2585,9 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
   gap: var(--okf-space-2);
   margin: var(--okf-space-3) 0 0;
   padding-top: var(--okf-space-3);
-  border-top: 1px solid var(--okf-border);
-  color: var(--okf-fg-muted);
-  font-size: var(--okf-text-sm);
+  border-top: 1px solid var(--border-strong);
+  color: var(--text-2);
+  font-size: 13px;
 }
 @media (pointer: coarse) {
   .okf-comment-list__elsewhere .okf-comment__action { min-height: 44px; }
@@ -2376,36 +2598,40 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
 .okf-agent-availability {
   margin: var(--okf-space-3) 0 0;
   padding-left: var(--okf-space-3);
-  border-left: 3px solid var(--okf-border-strong);
-  color: var(--okf-fg-muted);
-  font-size: var(--okf-text-sm);
+  border-left: 2px solid var(--border-strong);
+  color: var(--text-2);
+  font-size: 13px;
   line-height: 1.45;
 }
 .okf-agent-availability[data-level="active"],
 .okf-agent-availability[data-level="seen"] { border-left-color: var(--okf-ok); color: var(--okf-fg); }
-.okf-agent-availability[data-level="flagged"] { border-left-color: var(--okf-warn, var(--okf-accent)); color: var(--okf-fg); }
+.okf-agent-availability[data-level="flagged"] { border-left-color: var(--okf-warn); color: var(--okf-fg); }
 .okf-agent-setup {
   margin: var(--okf-space-4) 0;
-  padding: var(--okf-space-3);
-  border: 1px solid var(--okf-border);
-  border-radius: var(--okf-radius-sm);
-  font-size: var(--okf-text-sm);
+  padding: var(--okf-space-3) 0 0;
+  border: 0;
+  border-top: 1px solid var(--border-strong);
+  border-radius: 0;
+  font-size: 13px;
 }
 .okf-agent-setup > summary { cursor: pointer; font-weight: 600; }
 .okf-agent-setup > summary:focus-visible,
 .okf-agent-setup__commands:focus-visible {
-  outline: 2px solid var(--okf-accent);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
-  border-radius: var(--okf-radius-sm);
+  border-radius: 0;
 }
 .okf-agent-setup p { margin: var(--okf-space-2) 0; }
 .okf-agent-setup__commands {
   margin: var(--okf-space-2) 0;
-  padding: var(--okf-space-3);
+  padding: 12px 14px;
   overflow-x: auto;
-  background: var(--okf-bg-inset);
-  border-radius: var(--okf-radius-sm);
-  font-size: var(--okf-text-xs);
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: 0;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.6;
   white-space: pre;
 }
 @media (pointer: coarse) {
@@ -2413,21 +2639,24 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
 }
 
 /* ---- Proposal inspection (X3) ----------------------------------------
- * The opt-in, inspection-only Proposals panel. It is wider than the 440px
+ * The opt-in, inspection-only Proposals panel. It is wider than the 320px
  * drawer so a side-by-side diff has room; _syncPanelRail() measures the
  * drawer, so the rail/overlay decision and the reserved padding follow the
  * real width. Colour is never the only cue: every state is a word, every
- * diff line carries a +/− marker and a screen-reader label. */
+ * diff line carries a +/− marker and a screen-reader label.
+ * Ledger status: ready/applied/accepted/pass = ok; in_review/undecided =
+ * info; conflicted/blocked/not_run = warn; rejected/invalid/fail = error —
+ * as status-hued text, a square icon and 2px bars only, never a fill. */
 #okf-panel[data-okf-panel-wide="true"] { width: min(1080px, 100vw); }
-.okf-proposals { font-size: var(--okf-text-sm); line-height: 1.45; }
-.okf-proposals .okf-muted { color: var(--okf-fg-muted); }
+.okf-proposals { font-size: 13px; line-height: 1.5; }
+.okf-proposals .okf-muted { color: var(--text-2); }
 .okf-proposals code {
-  font-family: var(--okf-mono, ui-monospace, monospace);
-  font-size: var(--okf-text-xs);
+  font-family: var(--font-mono);
+  font-size: 11px;
   overflow-wrap: anywhere;
 }
 .okf-proposals :is(button, select, summary, a, [tabindex]):focus-visible {
-  outline: var(--okf-focus-width, 2px) solid var(--okf-focus-color, var(--okf-accent));
+  outline: var(--okf-focus-width, 2px) solid var(--focus);
   outline-offset: var(--okf-focus-offset, 2px);
 }
 .okf-proposals__header {
@@ -2435,20 +2664,22 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
   gap: var(--okf-space-2);
   padding-bottom: var(--okf-space-3);
   margin-bottom: var(--okf-space-3);
-  border-bottom: 1px solid var(--okf-border);
+  border-bottom: 1px solid var(--border-strong);
 }
 .okf-proposals__title,
 .okf-proposal-detail__title {
   margin: 0;
-  font-size: var(--okf-text-md);
-  line-height: 1.3;
+  font-size: var(--okf-text-lg);
+  font-weight: 700;
+  letter-spacing: -0.012em;
+  line-height: 1.25;
   overflow-wrap: anywhere;
-  border-radius: var(--okf-radius-sm);
+  border-radius: 0;
 }
 .okf-proposals__intro {
   margin: 0 0 var(--okf-space-2);
   max-width: 76ch;
-  color: var(--okf-fg-muted);
+  color: var(--text-2);
 }
 .okf-proposals__header .okf-proposals__intro { margin: 0; }
 .okf-proposals__controls {
@@ -2458,39 +2689,46 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
   gap: var(--okf-space-2) var(--okf-space-3);
 }
 .okf-proposals__field { display: inline-flex; align-items: center; gap: var(--okf-space-2); }
-.okf-proposals__field label { font-weight: 600; }
+.okf-proposals__field label {
+  font-family: var(--font-label);
+  font-size: var(--label-size, 9.5px);
+  font-weight: var(--label-weight, 500);
+  letter-spacing: var(--label-track, 0.16em);
+  text-transform: uppercase;
+  color: var(--text-2);
+}
 .okf-proposals__field select {
   font: inherit;
-  min-height: 32px;
+  min-height: var(--ctl-h, 32px);
   padding: 4px 8px;
-  border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-sm);
-  background: var(--okf-bg-elev);
-  color: var(--okf-fg);
+  border: 1px solid var(--input-border);
+  border-radius: 0;
+  background-color: var(--input-bg);
+  color: var(--input-text);
 }
 .okf-proposals__updated {
   margin: 0 0 0 auto;
-  color: var(--okf-fg-muted);
-  font-size: var(--okf-text-xs);
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
   font-variant-numeric: tabular-nums;
 }
-.okf-proposals__caption { margin: 0; max-width: 76ch; color: var(--okf-fg-muted); font-size: var(--okf-text-xs); }
-.okf-proposals__body[aria-busy="true"] { opacity: 0.7; }
-@media (prefers-reduced-motion: no-preference) {
-  .okf-proposals__body { transition: opacity 120ms ease; }
-}
+.okf-proposals__caption { margin: 0; max-width: 76ch; color: var(--text-2); font-size: 11.5px; }
+/* Refreshing keeps the old rows readable; the busy cue is the caption and
+ * aria-busy, plus a dashed rule (never dimmed ink). */
+.okf-proposals__body[aria-busy="true"] { outline: 1px dashed var(--border-strong); outline-offset: 4px; }
 .okf-proposals__error {
   margin: 0 0 var(--okf-space-3);
-  padding: var(--okf-space-3);
-  border: 1px solid var(--okf-error);
-  border-left-width: 4px;
-  border-radius: var(--okf-radius-sm);
-  background: var(--okf-error-bg);
+  padding: var(--okf-space-2) var(--okf-space-3);
+  border: 0;
+  border-left: 2px solid var(--okf-error);
+  border-radius: 0;
+  background: transparent;
   color: var(--okf-fg);
 }
 .okf-proposals__error p { margin: 0 0 var(--okf-space-2); }
-.okf-proposals__error-title { font-weight: 700; }
-.okf-proposals__error-meta { color: var(--okf-fg-muted); font-size: var(--okf-text-xs); overflow-wrap: anywhere; }
+.okf-proposals__error-title { font-weight: 700; color: var(--okf-error); }
+.okf-proposals__error-meta { color: var(--text-2); font-size: 11.5px; overflow-wrap: anywhere; }
 .okf-proposals__more {
   display: flex;
   flex-wrap: wrap;
@@ -2499,84 +2737,81 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
   margin-top: var(--okf-space-3);
 }
 .okf-proposals__more .okf-proposals__error-meta { flex-basis: 100%; margin: 0; }
-.okf-proposals__more .okf-studiobtn[aria-disabled="true"] { opacity: 0.6; cursor: progress; }
+.okf-proposals__more .okf-studiobtn[aria-disabled="true"] { cursor: progress; }
 .okf-proposals__blocked { margin-top: var(--okf-space-2); }
 .okf-proposals__blocked .okf-proposal-unavailable__title { margin: 0 0 var(--okf-space-2); font-size: var(--okf-text-base); }
 
-/* List rows: one button per proposal revision. */
-.okf-proposals__list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--okf-space-2); }
+/* List rows: one button per proposal revision — hairline-divided records
+ * whose 2px left bar carries the state hue. */
+.okf-proposals__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
 .okf-proposal-row__open {
   display: grid;
   gap: 4px;
   width: 100%;
-  padding: var(--okf-space-2) var(--okf-space-3);
+  padding: 10px 12px;
   font: inherit;
   text-align: left;
   color: var(--okf-fg);
-  background: var(--okf-bg-elev);
-  border: 1px solid var(--okf-border);
-  border-left: 4px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-sm);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-left: 2px solid var(--border-strong);
+  border-radius: 0;
   cursor: pointer;
 }
-.okf-proposal-row__open:hover { background: var(--okf-bg-inset); border-color: var(--okf-border-strong); }
-.okf-proposal-row__open:active { background: var(--okf-active-fill, var(--okf-bg-inset)); }
+.okf-proposal-row__open:hover { background: var(--surface-2); }
+.okf-proposal-row__open:active { background: var(--okf-press-fill); }
 .okf-proposal-row__open:is([data-state="ready"], [data-state="applied"]) { border-left-color: var(--okf-ok); }
 .okf-proposal-row__open[data-state="in_review"] { border-left-color: var(--okf-info); }
 .okf-proposal-row__open[data-state="conflicted"] { border-left-color: var(--okf-warn); }
+.okf-proposal-row__open:is([data-state="rejected"], [data-state="invalid"]) { border-left-color: var(--okf-error); }
 .okf-proposal-row__top {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--okf-space-2);
 }
-.okf-proposal-row__summary { min-width: 0; font-weight: 600; font-size: var(--okf-text-base); overflow-wrap: anywhere; }
-.okf-proposal-row__meta { color: var(--okf-fg-muted); font-size: var(--okf-text-xs); }
+.okf-proposal-row__summary { min-width: 0; font-weight: 600; font-size: 14.5px; letter-spacing: -0.005em; overflow-wrap: anywhere; }
+.okf-proposal-row__meta { color: var(--text-2); font-size: 11.5px; }
 .okf-proposal-row__id {
-  color: var(--okf-fg-muted);
-  font-family: var(--okf-mono, ui-monospace, monospace);
-  font-size: var(--okf-text-xs);
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
   overflow-wrap: anywhere;
 }
 
-/* State pills: tinted surface, tone border, body-colour text (contrast
- * holds in every theme); the word is the state. */
+/* State labels: an outlined mono micro-label with a 6px square icon. The
+ * label text and icon take the status hue (≥4.5:1 on every surface); the
+ * label never fills. The word is the state. */
 .okf-proposal-pill {
   display: inline-flex;
   flex: none;
   align-items: center;
-  gap: 5px;
-  padding: 0 8px;
-  border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-pill);
-  background: var(--okf-bg-inset);
-  color: var(--okf-fg);
-  font-size: var(--okf-text-xs);
-  font-weight: 600;
+  gap: 6px;
+  padding: 1px 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-label);
+  font-size: var(--label-size, 9.5px);
+  font-weight: var(--label-weight, 500);
+  letter-spacing: var(--label-track, 0.16em);
+  text-transform: uppercase;
   line-height: 1.6;
   white-space: nowrap;
 }
 .okf-proposal-pill::before {
   content: "";
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--okf-fg-muted);
+  width: 6px;
+  height: 6px;
+  border-radius: 0;
+  background: currentColor;
 }
-.okf-proposal-pill:is([data-state="ready"], [data-state="applied"], [data-state="accepted"], [data-state="pass"]) {
-  border-color: var(--okf-ok); background: var(--okf-ok-bg);
-}
-.okf-proposal-pill:is([data-state="ready"], [data-state="applied"], [data-state="accepted"], [data-state="pass"])::before { background: var(--okf-ok); }
-.okf-proposal-pill:is([data-state="in_review"], [data-state="undecided"]) { border-color: var(--okf-info); background: var(--okf-info-bg); }
-.okf-proposal-pill:is([data-state="in_review"], [data-state="undecided"])::before { background: var(--okf-info); }
-.okf-proposal-pill:is([data-state="conflicted"], [data-state="blocked"], [data-state="not_run"]) {
-  border-color: var(--okf-warn); background: var(--okf-warn-bg);
-}
-.okf-proposal-pill:is([data-state="conflicted"], [data-state="blocked"], [data-state="not_run"])::before { background: var(--okf-warn); }
-.okf-proposal-pill:is([data-state="rejected"], [data-state="invalid"], [data-state="fail"]) {
-  border-color: var(--okf-error); background: var(--okf-error-bg);
-}
-.okf-proposal-pill:is([data-state="rejected"], [data-state="invalid"], [data-state="fail"])::before { background: var(--okf-error); }
+.okf-proposal-pill:is([data-state="ready"], [data-state="applied"], [data-state="accepted"], [data-state="pass"]) { color: var(--okf-ok); }
+.okf-proposal-pill:is([data-state="in_review"], [data-state="undecided"]) { color: var(--okf-info); }
+.okf-proposal-pill:is([data-state="conflicted"], [data-state="blocked"], [data-state="not_run"]) { color: var(--okf-warn); }
+.okf-proposal-pill:is([data-state="rejected"], [data-state="invalid"], [data-state="fail"]) { color: var(--okf-error); }
 
 /* Detail view. */
 .okf-proposal-detail__nav {
@@ -2594,22 +2829,30 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
   gap: var(--okf-space-2) var(--okf-space-3);
   margin: 0 0 var(--okf-space-3);
   padding: var(--okf-space-2) var(--okf-space-3);
-  border: 1px solid var(--okf-info);
-  border-radius: var(--okf-radius-sm);
-  background: var(--okf-info-bg);
+  border: 0;
+  border-left: 2px solid var(--okf-info);
+  border-radius: 0;
+  background: transparent;
   color: var(--okf-fg);
 }
 .okf-proposal-notice p { margin: 0; flex: 1 1 18rem; }
+/* Facts are a field list: mono heads, hairline rows. */
 .okf-proposal-facts {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
-  gap: 6px var(--okf-space-4);
+  gap: 0 var(--okf-space-4);
   margin: 0;
 }
-.okf-proposal-facts dt { color: var(--okf-fg-muted); font-weight: 600; }
+.okf-proposal-facts :is(dt, dd) { padding: 5px 0; border-bottom: 1px solid var(--border); }
+.okf-proposal-facts dt {
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 400;
+}
 .okf-proposal-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .okf-proposal-facts a,
-.okf-proposal-change__link { color: var(--okf-accent); text-underline-offset: 2px; }
+.okf-proposal-change__link { color: var(--link); text-underline-offset: 3px; }
 .okf-proposal-section { margin-top: var(--okf-space-5); }
 .okf-proposal-section__head {
   display: flex;
@@ -2619,35 +2862,37 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
   gap: var(--okf-space-2);
   margin-bottom: var(--okf-space-2);
   padding-bottom: var(--okf-space-1);
-  border-bottom: 1px solid var(--okf-border);
+  border-bottom: 1px solid var(--border-strong);
 }
-.okf-proposal-section__title { margin: 0; font-size: var(--okf-text-base); font-weight: 700; }
-.okf-proposal-subtitle { margin: var(--okf-space-3) 0 var(--okf-space-2); font-size: var(--okf-text-sm); font-weight: 700; }
+.okf-proposal-section__title { margin: 0; font-size: 15.5px; font-weight: 700; }
+.okf-proposal-subtitle { margin: var(--okf-space-3) 0 var(--okf-space-2); font-size: 13px; font-weight: 700; }
 .okf-proposal-section > p,
 .okf-proposal-section > .okf-proposal-facts { margin: 0 0 var(--okf-space-2); }
 .okf-proposal-rationale { max-width: 76ch; white-space: pre-wrap; overflow-wrap: anywhere; }
 .okf-proposal-conflicts { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--okf-space-2); }
 .okf-proposal-conflict {
   padding: var(--okf-space-2) var(--okf-space-3);
-  border: 1px solid var(--okf-warn);
-  border-left-width: 4px;
-  border-radius: var(--okf-radius-sm);
-  background: var(--okf-warn-bg);
+  border: 0;
+  border-left: 2px solid var(--okf-warn);
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
   color: var(--okf-fg);
 }
 .okf-proposal-conflict p { margin: 0 0 4px; }
 .okf-proposal-conflict p:last-child { margin-bottom: 0; }
-.okf-proposal-conflict__meta { color: var(--okf-fg-muted); font-size: var(--okf-text-xs); overflow-wrap: anywhere; }
+.okf-proposal-conflict__meta { color: var(--text-2); font-size: 11.5px; overflow-wrap: anywhere; }
 .okf-proposal-layout { display: inline-flex; gap: 0; }
-.okf-proposal-layout .okf-studiobtn:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
-.okf-proposal-layout .okf-studiobtn + .okf-studiobtn { margin-left: -1px; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.okf-proposal-layout .okf-studiobtn + .okf-studiobtn { margin-left: -1px; }
 .okf-proposal-change {
   margin-top: var(--okf-space-3);
-  padding: var(--okf-space-3);
-  border: 1px solid var(--okf-border);
-  border-radius: var(--okf-radius-sm);
-  background: var(--okf-bg);
+  padding: var(--okf-space-3) 0 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
 }
+.okf-proposal-section__head + .okf-proposal-change { margin-top: 0; padding-top: var(--okf-space-1); border-top: 0; }
 .okf-proposal-change__head {
   display: flex;
   flex-wrap: wrap;
@@ -2657,85 +2902,96 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
 }
 .okf-proposal-change__title {
   margin: 0;
-  font-family: var(--okf-mono, ui-monospace, monospace);
-  font-size: var(--okf-text-sm);
-  font-weight: 700;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
-.okf-proposal-change__meta { margin: 4px 0 var(--okf-space-2); color: var(--okf-fg-muted); font-size: var(--okf-text-xs); overflow-wrap: anywhere; }
+.okf-proposal-change__meta { margin: 4px 0 var(--okf-space-2); color: var(--text-2); font-size: 11.5px; overflow-wrap: anywhere; }
 .okf-proposal-change__full { display: grid; gap: var(--okf-space-1); margin-top: var(--okf-space-2); }
 
 /* Diff tables (split and unified); bounded scrollport with a sticky head. */
 .okf-proposal-diff__scroll {
   max-height: min(70vh, 48rem);
   overflow: auto;
-  border: 1px solid var(--okf-border);
-  border-radius: var(--okf-radius-sm);
-  background: var(--okf-bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--surface);
 }
 .okf-proposal-diff {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  font-size: var(--okf-text-xs);
-  line-height: 1.5;
+  font-size: 11.5px;
+  line-height: 1.55;
 }
-.okf-proposal-diff td { font-family: var(--okf-mono, ui-monospace, monospace); }
+.okf-proposal-diff td { font-family: var(--font-mono); }
+/* Sticky head: mono micro-label over a --border-strong rule. It keeps an
+ * opaque panel ground so scrolled lines never show through it. */
 .okf-proposal-diff th {
   position: sticky;
   top: 0;
   z-index: 1;
-  padding: 4px 6px;
+  padding: 6px 6px;
   text-align: left;
-  font-weight: 600;
-  color: var(--okf-fg-muted);
-  background: var(--okf-bg-inset);
-  border-bottom: 1px solid var(--okf-border);
+  font-family: var(--font-label);
+  font-size: var(--label-size, 9.5px);
+  font-weight: var(--label-weight, 500);
+  letter-spacing: var(--label-track, 0.16em);
+  text-transform: uppercase;
+  color: var(--text-2);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-strong);
 }
 .okf-proposal-diff .okf-proposal-diff__th--num { width: 3.25rem; text-align: right; }
 .okf-proposal-diff .okf-proposal-diff__th--kind { width: 2.25rem; text-align: center; }
 .okf-proposal-diff td { padding: 0 6px; vertical-align: top; }
 .okf-proposal-diff__num {
   text-align: right;
-  color: var(--okf-fg-muted);
+  color: var(--text-3);
   font-variant-numeric: tabular-nums;
   user-select: none;
 }
-.okf-proposal-diff--split .okf-proposal-diff__num { border-left: 1px solid var(--okf-border); }
+.okf-proposal-diff--split .okf-proposal-diff__num { border-left: 1px solid var(--border); }
 .okf-proposal-diff--split .okf-proposal-diff__row > .okf-proposal-diff__num:first-child { border-left: 0; }
 .okf-proposal-diff__text { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--okf-fg); }
 .okf-proposal-diff__kind { text-align: center; font-weight: 700; }
 .okf-proposal-diff__marker { display: inline-block; min-width: 1ch; margin-right: 4px; font-weight: 700; user-select: none; }
+/* Added/deleted lines: a 2px status bar on the line's leading edge plus
+ * the status-hued +/− marker. Deleted text drops to secondary ink; the
+ * line ground stays the panel (no green/red washes). */
 .okf-proposal-diff__cell--add,
-.okf-proposal-diff__row--add > td { background: color-mix(in srgb, var(--okf-ok) 14%, transparent); }
+.okf-proposal-diff__row--add > td:first-child { box-shadow: inset 2px 0 0 0 var(--okf-ok); }
 .okf-proposal-diff__cell--del,
-.okf-proposal-diff__row--del > td { background: color-mix(in srgb, var(--okf-error) 14%, transparent); }
-.okf-proposal-diff__cell--empty {
-  background: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--okf-separator-subtle) 55%, transparent) 6px 7px);
-}
+.okf-proposal-diff__row--del > td:first-child { box-shadow: inset 2px 0 0 0 var(--okf-error); }
+.okf-proposal-diff__cell--del .okf-proposal-diff__text,
+.okf-proposal-diff__row--del .okf-proposal-diff__text { color: var(--text-2); }
+/* A side with no counterpart line: the band ground, flat. */
+.okf-proposal-diff__cell--empty { background: var(--bg-2); }
 .okf-proposal-diff__cell--add .okf-proposal-diff__marker,
 .okf-proposal-diff__row--add .okf-proposal-diff__marker { color: var(--okf-ok); }
 .okf-proposal-diff__cell--del .okf-proposal-diff__marker,
 .okf-proposal-diff__row--del .okf-proposal-diff__marker { color: var(--okf-error); }
 .okf-proposal-diff__hunk > td {
   padding: 3px 6px;
-  color: var(--okf-fg-muted);
-  background: var(--okf-info-bg);
-  border-block: 1px solid var(--okf-border);
+  color: var(--okf-info);
+  font-family: var(--font-mono);
+  background: var(--bg-2);
+  border-block: 1px solid var(--border);
   overflow-wrap: anywhere;
 }
-.okf-proposal-diff__note > td { padding: 2px 6px; color: var(--okf-fg-muted); font-style: italic; }
+.okf-proposal-diff__note > td { padding: 2px 6px; color: var(--text-2); font-style: italic; }
 .okf-proposal-diff__more { display: flex; flex-wrap: wrap; align-items: center; gap: var(--okf-space-2); margin-top: var(--okf-space-2); }
 .okf-proposal-diff__more:empty { display: none; }
-.okf-proposal-diff__all { margin: 0; color: var(--okf-fg-muted); font-size: var(--okf-text-xs); }
+.okf-proposal-diff__all { margin: 0; color: var(--text-2); font-size: 11.5px; }
 .okf-proposal-fulltext > summary {
   display: inline-flex;
   align-items: center;
   min-height: 28px;
   cursor: pointer;
-  color: var(--okf-accent);
+  color: var(--link);
   font-weight: 600;
-  border-radius: var(--okf-radius-sm);
+  border-radius: 0;
 }
 .okf-proposal-fulltext__body { margin-top: var(--okf-space-1); }
 .okf-proposal-fulltext__body > p { margin: 0; }
@@ -2743,13 +2999,14 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
   margin: 0;
   max-height: min(50vh, 32rem);
   overflow: auto;
-  padding: var(--okf-space-2) var(--okf-space-3);
-  border: 1px solid var(--okf-border);
-  border-radius: var(--okf-radius-sm);
-  background: var(--okf-pre-bg, var(--okf-bg-inset));
-  color: var(--okf-pre-fg, var(--okf-fg));
-  font-family: var(--okf-mono, ui-monospace, monospace);
-  font-size: var(--okf-text-xs);
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 0;
+  background: var(--okf-pre-bg);
+  color: var(--okf-pre-fg);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -2757,8 +3014,9 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
 /* Operation and attempt tables. */
 .okf-proposal-table-wrap {
   overflow-x: auto;
-  border: 1px solid var(--okf-border);
-  border-radius: var(--okf-radius-sm);
+  border-top: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+  border-radius: 0;
 }
 /* On narrow drawers the table scrolls inside its focusable region instead of
  * crushing identifiers into one-character columns. */
@@ -2769,22 +3027,34 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
   padding: 6px 8px;
   text-align: left;
   vertical-align: top;
-  border-bottom: 1px solid var(--okf-border);
+  border-bottom: 1px solid var(--border);
 }
 .okf-proposal-table tbody tr:last-child > td { border-bottom: 0; }
-.okf-proposal-table th { font-weight: 600; color: var(--okf-fg-muted); background: var(--okf-bg-inset); white-space: nowrap; }
+.okf-proposal-table tbody tr:hover > td { background: var(--surface-2); }
+.okf-proposal-table th {
+  font-family: var(--font-label);
+  font-size: var(--label-size, 9.5px);
+  font-weight: var(--label-weight, 500);
+  letter-spacing: var(--label-track, 0.16em);
+  text-transform: uppercase;
+  color: var(--text-2);
+  background: transparent;
+  border-bottom-color: var(--border-strong);
+  white-space: nowrap;
+}
 .okf-proposal-table__strong { display: block; font-weight: 600; }
-.okf-proposal-table__id { display: block; color: var(--okf-fg-muted); }
-.okf-proposal-table__meta { display: block; margin-top: 2px; color: var(--okf-fg-muted); overflow-wrap: anywhere; }
+.okf-proposal-table__id { display: block; color: var(--text-3); font-family: var(--font-mono); font-size: 10.5px; }
+.okf-proposal-table__meta { display: block; margin-top: 2px; color: var(--text-2); overflow-wrap: anywhere; }
 .okf-proposal-table__line { display: block; overflow-wrap: anywhere; }
 .okf-proposal-table .okf-proposal-pill { margin-bottom: 2px; }
 .okf-proposal-validation__status { display: flex; flex-wrap: wrap; align-items: center; gap: var(--okf-space-2); }
 .okf-proposal-findings { margin: 0; padding-left: 1.25rem; display: grid; gap: 4px; }
 .okf-proposal-findings__severity {
-  font-size: var(--okf-text-xs);
-  font-weight: 700;
+  font-family: var(--font-label);
+  font-size: var(--label-size, 9.5px);
+  font-weight: var(--label-weight, 500);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: var(--label-track, 0.16em);
 }
 @media (max-width: 520px) {
   .okf-proposal-facts { grid-template-columns: minmax(0, 1fr); gap: 2px; }

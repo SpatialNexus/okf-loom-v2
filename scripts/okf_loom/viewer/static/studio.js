@@ -17,8 +17,8 @@
  *   - Extension API (§13.6): okfLoomStudio.register(kind, impl). Wired kinds:
  *     {panel, viewMode}. Reserved (forward-compat, accepted + warned):
  *     {toolbar, graphDecorator, suggestionRenderer}.
- *   - Themes (§13.5): owned entirely by viewer/static/theme.js (family x
- *     mode: swiss/technical x auto/light/dark). This file only calls the
+ *   - Themes (§13.5): owned entirely by viewer/static/theme.js (Ledger
+ *     palettes bone/slate/clay/plum + system). This file only calls the
  *     theme.js API and registers its own overlays into the shared
  *     window.OKFOverlayStack so the theme Appearance menu can yield Escape
  *     to the actually-topmost studio modal.
@@ -395,6 +395,7 @@
   function shortId(id) { return id ? id.slice(-6) : ""; }
 
   // ---- toast region ----------------------------------------------------
+  const TOAST_GLYPHS = { success: "OK", error: "!", warn: "?" };
   let toastRegion;
   function toast(msg, opts) {
     opts = opts || {};
@@ -403,6 +404,10 @@
       document.body.appendChild(toastRegion);
     }
     const node = el("div", { class: "okf-toast", dataset: { tone: opts.tone || "" } });
+    // A toned toast carries a glyph beside its 2px status bar so the tone is
+    // never colour-only (WCAG 1.4.1). Decorative: the message says it.
+    const glyph = TOAST_GLYPHS[opts.tone];
+    if (glyph) node.appendChild(el("span", { class: "okf-toast__icon", "aria-hidden": "true", text: glyph }));
     node.appendChild(el("span", { class: "okf-toast__msg" }));
     node.querySelector(".okf-toast__msg").innerHTML = ""; // safety
     if (typeof msg === "string") {
@@ -495,7 +500,7 @@
   // ====================================================================
   // 2. Themes (§13.5) — state ownership delegated to theme.js
   // ====================================================================
-  // Theme state (family/mode/Auto/OS, persistence, the Appearance popover)
+  // Theme state (palette choice incl. System/OS, persistence, the Appearance popover)
   // is owned ENTIRELY by viewer/static/theme.js, which loads before this
   // module and resolves data-theme before first paint. The studio NEVER
   // reads/writes localStorage for theme and never sets data-theme; command
