@@ -1021,9 +1021,10 @@ summary, authored body, relationships/why connected, then Lens explanation and
 Graph settings. Each lens answers one
 question with a real algorithm (see
 [Why the graph is organised into question-named lenses](/explanation/live_studio_design.md#why-the-graph-is-organised-into-question-named-lenses)
-for the evidence base): Map (deterministic Louvain communities as colour +
-PageRank as size), Themes (strong community grouping + ranked theme
-digest), Flow (dagre layered layout over directed/typed edges, falling
+for the evidence base): Map (neutral nodes, deterministic Louvain community
+grouping and PageRank as size), Themes (strong community grouping, muted
+palette-derived community colours and a ranked theme digest), Flow (dagre
+layered layout over directed/typed edges, falling
 back to directed breadthfirst), Bridges (betweenness centrality as
 colour/size + ranked bridgers), Recent (effective generation-time recency
 ramp), and Explore neighborhood (topology isolation with a depth control;
@@ -1034,12 +1035,15 @@ reserved for distraction-free document reading. A `Find in graph` region
 combines query and filters; zoom, fit, fullscreen, and reset form one named
 viewport toolbar. A `Graph settings` disclosure holds spacing and layout
 controls, relationship bundles, the type filter, a relationship-label toggle,
-and a 'Colour by theme' toggle. Graph nodes are neutral by default; selection
-uses an accent stroke. Active lenses (communities, recency, bridges, importance
-or groups) use a muted ramp derived from the current palette and repaint on
-every palette change. Content types are never colour-coded. The selected concept's authored body uses the same progressive renderers
+and a 'Colour by theme' toggle, which applies the same muted community ramp
+as the Themes lens. Map, Flow and Explore neighborhood default to neutral round
+nodes; selection uses a 4px accent stroke. Colour encodings for communities, recency,
+bridges, importance or groups use a muted ramp derived from the current palette
+and repaint on every palette change. Halos and count badges are square;
+content types are never colour-coded. The selected concept's authored body uses the same progressive renderers
 (mermaid/KaTeX/highlight.js) as the wiki pages. Suggested starting points rank
-structural hubs before the theme digest. Hover
+structural hubs before the theme digest as ruled rows with mono figures and
+2px score bars, never filled importance bars. Hover
 previews, shift-click path tracing, keyboard navigation, clickable
 legend type filters, deterministic layouts, and live SSE canvas updates
 are part of the contract. Concept and relationship alternatives are one-stop
