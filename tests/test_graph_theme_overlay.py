@@ -113,6 +113,9 @@ def test_mobile_graph_appearance_overlay_has_topmost_pointer_and_keyboard_contro
     assert geometry["menu"]["left"] >= -0.5
     assert geometry["menu"]["right"] <= width + 0.5
     assert geometry["menu"]["top"] >= -0.5
+    # The five-option Ledger menu is taller than the old one; theme.js still
+    # clamps it inside the 844px viewport.
+    assert geometry["menu"]["bottom"] <= 844 + 0.5, geometry
     assert geometry["hitInsideMenu"], geometry
     assert all(z < geometry["menu"]["z"] for z in geometry["chromeZ"]), geometry
     assert geometry["scrollWidth"] <= geometry["clientWidth"] + 1, geometry
@@ -534,6 +537,84 @@ def test_selected_lens_preview_stays_legible_in_every_palette_and_forced_colours
     forced = page.evaluate(_SELECTED_LENS_PREVIEW_JS)
     assert forced["line"] >= 4.5 and forced["node"] >= 4.5, forced
     assert forced["selectedCue"] == '"Selected"', forced
+
+
+_FORCED_GRAPH_SNAPSHOT_JS = """() => {
+  const graph = window.__okfLoomGraph;
+  const node = graph.cy.nodes(':selected').first();
+  const edge = graph.cy.edges().not('.okf-path').not(':selected').first();
+  const resolve = value => {
+    const probe = document.createElement('span');
+    probe.style.color = value;
+    probe.style.position = 'fixed';
+    probe.style.visibility = 'hidden';
+    document.body.appendChild(probe);
+    const result = getComputedStyle(probe).color;
+    probe.remove();
+    return result;
+  };
+  const rgb = value => {
+    const match = String(value || '').match(/rgba?\\(([^)]+)/);
+    return match ? match[1].split(',').slice(0, 3).map(v => v.trim()).join(',') : null;
+  };
+  const style = (element, name) => element && element.length ? rgb(element.style(name)) : null;
+  return {
+    theme: document.documentElement.dataset.theme,
+    forced: matchMedia('(forced-colors: active)').matches,
+    text: rgb(resolve('CanvasText')),
+    canvas: rgb(resolve('Canvas')),
+    highlight: rgb(resolve('Highlight')),
+    nodeText: style(node, 'color'),
+    nodeBorder: style(node, 'border-color'),
+    nodeBackground: style(node, 'text-background-color'),
+    nodeOutline: style(node, 'text-outline-color'),
+    edgeLine: style(edge, 'line-color'),
+    edgeArrow: style(edge, 'target-arrow-color'),
+    edgeBackground: style(edge, 'text-background-color'),
+  };
+}"""
+
+
+def test_forced_colors_graph_preserves_system_palette_on_theme_change(
+    server_url: str, page
+) -> None:
+    """Under forced colours every palette event leaves the canvas on the
+    system palette: node ink and edges in CanvasText, label plates in Canvas,
+    the selected node's stroke in Highlight -- in Bone, Slate, Clay and Plum,
+    never an ordinary palette token (port of the pre-Ledger release test)."""
+    try:
+        page.emulate_media(forced_colors="active", color_scheme="light")
+    except Exception as exc:  # platform/browser inability only
+        pytest.fail(f"forced-colors emulation failed on provisioned browser: {exc}")
+    if not page.evaluate("() => window.matchMedia('(forced-colors: active)').matches"):
+        pytest.fail("browser accepted forced-colors request but did not expose the media state")
+
+    _open_graph(page, server_url)
+    page.evaluate("""() => {
+      const G = window.__okfLoomGraph;
+      G.interaction.dispatch({type: 'SELECT', id: G.cy.nodes().first().id(), source: 'test', quietUrl: true});
+    }""")
+    page.wait_for_function("() => window.__okfLoomGraph.cy.nodes(':selected').length === 1")
+    for palette in PALETTES:
+        _set_palette(page, palette)
+        snap = page.evaluate(_FORCED_GRAPH_SNAPSHOT_JS)
+        assert snap["theme"] == palette and snap["forced"] is True, snap
+        assert snap["nodeText"] == snap["text"], (palette, snap)
+        assert snap["nodeBorder"] == snap["highlight"], (palette, snap)
+        assert snap["nodeBackground"] == snap["canvas"], (palette, snap)
+        assert snap["nodeOutline"] == snap["canvas"], (palette, snap)
+        assert snap["edgeLine"] == snap["text"], (palette, snap)
+        assert snap["edgeArrow"] == snap["text"], (palette, snap)
+        assert snap["edgeBackground"] == snap["canvas"], (palette, snap)
+
+    # A lens change re-runs the visual encoding; it must not hand the canvas
+    # back to palette colours either.
+    page.evaluate("() => window.__okfLoomGraph.applyLens('themes')")
+    page.wait_for_function("() => window.__okfLoomGraph.getState().lens === 'themes'")
+    lensed = page.evaluate(_FORCED_GRAPH_SNAPSHOT_JS)
+    assert lensed["nodeText"] == lensed["text"], lensed
+    assert lensed["edgeLine"] == lensed["text"], lensed
+    assert lensed["edgeBackground"] == lensed["canvas"], lensed
 
 
 def test_graph_forced_colours_keep_system_palette_across_theme_event(
