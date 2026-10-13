@@ -1,14 +1,8 @@
-/* OKF wiki viewer - shared stylesheet.
+/* OKF wiki viewer - shared stylesheet (Ledger design system).
  *
- * Appearance is a family x mode model resolved by viewer/static/theme.js
- * (the sole owner of theme state). The :root block carries the light tokens
- * (the no-preference / no-JS default, identical to technical-light). Eight
- * concrete themes override them: Technical, Swiss, Purple, and Coffee in
- * light/dark variants. Technical and Swiss retain their shared palette;
- * Purple is restrained editorial deep-violet and Coffee is warm paper /
- * espresso. Every family also has a meaningful geometry/surface treatment.
- * Every concrete theme overrides the SAME token set (test_render.py enforces
- * this) so no theme inherits a stray value.
+ * Appearance: four Ledger palettes (Bone default, Slate, Clay, Plum) chosen
+ * by viewer/static/theme.js; see the palette block below. The --okf-*
+ * vocabulary used throughout is a bridge onto the Ledger roles.
  * Responsive: sidebar+main on wide screens, stacked
  * on narrow. Used by both the live server and the built static site.
  *
@@ -19,107 +13,482 @@
  *   --okf-radius-pill pill radius for chips
  */
 
-/* ---- Theme tokens ------------------------------------------------------ */
-/* Light palettes are deliberately dimmed (Soft Light): no light surface is
- * paper-white, so nothing glares. Each light family keeps its own tint and
- * its page < panel ordering; every text colour is measured against the
- * DARKEST light surface it can sit on (inset, code, its own *-bg tint), and
- * where the dimmer surfaces cost contrast the TEXT was darkened, never the
- * surface brightened back. Print (@media print) stays white: that is paper. */
+/* ---- Ledger palettes ---------------------------------------------------
+ * Appearance is one choice resolved by viewer/static/theme.js (the sole
+ * owner of theme state): data-theme="bone" | "slate" | "clay" | "plum" on
+ * <html>. :root carries Bone, so a page that never runs theme.js (no-JS,
+ * blocked script) still renders the default. Type, geometry and density are
+ * shared; only colour changes between palettes. Source: the Ledger package
+ * (tokens/tokens.css, DESIGN.md) plus okf-loom's --status-* roles. */
+:root, [data-theme] {
+  /* Type */
+  --font-display: "Public Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Public Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Azeret Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-label: "Azeret Mono", ui-monospace, Menlo, monospace;
+  --font-features: "tnum";
+  --fs-base: 14px;
+  --lh-base: 1.5;
+  --prose-size: 16px;
+  --fw-body: 400;
+  --fw-strong: 600;
+  --h1-size: 34px;
+  --h1-weight: 700;
+  --h1-track: -0.022em;
+  --h1-lh: 1.12;
+  --h1-case: none;
+  --h2-size: 21px;
+  --h2-weight: 700;
+  --h2-track: -0.012em;
+  --h3-size: 15.5px;
+  --h3-weight: 700;
+  --card-title-size: 14.5px;
+  --card-title-weight: 600;
+  --card-title-track: -0.005em;
+  --label-size: 9.5px;
+  --label-weight: 500;
+  --label-track: 0.16em;
+  --label-case: uppercase;
+  --btn-size: 12.5px;
+  --btn-weight: 600;
+  --btn-track: 0.01em;
+  --btn-case: none;
+  --nav-size: 13px;
+  --nav-weight: 500;
+  --nav-track: 0;
+  --nav-case: none;
+  --brand-size: 14.5px;
+  --brand-weight: 700;
+  --brand-track: -0.01em;
+  --brand-case: none;
+  /* Shape and depth */
+  --r-btn: 0px;
+  --r-input: 0px;
+  --r-card: 0px;
+  --r-chip: 0px;
+  --r-panel: 0px;
+  --r-code: 0px;
+  --r-badge: 0px;
+  --r-node: 0px;
+  --bw: 1px;
+  --shadow-card: none;
+  --shadow-card-hover: none;
+  --shadow-btn: none;
+  /* Density */
+  --nav-h: 50px;
+  --ctl-h: 32px;
+  --page-max: 1280px;
+  --doc-max: 760px;
+  --gap: 0px;
+  --card-pad: 12px;
+  --btn-pad: 6px 13px;
+  --section-gap: 40px;
+  --studio-w: 320px;
+  /* Colour rules shared by every palette */
+  --accent-soft: transparent;
+  --btn-bg: transparent;
+  --icode-border: transparent;
+  --graph-cat: 0%;
+  --tint: 0%;
+}
+
+/* Bone — Warm bone paper, ink text, oxide-red accent. The default: calm for long reading in daylight. */
+:root, [data-theme="bone"] {
+  color-scheme: light;
+  --bg: #f6f3ed;
+  --bg-2: #eae5dc;
+  --surface: #fbf9f5;
+  --surface-2: #e3ddd2;
+  --border: #dcd5c9;
+  --border-strong: #b0a696;
+  --text: #1d1a16;
+  --text-2: #575047;
+  --text-3: #6a6258;
+  --accent: #a3573a;
+  --accent-hover: #8c4a30;
+  --on-accent: #ffffff;
+  --accent-text: #8c4a30;
+  --link: #8c4a30;
+  --focus: #8c4a30;
+  --selection: rgba(163,87,58,.30);
+  --nav-bg: #f6f3ed;
+  --nav-text: #1d1a16;
+  --nav-text-2: #575047;
+  --nav-border: #dcd5c9;
+  --btn-text: #1d1a16;
+  --btn-border: #b0a696;
+  --btn-hover-bg: #e3ddd2;
+  --primary-bg: #a3573a;
+  --primary-text: #ffffff;
+  --primary-border: #a3573a;
+  --primary-hover-bg: #8c4a30;
+  --input-bg: #eae5dc;
+  --input-border: #b0a696;
+  --input-text: #1d1a16;
+  --code-bg: #1d1b17;
+  --code-text: #e3ded5;
+  --code-border: #dcd5c9;
+  --syn-1: #e0a184;
+  --syn-2: #ddd8ce;
+  --syn-3: #9c9483;
+  --icode-bg: #e3ddd2;
+  --icode-text: #1d1a16;
+  --panel-bg: #fbf9f5;
+  --panel-border: #dcd5c9;
+  --hero-bg: #fbf9f5;
+  --hero-text: #1d1a16;
+  --hero-border: #dcd5c9;
+  --dochead-bg: #eae5dc;
+  --dochead-border: #dcd5c9;
+  --dochead-text: #1d1a16;
+  --graph-bg: #f6f3ed;
+  --graph-edge: #a39a8b;
+  --graph-label: #1d1a16;
+  --graph-halo: #f6f3ed;
+  --graph-node: #d2cabd;
+  --graph-node-icon: #1d1a16;
+  --cat-tutorial: #6a6258;
+  --cat-howto: #6a6258;
+  --cat-reference: #6a6258;
+  --cat-explanation: #6a6258;
+  --cat-demo: #6a6258;
+  --cat-plan: #6a6258;
+  --cat-spec: #6a6258;
+  --cat-decision: #6a6258;
+  --cat-attested: #6a6258;
+  --badge-text: #f6f3ed;
+  --ok: #a3573a;
+  --card-title-color: #1d1a16;
+  --label-color: #575047;
+  --shadow-pop: 0 0 0 1px #b0a696;
+  /* Status roles (okf-loom addition): muted, AA on --bg/--bg-2/--surface/--surface-2.
+     Text, icons and 2px bars only, never fills. */
+  --status-ok: #3b6a45;
+  --status-warn: #7f5410;
+  --status-error: #9e2f2a;
+  --status-info: #36597e;
+}
+
+/* Slate — Cool graphite with a muted steel blue. The engineering read of Ledger. */
+[data-theme="slate"] {
+  color-scheme: dark;
+  --bg: #101215;
+  --bg-2: #171a1f;
+  --surface: #13161a;
+  --surface-2: #1e222a;
+  --border: #252a32;
+  --border-strong: #3b424c;
+  --text: #e3e7eb;
+  --text-2: #a6aeb9;
+  --text-3: #8d96a1;
+  --accent: #5f87b4;
+  --accent-hover: #8bacd0;
+  --on-accent: #0a0e13;
+  --accent-text: #8bacd0;
+  --link: #8bacd0;
+  --focus: #8bacd0;
+  --selection: rgba(95,135,180,.30);
+  --nav-bg: #101215;
+  --nav-text: #e3e7eb;
+  --nav-text-2: #a6aeb9;
+  --nav-border: #252a32;
+  --btn-text: #e3e7eb;
+  --btn-border: #3b424c;
+  --btn-hover-bg: #1e222a;
+  --primary-bg: #5f87b4;
+  --primary-text: #0a0e13;
+  --primary-border: #5f87b4;
+  --primary-hover-bg: #8bacd0;
+  --input-bg: #171a1f;
+  --input-border: #3b424c;
+  --input-text: #e3e7eb;
+  --code-bg: #0c0e11;
+  --code-text: #c9cfd7;
+  --code-border: #252a32;
+  --syn-1: #9dbbd8;
+  --syn-2: #cbd1d9;
+  --syn-3: #7f8893;
+  --icode-bg: #1e222a;
+  --icode-text: #e3e7eb;
+  --panel-bg: #13161a;
+  --panel-border: #252a32;
+  --hero-bg: #13161a;
+  --hero-text: #e3e7eb;
+  --hero-border: #252a32;
+  --dochead-bg: #171a1f;
+  --dochead-border: #252a32;
+  --dochead-text: #e3e7eb;
+  --graph-bg: #101215;
+  --graph-edge: #4e565f;
+  --graph-label: #e3e7eb;
+  --graph-halo: #101215;
+  --graph-node: #2c323b;
+  --graph-node-icon: #e3e7eb;
+  --cat-tutorial: #8d96a1;
+  --cat-howto: #8d96a1;
+  --cat-reference: #8d96a1;
+  --cat-explanation: #8d96a1;
+  --cat-demo: #8d96a1;
+  --cat-plan: #8d96a1;
+  --cat-spec: #8d96a1;
+  --cat-decision: #8d96a1;
+  --cat-attested: #8d96a1;
+  --badge-text: #101215;
+  --ok: #5f87b4;
+  --card-title-color: #e3e7eb;
+  --label-color: #a6aeb9;
+  --shadow-pop: 0 0 0 1px #3b424c;
+  /* Status roles (okf-loom addition): muted, AA on --bg/--bg-2/--surface/--surface-2.
+     Text, icons and 2px bars only, never fills. */
+  --status-ok: #86b893;
+  --status-warn: #d0a660;
+  --status-error: #e3948a;
+  --status-info: #8fb2d6;
+}
+
+/* Clay — Brown-black with a clay terracotta — the original warm hue, drained of chroma. */
+[data-theme="clay"] {
+  color-scheme: dark;
+  --bg: #121010;
+  --bg-2: #1a1716;
+  --surface: #151212;
+  --surface-2: #221e1c;
+  --border: #2a2523;
+  --border-strong: #433c38;
+  --text: #ece7e3;
+  --text-2: #b0a69f;
+  --text-3: #978c85;
+  --accent: #b56a4a;
+  --accent-hover: #d3906f;
+  --on-accent: #130b07;
+  --accent-text: #d3906f;
+  --link: #d3906f;
+  --focus: #d3906f;
+  --selection: rgba(181,106,74,.30);
+  --nav-bg: #121010;
+  --nav-text: #ece7e3;
+  --nav-text-2: #b0a69f;
+  --nav-border: #2a2523;
+  --btn-text: #ece7e3;
+  --btn-border: #433c38;
+  --btn-hover-bg: #221e1c;
+  --primary-bg: #b56a4a;
+  --primary-text: #130b07;
+  --primary-border: #b56a4a;
+  --primary-hover-bg: #d3906f;
+  --input-bg: #1a1716;
+  --input-border: #433c38;
+  --input-text: #ece7e3;
+  --code-bg: #0e0c0b;
+  --code-text: #d5cdc6;
+  --code-border: #2a2523;
+  --syn-1: #dba385;
+  --syn-2: #d7cfc8;
+  --syn-3: #8a8079;
+  --icode-bg: #221e1c;
+  --icode-text: #ece7e3;
+  --panel-bg: #151212;
+  --panel-border: #2a2523;
+  --hero-bg: #151212;
+  --hero-text: #ece7e3;
+  --hero-border: #2a2523;
+  --dochead-bg: #1a1716;
+  --dochead-border: #2a2523;
+  --dochead-text: #ece7e3;
+  --graph-bg: #121010;
+  --graph-edge: #57504b;
+  --graph-label: #ece7e3;
+  --graph-halo: #121010;
+  --graph-node: #332d29;
+  --graph-node-icon: #ece7e3;
+  --cat-tutorial: #978c85;
+  --cat-howto: #978c85;
+  --cat-reference: #978c85;
+  --cat-explanation: #978c85;
+  --cat-demo: #978c85;
+  --cat-plan: #978c85;
+  --cat-spec: #978c85;
+  --cat-decision: #978c85;
+  --cat-attested: #978c85;
+  --badge-text: #121010;
+  --ok: #b56a4a;
+  --card-title-color: #ece7e3;
+  --label-color: #b0a69f;
+  --shadow-pop: 0 0 0 1px #433c38;
+  /* Status roles (okf-loom addition): muted, AA on --bg/--bg-2/--surface/--surface-2.
+     Text, icons and 2px bars only, never fills. */
+  --status-ok: #8cb68f;
+  --status-warn: #d3a862;
+  --status-error: #e4958a;
+  --status-info: #93b0cc;
+}
+
+/* Plum — Neutral dark with a faint violet cast and a dusty plum accent. */
+[data-theme="plum"] {
+  color-scheme: dark;
+  --bg: #111013;
+  --bg-2: #19171d;
+  --surface: #141318;
+  --surface-2: #211f27;
+  --border: #292630;
+  --border-strong: #433e4c;
+  --text: #e8e6ec;
+  --text-2: #aba6b4;
+  --text-3: #948fa0;
+  --accent: #9878a2;
+  --accent-hover: #bb9cc3;
+  --on-accent: #120c14;
+  --accent-text: #bb9cc3;
+  --link: #bb9cc3;
+  --focus: #bb9cc3;
+  --selection: rgba(152,120,162,.30);
+  --nav-bg: #111013;
+  --nav-text: #e8e6ec;
+  --nav-text-2: #aba6b4;
+  --nav-border: #292630;
+  --btn-text: #e8e6ec;
+  --btn-border: #433e4c;
+  --btn-hover-bg: #211f27;
+  --primary-bg: #9878a2;
+  --primary-text: #120c14;
+  --primary-border: #9878a2;
+  --primary-hover-bg: #bb9cc3;
+  --input-bg: #19171d;
+  --input-border: #433e4c;
+  --input-text: #e8e6ec;
+  --code-bg: #0d0c0f;
+  --code-text: #d0ccd7;
+  --code-border: #292630;
+  --syn-1: #c8a9cf;
+  --syn-2: #d2ced9;
+  --syn-3: #847f8f;
+  --icode-bg: #211f27;
+  --icode-text: #e8e6ec;
+  --panel-bg: #141318;
+  --panel-border: #292630;
+  --hero-bg: #141318;
+  --hero-text: #e8e6ec;
+  --hero-border: #292630;
+  --dochead-bg: #19171d;
+  --dochead-border: #292630;
+  --dochead-text: #e8e6ec;
+  --graph-bg: #111013;
+  --graph-edge: #55505f;
+  --graph-label: #e8e6ec;
+  --graph-halo: #111013;
+  --graph-node: #312d3a;
+  --graph-node-icon: #e8e6ec;
+  --cat-tutorial: #948fa0;
+  --cat-howto: #948fa0;
+  --cat-reference: #948fa0;
+  --cat-explanation: #948fa0;
+  --cat-demo: #948fa0;
+  --cat-plan: #948fa0;
+  --cat-spec: #948fa0;
+  --cat-decision: #948fa0;
+  --cat-attested: #948fa0;
+  --badge-text: #111013;
+  --ok: #9878a2;
+  --card-title-color: #e8e6ec;
+  --label-color: #aba6b4;
+  --shadow-pop: 0 0 0 1px #433e4c;
+  /* Status roles (okf-loom addition): muted, AA on --bg/--bg-2/--surface/--surface-2.
+     Text, icons and 2px bars only, never fills. */
+  --status-ok: #89b794;
+  --status-warn: #d1a764;
+  --status-error: #e3968e;
+  --status-info: #97afd0;
+}
+
+/* ---- Ledger bridge ------------------------------------------------------
+ * The viewer's existing --okf-* vocabulary resolves onto Ledger roles, so
+ * every surface (including ones not yet ported to Ledger structure: graph
+ * chrome, Studio, feedback import) picks up the active palette. Declared on
+ * the same elements as the palettes so a nested data-theme scope (the
+ * Appearance swatches) resolves its own values. Component CSS must read
+ * tokens only — never a hex value. */
+:root, [data-theme] {
+  --okf-bg: var(--bg);
+  --okf-bg-elev: var(--surface);
+  --okf-bg-inset: var(--bg-2);
+  --okf-fg: var(--text);
+  --okf-fg-muted: var(--text-2);
+  --okf-fg-subtle: var(--text-3);
+  --okf-border: var(--border);
+  --okf-border-strong: var(--border-strong);
+  /* Non-frame uses of the rule colours: hover/press feedback, separators. */
+  --okf-hover-fill: var(--surface-2);
+  --okf-press-fill: var(--border);
+  --okf-separator: var(--border-strong);
+  --okf-separator-subtle: var(--border);
+  /* --okf-accent is mostly read as text (links, labels) and as rule/outline
+   * colour, so it maps to the AA accent-text role; the single filled
+   * primary action reads --okf-action-primary-* (the Ledger --primary-*). */
+  --okf-accent: var(--accent-text);
+  --okf-accent-hover: var(--accent-hover);
+  --okf-accent-on: var(--on-accent);
+  /* No tinted state washes: the old accent tint becomes the neutral raised
+   * surface, and active states are a 2px bar plus ink, not a fill. */
+  --okf-accent-bg: var(--surface-2);
+  --okf-select: var(--accent);
+  --okf-active-fill: transparent;
+  --okf-active-fg: var(--text);
+  --okf-active-border: var(--border-strong);
+  --okf-action-primary-bg: var(--primary-bg);
+  --okf-action-primary-fg: var(--primary-text);
+  --okf-action-primary-border: var(--primary-border);
+  /* Inline code uses the quiet raised chip; code blocks are always the dark
+   * --code-bg well (Bone included). */
+  --okf-code-bg: var(--icode-bg);
+  --okf-code-fg: var(--icode-text);
+  --okf-pre-bg: var(--code-bg);
+  --okf-pre-fg: var(--code-text);
+  /* Status roles: text, icons and 2px bars. The *-bg roles are the neutral
+   * panel (never a tinted fill) and *-on is the canvas, which clears AA on a
+   * status hue by construction (the hue clears AA on the canvas). */
+  --okf-ok: var(--status-ok);
+  --okf-warn: var(--status-warn);
+  --okf-info: var(--status-info);
+  --okf-error: var(--status-error);
+  --okf-danger: var(--status-error);
+  --okf-broken: var(--status-error);
+  --okf-ok-bg: var(--surface);
+  --okf-warn-bg: var(--surface);
+  --okf-info-bg: var(--surface);
+  --okf-error-bg: var(--surface);
+  --okf-ok-on: var(--bg);
+  --okf-warn-on: var(--bg);
+  --okf-info-on: var(--bg);
+  --okf-error-on: var(--bg);
+  /* Depth: hairlines, not shadows. Floating layers take the 1px pop ring. */
+  --okf-shadow: none;
+  --okf-shadow-hover: none;
+  --okf-shadow-overlay: var(--shadow-pop);
+  --okf-radius: 0px;
+  --okf-radius-sm: 0px;
+  --okf-radius-pill: 0px;
+  --okf-focus-color: var(--focus);
+  --okf-focus-ring: var(--focus);
+  --okf-focus-width: 2px;
+  --okf-focus-offset: 2px;
+  --okf-selection-cue: var(--accent);
+  --okf-path-cue: var(--text);
+  --okf-error-cue: var(--status-error);
+  --okf-status-cue: var(--status-info);
+  /* Retired Soft Contrast tokens still read by graph/Studio CSS. */
+  --okf-soft-bg-inset: var(--bg-2);
+  --okf-soft-border: var(--border);
+  --okf-soft-border-strong: var(--border-strong);
+  --okf-soft-active-fill: transparent;
+  --okf-soft-shadow: none;
+  /* Content types are not colour-coded: every type accent is --text-3. */
+  --okf-type-accent: var(--text-3);
+  /* Type */
+  --okf-font-display: var(--font-display);
+  --okf-font-body: var(--font-body);
+  --okf-mono: var(--font-mono);
+}
 :root {
-  --okf-bg: #eceff3;
-  --okf-bg-elev: #f3f5f7;
-  --okf-bg-inset: #e3e7ec;
-  --okf-fg: #0f172a;
-  --okf-fg-muted: #475569;            /* P2-58: was #64748b (4.33:1); ≈ 6.1:1 on bg-inset */
-  --okf-border: #d6dce4;
-  --okf-border-strong: #bfc8d4;
-  /* Non-frame uses of the border colours. They carry the SAME values as
-   * --okf-border / --okf-border-strong in every theme (Soft Contrast maps
-   * them to the soft values), but Border Off never touches them: Border
-   * Off removes frames, not hover/press feedback or separators.
-   *   --okf-hover-fill        hovered control background   (= border)
-   *   --okf-press-fill        pressed control background   (= border-strong)
-   *   --okf-separator         separator glyphs and non-frame line work:
-   *                           breadcrumb '/', graph-picture edges and
-   *                           arrowheads, overflow cue lines, grab handles,
-   *                           radio rings, the Swiss hover hairline
-   *                                                        (= border-strong)
-   *   --okf-separator-subtle  split-view divider bar, hatch stripes (= border) */
-  --okf-hover-fill: #d6dce4;
-  --okf-press-fill: #bfc8d4;
-  --okf-separator: #bfc8d4;
-  --okf-separator-subtle: #d6dce4;
-  /* P2-8 (iter-1): the UI accent is now a confident deep teal instead of
-   * the prior Tailwind blue-600 (#2563eb). A teal reads as
-   * curation/trust/provenance (the OKF value prop) and avoids the default
-   * "wiki/knowledge-tool → blue" reflex. Soft Light darkened it from
-   * #0c7373 so it keeps AA on the dimmed surfaces. Contrast (WCAG 2.2):
-   *   --okf-accent #0b6f6f on --okf-bg       (#eceff3) ≈ 5.18:1 (AA)
-   *   --okf-accent #0b6f6f on --okf-bg-elev  (#f3f5f7) ≈ 5.46:1 (AA)
-   *   --okf-accent #0b6f6f on --okf-bg-inset (#e3e7ec) ≈ 4.81:1 (AA)
-   *   --okf-accent-on #ffffff on #0b6f6f               ≈ 5.97:1 (AA)
-   *   --okf-accent-bg #d6e5e5 (text #0b6f6f)           ≈ 4.61:1 (AA)
-   * The auto-generated type palette hues (hash of concept type) are
-   * unchanged and separate from this UI accent. */
-  --okf-accent: #0b6f6f;
-  --okf-accent-hover: #0a5e5e;
-  --okf-accent-on: #ffffff;           /* 5.97:1 on #0b6f6f (AA) */
-  /* P1-11: opaque tinted teal background for accent chips/alias pills.
-   * Contrast vs the #0b6f6f accent text ≈ 4.61:1 (AA). */
-  --okf-accent-bg: #d6e5e5;
-  /* P2-5 (iter-2): graph-canvas selection colour. The Cytoscape canvas
-   * can't read CSS vars directly, so graph.js mirrors this value in a
-   * GRAPH_COLORS constant block (keep in sync). We reuse the brand teal
-   * rather than introducing a third accent hue: a 3px border-width keeps
-   * selection clearly visible against the auto-generated type-hash node
-   * fills. Contrast ratios (WCAG 2.2):
-   *   --okf-select #0b6f6f on --okf-bg-elev (#f3f5f7, canvas) ≈ 5.46:1 (AA) */
-  --okf-select: #0b6f6f;
-  /* Light code blocks share the inline-code surface: --okf-pre-* resolve to
-   * --okf-code-*, framed by a 1px --okf-border in light mode, and the
-   * light highlight.js token palette below is measured on this surface. */
-  --okf-code-bg: #e3e7ec;
-  --okf-code-fg: #0f172a;
-  --okf-pre-bg: var(--okf-code-bg);
-  --okf-pre-fg: var(--okf-code-fg);
-  --okf-broken: #b91c1c;              /* P2-73: AA on light bg-inset (≈ 5.2:1) */
-  /* iter1 CRI-011: theme-aware state tokens (ok / warn / info / error),
-   * tinted toward the brand teal hue family rather than raw Tailwind
-   * emerald/amber/indigo. OKLCH keeps chroma moderate so the palette
-   * never reads as generic SaaS-collab colours. Each role ships a
-   * matching *-bg tint for surfaces (chips, toast fills, comment state).
-   * Minimum WCAG ratio over bg / bg-elev / bg-inset / its own *-bg tint:
-   *   --okf-ok   oklch(0.49 0.10 165)  ≈ 4.8:1 (AA)
-   *   --okf-warn oklch(0.51 0.12 70)   ≈ 4.7:1 (AA)
-   *   --okf-info oklch(0.46 0.09 235)  ≈ 5.6:1 (AA)
-   *   --okf-error oklch(0.50 0.17 27)  ≈ 5.3:1 (AA) */
-  --okf-ok: oklch(0.49 0.10 165);
-  --okf-ok-bg: oklch(0.93 0.03 165);
-  --okf-warn: oklch(0.51 0.12 70);
-  --okf-warn-bg: oklch(0.93 0.04 70);
-  --okf-info: oklch(0.46 0.09 235);
-  --okf-info-bg: oklch(0.93 0.03 235);
-  --okf-error: oklch(0.50 0.17 27);
-  --okf-error-bg: oklch(0.93 0.03 27);
-  --okf-ok-on: #ffffff;
-  --okf-warn-on: #fff8ec;  /* on --okf-warn: 5.58 Technical/Swiss, 5.87 Purple, 5.82 Coffee */
-  --okf-error-on: #ffffff;
-  --okf-info-on: #ffffff;
-  --okf-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
-  --okf-shadow-hover: 0 4px 12px rgba(15, 23, 42, 0.10);
-  --okf-shadow-overlay: 0 12px 32px rgba(15, 23, 42, 0.18);
-  /* Radii */
-  --okf-radius: 8px;
-  --okf-radius-sm: 4px;
-  /* User feedback: the fully-rounded "oval pill" look is gone.
-   * Every chip-shaped element (tags, type chips, stats, entity chips,
-   * lens chips, badges, recent-rail items…) shares this crisp tag radius
-   * instead. The token keeps its historical name — it is referenced
-   * across wiki/studio/graph CSS — but now means "chip radius". Small
-   * square swatches/dots (≤10px) still render round because the radius
-   * exceeds half their size. */
-  --okf-radius-pill: 5px;
   /* Spacing scale (P2-66) */
   --okf-space-1: 4px;
   --okf-space-2: 8px;
@@ -128,686 +497,27 @@
   --okf-space-5: 24px;
   --okf-space-6: 32px;
   --okf-space-7: 48px;
-  /* Type scale (P2-60 / P2-66 / P2-21) - true 1.25 modular ratio on the
-   * heading end (base→md→lg→xl each *1.25). The smaller end (xs/sm) keeps
-   * the previous values so chip/caption sizes don't shift; the prior mid
-   * ratios (1.18 / 1.20) were inconsistent with the documented 1.25 intent
-   * and made H3 visually almost equal to body text. */
-  --okf-text-xs: 0.75rem;     /* 12px - chips, captions */
-  --okf-text-sm: 0.875rem;    /* 14px - secondary text */
-  --okf-text-base: 1rem;      /* 16px */
-  --okf-text-md: 1.25rem;     /* 20px - H3 (was 1.0625rem) */
-  --okf-text-lg: 1.5625rem;   /* 25px - H2 (was 1.25rem) */
-  --okf-text-xl: 1.9531rem;   /* 31.25px - H1 (was 1.5rem) */
-  /* Layout (UI overhaul phase 1, revised by the 2026 viewer-layout-usability
-   * pass). Two column widths cooperate:
-   *   --okf-article-maxw  the concept-page content column. One bounded column
-   *                       holds EVERYTHING authored — title band, metadata,
-   *                       tools, headings, paragraphs, lists, code, tables,
-   *                       figures — so every block shares the same edges and
-   *                       the page reads as filled, not as a narrow strip
-   *                       floating in whitespace. Wide blocks scroll locally
-   *                       inside the column instead of escaping it.
- *   --okf-prose-maxw    the classic ~76ch reading measure, kept for
- *                       text-only contexts outside the concept article
- *                       (index intro, copy fallback, graph/detail prose).
- *                       Reading Focus deliberately does NOT use it: focus
- *                       expands the workspace to the full available width
- *                       (studio.css, spec §10 exception).
-   * The page shell centers within --okf-page-maxw so ultra-wide monitors get
-   * margins, not mile-long lines. */
-  --okf-maxw: 1200px;          /* index/search shell (spec §10 "1200px rule") */
-  --okf-prose-maxw: 76ch;      /* text-only reading measure */
-  --okf-article-maxw: 1120px;  /* concept-page content column */
-  --okf-page-maxw: 1560px;     /* concept page shell (sidebar + article) */
-  --okf-topbar-h: 52px;
-  --okf-action-primary-bg: var(--okf-accent);
-  --okf-action-primary-fg: var(--okf-accent-on);
-  --okf-action-primary-border: var(--okf-accent);
-  /* Active selected/current state tokens. Each concrete theme overrides these
-   * so the Swiss/Technical family distinction is observable on shared
-   * "selected"/"current" surfaces (search-live option, the Appearance
-   * menuitemradio, the studio command-palette item). Technical = translucent
-   * tint + transparent frame; Swiss = solid boxed accent fill + accent frame.
-   * The :root values mirror Technical-light (the no-preference default). */
-  --okf-active-fill: var(--okf-accent-bg);
-  --okf-active-fg: var(--okf-accent);
-  --okf-active-border: transparent;
-  /* Semantic appearance modifiers. The concrete theme blocks repeat the
-   * complete set below so a target never inherits a mode-specific fallback. */
-  --okf-contrast: normal;
-  --okf-border-mode: on;
-  --okf-soft-bg-inset: #e9ecef;
-  --okf-soft-border: #dee3e7;
-  --okf-soft-border-strong: #cbd6db;
-  --okf-soft-active-fill: #e2ebeb;
-  --okf-soft-shadow: 0 1px 2px rgba(15, 23, 42, 0.025);
-  --okf-focus-color: var(--okf-accent);
-  --okf-focus-width: 2px;
-  --okf-focus-offset: 2px;
-  /* These cues intentionally survive Border Off. Canvas consumers mirror
-   * them through the resolved root/theme contract and add shape/dash/weight
-   * cues rather than relying on decorative frames. */
-  --okf-selection-cue: var(--okf-select);
-  --okf-path-cue: var(--okf-fg);
-  --okf-error-cue: var(--okf-error);
-  --okf-status-cue: var(--okf-info);
-  /* Display face for headings/hero: system serif stack. Body stays sans;
-   * the serif display gives the wiki its "atlas" identity without a
-   * webfont download. */
-  --okf-font-display: "Iowan Old Style", "Palatino Linotype", Palatino,
-    "Source Serif Pro", Georgia, "Noto Serif CJK SC", serif;
-}
-/* ============================ THEMES (8) ============================
- * Four first-class families x two modes, driven by theme.js:
- *   Technical  — the V2 identity: 8px radius, soft elevation shadow, tinted
- *                accent active states, subtle frame borders. This is the
- *                no-preference / no-JS default (it matches :root exactly).
- *   Swiss      — International-Typographic-Style grid: 0 radius, flat (no
- *                elevation shadow), hairline frames (--okf-border-strong =
- *                foreground), SOLID boxed accent fills for active states.
- * Purple     — editorial violet, generous page geometry, quiet layered shadow.
- * Coffee     — warm paper/espresso, crisp book-like corners, stamped active state.
- * Technical and Swiss share their validated colour palette within a mode;
- * all four families carry AA text/state tokens and non-colour geometry.
- * KEEP graph.js GRAPH_COLORS in sync per resolved theme.
- *
- * Every block overrides the SAME token set the light :root defines
- * (test_render.py enforces this) so no theme inherits a stray value.
- */
-[data-theme="technical-light"] {
-  /* The V2 default look (identical palette to :root) + Technical non-colour
-   * tokens: 8px radius, soft elevation shadow, tinted accent active states.
-   * Declared in full so this block is authoritative and self-contained. */
-  --okf-bg: #eceff3;
-  --okf-bg-elev: #f3f5f7;
-  --okf-bg-inset: #e3e7ec;
-  --okf-fg: #0f172a;
-  --okf-fg-muted: #475569;
-  --okf-border: #d6dce4;
-  --okf-border-strong: #bfc8d4;
-  --okf-hover-fill: #d6dce4;
-  --okf-press-fill: #bfc8d4;
-  --okf-separator: #bfc8d4;
-  --okf-separator-subtle: #d6dce4;
-  --okf-accent: #0b6f6f;
-  --okf-accent-hover: #0a5e5e;
-  --okf-accent-on: #ffffff;
-  --okf-accent-bg: #d6e5e5;
-  --okf-select: #0b6f6f;
-  --okf-code-bg: #e3e7ec;
-  --okf-code-fg: #0f172a;
-  --okf-pre-bg: var(--okf-code-bg);
-  --okf-pre-fg: var(--okf-code-fg);
-  --okf-broken: #b91c1c;
-  --okf-ok: oklch(0.49 0.10 165);
-  --okf-ok-bg: oklch(0.93 0.03 165);
-  --okf-warn: oklch(0.51 0.12 70);
-  --okf-warn-bg: oklch(0.93 0.04 70);
-  --okf-info: oklch(0.46 0.09 235);
-  --okf-info-bg: oklch(0.93 0.03 235);
-  --okf-error: oklch(0.50 0.17 27);
-  --okf-error-bg: oklch(0.93 0.03 27);
-  --okf-ok-on: #ffffff;
-  --okf-warn-on: #fff8ec;
-  --okf-error-on: #ffffff;
-  --okf-info-on: #ffffff;
-  --okf-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
-  --okf-shadow-hover: 0 4px 12px rgba(15, 23, 42, 0.10);
-  --okf-shadow-overlay: 0 12px 32px rgba(15, 23, 42, 0.18);
-  --okf-radius: 8px;
-  --okf-radius-sm: 4px;
-  --okf-radius-pill: 5px;
-    --okf-active-fill: var(--okf-accent-bg);
-    --okf-active-fg: var(--okf-accent);
-    --okf-active-border: transparent;
-    --okf-contrast: normal;
-    --okf-border-mode: on;
-    --okf-soft-bg-inset: #e9ecef;
-    --okf-soft-border: #dee3e7;
-    --okf-soft-border-strong: #cbd6db;
-    --okf-soft-active-fill: #e2ebeb;
-    --okf-soft-shadow: 0 1px 2px rgba(15, 23, 42, 0.025);
-    --okf-focus-color: var(--okf-accent);
-    --okf-focus-width: 2px;
-    --okf-focus-offset: 2px;
-      --okf-selection-cue: var(--okf-select);
-      --okf-path-cue: var(--okf-fg);
-      --okf-error-cue: var(--okf-error);
-      --okf-status-cue: var(--okf-info);
-      --okf-space-1: 4px; --okf-space-2: 8px; --okf-space-3: 12px;
-      --okf-space-4: 16px; --okf-space-5: 24px; --okf-space-6: 32px; --okf-space-7: 48px;
-      --okf-text-xs: 0.75rem; --okf-text-sm: 0.875rem; --okf-text-base: 1rem;
-      --okf-text-md: 1.25rem; --okf-text-lg: 1.5625rem; --okf-text-xl: 1.9531rem;
-      --okf-maxw: 1200px; --okf-prose-maxw: 76ch; --okf-article-maxw: 1120px;
-      --okf-page-maxw: 1560px; --okf-topbar-h: 52px;
-      --okf-action-primary-bg: var(--okf-accent);
-      --okf-action-primary-fg: var(--okf-accent-on);
-      --okf-action-primary-border: var(--okf-accent);
-      --okf-font-display: "Iowan Old Style", "Palatino Linotype", Palatino,
-        "Source Serif Pro", Georgia, "Noto Serif CJK SC", serif;
-  }
-[data-theme="technical-dark"] {
-  /* Dark surfaces + Technical non-colour tokens. Contrast ratios (WCAG 2.2):
-   *   --okf-accent #3ec9c9 on --okf-bg-elev (#111a2e) ≈ 7.6:1 (AAA) */
-  --okf-bg: #0b1220;
-  --okf-bg-elev: #111a2e;
-  --okf-bg-inset: #0d1626;
-  --okf-fg: #e2e8f0;
-  --okf-fg-muted: #94a3b8;
-  --okf-border: #1e293b;
-  --okf-border-strong: #334155;
-  --okf-hover-fill: #1e293b;
-  --okf-press-fill: #334155;
-  --okf-separator: #334155;
-  --okf-separator-subtle: #1e293b;
-  --okf-accent: #3ec9c9;
-  --okf-accent-hover: #5fd4d4;
-  --okf-accent-on: #0b1220;
-  --okf-accent-bg: rgba(62, 201, 201, 0.18);
-  --okf-select: #3ec9c9;
-  --okf-code-bg: #0d1626;
-  --okf-code-fg: #e2e8f0;
-  --okf-pre-bg: #020617;
-  --okf-pre-fg: #e2e8f0;
-  --okf-broken: #f87171;
-  --okf-ok: oklch(0.74 0.12 165);
-  --okf-ok-bg: oklch(0.28 0.05 165);
-  --okf-warn: oklch(0.80 0.13 70);
-  --okf-warn-bg: oklch(0.30 0.06 70);
-  --okf-info: oklch(0.74 0.10 235);
-  --okf-info-bg: oklch(0.28 0.05 235);
-  --okf-error: oklch(0.72 0.16 27);
-  --okf-error-bg: oklch(0.30 0.06 27);
-  --okf-ok-on: #071b13;
-  --okf-warn-on: #211500;
-  --okf-error-on: #260b08;
-  --okf-info-on: #071827;
-  --okf-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.5);
-  --okf-shadow-hover: 0 5px 14px rgba(0, 0, 0, 0.48);
-  --okf-shadow-overlay: 0 14px 36px rgba(0, 0, 0, 0.60);
-  --okf-radius: 8px;
-  --okf-radius-sm: 4px;
-  --okf-radius-pill: 5px;
-    --okf-active-fill: var(--okf-accent-bg);
-    --okf-active-fg: var(--okf-accent);
-    --okf-active-border: transparent;
-    --okf-contrast: normal;
-    --okf-border-mode: on;
-    --okf-soft-bg-inset: #101a2b;
-    --okf-soft-border: #263449;
-    --okf-soft-border-strong: #41536b;
-    --okf-soft-active-fill: rgba(62, 201, 201, 0.12);
-    --okf-soft-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
-    --okf-focus-color: var(--okf-accent);
-    --okf-focus-width: 2px;
-    --okf-focus-offset: 2px;
-      --okf-selection-cue: var(--okf-select);
-      --okf-path-cue: var(--okf-fg);
-      --okf-error-cue: var(--okf-error);
-      --okf-status-cue: var(--okf-info);
-      --okf-space-1: 4px; --okf-space-2: 8px; --okf-space-3: 12px;
-      --okf-space-4: 16px; --okf-space-5: 24px; --okf-space-6: 32px; --okf-space-7: 48px;
-      --okf-text-xs: 0.75rem; --okf-text-sm: 0.875rem; --okf-text-base: 1rem;
-      --okf-text-md: 1.25rem; --okf-text-lg: 1.5625rem; --okf-text-xl: 1.9531rem;
-      --okf-maxw: 1200px; --okf-prose-maxw: 76ch; --okf-article-maxw: 1120px;
-      --okf-page-maxw: 1560px; --okf-topbar-h: 52px;
-      --okf-action-primary-bg: var(--okf-accent);
-      --okf-action-primary-fg: var(--okf-accent-on);
-      --okf-action-primary-border: var(--okf-accent);
-      --okf-font-display: "Iowan Old Style", "Palatino Linotype", Palatino,
-        "Source Serif Pro", Georgia, "Noto Serif CJK SC", serif;
-  }
-[data-theme="swiss-light"] {
-  /* Swiss family: SAME validated light palette as Technical-light, but the
-   * grid identity — 0 radius, no elevation shadow, hairline frames
-   * (--okf-border-strong = foreground), SOLID boxed accent active fills.
-   * The colour distinction is zero by design: the family difference is a
-   * meaningful non-colour state (shape/elevation/frame/active). */
-  --okf-bg: #eceff3;
-  --okf-bg-elev: #f3f5f7;
-  --okf-bg-inset: #e3e7ec;
-  --okf-fg: #0f172a;
-  --okf-fg-muted: #475569;
-  --okf-border: #d6dce4;
-  --okf-border-strong: #0f172a;          /* hairline grid frame = foreground */
-  --okf-hover-fill: #d6dce4;
-  --okf-press-fill: #0f172a;
-  --okf-separator: #0f172a;
-  --okf-separator-subtle: #d6dce4;
-  --okf-accent: #0b6f6f;
-  --okf-accent-hover: #0a5e5e;
-  --okf-accent-on: #ffffff;
-  --okf-accent-bg: #d6e5e5;
-  --okf-select: #0b6f6f;
-  --okf-code-bg: #e3e7ec;
-  --okf-code-fg: #0f172a;
-  --okf-pre-bg: var(--okf-code-bg);
-  --okf-pre-fg: var(--okf-code-fg);
-  --okf-broken: #b91c1c;
-  --okf-ok: oklch(0.49 0.10 165);
-  --okf-ok-bg: oklch(0.93 0.03 165);
-  --okf-warn: oklch(0.51 0.12 70);
-  --okf-warn-bg: oklch(0.93 0.04 70);
-  --okf-info: oklch(0.46 0.09 235);
-  --okf-info-bg: oklch(0.93 0.03 235);
-  --okf-error: oklch(0.50 0.17 27);
-  --okf-error-bg: oklch(0.93 0.03 27);
-  --okf-ok-on: #ffffff;
-  --okf-warn-on: #fff8ec;
-  --okf-error-on: #ffffff;
-  --okf-info-on: #ffffff;
-  --okf-shadow: none;                    /* flat: no elevation shadow */
-  /* The hover hairline is a state cue, not a frame: it survives Border Off. */
-  --okf-shadow-hover: inset 0 0 0 1px var(--okf-separator);
-  --okf-shadow-overlay: 0 0 0 1px var(--okf-border-strong);
-  --okf-radius: 0;
-  --okf-radius-sm: 0;
-  --okf-radius-pill: 0;
-    --okf-active-fill: var(--okf-accent);  /* solid boxed accent fill */
-    --okf-active-fg: var(--okf-accent-on);
-    --okf-active-border: var(--okf-accent);
-    --okf-contrast: normal;
-    --okf-border-mode: on;
-    --okf-soft-bg-inset: #e9ecef;
-    --okf-soft-border: #dee3e7;
-    --okf-soft-border-strong: #cbd6db;
-    --okf-soft-active-fill: #e2ebeb;
-    --okf-soft-shadow: none;
-    --okf-focus-color: var(--okf-accent);
-    --okf-focus-width: 2px;
-    --okf-focus-offset: 2px;
-      --okf-selection-cue: var(--okf-select);
-      --okf-path-cue: var(--okf-fg);
-      --okf-error-cue: var(--okf-error);
-      --okf-status-cue: var(--okf-info);
-      --okf-space-1: 4px; --okf-space-2: 8px; --okf-space-3: 12px;
-      --okf-space-4: 16px; --okf-space-5: 24px; --okf-space-6: 32px; --okf-space-7: 48px;
-      --okf-text-xs: 0.75rem; --okf-text-sm: 0.875rem; --okf-text-base: 1rem;
-      --okf-text-md: 1.25rem; --okf-text-lg: 1.5625rem; --okf-text-xl: 1.9531rem;
-      --okf-maxw: 1200px; --okf-prose-maxw: 76ch; --okf-article-maxw: 1120px;
-      --okf-page-maxw: 1560px; --okf-topbar-h: 52px;
-      --okf-action-primary-bg: var(--okf-accent);
-      --okf-action-primary-fg: var(--okf-accent-on);
-      --okf-action-primary-border: var(--okf-accent);
-      --okf-font-display: "Iowan Old Style", "Palatino Linotype", Palatino,
-        "Source Serif Pro", Georgia, "Noto Serif CJK SC", serif;
-  }
-[data-theme="swiss-dark"] {
-  /* Swiss family on the dark palette. Same non-colour identity as
-   * swiss-light: 0 radius, flat, hairline frames, solid accent active. */
-  --okf-bg: #0b1220;
-  --okf-bg-elev: #111a2e;
-  --okf-bg-inset: #0d1626;
-  --okf-fg: #e2e8f0;
-  --okf-fg-muted: #94a3b8;
-  --okf-border: #1e293b;
-  --okf-border-strong: #e2e8f0;          /* hairline grid frame = foreground */
-  --okf-hover-fill: #1e293b;
-  --okf-press-fill: #e2e8f0;
-  --okf-separator: #e2e8f0;
-  --okf-separator-subtle: #1e293b;
-  --okf-accent: #3ec9c9;
-  --okf-accent-hover: #5fd4d4;
-  --okf-accent-on: #0b1220;
-  --okf-accent-bg: rgba(62, 201, 201, 0.18);
-  --okf-select: #3ec9c9;
-  --okf-code-bg: #0d1626;
-  --okf-code-fg: #e2e8f0;
-  --okf-pre-bg: #020617;
-  --okf-pre-fg: #e2e8f0;
-  --okf-broken: #f87171;
-  --okf-ok: oklch(0.74 0.12 165);
-  --okf-ok-bg: oklch(0.28 0.05 165);
-  --okf-warn: oklch(0.80 0.13 70);
-  --okf-warn-bg: oklch(0.30 0.06 70);
-  --okf-info: oklch(0.74 0.10 235);
-  --okf-info-bg: oklch(0.28 0.05 235);
-  --okf-error: oklch(0.72 0.16 27);
-  --okf-error-bg: oklch(0.30 0.06 27);
-  --okf-ok-on: #071b13;
-  --okf-warn-on: #211500;
-  --okf-error-on: #260b08;
-  --okf-info-on: #071827;
-  --okf-shadow: none;
-  --okf-shadow-hover: inset 0 0 0 1px var(--okf-separator);
-  --okf-shadow-overlay: 0 0 0 1px var(--okf-border-strong);
-  --okf-radius: 0;
-  --okf-radius-sm: 0;
-  --okf-radius-pill: 0;
-    --okf-active-fill: var(--okf-accent);
-    --okf-active-fg: var(--okf-accent-on);
-    --okf-active-border: var(--okf-accent);
-    --okf-contrast: normal;
-    --okf-border-mode: on;
-    --okf-soft-bg-inset: #101a2b;
-    --okf-soft-border: #263449;
-    --okf-soft-border-strong: #41536b;
-    --okf-soft-active-fill: rgba(62, 201, 201, 0.12);
-    --okf-soft-shadow: none;
-    --okf-focus-color: var(--okf-accent);
-    --okf-focus-width: 2px;
-    --okf-focus-offset: 2px;
-      --okf-selection-cue: var(--okf-select);
-      --okf-path-cue: var(--okf-fg);
-      --okf-error-cue: var(--okf-error);
-      --okf-status-cue: var(--okf-info);
-      --okf-space-1: 4px; --okf-space-2: 8px; --okf-space-3: 12px;
-      --okf-space-4: 16px; --okf-space-5: 24px; --okf-space-6: 32px; --okf-space-7: 48px;
-      --okf-text-xs: 0.75rem; --okf-text-sm: 0.875rem; --okf-text-base: 1rem;
-      --okf-text-md: 1.25rem; --okf-text-lg: 1.5625rem; --okf-text-xl: 1.9531rem;
-      --okf-maxw: 1200px; --okf-prose-maxw: 76ch; --okf-article-maxw: 1120px;
-      --okf-page-maxw: 1560px; --okf-topbar-h: 52px;
-      --okf-action-primary-bg: var(--okf-accent);
-      --okf-action-primary-fg: var(--okf-accent-on);
-      --okf-action-primary-border: var(--okf-accent);
-      --okf-font-display: "Iowan Old Style", "Palatino Linotype", Palatino,
-        "Source Serif Pro", Georgia, "Noto Serif CJK SC", serif;
-    }
-
-  [data-theme="purple-light"] {
-    /* Restrained editorial violet: a dimmed lavender paper field (Soft
-     * Light: no surface is paper-white), deep-violet ink, and generous
-     * rounded geometry. All text/state roles are AA on every light surface
-     * (lowest: --okf-warn on --okf-bg-inset ≈ 4.8:1). */
-    --okf-bg: #efebf5;
-    --okf-bg-elev: #f5f2f9;
-    --okf-bg-inset: #e6e0ef;
-    --okf-fg: #241b36;
-    --okf-fg-muted: #625574;
-    --okf-border: #d0c9dd;
-    --okf-border-strong: #ab9fba;
-    --okf-hover-fill: #d0c9dd;
-    --okf-press-fill: #ab9fba;
-    --okf-separator: #ab9fba;
-    --okf-separator-subtle: #d0c9dd;
-    --okf-accent: #5b2a86;
-    --okf-accent-hover: #46206d;
-    --okf-accent-on: #ffffff;
-    --okf-accent-bg: #e2dbec;
-    --okf-select: #5b2a86;
-    --okf-code-bg: #e6e0ef;
-    --okf-code-fg: #241b36;
-    --okf-pre-bg: var(--okf-code-bg);
-    --okf-pre-fg: var(--okf-code-fg);
-    --okf-broken: #a33a4a;
-    --okf-ok: #176b4d;
-    --okf-ok-bg: #dbe7e1;
-    --okf-warn: #805a10;
-    --okf-warn-bg: #ebe3ce;
-    --okf-info: #275a8a;
-    --okf-info-bg: #dde5ec;
-    --okf-error: #a33a4a;
-    --okf-error-bg: #ecdcdf;
-    --okf-ok-on: #ffffff;
-    --okf-warn-on: #fff8ec;
-    --okf-error-on: #ffffff;
-    --okf-info-on: #ffffff;
-    --okf-shadow: 0 2px 5px rgba(52, 28, 77, 0.08), 0 10px 26px rgba(52, 28, 77, 0.08);
-    --okf-shadow-hover: 0 7px 20px rgba(52, 28, 77, 0.16);
-    --okf-shadow-overlay: 0 18px 44px rgba(52, 28, 77, 0.24);
-    --okf-radius: 12px;
-    --okf-radius-sm: 6px;
-    --okf-radius-pill: 7px;
-    --okf-space-1: 4px; --okf-space-2: 8px; --okf-space-3: 12px;
-    --okf-space-4: 16px; --okf-space-5: 24px; --okf-space-6: 32px; --okf-space-7: 48px;
-    --okf-text-xs: 0.75rem; --okf-text-sm: 0.875rem; --okf-text-base: 1rem;
-    --okf-text-md: 1.25rem; --okf-text-lg: 1.5625rem; --okf-text-xl: 1.9531rem;
-    --okf-maxw: 1200px; --okf-prose-maxw: 76ch; --okf-article-maxw: 1120px;
-    --okf-page-maxw: 1560px; --okf-topbar-h: 52px;
-    --okf-action-primary-bg: var(--okf-accent);
-    --okf-action-primary-fg: var(--okf-accent-on);
-    --okf-action-primary-border: var(--okf-accent);
-    --okf-active-fill: var(--okf-accent-bg);
-    --okf-active-fg: var(--okf-accent);
-    --okf-active-border: #b79aca;
-    --okf-contrast: normal; --okf-border-mode: on;
-    --okf-soft-bg-inset: #eae7ef; --okf-soft-border: #dbd4e4;
-    --okf-soft-border-strong: #beb3cc; --okf-soft-active-fill: #e8e2ef;
-    --okf-soft-shadow: 0 1px 3px rgba(52, 28, 77, 0.05);
-    --okf-focus-color: var(--okf-accent); --okf-focus-width: 2px; --okf-focus-offset: 2px;
-    --okf-selection-cue: var(--okf-select); --okf-path-cue: var(--okf-fg);
-    --okf-error-cue: var(--okf-error); --okf-status-cue: var(--okf-info);
-    --okf-font-display: "Iowan Old Style", "Palatino Linotype", Palatino,
-      "Source Serif Pro", Georgia, "Noto Serif CJK SC", serif;
-  }
-  [data-theme="purple-dark"] {
-    /* The same editorial geometry in a deep-violet night mode. */
-    --okf-bg: #181222;
-    --okf-bg-elev: #21182b;
-    --okf-bg-inset: #1d1627;
-    --okf-fg: #f1eafa;
-    --okf-fg-muted: #c3b5d0;
-    --okf-border: #3c2e4c;
-    --okf-border-strong: #5b486d;
-    --okf-hover-fill: #3c2e4c;
-    --okf-press-fill: #5b486d;
-    --okf-separator: #5b486d;
-    --okf-separator-subtle: #3c2e4c;
-    --okf-accent: #c69cf2;
-    --okf-accent-hover: #ddbfff;
-    --okf-accent-on: #271535;
-    --okf-accent-bg: #3a294b;
-    --okf-select: #c69cf2;
-    --okf-code-bg: #21182b;
-    --okf-code-fg: #f1eafa;
-    --okf-pre-bg: #0f0a15;
-    --okf-pre-fg: #f6f0ff;
-    --okf-broken: #ff9ca8;
-    --okf-ok: #75d4aa;
-    --okf-ok-bg: #244536;
-    --okf-warn: #f0cf75;
-    --okf-warn-bg: #493d24;
-    --okf-info: #92c6ff;
-    --okf-info-bg: #253c52;
-    --okf-error: #ff9ca8;
-    --okf-error-bg: #522633;
-    --okf-ok-on: #10271e;
-    --okf-warn-on: #2b2105;
-    --okf-error-on: #321018;
-    --okf-info-on: #102235;
-    --okf-shadow: 0 2px 5px rgba(0, 0, 0, 0.28), 0 10px 28px rgba(0, 0, 0, 0.24);
-    --okf-shadow-hover: 0 7px 22px rgba(0, 0, 0, 0.38);
-    --okf-shadow-overlay: 0 18px 46px rgba(0, 0, 0, 0.58);
-    --okf-radius: 12px;
-    --okf-radius-sm: 6px;
-    --okf-radius-pill: 7px;
-    --okf-space-1: 4px; --okf-space-2: 8px; --okf-space-3: 12px;
-    --okf-space-4: 16px; --okf-space-5: 24px; --okf-space-6: 32px; --okf-space-7: 48px;
-    --okf-text-xs: 0.75rem; --okf-text-sm: 0.875rem; --okf-text-base: 1rem;
-    --okf-text-md: 1.25rem; --okf-text-lg: 1.5625rem; --okf-text-xl: 1.9531rem;
-    --okf-maxw: 1200px; --okf-prose-maxw: 76ch; --okf-article-maxw: 1120px;
-    --okf-page-maxw: 1560px; --okf-topbar-h: 52px;
-    --okf-action-primary-bg: var(--okf-accent);
-    --okf-action-primary-fg: var(--okf-accent-on);
-    --okf-action-primary-border: var(--okf-accent);
-    --okf-active-fill: var(--okf-accent-bg);
-    --okf-active-fg: var(--okf-accent);
-    --okf-active-border: #9b72c1;
-    --okf-contrast: normal; --okf-border-mode: on;
-    --okf-soft-bg-inset: #251c32; --okf-soft-border: #453554;
-    --okf-soft-border-strong: #684e7b; --okf-soft-active-fill: #47345a;
-    --okf-soft-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
-    --okf-focus-color: var(--okf-accent); --okf-focus-width: 2px; --okf-focus-offset: 2px;
-    --okf-selection-cue: var(--okf-select); --okf-path-cue: var(--okf-fg);
-    --okf-error-cue: var(--okf-error); --okf-status-cue: var(--okf-info);
-    --okf-font-display: "Iowan Old Style", "Palatino Linotype", Palatino,
-      "Source Serif Pro", Georgia, "Noto Serif CJK SC", serif;
-  }
-  [data-theme="coffee-light"] {
-    /* Warm paper and espresso ink: a crisp book/page treatment rather than a
-     * generic brown tint. Soft Light: the paper is dimmed to a warm sand so
-     * no surface glares; every text/state role stays AA on every light
-     * surface (lowest: --okf-ok / --okf-warn on --okf-bg-inset ≈ 4.7:1). */
-    --okf-bg: #f1eadf;
-    --okf-bg-elev: #f6f1e8;
-    --okf-bg-inset: #e9e0d2;
-    --okf-fg: #33241b;
-    --okf-fg-muted: #665248;
-    --okf-border: #d0c5b7;
-    --okf-border-strong: #ae9882;
-    --okf-hover-fill: #d0c5b7;
-    --okf-press-fill: #ae9882;
-    --okf-separator: #ae9882;
-    --okf-separator-subtle: #d0c5b7;
-    --okf-accent: #7b3f20;
-    --okf-accent-hover: #5d2e19;
-    --okf-accent-on: #fffaf2;
-    --okf-accent-bg: #e6d4c2;
-    --okf-select: #7b3f20;
-    --okf-code-bg: #e9e0d2;
-    --okf-code-fg: #33241b;
-    --okf-pre-bg: var(--okf-code-bg);
-    --okf-pre-fg: var(--okf-code-fg);
-    --okf-broken: #a33d2b;
-    --okf-ok: #3f6b4c;
-    --okf-ok-bg: #dce5dc;
-    --okf-warn: #7f5b1c;
-    --okf-warn-bg: #eae3ce;
-    --okf-info: #2f5d76;
-    --okf-info-bg: #dbe4e9;
-    --okf-error: #a33d2b;
-    --okf-error-bg: #ebdcd6;
-    --okf-ok-on: #ffffff;
-    --okf-warn-on: #fff8ec;
-    --okf-error-on: #ffffff;
-    --okf-info-on: #ffffff;
-    --okf-shadow: 0 2px 0 rgba(75, 42, 24, 0.08), 0 8px 18px rgba(75, 42, 24, 0.07);
-    --okf-shadow-hover: 0 4px 0 rgba(75, 42, 24, 0.10), 0 12px 24px rgba(75, 42, 24, 0.12);
-    --okf-shadow-overlay: 0 6px 0 rgba(75, 42, 24, 0.12), 0 20px 38px rgba(75, 42, 24, 0.20);
-    --okf-radius: 3px;
-    --okf-radius-sm: 2px;
-    --okf-radius-pill: 3px;
-    --okf-space-1: 4px; --okf-space-2: 8px; --okf-space-3: 12px;
-    --okf-space-4: 16px; --okf-space-5: 24px; --okf-space-6: 32px; --okf-space-7: 48px;
-    --okf-text-xs: 0.75rem; --okf-text-sm: 0.875rem; --okf-text-base: 1rem;
-    --okf-text-md: 1.25rem; --okf-text-lg: 1.5625rem; --okf-text-xl: 1.9531rem;
-    --okf-maxw: 1200px; --okf-prose-maxw: 76ch; --okf-article-maxw: 1120px;
-    --okf-page-maxw: 1560px; --okf-topbar-h: 52px;
-    --okf-action-primary-bg: var(--okf-accent);
-    --okf-action-primary-fg: var(--okf-accent-on);
-    --okf-action-primary-border: var(--okf-accent);
-    --okf-active-fill: var(--okf-accent);
-    --okf-active-fg: var(--okf-accent-on);
-    --okf-active-border: var(--okf-accent);
-    --okf-contrast: normal; --okf-border-mode: on;
-    --okf-soft-bg-inset: #eae4da; --okf-soft-border: #dccfbf;
-    --okf-soft-border-strong: #bca892; --okf-soft-active-fill: #eaddcd;
-    --okf-soft-shadow: 0 1px 0 rgba(75, 42, 24, 0.05);
-    --okf-focus-color: var(--okf-accent); --okf-focus-width: 2px; --okf-focus-offset: 2px;
-    --okf-selection-cue: var(--okf-select); --okf-path-cue: var(--okf-fg);
-    --okf-error-cue: var(--okf-error); --okf-status-cue: var(--okf-info);
-    --okf-font-display: "Iowan Old Style", "Palatino Linotype", Palatino,
-      "Source Serif Pro", Georgia, "Noto Serif CJK SC", serif;
-  }
-  [data-theme="coffee-dark"] {
-    /* Espresso night mode keeps the paper family legible with warm, bright
-     * ink and a restrained amber accent. */
-    --okf-bg: #211711;
-    --okf-bg-elev: #2b1e16;
-    --okf-bg-inset: #251a13;
-    --okf-fg: #f4e7d7;
-    --okf-fg-muted: #d0bfae;
-    --okf-border: #493429;
-    --okf-border-strong: #6c4d3b;
-    --okf-hover-fill: #493429;
-    --okf-press-fill: #6c4d3b;
-    --okf-separator: #6c4d3b;
-    --okf-separator-subtle: #493429;
-    --okf-accent: #e6aa72;
-    --okf-accent-hover: #f2bf8c;
-    --okf-accent-on: #321b11;
-    --okf-accent-bg: #4a3020;
-    --okf-select: #e6aa72;
-    --okf-code-bg: #2b1e16;
-    --okf-code-fg: #f4e7d7;
-    --okf-pre-bg: #140d09;
-    --okf-pre-fg: #f8eee3;
-    --okf-broken: #ff9e86;
-    --okf-ok: #91d1a1;
-    --okf-ok-bg: #294535;
-    --okf-warn: #f3d07d;
-    --okf-warn-bg: #4b3b22;
-    --okf-info: #9bc7e6;
-    --okf-info-bg: #273e4c;
-    --okf-error: #ff9e86;
-    --okf-error-bg: #512a20;
-    --okf-ok-on: #102419;
-    --okf-warn-on: #2a2106;
-    --okf-error-on: #35130d;
-    --okf-info-on: #10232f;
-    --okf-shadow: 0 2px 0 rgba(0, 0, 0, 0.28), 0 8px 20px rgba(0, 0, 0, 0.22);
-    --okf-shadow-hover: 0 4px 0 rgba(0, 0, 0, 0.30), 0 12px 25px rgba(0, 0, 0, 0.32);
-    --okf-shadow-overlay: 0 6px 0 rgba(0, 0, 0, 0.34), 0 20px 40px rgba(0, 0, 0, 0.50);
-    --okf-radius: 3px;
-    --okf-radius-sm: 2px;
-    --okf-radius-pill: 3px;
-    --okf-space-1: 4px; --okf-space-2: 8px; --okf-space-3: 12px;
-    --okf-space-4: 16px; --okf-space-5: 24px; --okf-space-6: 32px; --okf-space-7: 48px;
-    --okf-text-xs: 0.75rem; --okf-text-sm: 0.875rem; --okf-text-base: 1rem;
-    --okf-text-md: 1.25rem; --okf-text-lg: 1.5625rem; --okf-text-xl: 1.9531rem;
-    --okf-maxw: 1200px; --okf-prose-maxw: 76ch; --okf-article-maxw: 1120px;
-    --okf-page-maxw: 1560px; --okf-topbar-h: 52px;
-    --okf-action-primary-bg: var(--okf-accent);
-    --okf-action-primary-fg: var(--okf-accent-on);
-    --okf-action-primary-border: var(--okf-accent);
-    --okf-active-fill: var(--okf-accent);
-    --okf-active-fg: var(--okf-accent-on);
-    --okf-active-border: var(--okf-accent);
-    --okf-contrast: normal; --okf-border-mode: on;
-    --okf-soft-bg-inset: #302218; --okf-soft-border: #543c2e;
-    --okf-soft-border-strong: #765744; --okf-soft-active-fill: #553522;
-    --okf-soft-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
-    --okf-focus-color: var(--okf-accent); --okf-focus-width: 2px; --okf-focus-offset: 2px;
-    --okf-selection-cue: var(--okf-select); --okf-path-cue: var(--okf-fg);
-    --okf-error-cue: var(--okf-error); --okf-status-cue: var(--okf-info);
-    --okf-font-display: "Iowan Old Style", "Palatino Linotype", Palatino,
-      "Source Serif Pro", Georgia, "Noto Serif CJK SC", serif;
-  }
-
-  /* ---- Semantic Contrast / Border modifiers ------------------------------
- * These are root-owned values set atomically by theme.js. Contrast Soft
- * quiets surfaces and elevation without lowering body-text contrast. Border
- * Off removes decorative frames through the shared border tokens, while the
- * focus, selected, path, error, and status cue tokens remain intentionally
- * non-transparent. --okf-border / --okf-border-strong therefore mean FRAME
- * colours only: a hover or press fill, a separator glyph or any other
- * non-frame line work uses --okf-hover-fill / --okf-press-fill /
- * --okf-separator / --okf-separator-subtle, which Border Off leaves alone. */
-[data-okf-contrast="soft"] {
-  --okf-contrast: soft;
-  --okf-bg-inset: var(--okf-soft-bg-inset);
-  --okf-border: var(--okf-soft-border);
-  --okf-border-strong: var(--okf-soft-border-strong);
-  --okf-hover-fill: var(--okf-soft-border);
-  --okf-press-fill: var(--okf-soft-border-strong);
-  --okf-separator: var(--okf-soft-border-strong);
-  --okf-separator-subtle: var(--okf-soft-border);
-  --okf-active-fill: var(--okf-soft-active-fill);
-  --okf-shadow: var(--okf-soft-shadow);
-}
-  /* Soft Contrast changes surface quietness, not the family contract: Swiss
-   * and Coffee remain solid stamped treatments while Technical and Purple
-   * remain tinted editorial treatments. */
-  [data-theme^="swiss-"][data-okf-contrast="soft"] {
-    --okf-active-fill: var(--okf-accent);
-    --okf-active-fg: var(--okf-accent-on);
-    --okf-active-border: var(--okf-accent);
-  }
-  [data-theme^="coffee-"][data-okf-contrast="soft"] {
-    --okf-active-fill: var(--okf-accent);
-    --okf-active-fg: var(--okf-accent-on);
-    --okf-active-border: var(--okf-accent);
-  }
-[data-okf-border="off"] {
-  --okf-border-mode: off;
-  --okf-border: transparent;
-  --okf-border-strong: transparent;
-  --okf-focus-color: var(--okf-accent);
-  --okf-selection-cue: var(--okf-select);
-  --okf-path-cue: var(--okf-fg);
-  --okf-error-cue: var(--okf-error);
-  --okf-status-cue: var(--okf-info);
+  /* Type scale for UI chrome (prose sizes come from the Ledger roles). */
+  --okf-text-xs: 0.75rem;
+  --okf-text-sm: 0.875rem;
+  --okf-text-base: 1rem;
+  --okf-text-md: 1.25rem;
+  --okf-text-lg: 1.3125rem;   /* 21px Ledger section heading */
+  --okf-text-xl: 2.125rem;    /* 34px Ledger page title */
+  /* Layout: 1280px page, 760px reading column, prose capped at ~55ch. */
+  --okf-maxw: var(--page-max);
+  --okf-page-maxw: var(--page-max);
+  --okf-article-maxw: var(--doc-max);
+  --okf-prose-maxw: 55ch;
+  --okf-topbar-h: var(--nav-h);
+  /* Shared column ruler for the inventory: the group head and every row
+   * resolve to the same four columns (row number / record / summary /
+   * signals), so a group's count sits above the column of numbers. */
+  --ledger-col-n: 42px;
+  --ledger-col-a: minmax(0, 1.05fr);
+  --ledger-col-b: minmax(0, 1.9fr);
+  --ledger-col-c: minmax(0, 200px);
+  --ledger-col-gap: 22px;
 }
 
 /* ---- Reset / base ------------------------------------------------------ */
@@ -1355,45 +1065,27 @@ details.okf-frontmatter td code {
 }
 .okf-prose pre code { background: transparent; color: inherit; padding: 0; }
 
-/* ---- Light code blocks (Soft Light) -------------------------------------
- * Light themes render fenced code on the same light surface and ink as inline
- * code (--okf-pre-* resolve to --okf-code-* in every light block), framed by
- * the shared border token (so Appearance "Borders off" still removes it). The
- * vendored highlight.js "github" sheet is a legacy palette tuned for white;
- * these overrides map its token groups onto GitHub Primer light colours, each
- * >= 4.6:1 on every light --okf-code-bg (lowest: comment #59636e on Coffee
- * #e9e0d2 ≈ 4.7:1). Scoped to "not dark" so the github-dark sheet in dark
- * themes keeps its colours (only .hljs-section is lifted, below), and to .hljs
- * so specificity beats the vendor sheet whatever order it loads in. */
-:root:not([data-theme$="-dark"]) .okf-prose pre { border: 1px solid var(--okf-border); }
-/* Highlighted code outside .okf-prose (e.g. the graph detail panel body)
- * takes the light code surface instead of the vendor sheet's white. */
-:root:not([data-theme$="-dark"]) .hljs { color: var(--okf-code-fg); background: var(--okf-code-bg); }
-/* Inside prose the <pre> owns surface and padding in every theme: the vendor
- * `pre code.hljs { padding: 1em }` (github and github-dark alike) would
- * otherwise double-pad tagged blocks against untagged ones. `:root` lets it
- * outrank the light `.hljs` surface rule above. */
+/* ---- Code wells and syntax (Ledger) ------------------------------------
+ * Code wells are their own surface: dark --code-bg on every palette, Bone
+ * included. Syntax uses three roles only, over whichever vendored
+ * highlight.js sheet renderers.js loads: keys/keywords/flags (--syn-1, an
+ * accent tint), strings and values (--syn-2), punctuation/comments (--syn-3).
+ * `.hljs` specificity beats the vendor sheet whatever order it loads in. */
+.hljs { color: var(--code-text); background: var(--code-bg); }
+/* Inside prose the <pre> owns surface and padding: the vendor
+ * `pre code.hljs { padding: 1em }` would otherwise double-pad tagged blocks
+ * against untagged ones. */
 :root .okf-prose pre code.hljs { background: transparent; color: inherit; padding: 0; }
-/* Dark themes keep the vendored github-dark palette except .hljs-section:
- * its #1f6feb measured 4.15-4.35:1 on the dark code surfaces. #79c0ff is
- * github-dark's own attribute/number blue (9.89-10.37:1 on #020617, #0f0a15,
- * #140d09); the vendor bold still sets headings apart. */
-:root[data-theme$="-dark"] .hljs .hljs-section { color: #79c0ff; }
-:root:not([data-theme$="-dark"]) .hljs :is(.hljs-doctag, .hljs-keyword, .hljs-template-tag,
-  .hljs-template-variable, .hljs-type, .hljs-variable.language_) { color: #b62324; }
-:root:not([data-theme$="-dark"]) .hljs :is(.hljs-title, .hljs-title.class_,
-  .hljs-title.class_.inherited__, .hljs-title.function_) { color: #6639ba; }
-:root:not([data-theme$="-dark"]) .hljs :is(.hljs-attr, .hljs-attribute, .hljs-literal, .hljs-meta,
-  .hljs-number, .hljs-operator, .hljs-selector-attr, .hljs-selector-class, .hljs-selector-id,
-  .hljs-variable, .hljs-section) { color: #0550ae; }
-:root:not([data-theme$="-dark"]) .hljs :is(.hljs-regexp, .hljs-string) { color: #0a3069; }
-:root:not([data-theme$="-dark"]) .hljs :is(.hljs-built_in, .hljs-symbol, .hljs-bullet) { color: #953800; }
-:root:not([data-theme$="-dark"]) .hljs :is(.hljs-code, .hljs-comment, .hljs-formula) { color: #59636e; }
-:root:not([data-theme$="-dark"]) .hljs :is(.hljs-name, .hljs-quote, .hljs-selector-pseudo,
-  .hljs-selector-tag, .hljs-tag) { color: #116329; }
-:root:not([data-theme$="-dark"]) .hljs :is(.hljs-subst, .hljs-emphasis, .hljs-strong) { color: inherit; }
-:root:not([data-theme$="-dark"]) .hljs .hljs-addition { color: #116329; background-color: var(--okf-ok-bg); }
-:root:not([data-theme$="-dark"]) .hljs .hljs-deletion { color: #82071e; background-color: var(--okf-error-bg); }
+:root .hljs :is(.hljs-doctag, .hljs-keyword, .hljs-template-tag, .hljs-template-variable, .hljs-type,
+  .hljs-variable.language_, .hljs-attr, .hljs-attribute, .hljs-built_in, .hljs-selector-tag,
+  .hljs-selector-class, .hljs-selector-id, .hljs-name, .hljs-tag, .hljs-meta, .hljs-section,
+  .hljs-title, .hljs-title.class_, .hljs-title.function_, .hljs-symbol, .hljs-bullet) { color: var(--syn-1); }
+:root .hljs :is(.hljs-string, .hljs-regexp, .hljs-number, .hljs-literal, .hljs-variable,
+  .hljs-selector-attr, .hljs-selector-pseudo, .hljs-operator, .hljs-params) { color: var(--syn-2); }
+:root .hljs :is(.hljs-comment, .hljs-code, .hljs-formula, .hljs-quote, .hljs-punctuation) { color: var(--syn-3); }
+:root .hljs :is(.hljs-subst, .hljs-emphasis, .hljs-strong) { color: inherit; }
+:root .hljs .hljs-addition { color: var(--syn-2); background-color: transparent; box-shadow: inset 2px 0 0 var(--status-ok); }
+:root .hljs .hljs-deletion { color: var(--syn-3); background-color: transparent; box-shadow: inset 2px 0 0 var(--status-error); }
 /* P2-76 / P2-22: tables scroll horizontally on narrow viewports.
  * Previously ``.okf-table`` set ``display: block; overflow-x: auto`` AND
  * ``border-collapse: collapse`` - but ``border-collapse`` is ignored by
@@ -1625,9 +1317,6 @@ details.okf-frontmatter td code {
   padding: 1px 8px;
   text-transform: lowercase;
 }
-/* Light code blocks sit on the inset/code surface, so the badge lifts to the
- * panel surface like the copy button beside it instead of vanishing into it. */
-:root:not([data-theme$="-dark"]) .okf-code-lang { background: var(--okf-bg-elev); }
 .okf-code-copy {
   font: inherit;
   font-size: var(--okf-text-xs);
@@ -3390,231 +3079,17 @@ html:not(.okf-theme-ready) #okf-theme { display: none !important; }
    * shrink below their longest word, so "Compact" broke as "Comp|act". */
   overflow-wrap: break-word;
 }
-#okf-appearance-menu .okf-appearance__group {
-  border: 0;
-  min-inline-size: 0;
-  padding: var(--okf-space-1) var(--okf-space-2) var(--okf-space-2);
-  margin: 0;
-}
-#okf-appearance-menu .okf-appearance__intro,
-#okf-appearance-menu .okf-appearance__note {
-  margin: var(--okf-space-1) var(--okf-space-4) var(--okf-space-2);
-  color: var(--okf-fg-muted);
-  font-size: var(--okf-text-xs);
-  line-height: 1.45;
-}
-#okf-appearance-menu .okf-appearance__intro { color: var(--okf-fg); }
+
 @media (max-width: 640px) {
-  /* Five typed groups must still fit below the reflowed shell. Compact only
-   * this settings dialog; every radio remains at least 32px high and spaced,
-   * above the WCAG 2.2 24px minimum. */
-  #okf-appearance-menu .okf-appearance__intro,
-  #okf-appearance-menu .okf-appearance__note { margin-block: 2px 4px; line-height: 1.25; }
-  #okf-appearance-menu .okf-appearance__group { padding-block: 0 2px; }
-  #okf-appearance-menu .okf-appearance__group + .okf-appearance__group { margin-top: 0; padding-top: 2px; }
-  #okf-appearance-menu .okf-appearance__legend { padding-top: 1px; }
-  #okf-appearance-menu .okf-appearance__opt { min-height: 32px; padding-block: 3px; }
-  #okf-appearance-menu .okf-appearance__reset { min-height: 32px; margin-block: 3px; padding-block: 3px; }
+
 }
-#okf-appearance-menu .okf-appearance__group + .okf-appearance__group {
-  border-top: 1px solid var(--okf-border);
-  margin-top: var(--okf-space-1);
-  padding-top: var(--okf-space-2);
-}
-#okf-appearance-menu .okf-appearance__legend {
-  display: block;
-  font-size: var(--okf-text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--okf-fg-muted);
-  padding: var(--okf-space-1) var(--okf-space-2) 0;
-  font-weight: 700;
-}
-#okf-appearance-menu .okf-appearance__opt {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--okf-space-2);
-  width: 100%;
-  padding: var(--okf-space-2);
-  border: 0;
-  background: transparent;
-  color: var(--okf-fg);
-  border-radius: var(--okf-radius-sm);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-#okf-appearance-menu .okf-appearance__opt > input[type="radio"] {
-  position: absolute;
-  inset: 0;
-  /* The invisible radio owns the whole option's hit area. Without a z-index
-   * the checked option's sub-label (opacity < 1 => its own stacking context,
-   * later in DOM order) painted above it, so clicking the current choice
-   * pressed a non-focusable span: focus fell to <body>, the menu closed and
-   * the click was lost. */
-  z-index: 1;
-  inline-size: 100%;
-  block-size: 100%;
-  opacity: 0;
-  pointer-events: auto;
-  cursor: pointer;
-}
-#okf-appearance-menu .okf-appearance__opt .okf-appearance__check {
-  display: inline-grid;
-  place-items: center;
-  width: 1.25em;
-  height: 1.25em;
-  flex: none;
-  /* The radio ring is part of the icon, not a frame: --okf-separator keeps
-   * it under Border Off. */
-  border: 1px solid var(--okf-separator);
-  border-radius: 50%;
-  color: transparent;
-  font-size: var(--okf-text-xs);
-  line-height: 1;
-}
-#okf-appearance-menu .okf-appearance__opt[aria-checked="true"] .okf-appearance__check {
-  color: currentColor;
-  border-color: currentColor;
-  font-weight: 800;
-}
-#okf-appearance-menu .okf-appearance__opt[aria-checked="false"] .okf-appearance__check { visibility: visible; }
-#okf-appearance-menu .okf-appearance__opt .okf-appearance__sub {
-  margin-left: auto; color: var(--okf-fg-muted); font-size: var(--okf-text-xs);
-}
-#okf-appearance-menu .okf-appearance__opt:hover { background: var(--okf-bg-inset); }
-/* The checked ("current") menuitemradio carries the family-distinguishing
- * active treatment so the Swiss/Technical difference is observable right in
- * the picker: Technical = translucent accent tint + no frame; Swiss = solid
- * boxed accent fill + 1px accent frame. The frame is an inset box-shadow (not
- * a border) so it never shifts the option's measured size on toggle. Placed
- * after :hover so the checked treatment wins over hover. */
-#okf-appearance-menu .okf-appearance__opt[aria-checked="true"] {
-  background: var(--okf-active-fill);
-  color: var(--okf-active-fg);
-  box-shadow: inset 0 0 0 1px var(--okf-active-border);
-}
-#okf-appearance-menu .okf-appearance__opt[aria-checked="true"] .okf-appearance__check {
-  color: var(--okf-active-fg); /* readable on both the tint and the solid fill */
-}
-#okf-appearance-menu .okf-appearance__opt[aria-checked="true"] .okf-appearance__sub {
-  color: var(--okf-active-fg);
-  opacity: 0.85; /* keep the secondary hierarchy while staying legible on the fill */
-}
-#okf-appearance-menu .okf-appearance__opt:focus-visible {
-  outline: var(--okf-focus-width) solid var(--okf-focus-color);
-  outline-offset: -2px;
-}
-#okf-appearance-menu .okf-appearance__opt:focus-within {
-  outline: var(--okf-focus-width) solid var(--okf-focus-color);
-  outline-offset: -2px;
-}
-#okf-appearance-menu .okf-appearance__opt[aria-checked="true"] .okf-appearance__label {
-  font-weight: 700;
-}
-[data-okf-border="off"] #okf-appearance-menu .okf-appearance__opt[aria-checked="true"],
-[data-okf-border="off"] .okf-search-live__option[aria-selected="true"] {
-  font-weight: 700;
-  text-decoration: underline;
-  text-decoration-style: double;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 3px;
-  box-shadow: none;
-}
-/* The type-tinted card and concept-header frames mix the type colour INTO the
- * frame token, so zeroing the token alone left a translucent type-coloured
- * hairline behind. Border Off removes them like every other frame; the type
- * tint of the surface, the type chip and keyboard focus stay. */
-[data-okf-border="off"] .okf-page__header,
-[data-okf-border="off"] .okf-card:not(:focus-within) { border-color: transparent; }
-/* Directory tiles signalled hover only by darkening their frame; without a
- * frame they take the family hover elevation instead. */
-[data-okf-border="off"] .okf-subdirs a:hover { box-shadow: var(--okf-shadow-hover); }
-/* Border Off keeps an explicit, textual cue for error/status surfaces instead
- * of leaving users with a colour-only state. These selectors supplement the
- * existing semantic copy and do not create a decorative side stripe. */
-[data-okf-border="off"] .okf-graph-loading--error,
-[data-okf-border="off"] .okf-search-error,
-[data-okf-border="off"] .okf-toast[data-tone="error"],
-[data-okf-border="off"] [data-state="error"] {
-  border-color: transparent;
-  outline: 2px solid var(--okf-error-cue);
-  outline-offset: -2px;
-  font-weight: 650;
-}
-/* The search input error already carries its own textual cue ("Action
- * required"); the generic Error prefix supplements, never replaces it. */
-[data-okf-border="off"] .okf-graph-loading--error::before,
-[data-okf-border="off"] .okf-search-error:not(.okf-search-input-error)::before {
-  content: "Error: ";
-  font-weight: 800;
-}
-/* Only the framed fallback banner earns a textual "Status" cue: a generic
- * role="status" live region (the selection Comment affordance, composer and
- * search announcements) must never paint generated text — it floated a bare
- * "Status —" label over the page. The role itself is announced. */
-[data-okf-border="off"] .okf-studio-fallback-banner::before {
-  content: "Status: ";
-  font-weight: 700;
-}
-/* The graph canvas owns its own geometry, but its selected/path/error tokens
- * remain non-transparent under Border Off; the static dash/arrow and weight
- * cues are preserved by graph.js. */
-[data-okf-border="off"] .okf-graph,
-[data-okf-border="off"] .okf-graph__path,
-[data-okf-border="off"] .okf-graph [data-state="selected"] {
-  --okf-selection-cue: var(--okf-select);
-  --okf-path-cue: var(--okf-fg);
-  --okf-error-cue: var(--okf-error);
-}
-#okf-appearance-menu .okf-appearance__reset {
-  width: 100%;
-  margin: var(--okf-space-2) var(--okf-space-2) var(--okf-space-1);
-  padding: var(--okf-space-2);
-  border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-sm);
-  background: transparent;
-  color: var(--okf-fg-muted);
-  font: inherit;
-  font-size: var(--okf-text-sm);
-  text-align: left;
-  cursor: pointer;
-}
-#okf-appearance-menu .okf-appearance__reset:hover {
-  background: var(--okf-bg-inset);
-  color: var(--okf-fg);
-}
-#okf-appearance-menu .okf-appearance__reset:focus-visible {
-  outline: var(--okf-focus-width) solid var(--okf-focus-color);
-  outline-offset: 2px;
-}
-[data-okf-border="off"] #okf-appearance-menu .okf-appearance__reset {
-  border-color: transparent;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
+
 @media (prefers-reduced-motion: reduce) {
   /* No transitions on the popover: state changes are instant for users who
    * disable motion. (There are none defined, but this documents intent and
    * guards against accidental additions.) */
   #okf-appearance-menu { transition: none !important; }
 }
-
-/* F23 density is interface-only. It intentionally does not alter article
- * measure, body typography, minimum targets, or mobile touch geometry. */
-html[data-okf-density="compact"] :is(.okf-shell, .okf-topbar) { gap: var(--okf-space-1); }
-html[data-okf-density="compact"] :is(.okf-index, .okf-search) { padding-block: var(--okf-space-4); }
-html[data-okf-density="compact"] :is(.okf-card, .okf-index-card, .okf-search-result) {
-  padding-block: var(--okf-space-2);
-}
-html[data-okf-density="compact"] :is(.okf-cardgrid, .okf-search-results-list, .okf-index-browse__list) {
-  gap: var(--okf-space-2);
-}
-html[data-okf-density="compact"] :is(.okf-search-live__option, .okf-search-table th, .okf-search-table td) {
-  padding-block: 4px;
-}
-html[data-okf-density="compact"] #okf-appearance-menu .okf-appearance__opt { padding-block: 5px; }
 
 /* F20 global non-colour projection for structured alternatives. Canvas cues
  * retain shape/dash/arrow semantics in graph.js; these textual projections
@@ -3975,16 +3450,7 @@ body:has(.okf-graph-loading--error) .okf-cytoscape-fallback-actions { display: f
 
 @media (forced-colors: active) {
   .okf-search-submit, .okf-search-live__option[aria-selected="true"] { forced-color-adjust: none; background: Highlight; color: HighlightText; }
-  /* The Appearance picker's checked ("current") option maps to the system
-   * selected surface so the active family/mode stays unambiguous when the OS
-   * enforces a limited palette — mirroring the search-selected treatment. */
-  #okf-appearance-menu .okf-appearance__opt[aria-checked="true"] {
-    forced-color-adjust: none; background: Highlight; color: HighlightText;
-  }
-  #okf-appearance-menu .okf-appearance__opt[aria-checked="true"] .okf-appearance__check,
-  #okf-appearance-menu .okf-appearance__opt[aria-checked="true"] .okf-appearance__sub {
-    color: HighlightText; opacity: 1;
-  }
+
   .okf-search-live, .okf-search-error, .okf-copy-fallback, .okf-copy-fallback textarea,
   .okf-outline-jump__panel { border: 1px solid CanvasText; }
   :focus-visible { outline: 2px solid Highlight !important; outline-offset: 2px; }
@@ -4242,33 +3708,9 @@ details.okf-frontmatter code {
 .okf-appearance-trigger { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .okf-appearance-trigger__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .okf-appearance-trigger__swatch { width: 13px; height: 13px; flex: none; border: 1px solid currentColor; background: var(--okf-accent); border-radius: var(--okf-radius-sm); }
-.okf-appearance-trigger__swatch--swiss { border-radius: 0; box-shadow: inset 0 0 0 1px currentColor; }
-.okf-appearance-trigger__swatch--purple { border-radius: 50%; background: #7d4aa8; }
-.okf-appearance-trigger__swatch--coffee { border-radius: 2px; background: #8a4c2b; }
 
-/* (The former search-page-only topbar compacting rules (≤420px/≤340px) were
- * absorbed into shell.css's unified two-row mobile chrome, which keeps the
- * full "Appearance · <family>" label and a usable search field on every
- * route instead of a page-specific single-row squeeze.) */
-
-#okf-appearance-menu .okf-appearance__preview { display: inline-grid; grid-template-columns: repeat(3, 8px); width: 26px; height: 20px; padding: 2px; gap: 1px; flex: none; border: 1px solid currentColor; background: var(--okf-bg-elev); }
-#okf-appearance-menu .okf-appearance__preview span { display: block; background: currentColor; opacity: .35; }
-#okf-appearance-menu .okf-appearance__preview span:nth-child(2) { opacity: .8; }
-#okf-appearance-menu .okf-appearance__preview--technical { border-radius: 5px; box-shadow: 0 2px 4px rgba(15,23,42,.14); }
-#okf-appearance-menu .okf-appearance__preview--swiss { border-radius: 0; box-shadow: none; }
-#okf-appearance-menu .okf-appearance__preview--purple { border-radius: 8px; color: #7d4aa8; }
-#okf-appearance-menu .okf-appearance__preview--coffee { border-radius: 2px; color: #8a4c2b; }
-#okf-appearance-menu .okf-appearance__reset { position: static; width: 100%; min-height: 40px; margin-top: var(--okf-space-1); border: 1px solid var(--okf-border-strong); background: var(--okf-bg-elev); color: var(--okf-fg); font: inherit; font-weight: 650; cursor: pointer; }
-
-/* Family atmosphere is limited to product chrome and UI interaction layers;
- * concept type/community colours remain unchanged. */
-[data-theme^="technical-"] .okf-topbar { box-shadow: 0 1px 0 var(--okf-accent-bg); }
-[data-theme^="purple-"] :is(.okf-topbar, .okf-detail) { background: color-mix(in srgb, var(--okf-bg-elev) 94%, var(--okf-accent) 6%); }
-[data-theme^="coffee-"] :is(.okf-topbar, .okf-detail) { background: color-mix(in srgb, var(--okf-bg-elev) 91%, var(--okf-accent) 9%); }
-[data-theme^="swiss-"] .okf-topbar { border-bottom-color: var(--okf-border-strong); box-shadow: none; }
 .okf-btn:hover, .okf-topbar__controls button:hover, .okf-card:hover { box-shadow: var(--okf-shadow-hover); }
 #okf-appearance-menu, .okf-lightbox__figure img, .okf-popover { box-shadow: var(--okf-shadow-overlay); }
-[data-theme^="swiss-"] :is(.okf-btn, .okf-topbar__controls button):hover { transform: none; }
 
 /* Theme-owned UI colours in the canonical static graph export. */
 .okf-graph-export__count-bg { fill: var(--okf-bg-elev); stroke: var(--okf-border-strong); }
@@ -4305,14 +3747,11 @@ details.okf-frontmatter code {
 @media (max-height: 620px) {
   :root { --okf-topbar-h: 46px; }
   #okf-appearance-menu { max-height: calc(100vh - 8px); padding-block: var(--okf-space-1); }
-  #okf-appearance-menu .okf-appearance__opt { padding-block: 5px; }
-  #okf-appearance-menu .okf-appearance__group { padding-bottom: var(--okf-space-1); }
+
 }
 
 .okf-graph-loading--error, .okf-search-error, [data-state="error"] { color: var(--okf-error); background: var(--okf-error-bg); font-weight: 650; }
-[data-okf-border="off"] :is(.okf-graph-loading--error, .okf-search-error, [data-state="error"]) { outline: 2px solid var(--okf-error-cue); outline-offset: -2px; }
-[data-okf-border="off"] :is(.okf-graph-loading--error, .okf-search-error):not(.okf-search-input-error)::before { content: "Error — "; font-weight: 800; }
-[data-okf-border="off"] .okf-studio-fallback-banner:not(.okf-graph-loading--error, .okf-search-error)::before { content: "Status — "; font-weight: 700; }
+
 /* OKF 0.2 advisory information stays outside canonical annotation text. */
 .okf-metadata { margin-block: 0 1.5rem; padding-block: .75rem; border-block: 1px solid var(--okf-border); color: var(--okf-fg); overflow-wrap: anywhere; font-size: .875rem; }
 .okf-metadata__badges { display: flex; flex-wrap: wrap; gap: .5rem; }
@@ -4399,8 +3838,7 @@ details.okf-frontmatter code {
 .okf-context-manual-options > summary { min-height: 44px; padding-block: .65rem; cursor: pointer; }
 .okf-context-preview { grid-column: 1 / -1; max-height: 28rem; overflow: auto; margin-top: 1rem; border-top: 1px solid var(--okf-border); }
 .okf-context-preview h3 { font-size: var(--okf-text-base); }
-.okf-context-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--okf-font-body); line-height: 1.55; }
-.okf-appearance__advanced > summary, .okf-context-advanced > summary,
+.okf-context-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--okf-font-body); line-height: 1.55; } .okf-context-advanced > summary,
 .okf-index__overview > summary, .okf-authoring-help > summary {
   display: list-item; min-height: 44px; padding-block: .65rem; cursor: pointer;
 }
@@ -4590,6 +4028,11 @@ details.okf-frontmatter code {
     --okf-shadow: none;
     --okf-shadow-hover: none;
     --okf-shadow-overlay: none;
+    --code-bg: #f1f3f5;
+    --code-text: #101623;
+    --syn-1: #6b2f1a;
+    --syn-2: #101623;
+    --syn-3: #46505e;
   }
   .okf-topbar,
   .okf-studio-bar,
@@ -4601,4 +4044,974 @@ details.okf-frontmatter code {
   .okf-onthispage {
     display: none !important;
   }
+}
+
+/* ==== LEDGER STRUCTURE LAYER (hand-maintained) ==== */
+/* Ledger structure: every record is a row. Square corners, hairline
+ * hierarchy (1px --border between records, 1px --border-strong under heads
+ * and around controls, 2px --border-strong top rule where a record starts),
+ * no shadows except --shadow-pop on floating layers, no gradients, no zebra.
+ * The accent is only a 2px state bar, the focus ring, link text and the one
+ * filled primary action. Figures, ids, paths, times and column heads are set
+ * in Azeret Mono with tabular numerals. Every colour is a token.
+ * `.okf-viewer` scoping lifts these rules over the older layered component
+ * rules above (and studio.css, which loads later) without !important.
+ * MOCKUP SCOPE: top bar, index, concept page, Appearance menu. */
+
+/* ---- Base type and browser surfaces ------------------------------------ */
+body {
+  font-family: var(--font-body);
+  font-feature-settings: var(--font-features);
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+  caret-color: var(--accent);
+  scrollbar-color: var(--border-strong) var(--bg);
+}
+::selection { background: var(--selection); color: var(--text); }
+h1, h2, h3, h4, h5, h6 { font-family: var(--font-display); }
+code, kbd, samp, pre, time { font-family: var(--font-mono); }
+:focus-visible { border-radius: 0; }
+a { color: var(--link); }
+a:hover { color: var(--accent-hover); }
+
+/* Buttons: transparent with a 1px outline; one filled primary per view. */
+body.okf-viewer .okf-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--ctl-h);
+  padding: var(--btn-pad);
+  border: 1px solid var(--btn-border);
+  border-radius: 0;
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  font: var(--btn-weight) var(--btn-size)/1.25 var(--font-body);
+  letter-spacing: var(--btn-track);
+  text-decoration: none;
+  box-shadow: none;
+  transform: none;
+}
+body.okf-viewer .okf-btn[hidden] { display: none; }
+body.okf-viewer .okf-btn:hover { background: var(--btn-hover-bg); color: var(--btn-text); text-decoration: none; box-shadow: none; }
+body.okf-viewer .okf-btn--primary,
+body.okf-viewer .okf-btn--primary:hover {
+  background: var(--primary-bg);
+  border-color: var(--primary-border);
+  color: var(--primary-text);
+}
+body.okf-viewer .okf-btn--primary:hover { background: var(--primary-hover-bg); }
+body.okf-viewer :is(.okf-btn, .okf-studiobtn)[aria-pressed="true"] {
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--accent-text);
+  box-shadow: inset 2px 0 0 0 var(--accent);
+}
+
+/* Fields and selects: --input-bg, 1px outline, square, 32px. */
+body.okf-viewer :is(select, input[type="search"], input[type="text"]) {
+  border-radius: 0;
+  font-family: var(--font-body);
+}
+
+/* Mono micro-label: column heads, badges, eyebrows. */
+.okf-viewer :is(.okf-section__title, .okf-recent__label, .okf-type-chip, .okf-v2-spotlight__eyebrow,
+  .okf-sidebar-panel__title, .okf-appearance__legend, .okf-appearance__tag, .okf-onthispage > summary > span:first-child) {
+  font-family: var(--font-label);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-track);
+  text-transform: var(--label-case);
+}
+
+/* Content types are not colour-coded. The renderer still emits per-type
+ * colours inline (the graph uses them); Ledger neutralises them here.
+ * TODO(ledger): stop emitting the inline type colours at source. */
+.okf-viewer [style*="--okf-type-accent"] { --okf-type-accent: var(--text-3) !important; }
+.okf-viewer :is(.okf-section__icon, .okf-card__type-icon, .okf-type-iconwrap, .okf-conn__icon, .okf-type-nav__link svg) {
+  color: var(--text-3) !important;
+}
+
+/* ---- Top bar ------------------------------------------------------------- */
+html body .okf-topbar.okf-shell {
+  background: var(--nav-bg);
+  border-bottom: 1px solid var(--nav-border);
+  box-shadow: none;
+  color: var(--nav-text);
+}
+.okf-shell .okf-topbar__brand strong {
+  font-size: var(--brand-size);
+  font-weight: var(--brand-weight);
+  letter-spacing: var(--brand-track);
+}
+.okf-shell .okf-brand-link:hover { color: var(--nav-text); }
+html body .okf-shell__nav .okf-btn {
+  border-color: transparent;
+  background: transparent;
+  color: var(--nav-text);
+  font-size: var(--nav-size);
+  font-weight: var(--nav-weight);
+  padding-inline: 13px;
+}
+html body .okf-shell__nav .okf-btn:hover { background: var(--surface-2); }
+/* Current destination: a 2px accent bar under the label, never a fill. */
+html body .okf-shell [data-okf-shell-item] > [aria-current="page"] {
+  background: transparent;
+  color: var(--nav-text);
+  font-weight: 700;
+  box-shadow: inset 0 -2px 0 0 var(--accent);
+}
+/* Search: field and button joined. */
+html body .okf-shell__search-form { gap: 0; align-items: stretch; }
+html body .okf-shell__search-form input {
+  min-height: var(--ctl-h);
+  padding: 0 10px;
+  border: 1px solid var(--input-border);
+  border-radius: 0;
+  background: var(--input-bg);
+  color: var(--input-text);
+  font-size: 13px;
+}
+html body .okf-shell__search-form input::placeholder { color: var(--text-3); }
+html body .okf-shell__search-form button {
+  min-height: var(--ctl-h);
+  margin-left: -1px;
+  padding: 0 13px;
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
+  background: var(--surface-2);
+  color: var(--text);
+  font: var(--btn-weight) var(--btn-size)/1 var(--font-body);
+  cursor: pointer;
+}
+html body .okf-shell__search-form button:hover { background: var(--border); }
+html body .okf-shell .okf-studio-launcher {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  font-size: var(--nav-size);
+}
+html body .okf-shell .okf-studio-launcher:hover { background: var(--surface-2); }
+/* Appearance trigger: palette swatch + "Appearance · Bone". */
+html body .okf-shell .okf-appearance-trigger { gap: 8px; }
+.okf-appearance-trigger__swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border: 0;
+  border-radius: 0;
+  background: var(--accent);
+}
+.okf-appearance-trigger[aria-expanded="true"] { background: var(--surface-2); }
+@media (min-width: 641px) {
+  html body .okf-topbar.okf-shell { min-height: var(--nav-h); padding: 0 20px; }
+  html body .okf-shell__nav { gap: 4px; }
+  html body .okf-shell__nav .okf-btn { min-height: var(--ctl-h); }
+  html body .okf-shell [data-okf-shell-item="search"] { margin-right: 6px; }
+}
+
+/* ---- Appearance menu ----------------------------------------------------- */
+#okf-appearance-menu {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-pop);
+  font-size: 12.5px;
+}
+#okf-appearance-menu:focus { outline: none; }
+.okf-appearance__group { margin: 0; padding: 0; border: 0; min-width: 0; }
+.okf-appearance__legend {
+  float: left;
+  width: 100%;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: var(--label-size);
+}
+.okf-appearance__legend + * { clear: left; }
+.okf-appearance__opt {
+  position: relative;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  column-gap: 12px;
+  align-items: start;
+  padding: 11px 14px 11px 14px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.okf-appearance__opt:last-of-type { border-bottom: 0; }
+.okf-appearance__opt:hover { background: var(--surface-2); }
+/* The native radio stays focusable and announced; the row shows its state. */
+.okf-appearance__opt > input[type="radio"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+/* Current choice: the 2px accent bar, never a fill. */
+.okf-appearance__opt:has(> input:checked) { box-shadow: inset 2px 0 0 0 var(--accent); }
+.okf-appearance__opt:has(> input:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.okf-appearance__swatch {
+  display: flex;
+  width: 40px;
+  height: 28px;
+  margin-top: 2px;
+  border: 1px solid var(--border-strong);
+  pointer-events: none;
+}
+.okf-appearance__swatch i { flex: 1 1 0; }
+.okf-appearance__swatch i:nth-child(1) { background: var(--bg); }
+.okf-appearance__swatch i:nth-child(2) { background: var(--surface-2); }
+.okf-appearance__swatch i:nth-child(3) { background: var(--text); }
+.okf-appearance__swatch i:nth-child(4) { background: var(--accent); }
+.okf-appearance__swatch--split { border-color: var(--border-strong); }
+.okf-appearance__swatch--split > span { display: flex; flex: 1 1 0; }
+.okf-appearance__swatch--split i:nth-child(2) { display: none; }
+.okf-appearance__text { display: grid; gap: 2px; min-width: 0; pointer-events: none; }
+.okf-appearance__label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.okf-appearance__tag { color: var(--text-3); font-size: 9px; }
+.okf-appearance__sub { color: var(--text-2); font-size: 11.5px; line-height: 1.45; }
+@media (forced-colors: active) {
+  .okf-appearance__opt:has(> input:checked) {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+  }
+  .okf-appearance__opt:has(> input:checked) :is(.okf-appearance__label, .okf-appearance__sub, .okf-appearance__tag) { color: HighlightText; }
+  .okf-appearance__swatch { forced-color-adjust: none; }
+}
+
+/* ---- Index ---------------------------------------------------------------- */
+body.okf-viewer .okf-index {
+  max-width: calc(var(--page-max) + 40px);
+  padding: 28px 20px 64px;
+}
+body.okf-viewer .okf-hero {
+  margin: 0 0 var(--section-gap);
+  padding: 0;
+  border: 0;
+}
+body.okf-viewer .okf-index__title {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-size: var(--h1-size);
+  font-weight: var(--h1-weight);
+  line-height: var(--h1-lh);
+  letter-spacing: var(--h1-track);
+}
+body.okf-viewer .okf-index .okf-page-feedback { margin: 0 0 14px; }
+body.okf-viewer .okf-index__intro { margin: 0 0 16px; max-width: 60ch; color: var(--text-2); }
+body.okf-viewer .okf-index__intro.okf-prose,
+body.okf-viewer .okf-index__intro.okf-prose p { font-size: 15px; line-height: 1.6; }
+body.okf-viewer .okf-index__intro.okf-prose > p { margin: 0; max-width: 60ch; }
+/* Corpus totals read as the ledger's summary line. */
+body.okf-viewer .okf-hero__stats {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0;
+  margin: 0 0 30px;
+  border-top: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border);
+}
+body.okf-viewer .okf-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin: 0 20px 0 0;
+  padding: 8px 20px 8px 0;
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-2);
+  font: var(--label-weight) var(--label-size)/1.3 var(--font-label);
+  letter-spacing: var(--label-track);
+  text-transform: uppercase;
+}
+body.okf-viewer .okf-stat:last-child { margin-right: 0; border-right: 0; }
+body.okf-viewer .okf-stat strong {
+  color: var(--text);
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+/* Recently changed: a numbered hairline list with mono times. */
+body.okf-viewer .okf-recent { margin: 0; padding: 0; border: 0; background: transparent; }
+body.okf-viewer .okf-recent__label {
+  margin: 0 0 9px;
+  color: var(--text-2);
+  font-size: var(--label-size);
+}
+body.okf-viewer .okf-recent__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border-strong);
+  counter-reset: okf-recent;
+}
+body.okf-viewer .okf-recent__list > li {
+  display: grid;
+  grid-template-columns: 2.4em minmax(0, 1fr);
+  align-items: baseline;
+  border-bottom: 1px solid var(--border);
+  counter-increment: okf-recent;
+}
+body.okf-viewer .okf-recent__list > li::before {
+  content: counter(okf-recent) ".";
+  color: var(--text-3);
+  font: 11px/1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+body.okf-viewer .okf-recent__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 7px 0;
+  color: var(--text-2);
+  font-size: 13px;
+  text-decoration: none;
+}
+body.okf-viewer .okf-recent__item strong { color: var(--text); font-weight: 600; }
+body.okf-viewer .okf-recent__item:hover strong { color: var(--text); text-decoration: underline; }
+body.okf-viewer .okf-recent__time { color: var(--text-3); font: 11px/1.5 var(--font-mono); white-space: nowrap; }
+/* 'New in' spotlight: a flat panel; its CTA is the view's one filled button. */
+body.okf-viewer .okf-v2-spotlight {
+  margin: 0;
+  padding: 18px;
+  border: 1px solid var(--hero-border);
+  border-radius: 0;
+  background: var(--hero-bg);
+  box-shadow: none;
+}
+body.okf-viewer .okf-hero--split .okf-v2-spotlight { padding: 18px; }
+body.okf-viewer .okf-v2-spotlight__eyebrow {
+  display: inline-block;
+  margin: 0 0 12px;
+  padding: 2px 7px;
+  border: 1px solid var(--accent);
+  border-radius: 0;
+  background: transparent;
+  color: var(--accent-text);
+  font-size: var(--label-size);
+  font-weight: 700;
+}
+body.okf-viewer .okf-v2-spotlight__title {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+body.okf-viewer .okf-v2-spotlight__outcome { margin: 0 0 14px; color: var(--text-2); font-size: 13px; line-height: 1.55; }
+body.okf-viewer .okf-v2-spotlight__features {
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 6px 14px;
+  margin: 0 0 14px;
+}
+body.okf-viewer .okf-v2-spotlight__features li { color: var(--text); font-size: 13px; }
+body.okf-viewer .okf-v2-spotlight__features svg { color: var(--accent-text); }
+body.okf-viewer .okf-v2-spotlight__actions { gap: 10px; }
+body.okf-viewer :is(.okf-v2-spotlight__cta, .okf-v2-spotlight__secondary) {
+  min-height: 36px;
+  padding: 8px 14px;
+  border-radius: 0;
+  font-size: var(--btn-size);
+  font-weight: var(--btn-weight);
+}
+body.okf-viewer .okf-v2-spotlight__cta,
+body.okf-viewer .okf-v2-spotlight__cta:hover { color: var(--primary-text); }
+body.okf-viewer .okf-v2-spotlight__secondary { background: transparent; }
+body.okf-viewer .okf-v2-spotlight__tertiary {
+  align-self: center;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+body.okf-viewer .okf-v2-spotlight__tertiary:hover { color: var(--accent-text); }
+/* Graph preview disclosure. */
+body.okf-viewer .okf-home-graph { margin-top: 18px; border-bottom: 1px solid var(--border); }
+body.okf-viewer .okf-home-graph > summary {
+  padding: 4px 0 10px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+body.okf-viewer .okf-home-graph .okf-graph-thumb { border-radius: 0; box-shadow: none; }
+@media (min-width: 960px) {
+  body.okf-viewer .okf-hero.okf-hero--split {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    grid-template-areas: "title visual" "feedback visual" "intro visual" "stats visual" "recent visual";
+    grid-template-rows: auto auto auto auto 1fr;
+    gap: 0 40px;
+  }
+  body.okf-viewer .okf-hero > .okf-page-feedback { grid-area: feedback; }
+  body.okf-viewer .okf-hero > .okf-recent { grid-area: recent; }
+  body.okf-viewer .okf-hero > .okf-hero__visual { max-width: none; justify-self: stretch; gap: 0; }
+  body.okf-viewer .okf-hero > .okf-hero__stats { justify-self: start; }
+}
+/* Explore: heading, controls and outlined type chips. */
+body.okf-viewer .okf-index-browse { margin: 0 0 14px; gap: 24px; }
+body.okf-viewer .okf-index-browse__heading h2 {
+  font-family: var(--font-display);
+  font-size: var(--h2-size);
+  font-weight: var(--h2-weight);
+  letter-spacing: var(--h2-track);
+}
+body.okf-viewer .okf-index-browse__heading p { margin-top: 2px; color: var(--text-2); font-size: 13.5px; }
+body.okf-viewer .okf-index-browse__controls { gap: 8px; }
+body.okf-viewer .okf-index-browse__controls label { gap: 4px; color: var(--text-2); font-size: 11.5px; font-weight: 500; }
+body.okf-viewer .okf-index-browse__controls select {
+  min-height: var(--ctl-h);
+  min-width: 9.5rem;
+  padding: 0 8px;
+  border: 1px solid var(--input-border);
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  font-size: 13px;
+}
+body.okf-viewer .okf-type-nav { gap: 8px; margin: 0 0 18px; padding: 0; border: 0; }
+body.okf-viewer .okf-type-nav__link {
+  gap: 7px;
+  padding: 6px 11px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+body.okf-viewer .okf-type-nav__link:hover { background: var(--surface-2); border-color: var(--border-strong); color: var(--text); }
+body.okf-viewer .okf-type-nav__link svg { width: 13px; height: 13px; }
+body.okf-viewer .okf-type-nav__count {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-3);
+  font: 10.5px/1 var(--font-mono);
+}
+
+/* Inventory: one shared four-column ruler per type group. */
+body.okf-viewer .okf-section { margin: 0 0 22px; }
+body.okf-viewer .okf-section__title {
+  display: grid;
+  grid-template-columns: var(--ledger-col-n) var(--ledger-col-a) var(--ledger-col-b) var(--ledger-col-c);
+  column-gap: var(--ledger-col-gap);
+  align-items: baseline;
+  margin: 0;
+  padding: 0 8px 7px;
+  border: 0;
+  border-bottom: 1px solid var(--border-strong);
+  color: var(--text);
+  font-size: 10.5px;
+  line-height: 1.3;
+}
+body.okf-viewer .okf-section__icon { display: none; }
+body.okf-viewer .okf-section__count {
+  grid-area: 1 / 1;
+  justify-self: end;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-2);
+  font: 10.5px/1.3 var(--font-mono);
+  letter-spacing: 0;
+}
+body.okf-viewer .okf-section__title::before,
+body.okf-viewer .okf-section__title::after {
+  color: var(--text-3);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+}
+body.okf-viewer .okf-section__title::before { grid-area: 1 / 3; content: "Summary"; }
+body.okf-viewer .okf-section__title::after { grid-area: 1 / 4; justify-self: end; content: "Links · tags"; }
+body.okf-viewer .okf-cardgrid { display: block; gap: 0; counter-reset: okf-row; }
+body.okf-viewer .okf-card {
+  display: grid;
+  grid-template-columns: var(--ledger-col-n) var(--ledger-col-a) var(--ledger-col-b) var(--ledger-col-c);
+  grid-template-areas: "n title desc meta" "n id desc meta";
+  grid-template-rows: auto 1fr;
+  column-gap: var(--ledger-col-gap);
+  row-gap: 1px;
+  align-items: start;
+  padding: 9px 8px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+  counter-increment: okf-row;
+  transition: none;
+}
+body.okf-viewer .okf-card::before {
+  grid-area: n;
+  justify-self: end;
+  content: counter(okf-row, decimal-leading-zero);
+  color: var(--text-3);
+  font: 11px/1.9 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+body.okf-viewer .okf-card:hover { background: var(--surface-2); border-color: var(--border); box-shadow: none; transform: none; }
+body.okf-viewer .okf-card:hover::before { color: var(--accent-text); }
+body.okf-viewer .okf-card:focus-within { border-color: var(--border); box-shadow: inset 2px 0 0 0 var(--accent); }
+body.okf-viewer .okf-card__type { display: none; }
+body.okf-viewer .okf-card__link {
+  grid-area: title;
+  color: var(--card-title-color);
+  font-size: var(--card-title-size);
+  font-weight: var(--card-title-weight);
+  letter-spacing: var(--card-title-track);
+  line-height: 1.4;
+  text-decoration: none;
+}
+body.okf-viewer .okf-card__link:hover { color: var(--card-title-color); text-decoration: underline; text-underline-offset: 3px; }
+body.okf-viewer .okf-card__link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 0; }
+body.okf-viewer .okf-card__id {
+  grid-area: id;
+  color: var(--text-3);
+  font: 10.5px/1.5 var(--font-mono);
+  overflow-wrap: anywhere;
+}
+body.okf-viewer .okf-card__desc {
+  grid-area: desc;
+  margin: 0;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+body.okf-viewer .okf-card__meta {
+  grid-area: meta;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+body.okf-viewer .okf-card__links {
+  margin-right: 2px;
+  color: var(--text-3);
+  font: 10.5px/1.6 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+body.okf-viewer .okf-tag,
+body.okf-viewer .okf-tag--card {
+  padding: 2px 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-2);
+  font: 500 9px/1.3 var(--font-label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+body.okf-viewer .okf-index__overview { border-top: 1px solid var(--border-strong); border-bottom: 0; }
+body.okf-viewer .okf-index__overview > summary { font-weight: 600; }
+
+/* ---- Concept page --------------------------------------------------------- */
+/* View tabs: text tabs; the selected view gets the bold label + 2px accent
+ * underline. Wrap lines is a toggle and is marked neutrally. */
+html body.okf-viewer .okf-concept-viewbar {
+  min-height: 52px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-2);
+  gap: 18px;
+}
+html body.okf-viewer .okf-viewswitch {
+  gap: 18px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+}
+html body.okf-viewer .okf-viewswitch__btn {
+  padding: 9px 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  box-shadow: none;
+}
+html body.okf-viewer .okf-viewswitch__btn:hover:not([aria-pressed="true"]) { background: transparent; color: var(--text); }
+html body.okf-viewer .okf-viewswitch__btn[aria-pressed="true"] {
+  background: transparent;
+  color: var(--text);
+  font-weight: 700;
+  border-bottom-color: var(--accent);
+}
+html body.okf-viewer .okf-viewswitch__btn.okf-source-wrap[aria-pressed="true"] {
+  font-weight: 600;
+  border-bottom-color: var(--text-3);
+}
+html body.okf-viewer .okf-outline-jump__toggle {
+  min-height: var(--ctl-h);
+  border: 1px solid var(--btn-border);
+  border-radius: 0;
+  background: transparent;
+  font-size: 12.5px;
+}
+html body.okf-viewer .okf-outline-jump__panel { border-radius: 0; box-shadow: var(--shadow-pop); border: 0; background: var(--surface); }
+
+/* The reading column (760px) with Related on the right. */
+body.okf-viewer .okf-page {
+  max-width: var(--page-max);
+  padding: 28px 20px 64px;
+  gap: 32px;
+}
+body.okf-viewer .okf-page__main {
+  --okf-lane: var(--doc-max);
+  --okf-reading-inset: 18px;
+  max-width: var(--doc-max);
+}
+@media (min-width: 901px) {
+  body.okf-viewer .okf-page:not([data-okf-related="below"]) {
+    grid-template-columns: minmax(0, var(--doc-max)) minmax(180px, 210px);
+    justify-content: center;
+  }
+  body.okf-viewer .okf-page:not([data-okf-related="below"]) > .okf-page__main { grid-column: 1; }
+  body.okf-viewer .okf-page:not([data-okf-related="below"]) > .okf-page__sidebar {
+    grid-column: 2;
+    min-width: 0;
+    max-width: none;
+    resize: none;
+    top: calc(var(--okf-viewbar-top, var(--nav-h)) + var(--okf-viewbar-h, 52px) + 16px);
+  }
+}
+/* Document header: a flat band with a 1px outline and a 2px top rule. */
+body.okf-viewer .okf-page__header {
+  margin: 0;
+  padding: 18px;
+  border: 1px solid var(--dochead-border);
+  border-top: 2px solid var(--border-strong);
+  border-radius: 0;
+  background: var(--dochead-bg);
+  color: var(--dochead-text);
+}
+body.okf-viewer .okf-page__header > * { max-width: none; }
+body.okf-viewer .okf-breadcrumb {
+  margin: 0 0 8px;
+  color: var(--text-2);
+  font: 400 11px/1.5 var(--font-mono);
+}
+body.okf-viewer .okf-breadcrumb a { color: var(--text-2); }
+body.okf-viewer .okf-breadcrumb a:hover { color: var(--text); }
+body.okf-viewer .okf-breadcrumb__current { color: var(--text); font-weight: 600; }
+body.okf-viewer .okf-breadcrumb__sep { color: var(--text-3); }
+body.okf-viewer .okf-page__typerow { margin: 0; gap: 8px; }
+body.okf-viewer .okf-type-iconwrap { display: none; }
+body.okf-viewer .okf-type-chip,
+body.okf-viewer .okf-type-chip[style] {
+  padding: 2px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
+  background: transparent !important;
+  color: var(--text-2) !important;
+  font-size: var(--label-size);
+  line-height: 1.5;
+}
+body.okf-viewer .okf-readtime { color: var(--text-3); font: 11px/1.5 var(--font-mono); }
+body.okf-viewer .okf-page__title {
+  margin: 10px 0 10px;
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: var(--h1-weight);
+  line-height: var(--h1-lh);
+  letter-spacing: var(--h1-track);
+}
+body.okf-viewer .okf-page__description {
+  max-width: 66ch;
+  margin: 0 0 10px;
+  color: var(--text-2);
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+body.okf-viewer .okf-page__meta { margin: 0; }
+body.okf-viewer .okf-page__meta .okf-external {
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--bg-2);
+  color: var(--text-2);
+  font: 11px/1.5 var(--font-mono);
+  text-decoration: none;
+}
+body.okf-viewer .okf-page__meta .okf-external:hover { border-color: var(--border-strong); color: var(--text); }
+body.okf-viewer .okf-page__meta .okf-external::after { content: none; }
+/* Metadata strip: a field row, every value divided by a vertical hairline. */
+body.okf-viewer .okf-page__main > [data-okf-metadata-slot] { max-width: none; }
+body.okf-viewer .okf-metadata {
+  margin: 0;
+  padding: 10px 18px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+body.okf-viewer .okf-metadata__badges { gap: 0; row-gap: 4px; }
+body.okf-viewer .okf-metadata__badge {
+  margin-right: 16px;
+  padding: 0 16px 0 0;
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+  color: var(--text-2);
+}
+body.okf-viewer .okf-metadata__badge strong { color: var(--text); }
+body.okf-viewer .okf-metadata__badge:last-child { margin-right: 0; padding-right: 0; border-right: 0; }
+body.okf-viewer .okf-metadata__details { margin-top: 8px; padding-top: 4px; border-top: 1px solid var(--border); }
+body.okf-viewer .okf-metadata__details > summary { min-height: 0; padding-block: 4px; font-weight: 600; }
+/* On-this-page toolbar: micro-label summary over outlined buttons. */
+body.okf-viewer .okf-page__main > .okf-document-tools {
+  display: block;
+  max-width: none;
+  margin: 14px 0 0;
+  padding: 10px 18px 12px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+body.okf-viewer .okf-onthispage { margin: 0; padding: 0; border: 0; background: transparent; }
+body.okf-viewer .okf-onthispage > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0;
+  color: var(--text);
+  font-size: 11.5px;
+  font-weight: 400;
+}
+body.okf-viewer .okf-onthispage > summary > span:first-child { font-size: var(--label-size); font-weight: 700; }
+body.okf-viewer .okf-onthispage__current { color: var(--text-2); font-size: 11.5px; }
+body.okf-viewer .okf-onthispage > summary::before { color: var(--text-3); font-family: var(--font-mono); }
+body.okf-viewer .okf-document-tools > .okf-page-utilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+}
+body.okf-viewer .okf-page-utilities .okf-btn { min-height: var(--ctl-h); padding: var(--btn-pad); }
+body.okf-viewer .okf-page__body-col > .okf-selection-hint {
+  margin: 12px auto 0;
+  color: var(--text-3);
+  font-size: 11.5px;
+}
+/* Prose: 16px / 1.72, paragraphs capped near 55ch. */
+body.okf-viewer .okf-page__body.okf-prose {
+  font-size: var(--prose-size);
+  line-height: 1.72;
+}
+/* The body column carries the reading inset (it shares the header text's
+ * left edge); running text is capped at the measure, wide blocks (code,
+ * tables, figures) use the whole inset column. */
+body.okf-viewer .okf-page__body.okf-prose { padding-inline: var(--okf-reading-inset); }
+body.okf-viewer .okf-page__body.okf-prose > * { max-width: 100%; margin-left: 0; margin-right: 0; }
+body.okf-viewer .okf-page__body.okf-prose > :is(p, ul, ol, blockquote, dl, h2, h3, h4),
+body.okf-viewer .okf-page__body.okf-prose li { max-width: 55ch; }
+body.okf-viewer .okf-page__body.okf-prose > .okf-wide { max-width: none; }
+body.okf-viewer .okf-prose > * + * { margin-top: 16px; }
+body.okf-viewer .okf-prose p { margin: 16px 0 0; }
+body.okf-viewer .okf-prose :is(h2, h3, h4) { font-family: var(--font-display); color: var(--text); }
+body.okf-viewer .okf-prose h2 {
+  margin: 34px 0 0;
+  font-size: var(--h2-size);
+  font-weight: var(--h2-weight);
+  line-height: 1.25;
+  letter-spacing: var(--h2-track);
+}
+body.okf-viewer .okf-prose > h2:first-child { margin-top: 18px; }
+body.okf-viewer .okf-prose h3 { margin: 26px 0 0; font-size: var(--h3-size); font-weight: var(--h3-weight); }
+body.okf-viewer .okf-prose a {
+  color: var(--link);
+  text-decoration-line: underline;
+  text-decoration-color: currentColor;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+body.okf-viewer .okf-prose a:hover { color: var(--accent-hover); }
+body.okf-viewer .okf-prose :not(pre) > code {
+  padding: 1px 5px;
+  border: 0;
+  border-radius: 0;
+  background: var(--icode-bg);
+  color: var(--icode-text);
+  font-family: var(--font-mono);
+  font-size: 0.84em;
+}
+/* Prose tables: mono micro-label heads over a strong rule, hairline rows. */
+body.okf-viewer .okf-prose .okf-tablewrap-frame {
+  border-top: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+  border-radius: 0;
+}
+body.okf-viewer .okf-prose .okf-table { border: 0; border-radius: 0; font-size: 0.88em; }
+body.okf-viewer .okf-prose .okf-table :is(th, td) {
+  padding: 8px 14px 8px 0;
+  border-width: 0 0 1px;
+  border-style: solid;
+  border-color: var(--border);
+  background: transparent;
+  font-size: 12.5px;
+}
+body.okf-viewer .okf-prose .okf-table th {
+  border-color: var(--border-strong);
+  color: var(--text-2);
+  font: 500 var(--label-size)/1.4 var(--font-label);
+  letter-spacing: var(--label-track);
+  text-transform: uppercase;
+}
+body.okf-viewer .okf-prose .okf-table tbody tr:last-child td { border-bottom: 0; }
+body.okf-viewer .okf-prose .okf-table tbody tr:hover td { background: var(--surface-2); }
+body.okf-viewer .okf-prose .okf-table td code { font-size: 11.5px; }
+/* Code wells: --code-bg on every palette, mono language micro-label. */
+body.okf-viewer .okf-prose pre {
+  padding: 30px 16px 16px;
+  border: 0;
+  border-radius: 0;
+  background: var(--code-bg);
+  color: var(--code-text);
+  font: 12.5px/1.68 var(--font-mono);
+}
+body.okf-viewer .okf-codewrap { margin: 0; }
+/* The code scrollport is a transparent carrier: the well is the surface. */
+body.okf-viewer .okf-content-scrollport--code {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+body.okf-viewer .okf-codewrap > pre { padding-top: 30px; }
+body.okf-viewer .okf-code-tools { top: 8px; left: 16px; right: 8px; justify-content: space-between; }
+body.okf-viewer .okf-code-lang {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--syn-3);
+  font: 500 9px/20px var(--font-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+body.okf-viewer .okf-code-copy {
+  padding: 0 8px;
+  border: 1px solid var(--syn-3);
+  border-radius: 0;
+  background: transparent;
+  color: var(--code-text);
+  font-size: 11px;
+}
+body.okf-viewer .okf-code-copy:hover { color: var(--code-text); border-color: var(--code-text); }
+/* Related panel: transparent, 2px top rule, hairline list. */
+body.okf-viewer .okf-page__sidebar .okf-sidebar-panel {
+  border: 1px solid var(--border);
+  border-top: 2px solid var(--border-strong);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+body.okf-viewer .okf-sidebar-panel__header {
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+}
+body.okf-viewer .okf-sidebar-panel__title { color: var(--text-2); font-size: var(--label-size); }
+body.okf-viewer .okf-sidebar-panel__toggle {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+}
+body.okf-viewer .okf-sidebar-panel__body { padding: 0 12px 6px; }
+body.okf-viewer .okf-local-graph { gap: 0; padding: 0; border: 0; background: transparent; }
+body.okf-viewer .okf-local-graph__node {
+  gap: 9px;
+  width: 100%;
+  padding: 7px 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 12.5px;
+}
+body.okf-viewer .okf-local-graph__node:last-child { border-bottom: 0; }
+body.okf-viewer .okf-local-graph__node:hover { background: transparent; color: var(--text); text-decoration: underline; }
+body.okf-viewer .okf-local-graph__swatch {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 0;
+  background: var(--text-3) !important;
+}
+/* Pager and document-end links share the record discipline. */
+body.okf-viewer .okf-prevnext__link { border: 1px solid var(--border); border-radius: 0; background: transparent; box-shadow: none; }
+body.okf-viewer .okf-prevnext__link:hover { background: var(--surface-2); border-color: var(--border-strong); }
+body.okf-viewer .okf-prevnext__label { font-family: var(--font-label); font-size: var(--label-size); letter-spacing: var(--label-track); text-transform: uppercase; color: var(--text-3); }
+
+/* ---- Responsive ------------------------------------------------------------ */
+@media (max-width: 900px) {
+  body.okf-viewer .okf-section__title { display: flex; align-items: baseline; gap: 10px; }
+  body.okf-viewer .okf-section__title::before,
+  body.okf-viewer .okf-section__title::after { display: none; }
+  body.okf-viewer .okf-section__count { order: 2; }
+  body.okf-viewer .okf-card {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "title" "id" "desc" "meta";
+    grid-template-rows: auto;
+    row-gap: 4px;
+  }
+  body.okf-viewer .okf-card::before { display: none; }
+  body.okf-viewer .okf-card__meta { justify-content: flex-start; }
+  body.okf-viewer .okf-stat { margin-right: 14px; padding-right: 14px; }
+}
+@media (max-width: 640px) {
+  body.okf-viewer .okf-index { padding: 20px 16px 48px; }
+  body.okf-viewer .okf-index__title { font-size: 28px; }
+  body.okf-viewer .okf-page { padding: 16px 12px 48px; }
+  body.okf-viewer .okf-page__header { padding: 14px; }
+  body.okf-viewer .okf-page__title { font-size: 25px; }
+  body.okf-viewer .okf-page__main { --okf-reading-inset: 14px; }
+  body.okf-viewer .okf-metadata,
+  body.okf-viewer .okf-page__main > .okf-document-tools { padding-inline: 14px; }
+  html body.okf-viewer .okf-concept-viewbar { padding-inline: 12px; }
+  body.okf-viewer .okf-stat strong { font-size: 22px; }
+}
+/* Coarse pointers keep the 44px targets whatever the density of the chrome. */
+@media (pointer: coarse) {
+  body.okf-viewer :is(.okf-btn, .okf-type-nav__link, .okf-index-browse__controls select,
+    .okf-viewswitch__btn, .okf-local-graph__node, .okf-appearance__opt) { min-height: 44px; }
+  html body .okf-shell__search-form :is(input, button) { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.okf-viewer :is(.okf-card, .okf-btn, .okf-type-nav__link) { transition: none; }
 }
