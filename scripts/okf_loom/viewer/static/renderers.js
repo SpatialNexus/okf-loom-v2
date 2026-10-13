@@ -337,19 +337,19 @@
 
   function themeName() {
     var root = document.documentElement;
-    return (root && (root.getAttribute("data-theme") || root.dataset.theme)) || "technical-light";
+    return (root && (root.getAttribute("data-theme") || root.dataset.theme)) || "bone";
   }
 
+  // Ledger palettes carry their scheme by name, not by a "-dark" suffix:
+  // Bone is light; Slate, Clay and Plum are dark. Mermaid diagrams and the
+  // highlight.js base sheet follow the page scheme (code wells are always
+  // dark and wiki.css paints syntax from the --syn-* roles on top).
   function resolvedMode(name) {
-    return /-dark$/.test(name || "") ? "dark" : "light";
+    return name === "slate" || name === "clay" || name === "plum" ? "dark" : "light";
   }
 
   function isDark() {
-    // Resolved themes are "<family>-<mode>" (e.g. "technical-dark"). A
-    // theme is dark whenever its resolved mode is dark, regardless of family.
-    var root = document.documentElement;
-    var name = root && (root.getAttribute("data-theme") || root.dataset.theme) || "technical-light";
-    return /-dark$/.test(name);
+    return resolvedMode(themeName()) === "dark";
   }
 
   function rendererError(code, message, cause) {

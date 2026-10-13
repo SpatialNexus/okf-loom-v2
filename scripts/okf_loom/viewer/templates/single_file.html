@@ -15,7 +15,7 @@
                             any Technical/Swiss/Purple/Coffee light/dark theme. theme.js (inlined in
                           <head>) honours a saved user preference + Auto/OS
                           at boot; otherwise this concrete first-paint value.
-      __THEME_MODIFIER_ATTRS__ → configured contrast/border + default density
+      (retired: appearance modifiers were removed; always empty)
                           root attributes (same values theme.js resolves for a
                           visitor with no saved preference; no-JS parity).
       __INITIAL_LAYOUT__ → "cose" | "concentric" | ...
@@ -29,7 +29,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230c7373'/%3E%3Cpath d='M8 10h16M8 16h10M8 22h16' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'none'; font-src 'self' https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'none'; font-src 'self' data: https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self'">
 <title>OKF Viewer</title>
 __CDN_SCRIPTS__
 <style>

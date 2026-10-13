@@ -63,7 +63,7 @@ STATIC_VENDOR_DIR = "vendor"
 CDN_PAGE_CSP = (
     "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; "
     "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data:; "
-    "connect-src 'self' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; "
+    "connect-src 'self' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; "
     "object-src 'none'; base-uri 'self'; form-action 'self'"
 )
 OFFLINE_PAGE_CSP = (
@@ -74,7 +74,7 @@ OFFLINE_PAGE_CSP = (
 CDN_SINGLE_FILE_CSP = (
     "default-src 'none'; script-src 'unsafe-inline' https://cdn.jsdelivr.net; "
     "style-src 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data:; "
-    "connect-src 'none'; font-src 'self' https://cdn.jsdelivr.net; object-src 'none'; "
+    "connect-src 'none'; font-src 'self' data: https://cdn.jsdelivr.net; object-src 'none'; "
     "base-uri 'self'"
 )
 OFFLINE_SINGLE_FILE_CSP = (

@@ -8259,18 +8259,15 @@
     if (AUTHORITY_MODE === "local-edit" && window.location.pathname !== FEEDBACK_IMPORT_PATH) {
       items.push({ label: "Import feedback note", sub: "local Studio", run: () => { window.location.href = FEEDBACK_IMPORT_PATH; } });
     }
-    // Theme choices delegate to theme.js (sole owner of theme state). Each
-    // concrete pick sets an explicit family + mode; "Auto" follows the OS.
+    // Appearance choices delegate to theme.js (sole owner of theme state).
     {
       const api = themeApi();
-      if (api) {
-          items.push({ label: "Appearance: Technical", sub: "theme family", run: () => api.setFamily("technical") });
-          items.push({ label: "Appearance: Swiss", sub: "theme family", run: () => api.setFamily("swiss") });
-          items.push({ label: "Appearance: Purple", sub: "theme family", run: () => api.setFamily("purple") });
-          items.push({ label: "Appearance: Coffee", sub: "theme family", run: () => api.setFamily("coffee") });
-        items.push({ label: "Appearance: Light", sub: "colour mode", run: () => api.setMode("light") });
-        items.push({ label: "Appearance: Dark", sub: "colour mode", run: () => api.setMode("dark") });
-          items.push({ label: "Appearance: Auto (current family + follow OS colour mode)", sub: "family stays selected; light/dark follows the OS", run: () => api.setMode("auto") });
+      if (api && typeof api.setTheme === "function") {
+        items.push({ label: "Appearance: Bone", sub: "palette (default)", run: () => api.setTheme("bone") });
+        items.push({ label: "Appearance: Slate", sub: "palette", run: () => api.setTheme("slate") });
+        items.push({ label: "Appearance: Clay", sub: "palette", run: () => api.setTheme("clay") });
+        items.push({ label: "Appearance: Plum", sub: "palette", run: () => api.setTheme("plum") });
+        items.push({ label: "Appearance: System", sub: "Bone in light mode, Slate in dark mode", run: () => api.setTheme("system") });
       }
     }
     if (window.okfLoomLive && window.okfLoomLive.resync) items.push({ label: "Resync now", sub: "live", run: () => window.okfLoomLive.resync() });

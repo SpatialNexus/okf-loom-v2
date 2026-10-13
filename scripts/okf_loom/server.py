@@ -3876,7 +3876,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
                     "okf_loom.proposal_review.activation", fromlist=["capability"]
                 ).capability(getattr(self.server, "proposal_service", None) is not None),
                 "rev": studio.current_rev(),
-                "theme": getattr(self.server, "studio_theme", "auto"),
+                "theme": getattr(self.server, "studio_theme", "bone"),
             }
             payload = json.dumps(cfg, default=str)
             # CSP-safe bootstrap: a non-executable JSON data block. The
@@ -3971,7 +3971,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
                 "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
                 "img-src 'self' data: https://cdn.jsdelivr.net; "
                 "connect-src 'self' https://cdn.jsdelivr.net; "
-                "font-src 'self' https://cdn.jsdelivr.net; "
+                "font-src 'self' data: https://cdn.jsdelivr.net; "
                 "object-src 'none'; "
                 "base-uri 'self'; "
                 "form-action 'self'"

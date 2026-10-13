@@ -110,10 +110,19 @@
       "coffee-light": _palette(_COFFEE_LIGHT, "#8d5a3c"),
       "coffee-dark": _palette(_COFFEE_DARK, "#b78358"),
       };
+  // Ledger palettes (bone/slate/clay/plum) borrow the nearest legacy canvas
+  // palette until the graph is ported to read Ledger tokens (TODO: neutral
+  // nodes + palette-derived lens ramp, per DESIGN.md "Graph").
+  var LEDGER_GRAPH_ALIASES = {
+    bone: "technical-light", slate: "technical-dark", clay: "coffee-dark", plum: "purple-dark",
+  };
+  var LEDGER_DARK = { slate: true, clay: true, plum: true };
+  function themeIsDark(t) { return !!LEDGER_DARK[t] || /-dark$/.test(t || ""); }
 
-  // Resolve the palette for the CURRENT data-theme (technical-light fallback).
+  // Resolve the palette for the CURRENT data-theme (Bone fallback).
   function graphPalette() {
-    var t = document.documentElement.getAttribute("data-theme") || "technical-light";
+    var t = document.documentElement.getAttribute("data-theme") || "bone";
+    t = LEDGER_GRAPH_ALIASES[t] || t;
     return Object.assign({}, GRAPH_COLORS[t] || GRAPH_COLORS["technical-light"]);
   }
 
@@ -2052,7 +2061,7 @@
       // labels crossing dark edges need the disambiguator. Plate COLOR is
       // still set above so a theme switch flips cleanly between modes
       // without a transient unstyled state.
-      var isDark = /-dark$/.test(document.documentElement.getAttribute("data-theme") || "");
+      var isDark = themeIsDark(document.documentElement.getAttribute("data-theme") || "");
       cy.style().selector("node").style("text-background-opacity", isDark ? 0.85 : 0).update();
       cy.style().selector("node:selected, node.okf-hover, node.okf-tour-target").style({
         "color": pal.nodeText,

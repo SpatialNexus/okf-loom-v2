@@ -2495,206 +2495,150 @@ def build_graph_data(
 # Theme button (P2-74) + shared topbar nav fragment (P2-61)
 # ---------------------------------------------------------------------------
 
-# Resolved data-theme values (family + mode). viewer/static/theme.js is the
-# SOLE owner of theme state; these concrete values are the only ones painted
-# on <html> and the only ones with a wiki.css token block. KEEP IN SYNC with
-# theme.js (THEMES/LEGACY_THEMES), config.py (_ALLOWED_STUDIO_THEMES) and
-# viewer/assets.py (_ALLOWED_THEMES) — tests/test_theme_contract.py enforces
-# the parity. Technical and Swiss retain their established shared palette;
-# Purple and Coffee add optional editorial palettes. Every family has a
-# meaningful geometry/surface treatment in addition to colour (see wiki.css).
-_THEMES: tuple[str, ...] = (
-    "technical-light", "technical-dark", "swiss-light", "swiss-dark",
-    "purple-light", "purple-dark", "coffee-light", "coffee-dark",
+# Ledger appearance. viewer/static/theme.js is the SOLE owner of theme state;
+# these palettes are the only values painted on <html> as data-theme and the
+# only ones with a wiki.css token block. A reader picks one of the palettes or
+# "system" (Bone when the OS is light, Slate when it is dark). KEEP IN SYNC
+# with theme.js (PALETTES/CHOICES/LEGACY_THEMES), config.py
+# (_ALLOWED_STUDIO_THEMES) and viewer/assets.py (_ALLOWED_THEMES).
+_THEMES: tuple[str, ...] = ("bone", "slate", "clay", "plum")
+_THEME_CHOICES: tuple[str, ...] = (*_THEMES, "system")
+# Retired names (v2 family-mode themes, "auto", v1 aliases) map to the nearest
+# Ledger choice through _LEGACY_THEME_MIGRATIONS, imported from config.py
+# (the single table that theme.js LEGACY_THEMES mirrors for saved choices).
+# Bone is both the default choice and the first-paint palette: :root carries
+# its tokens, so a page that never runs theme.js still renders Bone.
+_DEFAULT_THEME = "bone"
+_DEFAULT_CONFIGURED_THEME = "bone"
+# Appearance menu entries: (choice, label, one-line description). The copy is
+# the Ledger package's (appearance/appearance.js THEMES); swatches read each
+# palette's own tokens by scoping data-theme on the swatch element.
+_APPEARANCE_OPTIONS: tuple[tuple[str, str, str], ...] = (
+    ("bone", "Bone", "Warm bone paper, ink text, oxide-red accent. "
+     "The default: calm for long reading in daylight."),
+    ("slate", "Slate", "Cool graphite with a muted steel blue. "
+     "The engineering read of Ledger."),
+    ("clay", "Clay", "Brown-black with a clay terracotta \u2014 "
+     "the original warm hue, drained of chroma."),
+    ("plum", "Plum", "Neutral dark with a faint violet cast and a dusty plum accent."),
+    ("system", "System", "Follows your device: Bone in light mode, Slate in dark mode."),
 )
-# Legacy v1 concrete theme values → new resolved theme: _LEGACY_THEME_MIGRATIONS
-# is imported from config.py (the single table, which theme.js LEGACY_THEMES
-# mirrors for localStorage["okf-theme"]).
-# Server-side default when no concrete theme is configured. This is a concrete
-# paint hint only; the configured preference is _DEFAULT_CONFIGURED_THEME and
-# theme.js resolves Technical Auto from the OS before the body can paint.
-_DEFAULT_THEME = "technical-light"
-_DEFAULT_CONFIGURED_THEME = "auto"
-_CONTRASTS: tuple[str, ...] = ("normal", "soft")
-_BORDERS: tuple[str, ...] = ("on", "off")
-_DENSITIES: tuple[str, ...] = ("comfortable", "compact")
-# Fresh-visitor defaults (Technical, Auto/System mode, Normal contrast,
-# Borders Off, Compact density). KEEP IN SYNC with theme.js DEFAULT_* and
-# viewer/assets.py _DEFAULT_CONFIG. Density is a user-only preference (no
-# configured value), so the server always paints the default.
-_DEFAULT_CONTRAST = "normal"
-_DEFAULT_BORDER = "off"
-_DEFAULT_DENSITY = "compact"
+_APPEARANCE_LABELS: dict[str, str] = {c: label for c, label, _ in _APPEARANCE_OPTIONS}
 
 
-def _theme_preference(config: dict[str, Any] | None) -> tuple[str, str, str]:
-    """Return the validated configured theme preference and modifiers.
+def _normalise_theme_choice(value: Any) -> str | None:
+    """Return a Ledger choice for ``value`` (mapping retired names) or None."""
+    if not isinstance(value, str):
+        return None
+    value = _LEGACY_THEME_MIGRATIONS.get(value, value)
+    return value if value in _THEME_CHOICES else None
+
+
+def _theme_preference(config: dict[str, Any] | None) -> str:
+    """Return the validated configured appearance choice.
 
     ``data-theme`` is deliberately not used here. It is a concrete first
-    paint hint and must never turn an absent configured Auto preference into an
-    explicit Light/Dark choice. ``viewer.assets.load_config`` already filters
-    user config, but this second boundary keeps render callers fail-closed when
-    supplied a hand-built config dictionary in tests or an embedding.
+    paint hint and must never turn a configured "system" into a pinned
+    palette. ``viewer.assets.load_config`` already filters user config, but
+    this second boundary keeps render callers fail-closed when supplied a
+    hand-built config dictionary in tests or an embedding.
     """
-    cfg = config or {}
-    theme_value = cfg.get("theme")
-    theme = (
-        theme_value if theme_value == "auto" or theme_value in _THEMES
-        else _DEFAULT_CONFIGURED_THEME
-    )
-    contrast_value = cfg.get("contrast")
-    contrast = contrast_value if contrast_value in _CONTRASTS else _DEFAULT_CONTRAST
-    border_value = cfg.get("border")
-    border = border_value if border_value in _BORDERS else _DEFAULT_BORDER
-    return theme, contrast, border
+    return _normalise_theme_choice((config or {}).get("theme")) or _DEFAULT_CONFIGURED_THEME
 
 
 def _resolve_initial_theme(value: str | None) -> str:
-    """Normalise a configured preference to a concrete first-paint theme.
+    """Normalise a configured choice to the concrete first-paint palette.
 
-    Accepts the new family-mode vocabulary directly. The retired legacy
-    concrete names (light/dark/pastel/sepia/midnight) are migrated to their
-    new resolved theme so an older viewer config.json keeps working. ``"auto"``
-    and invalid/absent values use the Technical-light paint hint. The caller
-    emits the original validated preference separately; theme.js owns the
-    follow-OS resolution and never infers preference from this paint hint.
+    ``"system"``, invalid and absent values paint Bone; theme.js resolves
+    "system" from the OS before the body paints and never infers a saved
+    preference from this paint hint.
     """
-    if value in _THEMES:
-        return value
-    if value and value in _LEGACY_THEME_MIGRATIONS:
-        return _LEGACY_THEME_MIGRATIONS[value]
-    return _DEFAULT_THEME
+    choice = _normalise_theme_choice(value)
+    return choice if choice in _THEMES else _DEFAULT_THEME
 
 
-def _theme_modifier_attrs(contrast: str = _DEFAULT_CONTRAST,
-                          border: str = _DEFAULT_BORDER) -> str:
-    """Root ``<html>`` modifier attributes for the configured preference.
+def _theme_config_html(theme: str) -> str:
+    """Emit the non-executable configured choice consumed by theme.js.
 
-    The server paints the configured contrast/border and the default density
-    so no-JS readers get the same defaults as a fresh scripted visitor and
-    the first paint matches what theme.js resolves when no saved user
-    preference exists. theme.js (parser-blocking in ``<head>``) still owns
-    the final values and overwrites them before the body paints.
+    Present on live, SPA, static, and single-file targets, and separate from
+    the concrete ``data-theme`` attribute so a configured "system" stays
+    "system" when the OS is dark.
     """
-    contrast = contrast if contrast in _CONTRASTS else _DEFAULT_CONTRAST
-    border = border if border in _BORDERS else _DEFAULT_BORDER
-    return (
-        f' data-okf-contrast="{contrast}" data-okf-border="{border}"'
-        f' data-okf-density="{_DEFAULT_DENSITY}"'
-    )
-
-
-def _theme_config_html(theme: str, contrast: str = _DEFAULT_CONTRAST,
-                       border: str = _DEFAULT_BORDER) -> str:
-    """Emit the non-executable configured preference consumed by theme.js.
-
-    This block is present on live, SPA, static, and single-file targets. It is
-    intentionally separate from the concrete ``data-theme`` attribute so a
-    Technical Auto configuration remains Auto when the OS is dark.
-    """
-    configured_theme = (
-        theme if theme == "auto" or theme in _THEMES else _DEFAULT_CONFIGURED_THEME
-    )
-    configured_contrast = contrast if contrast in _CONTRASTS else _DEFAULT_CONTRAST
-    configured_border = border if border in _BORDERS else _DEFAULT_BORDER
     payload = json.dumps(
-        {"theme": configured_theme, "contrast": configured_contrast, "border": configured_border},
+        {"theme": _normalise_theme_choice(theme) or _DEFAULT_CONFIGURED_THEME},
         separators=(",", ":"),
     )
     return f'<script type="application/json" id="okf-theme-config">{payload}</script>'
 
 
-def _appearance_control_html(initial_theme: str,
-                             initial_mode: str = "auto",
-                             initial_contrast: str = _DEFAULT_CONTRAST,
-                             initial_border: str = _DEFAULT_BORDER) -> str:
+def _appearance_swatch_html(choice: str) -> str:
+    """Four-colour palette preview: canvas, raised surface, ink, accent.
+
+    Each stripe reads the palette's own tokens because the swatch carries
+    that palette's ``data-theme``; "system" shows Bone and Slate halves.
+    """
+    stripes = "<i></i><i></i><i></i><i></i>"
+    if choice == "system":
+        return (
+            '<span class="okf-appearance__swatch okf-appearance__swatch--split" aria-hidden="true">'
+            f'<span data-theme="bone">{stripes}</span>'
+            f'<span data-theme="slate">{stripes}</span></span>'
+        )
+    return (
+        f'<span class="okf-appearance__swatch" data-theme="{choice}" aria-hidden="true">'
+        f'{stripes}</span>'
+    )
+
+
+def _appearance_control_html(appearance_choice: str = _DEFAULT_CONFIGURED_THEME) -> str:
     """Server-side Appearance control (no FOUC, keyboard-accessible).
 
-    Emits a native trigger plus a form with real labelled radio inputs for
-    Family, Mode, Contrast, Border, and Density. ``viewer/static/theme.js`` (loaded
-    before first paint) is the sole owner of preference state and wires
-    open/close, Arrow/Home/End/Escape/Tab behaviour. The server only seeds
-    the pre-JavaScript checked state from the configured preference.
+    Emits a native trigger plus a dialog form holding ONE native radio group:
+    Bone (default), Slate, Clay, Plum and System, each with a label, a
+    one-line description and a four-colour swatch. ``viewer/static/theme.js``
+    (loaded before first paint) is the sole owner of preference state and
+    wires open/close, Arrow/Home/End/Escape/Tab behaviour; the server only
+    seeds the pre-JavaScript checked state from the configured choice.
 
-    The trigger keeps the historical ``#okf-theme`` id so the existing
-    no-JS CSS (``body:not([data-okf-js]) #okf-theme { display:none }``) hides
+    The trigger keeps the historical ``#okf-theme`` id so the no-JS CSS hides
     it when JavaScript is unavailable; the menu starts ``hidden`` and is
     therefore inert without theme.js.
     """
-    theme = initial_theme if initial_theme in _THEMES else _DEFAULT_THEME
-    initial_contrast = (
-        initial_contrast if initial_contrast in _CONTRASTS else _DEFAULT_CONTRAST
-    )
-    initial_border = initial_border if initial_border in _BORDERS else _DEFAULT_BORDER
-    initial_mode = initial_mode if initial_mode in ("auto", "light", "dark") else "auto"
-    family = theme.rsplit("-", 1)[0]
-
-    def _opt(group: str, value: str, label: str, sub: str, checked: str) -> str:
-        is_checked = checked == "true"
-        input_id = f"okf-appearance-{group}-{value}"
-        preview = (
-            f'<span class="okf-appearance__preview okf-appearance__preview--{value}" '
-            f'aria-hidden="true"><span></span><span></span><span></span></span>'
-            if group == "family" else ""
+    choice = _normalise_theme_choice(appearance_choice) or _DEFAULT_CONFIGURED_THEME
+    options = []
+    for value, label, description in _APPEARANCE_OPTIONS:
+        checked = value == choice
+        input_id = f"okf-appearance-theme-{value}"
+        tag = ('<span class="okf-appearance__tag">Default</span>'
+               if value == _DEFAULT_THEME else "")
+        options.append(
+            f'<label for="{input_id}" class="okf-appearance__opt" data-okf-choice="{value}">'
+            f'<input id="{input_id}" type="radio" name="okf-appearance" value="{value}"'
+            f' data-okf-set="theme" data-okf-val="{value}"'
+            f' aria-describedby="{input_id}-sub"'
+            f' tabindex="{"0" if checked else "-1"}"{" checked" if checked else ""}>'
+            f'{_appearance_swatch_html(value)}'
+            '<span class="okf-appearance__text">'
+            f'<span class="okf-appearance__label">{label}{tag}</span>'
+            f'<span class="okf-appearance__sub" id="{input_id}-sub">{description}</span>'
+            '</span></label>'
         )
-        return (
-            f'<label for="{input_id}" class="okf-appearance__opt" aria-checked="{checked}">'
-            f'<input id="{input_id}" type="radio" name="okf-theme-{group}"'
-            f' value="{value}" data-okf-set="{group}" data-okf-val="{value}"'
-            f' aria-checked="{checked}" tabindex="{"0" if is_checked else "-1"}"'
-            f'{" checked" if is_checked else ""}>'
-            '<span class="okf-appearance__check" aria-hidden="true">\u2713</span>'
-            f'{preview}'
-            f'<span class="okf-appearance__label">{label}</span>'
-            f'<span class="okf-appearance__sub">{sub}</span>'
-            '</label>'
-        )
-
     return (
         '<button id="okf-theme" type="button" class="okf-btn okf-appearance-trigger" '
         'aria-haspopup="dialog" aria-expanded="false" '
         'aria-controls="okf-appearance-menu" '
-        'title="Appearance \u2014 theme, colour mode, contrast, borders, and density">'
-        f'<span class="okf-appearance-trigger__swatch okf-appearance-trigger__swatch--{_esc_attr_qs(family)}" aria-hidden="true"></span>'
+        'title="Appearance \u2014 colour palette">'
+        '<span class="okf-appearance-trigger__swatch" aria-hidden="true"></span>'
         '<span class="okf-appearance-trigger__label">'
         '<span class="okf-appearance-trigger__prefix">Appearance \u00b7 </span>'
-        f'<span class="okf-appearance-trigger__family">{family.title()}</span>'
+        f'<span class="okf-appearance-trigger__family">{_APPEARANCE_LABELS[choice]}</span>'
         '</span></button>'
         '<form id="okf-appearance-menu" role="dialog" aria-label="Appearance" hidden>'
-        '<h2 class="sr-only">Appearance</h2>'
-        '<fieldset class="okf-appearance__group" role="group" aria-labelledby="okf-appearance-mode-label">'
-        '<legend id="okf-appearance-mode-label" class="okf-appearance__legend">Colour mode</legend>'
-        + _opt("mode", "auto", "Auto", f"{family.title()} family + follow OS colour mode", "true" if initial_mode == "auto" else "false")
-        + _opt("mode", "light", "Light", "", "true" if initial_mode == "light" else "false")
-        + _opt("mode", "dark", "Dark", "", "true" if initial_mode == "dark" else "false")
-        + '</fieldset>'
-        '<fieldset class="okf-appearance__group" role="group" aria-labelledby="okf-appearance-density-label">'
-        '<legend id="okf-appearance-density-label" class="okf-appearance__legend">Density</legend>'
-        + _opt("density", "comfortable", "Comfortable", "more room in interface lists and controls", "true" if _DEFAULT_DENSITY == "comfortable" else "false")
-        + _opt("density", "compact", "Compact", "less interface space; reading measure unchanged", "true" if _DEFAULT_DENSITY == "compact" else "false")
-        + '</fieldset>'
-        '<details class="okf-appearance__advanced"><summary>Advanced appearance</summary>'
-        '<fieldset class="okf-appearance__group" role="group" aria-labelledby="okf-appearance-family-label">'
-        '<legend id="okf-appearance-family-label" class="okf-appearance__legend">Family</legend>'
-        + _opt("family", "technical", "Technical", "application default", "true" if family == "technical" else "false")
-        + _opt("family", "swiss", "Swiss", "hairline grid", "true" if family == "swiss" else "false")
-        + _opt("family", "purple", "Purple", "editorial violet", "true" if family == "purple" else "false")
-        + _opt("family", "coffee", "Coffee", "paper and espresso", "true" if family == "coffee" else "false")
-        + '</fieldset>'
-        '<fieldset class="okf-appearance__group" role="group" aria-labelledby="okf-appearance-contrast-label">'
-        '<legend id="okf-appearance-contrast-label" class="okf-appearance__legend">Contrast</legend>'
-        + _opt("contrast", "normal", "Normal", "standard surfaces", "true" if initial_contrast == "normal" else "false")
-        + _opt("contrast", "soft", "Soft", "quieter surfaces", "true" if initial_contrast == "soft" else "false")
-        + '</fieldset>'
-        '<fieldset class="okf-appearance__group" role="group" aria-labelledby="okf-appearance-border-label">'
-        '<legend id="okf-appearance-border-label" class="okf-appearance__legend">Borders</legend>'
-        + _opt("border", "on", "On", "visible frames", "true" if initial_border == "on" else "false")
-        + _opt("border", "off", "Off", "focus and status cues remain", "true" if initial_border == "off" else "false")
-        + '</fieldset>'
-        '</details>'
-        '<p class="okf-appearance__note">Density changes interface spacing, never reading width or minimum control targets.</p>'
-        '<button type="button" class="okf-appearance__reset" data-okf-action="reset">Reset to Technical Auto, compact, borders off</button>'
-        '</form>'
+        '<fieldset class="okf-appearance__group" role="radiogroup" '
+        'aria-labelledby="okf-appearance-legend">'
+        '<legend id="okf-appearance-legend" class="okf-appearance__legend">Appearance</legend>'
+        + "".join(options)
+        + '</fieldset></form>'
     )
 
 
@@ -2702,10 +2646,7 @@ def _nav_controls_html(
     *,
     root_prefix: str,
     graph_link: str,
-    initial_theme: str,
-    initial_mode: str = "auto",
-    initial_contrast: str = _DEFAULT_CONTRAST,
-    initial_border: str = _DEFAULT_BORDER,
+    appearance_choice: str = _DEFAULT_CONFIGURED_THEME,
     current_query: str = "",
     mode: str = "serve",
 ) -> str:
@@ -2734,7 +2675,7 @@ def _nav_controls_html(
         '</form>'
         f'<a class="okf-btn" href="{graph_link}">Graph</a>'
         f'<a class="okf-btn" href="{index_href}">Index</a>'
-          f'{_appearance_control_html(initial_theme, initial_mode, initial_contrast, initial_border)}'
+          f'{_appearance_control_html(appearance_choice)}'
         '</div>'
     )
 
@@ -2748,10 +2689,7 @@ def _application_shell_html(
     graph_href: str,
     current: str | None,
     mode: str,
-    initial_theme: str,
-    initial_mode: str,
-    initial_contrast: str,
-    initial_border: str,
+    appearance_choice: str = _DEFAULT_CONFIGURED_THEME,
     search_query: str = "",
 ) -> str:
     """Bridge renderer-owned route state into the canonical shell model."""
@@ -2768,9 +2706,7 @@ def _application_shell_html(
             studio_available=mode == "serve",
             search_query=search_query,
         ),
-        _appearance_control_html(
-            initial_theme, initial_mode, initial_contrast, initial_border,
-        ),
+        _appearance_control_html(appearance_choice),
     )
 
 
@@ -2780,20 +2716,19 @@ def _render_not_found_page(*, name: str, path: str, config: dict[str, Any]) -> s
     No concept lookup, suggestions, or query-string reflection belongs here.
     The server retains status, security headers, and Studio authority ownership.
     """
-    theme, contrast, border = _theme_preference(config)
-    initial_theme = _resolve_initial_theme(theme)
+    configured_theme = _theme_preference(config)
+    initial_theme = _resolve_initial_theme(configured_theme)
     shell = _application_shell_html(
         name=name, bundle_href="/", search_href="/__search", index_href="/",
         graph_href="/__graph", current=None, mode="serve",
-        initial_theme=initial_theme,
-        initial_mode="auto" if theme == "auto" else theme.rsplit("-", 1)[1],
-        initial_contrast=contrast, initial_border=border,
+        appearance_choice=configured_theme,
     )
     return (
         '<!doctype html><html lang="en"'
-        f' data-theme="{_esc_attr_qs(initial_theme)}"{_theme_modifier_attrs(contrast, border)}><head>'
+        f' data-theme="{_esc_attr_qs(initial_theme)}"><head>'
         '<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
         f'<title>Page not found — {_esc(name)}</title>'
+        '<link rel="stylesheet" href="/__static/ledger-fonts.css">'
         '<link rel="stylesheet" href="/__static/wiki.css">'
         '<link rel="stylesheet" href="/__static/shell.css">'
         '</head><body data-okf-mode="serve">'
@@ -2835,14 +2770,12 @@ def render_feedback_import_page(*, name: str, config: dict[str, Any], availabili
     """
     if availability not in {"available", *_FEEDBACK_IMPORT_BLOCKED}:
         raise ValueError(f"unsupported feedback import availability: {availability}")
-    theme, contrast, border = _theme_preference(config)
-    initial_theme = _resolve_initial_theme(theme)
+    configured_theme = _theme_preference(config)
+    initial_theme = _resolve_initial_theme(configured_theme)
     shell = _application_shell_html(
         name=name, bundle_href="/", search_href="/__search", index_href="/",
         graph_href="/__graph", current=None, mode="serve",
-        initial_theme=initial_theme,
-        initial_mode="auto" if theme == "auto" else theme.rsplit("-", 1)[1],
-        initial_contrast=contrast, initial_border=border,
+        appearance_choice=configured_theme,
     )
     icon = re.search(r'<link rel="icon"[^>]*>', load_template("index_page.html"))
     page_config = json.dumps({
@@ -2881,16 +2814,17 @@ def render_feedback_import_page(*, name: str, config: dict[str, Any], availabili
         )
     return (
         f'<!DOCTYPE html>\n<html lang="en" data-theme="{_esc_attr_qs(initial_theme)}"'
-        f'{_theme_modifier_attrs(contrast, border)}>\n<head>\n'
+        f'>\n<head>\n'
         '<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
         f'<meta http-equiv="Content-Security-Policy" content="{_RESERVED_CSP}">\n'
         f'<title>Import a feedback note — {_esc(name)}</title>\n'
         + (icon.group(0) + '\n' if icon else '')
-        + '<link rel="stylesheet" href="/__static/wiki.css">\n'
+        + '<link rel="stylesheet" href="/__static/ledger-fonts.css">\n'
+        '<link rel="stylesheet" href="/__static/wiki.css">\n'
         '<link rel="stylesheet" href="/__static/shell.css">\n'
         '<link rel="stylesheet" href="/__static/feedback-import.css">\n'
-        + _theme_config_html(theme, contrast, border) + '\n'
+        + _theme_config_html(configured_theme) + '\n'
         f'<script type="application/json" id="okf-feedback-import-config">{page_config}</script>\n'
         '</head>\n'
         '<body class="okf-viewer okf-viewer--feedback-import" data-okf-mode="serve" '
@@ -3323,7 +3257,8 @@ def render_single_file(
         '</head>',
         _single_source_revisions_script(bundle)
         + '</head>', 1)
-    css = (load_static("wiki.css", bundle) + "\n" + load_static("shell.css", bundle)
+    css = (load_static("ledger-fonts.css", bundle) + "\n"
+           + load_static("wiki.css", bundle) + "\n" + load_static("shell.css", bundle)
            + "\n" + load_static("graph.css", bundle))
     # Bundle renderers.js too so the single-file detail panel gets
     # the same mermaid/hljs/KaTeX treatment as the wiki + graph views
@@ -3345,11 +3280,8 @@ def render_single_file(
         # Opt-in only: the default single-file bundle is byte-for-byte unchanged.
         js += "\n" + load_static(PORTABLE_FEEDBACK_ASSET, bundle)
 
-    configured_theme, configured_contrast, configured_border = _theme_preference(config)
+    configured_theme = _theme_preference(config)
     initial_theme = _resolve_initial_theme(configured_theme)
-    initial_mode = (
-        "auto" if configured_theme == "auto" else configured_theme.rsplit("-", 1)[1]
-    )
     revision = bundle_revision(bundle)
     data_attrs = (
         'data-okf-mode="static" data-okf-enhance="0" data-okf-studio="0" '
@@ -3369,9 +3301,7 @@ def render_single_file(
 
     single_shell = render_single_file_shell(
         display_name,
-        _appearance_control_html(
-            initial_theme, initial_mode, configured_contrast, configured_border,
-        ),
+        _appearance_control_html(configured_theme),
     )
     html = (
         template
@@ -3384,18 +3314,12 @@ def render_single_file(
         .replace("__SINGLE_INDEX_CONCEPTS__", single_index_concepts)
         .replace("__GRAPH_THUMBNAIL__", _graph_thumbnail_html(data, "#okf-graph"))
         .replace("/*__VIEWER_CSS__*/", css)
-        .replace("__THEME_CONFIG__", _theme_config_html(
-            configured_theme, configured_contrast, configured_border,
-        ))
+        .replace("__THEME_CONFIG__", _theme_config_html(configured_theme))
         .replace("/*__THEME_HEAD_JS__*/", theme_js)
         .replace("/*__VIEWER_JS__*/", js)
         .replace("__INITIAL_THEME__", initial_theme)
-        .replace("__THEME_MODIFIER_ATTRS__", _theme_modifier_attrs(
-            configured_contrast, configured_border,
-        ))
-        .replace("__INITIAL_THEME_BUTTON__", _appearance_control_html(
-            initial_theme, initial_mode, configured_contrast, configured_border,
-        ))
+        .replace("__THEME_MODIFIER_ATTRS__", "")
+        .replace("__INITIAL_THEME_BUTTON__", _appearance_control_html(configured_theme))
         .replace("__INITIAL_LAYOUT__", initial_layout)
         .replace("__CDN_SCRIPTS__", cdn_scripts)
     )
@@ -4503,18 +4427,12 @@ def _render_concept_page(
     # only seeds the first paint.
     # P1-3: in static mode the Graph link must point at __graph.html (the
     # page is emitted at that path; the extensionless URL 404s).
-    configured_theme, configured_contrast, configured_border = _theme_preference(config)
+    configured_theme = _theme_preference(config)
     initial_theme = _resolve_initial_theme(configured_theme)
-    initial_mode = (
-        "auto" if configured_theme == "auto" else configured_theme.rsplit("-", 1)[1]
-    )
     nav_html = _nav_controls_html(
         root_prefix=root_prefix,
         graph_link=f"{root_prefix}__graph{'.html' if mode == 'static' else ''}",
-        initial_theme=initial_theme,
-        initial_mode=initial_mode,
-        initial_contrast=configured_contrast,
-        initial_border=configured_border,
+        appearance_choice=configured_theme,
         mode=mode,
     )
     bundle_href = "/" if mode in ("serve", "spa") else root_prefix
@@ -4526,14 +4444,10 @@ def _render_concept_page(
         graph_href=f"{root_prefix}__graph{'.html' if mode == 'static' else ''}",
         current="index",
         mode=mode,
-        initial_theme=initial_theme,
-        initial_mode=initial_mode,
-        initial_contrast=configured_contrast,
-        initial_border=configured_border,
+        appearance_choice=configured_theme,
     )
 
-    theme_attr = (f' data-theme="{initial_theme}"'
-                  + _theme_modifier_attrs(configured_contrast, configured_border))
+    theme_attr = (f' data-theme="{initial_theme}"')
     revision = bundle_revision(bundle)
     # Capture readiness is deliberately not server-seeded on document
     # surfaces. An absent surface state is nonterminal to
@@ -4547,7 +4461,8 @@ def _render_concept_page(
         f'data-okf-capture-revision="{_esc_attr_qs(revision)}"'
     )
 
-    css_link = f'<link rel="stylesheet" href="{static_prefix}/wiki.css">'
+    css_link = (f'<link rel="stylesheet" href="{static_prefix}/ledger-fonts.css">'
+                f'<link rel="stylesheet" href="{static_prefix}/wiki.css">')
     shell_css_link = f'<link rel="stylesheet" href="{static_prefix}/shell.css">'
     # theme.js is parser-blocking (no defer) in <head> so it resolves
     # data-theme BEFORE first paint (no FOUC for a stored non-default
@@ -4660,9 +4575,7 @@ def _render_concept_page(
         .replace("__ROOT_PREFIX__", _esc_attr_qs(root_prefix))
           .replace("__WIKI_CSS_LINK__", css_link)
           .replace("__SHELL_CSS_LINK__", shell_css_link)
-          .replace("__THEME_CONFIG__", _theme_config_html(
-              configured_theme, configured_contrast, configured_border,
-          ))
+          .replace("__THEME_CONFIG__", _theme_config_html(configured_theme))
           .replace("__THEME_HEAD_JS__", head_theme_js)
         .replace("__WIKI_JS_LINK__", _type_icons_block() + js_link)
         .replace("__DOCUMENT_OUTLINE_JS_LINK__", document_outline_link)
@@ -5668,7 +5581,7 @@ def _v2_spotlight_html(bundle: Bundle, mode: str, graph_href: str) -> str:
 _RESERVED_CSP = (
     "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; "
     "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data:; "
-    "connect-src 'self' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; "
+    "connect-src 'self' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; "
     "object-src 'none'; base-uri 'self'; form-action 'self'"
 )
 
@@ -5744,16 +5657,14 @@ def render_reserved_document(document: str, body: str, *, mode: str,
     prefix = '/__static' if serve_like else '../' * depth + '__static'
     suffix = '.html' if mode == 'static' else ''
     display = name or (bundle.root.name if bundle is not None else document)
-    configured_theme, configured_contrast, configured_border = _theme_preference(config)
+    configured_theme = _theme_preference(config)
     initial_theme = _resolve_initial_theme(configured_theme)
-    initial_mode = "auto" if configured_theme == "auto" else configured_theme.rsplit("-", 1)[1]
     home = '/' if serve_like else root_prefix + 'index.html'
     graph_href = f"{root_prefix}__graph{suffix}"
     shell_html = _application_shell_html(
         name=display, bundle_href=home, search_href=f"{root_prefix}__search{suffix}",
         index_href=home, graph_href=graph_href, current="index", mode=mode,
-        initial_theme=initial_theme, initial_mode=initial_mode,
-        initial_contrast=configured_contrast, initial_border=configured_border,
+        appearance_choice=configured_theme,
     )
     rendered = _reserved_document_links(markdown_to_html(body), document, mode, bundle)
     heading = '' if re.search(r'<h1\b', rendered) else f'<h1>{_esc(document)}</h1>'
@@ -5779,16 +5690,16 @@ def render_reserved_document(document: str, body: str, *, mode: str,
         'Static viewer: read and copy. Live authoring is unavailable. '
         f'<a href="{_esc_attr_qs(home)}">Index</a>.</p>\n')
     page = (
-        f'<!DOCTYPE html>\n<html lang="en" data-theme="{initial_theme}"'
-        f'{_theme_modifier_attrs(configured_contrast, configured_border)}>\n<head>\n'
+        f'<!DOCTYPE html>\n<html lang="en" data-theme="{initial_theme}">\n<head>\n'
         '<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
         f'<meta http-equiv="Content-Security-Policy" content="{_RESERVED_CSP}">\n'
         f'<title>{_esc(document)} — {_esc(display)}</title>\n'
         + icon_html +
+        f'<link rel="stylesheet" href="{prefix}/ledger-fonts.css">\n'
         f'<link rel="stylesheet" href="{prefix}/wiki.css">\n'
         f'<link rel="stylesheet" href="{prefix}/shell.css">\n'
-        + _theme_config_html(configured_theme, configured_contrast, configured_border) + '\n'
+        + _theme_config_html(configured_theme) + '\n'
         + head_theme_js + '\n</head>\n'
         f'<body class="okf-viewer okf-viewer--reserved" {data_attrs}>\n'
         '<a href="#okf-main" class="okf-skip-link">Skip to content</a>\n'
@@ -6157,13 +6068,9 @@ def _render_index_page(
             groups_parts.insert(0, type_nav_html)
 
     theme_attr = ""
-    configured_theme, configured_contrast, configured_border = _theme_preference(config)
+    configured_theme = _theme_preference(config)
     initial_theme = _resolve_initial_theme(configured_theme)
-    initial_mode = (
-        "auto" if configured_theme == "auto" else configured_theme.rsplit("-", 1)[1]
-    )
-    theme_attr = (f' data-theme="{initial_theme}"'
-                  + _theme_modifier_attrs(configured_contrast, configured_border))
+    theme_attr = (f' data-theme="{initial_theme}"')
 
     # P1-10: emit data-okf-enhance on index pages too so wiki.js detects
     # static mode and gates typed-query live suggestions there (was only on
@@ -6184,7 +6091,8 @@ def _render_index_page(
                   f'data-okf-revision="{_esc_attr_qs(revision)}" data-okf-capture-revision="{_esc_attr_qs(revision)}" '
                   f'data-okf-concept-routes="{_esc_attr_qs(routes_json)}"')
 
-    css_link = f'<link rel="stylesheet" href="{static_prefix}/wiki.css">'
+    css_link = (f'<link rel="stylesheet" href="{static_prefix}/ledger-fonts.css">'
+                f'<link rel="stylesheet" href="{static_prefix}/wiki.css">')
     shell_css_link = f'<link rel="stylesheet" href="{static_prefix}/shell.css">'
     # theme.js in <head> before first paint (no FOUC); see concept page.
     head_theme_js = (
@@ -6208,10 +6116,7 @@ def _render_index_page(
     nav_html = _nav_controls_html(
         root_prefix=root_prefix_for_nav,
         graph_link=graph_link,
-        initial_theme=initial_theme,
-        initial_mode=initial_mode,
-        initial_contrast=configured_contrast,
-        initial_border=configured_border,
+        appearance_choice=configured_theme,
         mode=mode,
     )
 
@@ -6233,10 +6138,7 @@ def _render_index_page(
         graph_href=graph_link,
         current="index",
         mode=mode,
-        initial_theme=initial_theme,
-        initial_mode=initial_mode,
-        initial_contrast=configured_contrast,
-        initial_border=configured_border,
+        appearance_choice=configured_theme,
     )
 
     return (
@@ -6251,9 +6153,7 @@ def _render_index_page(
         .replace("__STATIC_PREFIX__", static_prefix)
           .replace("__WIKI_CSS_LINK__", css_link)
           .replace("__SHELL_CSS_LINK__", shell_css_link)
-          .replace("__THEME_CONFIG__", _theme_config_html(
-              configured_theme, configured_contrast, configured_border,
-          ))
+          .replace("__THEME_CONFIG__", _theme_config_html(configured_theme))
           .replace("__THEME_HEAD_JS__", head_theme_js)
         .replace("__WIKI_JS_LINK__", _type_icons_block() + js_link)
         .replace("__RENDERERS_JS_LINK__", renderers_link)
@@ -6676,13 +6576,9 @@ def _render_search_page(
                         f'<p><a class="okf-btn" href="{clear_href}?q={_esc_attr_qs(query)}">Clear filters</a> <a href="{back_link}">Browse the index</a></p></div>')
 
     theme_attr = ""
-    configured_theme, configured_contrast, configured_border = _theme_preference(config)
+    configured_theme = _theme_preference(config)
     initial_theme = _resolve_initial_theme(configured_theme)
-    initial_mode = (
-        "auto" if configured_theme == "auto" else configured_theme.rsplit("-", 1)[1]
-    )
-    theme_attr = (f' data-theme="{initial_theme}"'
-                  + _theme_modifier_attrs(configured_contrast, configured_border))
+    theme_attr = (f' data-theme="{initial_theme}"')
 
     # P1-10: emit data-okf-enhance on the search page too so wiki.js
     # detects static mode there as well (the search page body also carries
@@ -6697,7 +6593,8 @@ def _render_search_page(
         f'data-okf-capture-query="{_esc_attr_qs(query)}" data-okf-revision="{_esc_attr_qs(bundle_revision(bundle))}"'
     )
 
-    css_link = f'<link rel="stylesheet" href="{static_prefix}/wiki.css">'
+    css_link = (f'<link rel="stylesheet" href="{static_prefix}/ledger-fonts.css">'
+                f'<link rel="stylesheet" href="{static_prefix}/wiki.css">')
     shell_css_link = f'<link rel="stylesheet" href="{static_prefix}/shell.css">'
     # theme.js in <head> before first paint (no FOUC); see concept page.
     head_theme_js = (
@@ -6727,10 +6624,7 @@ def _render_search_page(
     nav_html = _nav_controls_html(
         root_prefix=root_prefix_for_nav,
         graph_link=graph_link,
-        initial_theme=initial_theme,
-        initial_mode=initial_mode,
-        initial_contrast=configured_contrast,
-        initial_border=configured_border,
+        appearance_choice=configured_theme,
         current_query=query,
         mode=mode,
     )
@@ -6742,10 +6636,7 @@ def _render_search_page(
         graph_href=graph_link,
         current="search",
         mode=mode,
-        initial_theme=initial_theme,
-        initial_mode=initial_mode,
-        initial_contrast=configured_contrast,
-        initial_border=configured_border,
+        appearance_choice=configured_theme,
         search_query=query,
     )
 
@@ -6800,9 +6691,7 @@ def _render_search_page(
         .replace("__STATIC_PREFIX__", static_prefix)
           .replace("__WIKI_CSS_LINK__", css_link)
           .replace("__SHELL_CSS_LINK__", shell_css_link)
-          .replace("__THEME_CONFIG__", _theme_config_html(
-              configured_theme, configured_contrast, configured_border,
-          ))
+          .replace("__THEME_CONFIG__", _theme_config_html(configured_theme))
           .replace("__THEME_HEAD_JS__", head_theme_js)
         .replace("__WIKI_JS_LINK__", _type_icons_block() + js_link)
         .replace("__RENDERERS_JS_LINK__", renderers_link)
@@ -6840,14 +6729,10 @@ def _render_graph_page(
     data_url = "/__data/graph.json" if mode in ("serve", "spa") else "__data/graph.json"
     back_link = "/" if mode in ("serve", "spa") else "index.html"
     search_link = "/__search" if mode in ("serve", "spa") else "__search.html"
-    configured_theme, configured_contrast, configured_border = _theme_preference(config)
+    configured_theme = _theme_preference(config)
     initial_theme = _resolve_initial_theme(configured_theme)
-    initial_mode = (
-        "auto" if configured_theme == "auto" else configured_theme.rsplit("-", 1)[1]
-    )
     initial_layout = config.get("default_layout") or "cose"
-    theme_attr = (f' data-theme="{initial_theme}"'
-                  + _theme_modifier_attrs(configured_contrast, configured_border))
+    theme_attr = (f' data-theme="{initial_theme}"')
 
     # F7: the no-JS suggestion head follows the metadata owner's effective
     # change instant (dated first, newest first; unknown-time last, stable
@@ -6902,7 +6787,8 @@ def _render_graph_page(
                   f'data-okf-studio="{("1" if mode == "serve" else "0")}" '
                   f'data-okf-revision="{_esc_attr_qs(revision)}" data-okf-capture-revision="{_esc_attr_qs(revision)}" data-okf-capture-ready="loading"')
 
-    css_link = f'<link rel="stylesheet" href="{static_prefix}/wiki.css">'
+    css_link = (f'<link rel="stylesheet" href="{static_prefix}/ledger-fonts.css">'
+                f'<link rel="stylesheet" href="{static_prefix}/wiki.css">')
     shell_css_link = f'<link rel="stylesheet" href="{static_prefix}/shell.css">'
     graph_css_link = f'<link rel="stylesheet" href="{static_prefix}/graph.css">'
     # theme.js in <head> before first paint (no FOUC); see concept page.
@@ -6929,10 +6815,7 @@ def _render_graph_page(
         graph_href=("/__graph" if mode in ("serve", "spa") else "__graph.html"),
         current="graph",
         mode=mode,
-        initial_theme=initial_theme,
-        initial_mode=initial_mode,
-        initial_contrast=configured_contrast,
-        initial_border=configured_border,
+        appearance_choice=configured_theme,
     )
 
     return (
@@ -6946,16 +6829,12 @@ def _render_graph_page(
         .replace("__WIKI_CSS_LINK__", css_link)
           .replace("__SHELL_CSS_LINK__", shell_css_link)
           .replace("__GRAPH_CSS_LINK__", graph_css_link)
-          .replace("__THEME_CONFIG__", _theme_config_html(
-              configured_theme, configured_contrast, configured_border,
-          ))
+          .replace("__THEME_CONFIG__", _theme_config_html(configured_theme))
           .replace("__THEME_HEAD_JS__", head_theme_js)
         .replace("__GRAPH_JS_SRC__", graph_js)
         .replace("__CDN_SCRIPTS__", cdn_scripts)
         .replace("__INITIAL_THEME__", initial_theme)
-          .replace("__INITIAL_THEME_BUTTON__", _appearance_control_html(
-              initial_theme, initial_mode, configured_contrast, configured_border,
-          ))
+          .replace("__INITIAL_THEME_BUTTON__", _appearance_control_html(configured_theme))
         .replace("__APPLICATION_SHELL__", shell_html)
         .replace("__INITIAL_LAYOUT__", initial_layout)
         .replace("__GRAPH_DATA_URL__", data_url)

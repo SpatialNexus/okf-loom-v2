@@ -117,7 +117,7 @@ _DEFAULT_STUDIO_DEBOUNCE_MS: int = 600
 _DEFAULT_STUDIO_SESSION_DIR: str = ".okf-loom/session"
 _DEFAULT_STUDIO_LOG_EDITS: bool = True
 _DEFAULT_STUDIO_MAX_SSE_CLIENTS: int = 32
-_DEFAULT_STUDIO_THEME: str = "auto"
+_DEFAULT_STUDIO_THEME: str = "bone"
 _DEFAULT_STUDIO_ALLOWED_HOSTS: tuple[str, ...] = ("127.0.0.1", "localhost")
 # §10.5 events.jsonl rotation caps. 8 MiB active + 7 rotated files kept.
 _DEFAULT_STUDIO_EVENTS_MAX_BYTES: int = 8 * 1024 * 1024
@@ -351,28 +351,31 @@ class DiscoverConfig:
 
 
 _ALLOWED_STUDIO_THEMES: frozenset[str] = frozenset(
-    # "auto" = no preference (follow OS via theme.js); the eight concrete
-    # family-mode themes are the only canonical/painted values. KEEP IN SYNC
-    # with render.py._THEMES and viewer/static/theme.js (THEMES). The retired
-    # v1 names (light/dark/pastel/sepia/midnight) are accepted as aliases:
-    # StudioConfig.from_dict maps them through _LEGACY_THEME_MIGRATIONS
-    # before this check, so no consumer ever sees a v1 value.
-    {
-        "auto",
-        "technical-light", "technical-dark",
-        "swiss-light", "swiss-dark",
-        "purple-light", "purple-dark",
-        "coffee-light", "coffee-dark",
-    }
+    # Ledger appearance choices: the four palettes plus "system" (Bone when
+    # the OS is light, Slate when it is dark, resolved live by theme.js).
+    # KEEP IN SYNC with render.py._THEMES/_THEME_CHOICES, viewer/assets.py
+    # _ALLOWED_THEMES and viewer/static/theme.js (PALETTES/CHOICES). Retired
+    # names (v2 family-mode themes, "auto", and the v1 light/dark/pastel/
+    # sepia/midnight) are accepted as aliases: StudioConfig.from_dict maps
+    # them through _LEGACY_THEME_MIGRATIONS before this check, so no
+    # consumer ever sees a retired value.
+    {"bone", "slate", "clay", "plum", "system"}
 )
-# Retired v1 concrete theme name -> v2 family-mode theme. The single table:
-# config load (studio.theme), viewer/assets.py (viewer config.json) and
-# render.py (first paint) all use it; theme.js LEGACY_THEMES mirrors it for
-# saved browser choices, enforced by tests/test_theme_contract.py. "light"
-# (the V2 default look) maps to Technical-light so users keep their visuals.
+# Retired theme name -> Ledger appearance choice. The single table: config
+# load (studio.theme), viewer/assets.py (viewer config.json) and render.py
+# (first paint) all use it; theme.js LEGACY_THEMES mirrors it for saved
+# browser choices. Every old light variant becomes Bone; Technical/Swiss dark
+# become Slate, Coffee dark Clay, Purple dark Plum; "auto" becomes "system".
+# v1 aliases resolve through their v2 equivalent to the same answer.
 _LEGACY_THEME_MIGRATIONS: dict[str, str] = {
-    "light": "technical-light", "dark": "technical-dark",
-    "pastel": "swiss-light", "sepia": "swiss-light", "midnight": "technical-dark",
+    "auto": "system",
+    "technical-light": "bone", "swiss-light": "bone",
+    "purple-light": "bone", "coffee-light": "bone",
+    "technical-dark": "slate", "swiss-dark": "slate",
+    "coffee-dark": "clay", "purple-dark": "plum",
+    # v1 -> v2 (light/pastel/sepia -> *-light, dark/midnight -> technical-dark)
+    "light": "bone", "pastel": "bone", "sepia": "bone",
+    "dark": "slate", "midnight": "slate",
 }
 
 
@@ -415,7 +418,7 @@ class StudioConfig:
     def from_dict(cls, data: dict[str, Any] | None) -> "StudioConfig":
         data = data or {}
         theme = str(data.get("theme", _DEFAULT_STUDIO_THEME))
-        theme = _LEGACY_THEME_MIGRATIONS.get(theme, theme)  # v1 alias -> v2 value
+        theme = _LEGACY_THEME_MIGRATIONS.get(theme, theme)  # retired name -> Ledger choice
         _validate_enum("studio.theme", theme, _ALLOWED_STUDIO_THEMES)
         raw_hosts = data.get("allowed_hosts", list(_DEFAULT_STUDIO_ALLOWED_HOSTS))
         if isinstance(raw_hosts, str):
@@ -854,6 +857,6 @@ studio:                             # Live collaborative studio (all ON by defau
   log_edits: true                   # append a SPEC §7 log.md entry per agent write / resolved comment
   max_sse_clients: 32
   allowed_hosts: [127.0.0.1, localhost]   # invisible cross-origin guard (§15)
-  theme: auto                       # auto | technical-light | technical-dark | swiss-light | swiss-dark | purple-light | purple-dark | coffee-light | coffee-dark
-                                    # v1 names light/dark/pastel/sepia/midnight still load, mapped to their v2 theme
+  theme: bone                       # bone | slate | clay | plum | system (Bone in OS light mode, Slate in dark)
+                                    # retired names (auto, technical-dark, coffee-dark, v1 light/dark, ...) still load, mapped to the nearest palette
 """
