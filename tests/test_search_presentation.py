@@ -91,7 +91,10 @@ def test_search_uses_canonical_labels_compact_disclosure_and_action_ids(tmp_path
     ):
         assert re.search(rf'name="mode" value="{value}"[^>]*>\s*<span>{label}<small>', html)
     article = re.search(r'<article class="okf-search-result".*?</article>', html, re.DOTALL).group(0)
-    assert '<a class="okf-btn okf-btn--primary okf-search-open"' in article
+    # Ledger: one primary action per page (the search submit); each result's
+    # Open is a secondary outlined button.
+    assert '<a class="okf-btn okf-search-open"' in article
+    assert 'okf-btn--primary' not in article
     assert article.count("Evidence and context") == 1
     assert '<details class="okf-search-disclosure">' in article
     assert '<details class="okf-search-disclosure" open>' not in article

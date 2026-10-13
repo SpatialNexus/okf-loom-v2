@@ -35,8 +35,12 @@ def test_graph_thumbnail_is_deterministic_safe_and_order_independent() -> None:
     second = _graph_thumbnail_html({"nodes": list(reversed(nodes)), "edges": list(reversed(edges))}, "/__graph")
     assert first == second
     assert "<script>" not in first and "onload=" not in first
-    assert 'class="okf-graph-export__node-fallback"' in first
-    assert "#3973a8" not in first and "#123abc" in first
+    # Ledger: the index preview is the organic mini-graph of square ink dots;
+    # node colours from the payload are never painted (types are not colour-
+    # coded), so a hostile colour cannot reach an attribute either.
+    assert 'data-okf-graph-preview="organic-v1"' in first
+    assert first.count('class="okf-graph-thumb__dot"') == 2
+    assert "#123abc" not in first and "fill=" not in first and "style=" not in first
     assert 'href="/__graph"' in first and "https://" not in first
     assert 'aria-hidden="true"' in first and 'focusable="false"' in first
     assert 'role="img"' not in first
@@ -63,7 +67,11 @@ def test_graph_export_is_the_exact_shared_semantic_artifact() -> None:
     export = graph_export_svg(payload)
     hero = _graph_thumbnail_html(payload, "/__graph")
     assert export not in hero, "the link-nested copy must not contribute SVG text to its name"
-    assert 'data-okf-graph-export="canonical-v1"' in hero
+    # The index hero draws the Ledger organic preview, not a copy of the
+    # canonical export; the export itself stays the shared semantic artifact.
+    assert 'data-okf-graph-export' not in hero
+    assert 'data-okf-graph-preview="organic-v1"' in hero
+    assert '<text' not in hero, "preview must not contribute SVG text to the link name"
     assert 'aria-hidden="true"' in hero and 'focusable="false"' in hero
     assert 'data-okf-graph-export="canonical-v1"' in export
     assert 'data-concept-id="orders"' in export and 'data-type="table"' in export
@@ -1543,12 +1551,14 @@ def test_iter1_accent_is_not_tailwind_blue() -> None:
         assert m, f"token --{name} not defined in block"
         return m.group(1).strip()
 
-    root_block = css.split(":root", 1)[1].split("}", 1)[0]
-    light_accent = _token(root_block, "okf-accent")
-    assert light_accent.lower() != "#2563eb", "light accent still Tailwind blue-600"
-    dark_block = css.split('[data-theme="technical-dark"]', 1)[1].split("}", 1)[0]
-    dark_accent = _token(dark_block, "okf-accent")
-    assert dark_accent.lower() != "#60a5fa", "dark accent still Tailwind blue-400"
+    tailwind_blues = {"#2563eb", "#60a5fa", "#3b82f6", "#1d4ed8"}
+    for theme in ("bone", "slate", "clay", "plum"):
+        block = css.split(f'[data-theme="{theme}"]', 1)[1].split("}", 1)[0]
+        for name in ("accent", "accent-text", "link"):
+            value = _token(block, name).lower()
+            assert value not in tailwind_blues, f"{theme} --{name} is Tailwind blue ({value})"
+    # The legacy alias reads the palette role rather than a literal.
+    assert re.search(r"--okf-accent:\s*var\(--accent-text\);", css)
 
 
 # ===========================================================================
@@ -1559,11 +1569,20 @@ def test_iter1_accent_is_not_tailwind_blue() -> None:
 # ===========================================================================
 
 
-def test_phase1_curated_type_color_on_concept_header(tmp_path: _Path) -> None:
-    """The concept header band carries the CURATED type colour as
-    ``--okf-type-accent`` (inline style), applied uniformly via
-    resolve_palette. A known type ("Dataset") gets its curated hue, not a
-    golden-angle positional hue."""
+def _assert_no_type_colour(html: str, *colours: str) -> None:
+    """Ledger: content types are never colour-coded. No inline type accent,
+    no curated/hash type colour and no inline background reach the page."""
+    assert "--okf-type-accent:" not in html, "inline type accent still rendered"
+    assert "hsl(" not in html, "a type hue still reaches the rendered page"
+    assert not re.search(r'style="[^"]*background', html), "inline background on a type element"
+    for colour in colours:
+        assert colour not in html, f"type colour {colour!r} still rendered"
+
+
+def test_ledger_concept_header_type_chip_is_neutral(tmp_path: _Path) -> None:
+    """The concept header names its type in a neutral chip (ink on the
+    page, styled by wiki.css tokens); the curated type colour that
+    ``resolve_palette`` still computes for the graph is not painted here."""
     from okf_loom.viewer import assets
     bundle = _build_bundle_with(tmp_path, {
         "a.md": "---\ntype: Dataset\ntitle: A\ndescription: d\n---\nbody\n",
@@ -1573,21 +1592,17 @@ def test_phase1_curated_type_color_on_concept_header(tmp_path: _Path) -> None:
     html = _render_concept_html(bundle, "a")
     curated = assets.curated_type_color("Dataset")
     assert curated is not None
-    # The inline --okf-type-accent on the header band carries the curated colour.
-    assert f"--okf-type-accent:{curated}" in html or f'--okf-type-accent: {curated}' in html, (
-        f"curated Dataset colour {curated!r} not on the concept header band"
-    )
-    # The type chip background uses the same curated colour.
-    assert f"background:{curated}" in html or f"background: {curated}" in html
+    header = re.search(r'<header class="okf-page__header">.*?</header>', html, re.S)
+    assert header, "concept header missing"
+    assert re.search(r'<span class="okf-type-chip">.*?Dataset', header.group(0), re.S)
+    _assert_no_type_colour(html, curated)
 
 
-def test_phase1_unknown_type_gets_hash_fallback_color(tmp_path: _Path) -> None:
-    """An unknown type ("WibblyFrob") gets a deterministic hash-fallback
-    colour on the concept header, not None and not a curated colour. The
-    same colour ships in static AND single-file targets (parity)."""
+def test_ledger_unknown_type_header_has_no_hash_colour(tmp_path: _Path) -> None:
+    """An unknown type ("WibblyFrob") renders the same neutral chip as a
+    curated one: the hash-fallback hue is not painted on the page."""
     from okf_loom.viewer import assets
     expected = assets.type_color_for("WibblyFrob")
-    assert expected.startswith("hsl(")
     assert assets.curated_type_color("WibblyFrob") is None  # truly unknown
     bundle = _build_bundle_with(tmp_path, {
         "a.md": "---\ntype: WibblyFrob\ntitle: A\ndescription: d\n---\nbody\n",
@@ -1595,15 +1610,13 @@ def test_phase1_unknown_type_gets_hash_fallback_color(tmp_path: _Path) -> None:
         "index.md": "# T\n",
     })
     html = _render_concept_html(bundle, "a")
-    assert f"--okf-type-accent:{expected}" in html or f'--okf-type-accent: {expected}' in html, (
-        f"hash fallback colour {expected!r} not on the concept header for an unknown type"
-    )
+    assert re.search(r'<span class="okf-type-chip">.*?WibblyFrob', html, re.S)
+    _assert_no_type_colour(html, expected)
 
 
-def test_phase1_index_cards_carry_curated_type_accent(tmp_path: _Path) -> None:
-    """Index cards carry ``--okf-type-accent`` with the curated type colour,
-    and the card structure has the semantic data the design calls for
-    (title link, description, type-tinted identity). The ``.okf-concept-list
+def test_ledger_index_cards_are_neutral_rows(tmp_path: _Path) -> None:
+    """Index cards keep their semantic structure (title link, description,
+    tag chips, type as data) but carry no type colour. The ``.okf-concept-list
     li`` + first-anchor contract (studio.js stampConceptIds) is preserved."""
     from okf_loom.viewer import assets
     bundle = _build_bundle_with(tmp_path, {
@@ -1615,10 +1628,10 @@ def test_phase1_index_cards_carry_curated_type_accent(tmp_path: _Path) -> None:
     html = _render_concept_html(bundle, "index")
     ds_color = assets.curated_type_color("Dataset")
     sv_color = assets.curated_type_color("Service")
-    # Both curated colours appear as the per-card type accent.
     assert ds_color is not None and sv_color is not None
-    assert f"--okf-type-accent:{ds_color}" in html or f'--okf-type-accent: {ds_color}' in html
-    assert f"--okf-type-accent:{sv_color}" in html or f'--okf-type-accent: {sv_color}' in html
+    _assert_no_type_colour(html, ds_color, sv_color)
+    # The type survives as data (filtering), not as paint.
+    assert 'data-index-type="Dataset"' in html and 'data-index-type="Service"' in html
     # Card structure: title link + description + tag chips present.
     assert 'class="okf-card"' in html
     assert 'okf-card__link' in html
@@ -1826,18 +1839,16 @@ def test_phase1_index_cards_have_type_icon_and_textual_label(tmp_path: _Path) ->
     assert first_a, "card li has no <a> (presence contract broken)"
 
 
-def test_phase1_cardgrid_uses_autofit_not_autofill() -> None:
-    """The card grid uses ``auto-fit`` (not ``auto-fill``) so a single card
-    in a type section expands to fill the section width instead of leaving
-    an orphaned narrow tile with a large empty gap (Phase 1 visual fix)."""
+def test_ledger_cardgrid_is_a_numbered_row_ruler() -> None:
+    """Ledger: every record is a row. The old card grid is a single-column
+    ruler of hairline rows with a row counter, so no type section can leave
+    an orphaned tile or an empty track."""
     css = _runtime_file("viewer", "static", "wiki.css").read_text(encoding="utf-8")
-    cardgrid_block = css.split(".okf-cardgrid", 1)[1].split("}", 1)[0]
-    assert "auto-fit" in cardgrid_block, (
-        f"card grid does not use auto-fit (orphaned-tile fix missing): {cardgrid_block!r}"
-    )
-    assert "auto-fill" not in cardgrid_block, (
-        f"card grid still uses auto-fill (single cards leave empty tracks): {cardgrid_block!r}"
-    )
+    cardgrid_block = css.split(".okf-cardgrid {", 1)[1].split("}", 1)[0]
+    assert "display: block" in cardgrid_block, cardgrid_block
+    assert "counter-reset: okf-row" in cardgrid_block, cardgrid_block
+    for retired in ("grid-template-columns", "auto-fill", "auto-fit"):
+        assert retired not in cardgrid_block, (retired, cardgrid_block)
 
 
 def test_phase1_index_subdir_page_keeps_subdirs(tmp_path: _Path) -> None:
@@ -2159,11 +2170,10 @@ def test_context_action_note_is_its_description_not_page_text(tmp_path: _Path, m
             browser.close()
 
 
-def test_phase1_uniform_fallback_no_fixed_gray_in_render(tmp_path: _Path) -> None:
-    """P1 #2 (contract-runtime-parity): render output uses ``type_color_for``
-    as the uniform fallback for unknown types — NOT the old fixed gray
-    ``#94a3b8``. Verified by rendering a concept with an unknown type and
-    checking the header band carries the hash-fallback colour, not gray."""
+def test_ledger_unknown_type_render_has_no_type_colour(tmp_path: _Path) -> None:
+    """The served concept page paints neither the hash-fallback hue nor the
+    old fixed gray ``#94a3b8`` for an unknown type: Ledger type identity is
+    the neutral chip text, so there is no colour fallback to drift."""
     from okf_loom.viewer import assets
     from okf_loom.render import _render_concept_page
     expected = assets.type_color_for("ZyxNoMatch")
@@ -2181,18 +2191,13 @@ def test_phase1_uniform_fallback_no_fixed_gray_in_render(tmp_path: _Path) -> Non
     concept = b.concepts[("a",)]
     html = _render_concept_page(concept, b, graph, mode="serve", name="T",
                                 palette=pal, config={})
-    # The header band carries the hash-fallback colour, not gray.
-    assert expected in html, (
-        f"hash fallback {expected!r} not in rendered HTML (stale gray fallback?)"
-    )
-    assert "#94a3b8" not in html, "fixed gray #94a3b8 still in render output"
+    _assert_no_type_colour(html, expected, "#94a3b8")
+    assert 'class="okf-type-chip"' in html
 
 
-def test_phase1_empty_palette_uses_uniform_fallback(tmp_path: _Path) -> None:
-    """P1 #2: when the palette dict is EMPTY (stale/missing), the render
-    still uses ``type_color_for`` as the fallback — not the old gray. This
-    proves the fallback identity is uniform whether the palette is populated
-    or not."""
+def test_ledger_empty_palette_renders_the_same_neutral_page(tmp_path: _Path) -> None:
+    """With an EMPTY palette dict (stale/missing) the concept page is the
+    same neutral page as with a populated one: no hash fallback, no gray."""
     from okf_loom.viewer import assets
     from okf_loom.render import _render_concept_page
     bundle = _build_bundle_with(tmp_path, {
@@ -2207,11 +2212,10 @@ def test_phase1_empty_palette_uses_uniform_fallback(tmp_path: _Path) -> None:
     # Empty palette — every type hits the fallback path.
     html = _render_concept_page(concept, b, graph, mode="serve", name="T",
                                 palette={}, config={})
-    expected = assets.type_color_for("Table")
-    assert expected in html, (
-        f"empty-palette fallback {expected!r} not in rendered HTML"
-    )
-    assert "#94a3b8" not in html
+    _assert_no_type_colour(html, assets.type_color_for("Table"), "#94a3b8")
+    populated = _render_concept_page(concept, b, graph, mode="serve", name="T",
+                                     palette=assets.resolve_palette(b), config={})
+    assert populated == html, "palette contents must not change the rendered page"
 
 
 def test_phase1_card_type_label_uses_safe_text_token(tmp_path: _Path) -> None:
@@ -2230,21 +2234,15 @@ def test_phase1_card_type_label_uses_safe_text_token(tmp_path: _Path) -> None:
     assert "inline-flex" in icon_block, "card type icon wrapper missing"
 
 
-def test_phase1_conn_css_not_modified_from_head() -> None:
-    """P1 #4 (Phase boundary): ``.okf-conn`` must match HEAD (its original
-    side-stripe style) — the Phase-1 diff must NOT have changed connection-
-    card styling. Verified by checking the CSS has the original side-stripe
-    and does NOT have the color-mix additions."""
+def test_ledger_conn_is_a_hairline_row() -> None:
+    """``.okf-conn`` is a Ledger row: a 1px bottom hairline on the page,
+    with no side stripe, no tinted fill and no colour-mix wash."""
     css = _runtime_file("viewer", "static", "wiki.css").read_text(encoding="utf-8")
     conn_block = css.split(".okf-conn {", 1)[1].split("}", 1)[0]
-    # Original side-stripe is present.
-    assert "border-left: 3px solid" in conn_block, (
-        ".okf-conn missing original border-left side stripe (was reverted?)"
-    )
-    # Phase-1 color-mix additions are ABSENT.
-    assert "color-mix" not in conn_block, (
-        ".okf-conn still has Phase-1 color-mix additions (should be reverted)"
-    )
+    assert "border-bottom: 1px solid var(--border)" in conn_block, conn_block
+    assert "background: transparent" in conn_block, conn_block
+    assert "border-left" not in conn_block, ".okf-conn still has a side stripe"
+    assert "color-mix" not in conn_block, ".okf-conn still has a color-mix wash"
 
 
 def test_phase1_graph_js_type_fallback_is_deterministic_not_gray() -> None:
@@ -2322,11 +2320,10 @@ def _phase1_parity_bundle(tmp_path: _Path) -> tuple[_Path, Bundle]:
 
 
 def test_phase1_parity_served_and_static_concept_header_match(tmp_path: _Path) -> None:
-    """The concept header ``--okf-type-accent`` is IDENTICAL in the served
-    and static render targets — same curated colour for a known type, same
-    hash fallback for an unknown type. The server and static builder share
-    one ``resolve_palette`` + one ``_render_concept_page``; this test pins
-    that the identity does not diverge between them."""
+    """The concept header type chip is IDENTICAL in the served and static
+    render targets for a curated and an unknown type, and neither target
+    paints a type colour. The server and static builder share one
+    ``_render_concept_page``; this pins that the identity does not diverge."""
     from okf_loom.render import _render_concept_page
     from okf_loom.viewer import assets
 
@@ -2345,24 +2342,26 @@ def test_phase1_parity_served_and_static_concept_header_match(tmp_path: _Path) -
             expected = assets.type_color_for(ctype)
             assert assets.curated_type_color(ctype) is None  # truly unknown
 
+        chips = {}
         for mode in ("serve", "static"):
             html = _render_concept_page(
                 concept, bundle, graph, mode=mode, name="T",
                 palette=pal, config={},
             )
-            # The inline --okf-type-accent on the header band carries the
-            # SAME colour in both targets.
-            assert f"--okf-type-accent:{expected}" in html or \
-                   f"--okf-type-accent: {expected}" in html, (
+            _assert_no_type_colour(html, expected)
+            chip = re.search(r'<span class="okf-type-chip">.*?</span>\s*</span>|<span class="okf-type-chip">.*?</span>', html, re.S)
+            assert chip and ctype in chip.group(0), (
                 f"concept header for type {ctype!r} ({expected_kind}) in "
-                f"mode={mode!r} does not carry the expected colour {expected!r}"
+                f"mode={mode!r} has no neutral type chip"
             )
+            chips[mode] = chip.group(0)
+        assert chips["serve"] == chips["static"], chips
 
 
 def test_phase1_parity_static_index_cards_match_curated_and_hash(tmp_path: _Path) -> None:
-    """The static index page carries the curated colour on known-type cards
-    and the hash fallback on unknown-type cards — both resolved through the
-    SAME ``resolve_palette`` the concept page uses."""
+    """The static index page renders known-type and unknown-type cards the
+    same neutral way: the palette ``resolve_palette`` still computes (for the
+    graph canvas) is never painted on an index card."""
     from okf_loom.viewer import assets
 
     root, bundle = _phase1_parity_bundle(tmp_path)
@@ -2379,15 +2378,11 @@ def test_phase1_parity_static_index_cards_match_curated_and_hash(tmp_path: _Path
     # The hash path: ZyxUnknown gets the hash fallback (not curated).
     assert assets.curated_type_color("ZyxUnknown") is None
     assert unknown_color == assets.type_color_for("ZyxUnknown")
-    # Both appear on index cards as --okf-type-accent.
-    assert f"--okf-type-accent:{table_color}" in html or \
-           f"--okf-type-accent: {table_color}" in html, (
-        f"curated Table colour {table_color!r} not on an index card"
-    )
-    assert f"--okf-type-accent:{unknown_color}" in html or \
-           f"--okf-type-accent: {unknown_color}" in html, (
-        f"hash-fallback ZyxUnknown colour {unknown_color!r} not on an index card"
-    )
+    _assert_no_type_colour(html, table_color, unknown_color)
+    cards = re.findall(r'<li class="okf-card"[^>]*>', html)
+    assert len(cards) == 2, cards
+    assert {re.search(r'data-index-type="([^"]+)"', c).group(1) for c in cards} == {"Table", "ZyxUnknown"}
+    assert not any("style=" in c for c in cards), cards
 
 
 def test_phase1_parity_single_file_graph_node_identity(tmp_path: _Path) -> None:
@@ -2645,87 +2640,96 @@ def test_iter2_graph_selection_color_is_token_governed() -> None:
     ), "syncLabelColour does not re-sync node:selected border-color"
 
 
-def test_graph_palette_edge_mirrors_or_contrast_lifts_each_theme_border_strong() -> None:
-    """Graph edges follow each family token except where Technical deliberately
-    lifts a low-contrast decorative border to a semantic slate (#5e6e85 light,
-    #64748b dark). Swiss remains an exact token mirror; lifts meet the
-    applicable graphical-object contrast threshold, and the Technical light
-    lift also clears 4.5:1 against the dimmed (Soft Light) canvas and page."""
-    graph_js = _runtime_file("viewer", "static", "graph.js").read_text(encoding="utf-8")
+_LEDGER_PALETTES = ("bone", "slate", "clay", "plum")
+
+
+def _ledger_palette_block(css: str, theme: str) -> str:
+    """The raw palette block for one Ledger palette (hex roles only)."""
+    marker = f'[data-theme="{theme}"] {{'
+    assert marker in css, f"{theme} palette block missing"
+    return css.split(marker, 1)[1].split("}", 1)[0]
+
+
+def _ledger_alias_block(css: str) -> str:
+    """The ``--okf-*`` compatibility alias block that maps onto the roles."""
+    for chunk in css.split(":root, [data-theme] {")[1:]:
+        block = chunk.split("}", 1)[0]
+        if "--okf-bg: var(--bg);" in block:
+            return block
+    raise AssertionError("--okf-* alias block missing from wiki.css")
+
+
+def test_ledger_palettes_define_graph_roles() -> None:
+    """Every Ledger palette ships the graph canvas roles the index preview
+    and the graph page paint (graph.css/graph.js mirror these per palette).
+    Edges are a quiet decorative hairline, distinct from both the canvas and
+    the node fill; labels read as text on the graph canvas."""
     css = _runtime_file("viewer", "static", "wiki.css").read_text(encoding="utf-8")
-
-    def _hex_rgb(h: str):
-        h = h.lstrip("#")
-        return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
-
-    def _edge(theme: str) -> str:
-        m = re.search(rf'"{re.escape(theme)}":\s*_palette\(_(?:LIGHT|DARK),\s*"(#[0-9a-fA-F]+)"\)', graph_js)
-        assert m, f"{theme} edge literal not found"
-        return m.group(1).lower()
 
     def _contrast(a: str, b: str) -> float:
         def lum(value: str) -> float:
-            channels = [part / 255 for part in _hex_rgb(value)]
-            linear = [part / 12.92 if part <= 0.03928 else ((part + 0.055) / 1.055) ** 2.4 for part in channels]
+            value = value.lstrip("#")
+            channels = [int(value[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+            linear = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
             return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
         hi, lo = sorted((lum(a), lum(b)), reverse=True)
         return (hi + 0.05) / (lo + 0.05)
 
-    def _border_strong(theme: str) -> str:
-        block = css.split(f'[data-theme="{theme}"]', 1)[1].split("}", 1)[0]
-        bs = re.search(r'--okf-border-strong:\s*(#[0-9a-fA-F]+);', block)
-        assert bs, f"{theme} --okf-border-strong not found in wiki.css"
-        return bs.group(1).lower()
+    for theme in _LEDGER_PALETTES:
+        block = _ledger_palette_block(css, theme)
+        roles = {}
+        for name in ("graph-bg", "graph-edge", "graph-node", "graph-label"):
+            m = re.search(rf"--{name}:\s*(#[0-9a-fA-F]{{6}});", block)
+            assert m, f"{theme} --{name} missing"
+            roles[name] = m.group(1).lower()
+        assert len(set(roles.values())) == 4, (theme, roles)
+        assert _contrast(roles["graph-label"], roles["graph-bg"]) >= 4.5, (theme, roles)
+    # The preview reads the role, never a literal.
+    assert ".okf-graph-thumb__edges line { stroke: var(--graph-edge);" in css
 
-    for theme in ("technical-light", "swiss-light", "technical-dark", "swiss-dark"):
-        edge = _edge(theme)
-        bs = _border_strong(theme)
-        if theme.startswith("technical-"):
-            # Technical uses semantic slate rather than its decorative frame.
-            dark = theme.endswith("dark")
-            assert edge == ("#64748b" if dark else "#5e6e85")
-            # The canvas is --okf-bg-elev (#f3f5f7 in Soft Light, no longer
-            # white); the page behind it is --okf-bg (#eceff3).
-            canvases = ("#0b1220",) if dark else ("#f3f5f7", "#eceff3")
-            # WCAG non-text AA is 3:1 for graphical strokes; the Technical
-            # light lift also clears 4.5:1 against both light surfaces.
-            for canvas in canvases:
-                assert _contrast(edge, canvas) >= (3 if dark else 4.5), (theme, edge, canvas)
-        else:
-            assert edge == bs, (
-                f"{theme}: graph edge {edge} != wiki.css --okf-border-strong {bs}"
-            )
-    # The two families MUST differ within a mode (non-colour distinction is in
-    # radius/shadow, but border-strong is intentionally family-specific).
-    assert _edge("technical-light") != _edge("swiss-light"), (
-        "light-family graph edge is identical; --okf-border-strong must differ"
-    )
-    assert _edge("technical-dark") != _edge("swiss-dark"), (
-        "dark-family graph edge is identical; the two dark families must differ"
-    )
+
+@pytest.mark.xfail(strict=False, reason=(
+    "lane C owns graph.js: GRAPH_COLORS moves from the retired "
+    "technical/swiss families to the Ledger palettes; the integrator "
+    "removes this xfail once lane C merges"))
+def test_graph_js_palettes_follow_the_ledger_palettes() -> None:
+    """graph.js resolves its canvas palette per Ledger palette (or from the
+    computed --graph-* roles), with no retired family keys left."""
+    graph_js = _runtime_file("viewer", "static", "graph.js").read_text(encoding="utf-8")
+    for retired in ("technical-light", "technical-dark", "swiss-light", "swiss-dark"):
+        assert f'"{retired}"' not in graph_js, f"graph.js still keys {retired}"
+    assert "--graph-edge" in graph_js or all(f'"{p}"' in graph_js for p in _LEDGER_PALETTES)
 
 
 def test_iter2_select_token_defined_in_wiki_css() -> None:
-    """P2-5 (iter-2): the --okf-select token is defined in EVERY theme
-    (the graph.js GRAPH_COLORS block mirrors these values)."""
+    """P2-5 (iter-2): --okf-select resolves in EVERY palette: the alias block
+    maps it onto the palette ``--accent`` role, which each Ledger palette
+    defines as a literal."""
     css = _runtime_file("viewer", "static", "wiki.css").read_text(encoding="utf-8")
-    root_block = css.split(":root", 1)[1].split("}", 1)[0]
-    assert re.search(r'--okf-select\s*:', root_block), (
-        "light theme missing --okf-select token"
-    )
-    for theme in ("technical-dark", "swiss-light", "swiss-dark"):
-        block = css.split(f'[data-theme="{theme}"]', 1)[1].split("}", 1)[0]
-        assert re.search(r'--okf-select\s*:', block), (
-            f"{theme} theme missing --okf-select token"
+    assert re.search(r"--okf-select:\s*var\(--accent\);", _ledger_alias_block(css))
+    for theme in _LEDGER_PALETTES:
+        assert re.search(r"--accent:\s*#[0-9a-fA-F]{6};", _ledger_palette_block(css, theme)), (
+            f"{theme} palette missing its --accent role"
         )
 
 
 def test_theme_blocks_override_full_token_set() -> None:
-    """Every concrete family-mode theme block overrides the same colour
-    tokens the light :root defines, so no theme inherits a light-only colour
-    that breaks contrast (e.g. a Swiss-dark page with the light theme's white
-    code background). technical-light mirrors :root exactly (the default)."""
+    """Every Ledger palette block defines exactly the same set of colour
+    roles as Bone (the :root default), so no palette inherits a Bone-only
+    colour that breaks contrast (e.g. Plum with Bone's light inline-code
+    chip). Every legacy ``--okf-*`` colour token is aliased onto a role."""
     css = _runtime_file("viewer", "static", "wiki.css").read_text(encoding="utf-8")
+    assert ':root, [data-theme="bone"] {' in css, "Bone is not the :root default"
+
+    def _roles(theme: str) -> set[str]:
+        return set(re.findall(r"(--[a-z0-9-]+):", _ledger_palette_block(css, theme)))
+
+    bone = _roles("bone")
+    assert len(bone) > 60, sorted(bone)
+    for theme in _LEDGER_PALETTES[1:]:
+        roles = _roles(theme)
+        assert roles == bone, (theme, sorted(bone ^ roles))
+    alias = _ledger_alias_block(css)
     core_tokens = (
         "okf-bg", "okf-bg-elev", "okf-bg-inset", "okf-fg", "okf-fg-muted",
         "okf-border", "okf-border-strong", "okf-accent", "okf-accent-hover",
@@ -2734,13 +2738,14 @@ def test_theme_blocks_override_full_token_set() -> None:
         "okf-ok", "okf-ok-bg", "okf-warn", "okf-warn-bg",
         "okf-info", "okf-info-bg", "okf-error", "okf-error-bg", "okf-shadow",
     )
-    for theme in ("technical-light", "technical-dark", "swiss-light", "swiss-dark"):
-        assert f'[data-theme="{theme}"]' in css, f"{theme} theme block missing"
-        block = css.split(f'[data-theme="{theme}"]', 1)[1].split("}", 1)[0]
-        for token in core_tokens:
-            assert re.search(rf'--{token}\s*:', block), (
-                f"{theme} theme missing --{token} token"
-            )
+    for token in core_tokens:
+        m = re.search(rf"--{token}:\s*([^;]+);", alias)
+        assert m, f"alias block missing --{token}"
+        value = m.group(1).strip()
+        # Each alias reads a role (or is a deliberate flat value), never a hex.
+        assert not re.search(r"#[0-9a-fA-F]{3,8}", value), (token, value)
+        for role in re.findall(r"var\((--[a-z0-9-]+)\)", value):
+            assert role in bone, f"--{token} aliases {role}, which no palette defines"
 
 
 # ===========================================================================
@@ -3875,13 +3880,11 @@ def test_phase2_onthispage_labels_single_escaped_and_stripped(tmp_path: _Path) -
         )
 
 
-def test_phase2_infobox_carries_type_accent_var(tmp_path: _Path) -> None:
-    """Phase 2 contract-runtime parity: --okf-type-accent is set on the
-    infobox <details> (a sibling of the header, not a descendant) so the
-    infobox's tinted border resolves to the concept's actual type colour
-    instead of falling back to the generic accent. The whole facts card is a
-    native <details> disclosure (collapsed by default — mobile-correct),
-    with a <summary> type/rev row and a .okf-infobox__body wrapper."""
+def test_phase2_infobox_is_a_neutral_details_disclosure(tmp_path: _Path) -> None:
+    """The facts card is a native <details> disclosure (collapsed by default
+    — mobile-correct) with a <summary> type/rev row and a .okf-infobox__body
+    wrapper. Ledger: it carries no inline type accent; its hairline frame
+    comes from wiki.css tokens."""
     bundle = _build_bundle_with(tmp_path, {
         "c.md": "---\ntype: Table\ntitle: C\n---\nbody\n",
     })
@@ -3890,8 +3893,8 @@ def test_phase2_infobox_carries_type_accent_var(tmp_path: _Path) -> None:
     m = _re.search(r'<details class="okf-page__infobox"[^>]*>', html)
     assert m, "infobox not rendered as a <details> disclosure"
     tag = m.group(0)
-    assert "style=" in tag and "--okf-type-accent:" in tag, (
-        f"infobox must carry its own --okf-type-accent; got {tag!r}"
+    assert "style=" not in tag and "--okf-type-accent" not in tag, (
+        f"infobox must not carry an inline type accent; got {tag!r}"
     )
     # The summary is the type/rev toggle; the body wraps tags/facts/governed.
     assert '<summary class="okf-infobox__summary"' in html, "infobox summary missing"
