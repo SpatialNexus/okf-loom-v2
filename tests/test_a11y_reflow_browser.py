@@ -580,11 +580,10 @@ def test_complementary_landmarks_are_named_with_the_studio_rail_open(open_page, 
 
 # ------------------------------------------------ E. measured text contrast (Q7)
 
-# Every Appearance theme (theme.js THEMES, kept in sync with render.py and
-# config.py). The test also reads the runtime list, so a theme added there
+# Every Ledger palette (theme.js THEMES, kept in sync with render.py and
+# config.py). The test also reads the runtime list, so a palette added there
 # without a row here fails instead of going unmeasured.
-APPEARANCE_THEMES = ("technical-light", "technical-dark", "swiss-light", "swiss-dark",
-                     "purple-light", "purple-dark", "coffee-light", "coffee-dark")
+APPEARANCE_THEMES = ("bone", "slate", "clay", "plum")
 
 # WCAG 1.4.3 for every visible node that owns text under the matched elements.
 # The effective background composites the background colours of the node and
@@ -639,15 +638,15 @@ _TEXT_CONTRAST = r"""(selector) => {
 }"""
 
 
-def _choose_appearance(page, group: str, value: str) -> None:
-    """Pick one Appearance option the way a reader does (its label)."""
+def _choose_appearance(page, theme: str) -> None:
+    """Pick one Appearance palette the way a reader does (its label)."""
     trigger = page.locator("#okf-theme")
     menu = page.locator("#okf-appearance-menu")
     trigger.click()
     expect(menu).to_be_visible()
-    option = menu.locator(f'input[data-okf-set="{group}"][data-okf-val="{value}"]')
+    option = menu.locator(f'input[data-okf-set="theme"][data-okf-val="{theme}"]')
     reveal_control(page, option)
-    menu.locator(f'label.okf-appearance__opt[for="okf-appearance-{group}-{value}"]').click()
+    menu.locator(f'label.okf-appearance__opt[for="okf-appearance-theme-{theme}"]').click()
     expect(option).to_be_checked()
     page.keyboard.press("Escape")
     expect(menu).to_be_hidden()
@@ -657,9 +656,7 @@ def _choose_appearance(page, group: str, value: str) -> None:
 def test_muted_and_secondary_text_meets_wcag_aa_contrast_in_every_theme(open_page, server_url, theme) -> None:
     page = open_page(CONCEPT, DESKTOP)
     assert tuple(page.evaluate("() => window.OKFLoomTheme.THEMES")) == APPEARANCE_THEMES
-    family, mode = theme.rsplit("-", 1)
-    _choose_appearance(page, "family", family)
-    _choose_appearance(page, "mode", mode)
+    _choose_appearance(page, theme)
     expect(page.locator("html")).to_have_attribute("data-theme", theme)
 
     measured: dict[str, list[dict]] = {}
@@ -701,15 +698,24 @@ def test_muted_and_secondary_text_meets_wcag_aa_contrast_in_every_theme(open_pag
     assert not failing, f"{theme}: text below WCAG AA contrast: {failing[:8]}"
 
 
-# Every studio.css rule that paints text in an --okf-*-on colour on its solid
-# status fill: the toast tone icons and the resolved/claimed comment markers.
-# They are built with the shipped classes (a claimed marker needs a live agent
-# claim, a toast a mutation outcome), so the measured colours are the real
-# rules' cascade, not the tokens read back.
+# Ledger status roles are text, icons and 2px bars, never fills. Two kinds of
+# probe sit on a --surface panel: one line of text per status role (ok, warn,
+# error, info), and the shipped studio.css status carriers (the toast tone
+# icons, the resolved/claimed comment markers), built with the real classes
+# (a claimed marker needs a live agent claim, a toast a mutation outcome) so
+# the measured colours are whatever the cascade paints, fill or no fill.
 _STATUS_ON_PROBES = """() => {
   const host = document.createElement('div');
   host.id = 'okf-status-on-probe';
-  host.style.cssText = 'position:fixed;top:120px;left:40px;z-index:2147483647;display:flex;gap:12px;align-items:center';
+  host.style.cssText = 'position:fixed;top:120px;left:40px;z-index:2147483647;display:flex;gap:12px;align-items:center;padding:8px;background:var(--surface)';
+  for (const role of ['ok', 'warn', 'error', 'info']) {
+    const line = document.createElement('span');
+    line.className = 'okf-status-probe';
+    line.style.color = `var(--status-${role})`;
+    line.style.fontSize = '13px';
+    line.textContent = role;
+    host.append(line);
+  }
   for (const tone of ['error', 'success', 'warn']) {
     const toast = document.createElement('div');
     toast.className = 'okf-toast';
@@ -735,24 +741,23 @@ _STATUS_ON_PROBES = """() => {
 
 
 @pytest.mark.parametrize("theme", APPEARANCE_THEMES)
-def test_status_fill_on_colours_meet_wcag_aa_contrast_in_every_theme(open_page, theme) -> None:
-    """The light --okf-warn-on (#1f1600-#241700) measured 2.85-3.04:1 on the amber
-    fill, so claimed comment markers and warn toast icons were illegible."""
+def test_status_text_and_carriers_meet_wcag_aa_contrast_in_every_theme(open_page, theme) -> None:
+    """Status hues are read as text: each --status-* role on --surface, and
+    the toast icons / comment markers as the cascade paints them, reach AA.
+    (The retired solid fills once put --okf-warn-on at 2.85-3.04:1.)"""
     page = open_page(CONCEPT, DESKTOP)
-    family, mode = theme.rsplit("-", 1)
-    _choose_appearance(page, "family", family)
-    _choose_appearance(page, "mode", mode)
+    _choose_appearance(page, theme)
     expect(page.locator("html")).to_have_attribute("data-theme", theme)
     page.evaluate(_STATUS_ON_PROBES)
-    rows = page.evaluate(_TEXT_CONTRAST, "#okf-status-on-probe .okf-toast__icon, #okf-status-on-probe .okf-comment-marker")
-    fills = page.evaluate("""() => [...document.querySelectorAll('#okf-status-on-probe .okf-toast__icon, #okf-status-on-probe .okf-comment-marker')]
-      .map(el => getComputedStyle(el).backgroundColor)""")
-    tokens = page.evaluate("""() => { const s = getComputedStyle(document.documentElement);
-      return ['--okf-error', '--okf-ok', '--okf-warn', '--okf-ok', '--okf-warn']
-        .map(t => { const p = document.createElement('i'); p.style.color = s.getPropertyValue(t); document.body.append(p);
-                    const c = getComputedStyle(p).color; p.remove(); return c; }); }""")
-    assert fills == tokens, f"{theme}: probes are not painted by the status fills: {fills} != {tokens}"
-    assert [row["text"] for row in rows] == ["!", "OK", "?", "3", "3"], rows
+    rows = page.evaluate(_TEXT_CONTRAST, "#okf-status-on-probe .okf-status-probe, #okf-status-on-probe .okf-toast__icon, #okf-status-on-probe .okf-comment-marker")
+    assert [row["text"] for row in rows] == ["ok", "warn", "error", "info", "!", "OK", "?", "3", "3"], rows
+    # The role probes really paint the palette status hues on --surface.
+    resolved = page.evaluate("""() => ['--status-ok', '--status-warn', '--status-error', '--status-info', '--surface'].map(t => {
+      const p = document.createElement('i'); p.style.color = `var(${t})`; document.body.append(p);
+      const c = getComputedStyle(p).color; p.remove(); return c; })""")
+    painted = page.evaluate("""() => [...document.querySelectorAll('#okf-status-on-probe .okf-status-probe')].map(e => getComputedStyle(e).color)""")
+    assert painted == resolved[:4], (theme, painted, resolved)
+    assert page.evaluate("() => getComputedStyle(document.getElementById('okf-status-on-probe')).backgroundColor") == resolved[4]
     unresolved = [row for row in rows if not row["opaque"] or row["images"]]
     assert not unresolved, f"{theme}: background not measurable from colours: {unresolved}"
     failing = [(row["node"], row["text"], row["fg"], row["bg"], row["ratio"], row["required"])
@@ -843,12 +848,15 @@ CODE_TOKENS = {
     "tag": ".hljs-tag", "name": ".hljs-name", "selector-tag": ".hljs-selector-tag",
     "subst": ".hljs-subst", "emphasis": ".hljs-emphasis", "strong": ".hljs-strong",
 }
-# Dark themes keep the vendored github-dark token colours except
-# .hljs-section: its #1f6feb measured 4.15-4.35:1 on the dark code
-# backgrounds, so wiki.css lifts it to #79c0ff. There is no known-gap floor
-# any more: every token in every theme must reach 4.5:1.
-GITHUB_DARK_KEYWORD = "rgb(255, 123, 114)"
-DARK_SECTION = "rgb(121, 192, 255)"
+# Ledger code blocks are one dark well in every palette (Bone included):
+# --code-bg / --code-text, with three syntax roles (--syn-1 keys/keywords,
+# --syn-2 values, --syn-3 comments/punctuation) painted by wiki.css; no
+# vendor theme sheet. Inline code is the quiet raised --icode-* chip. Every
+# token in every palette must reach 4.5:1.
+_CODE_ROLES = """() => { const s = getComputedStyle(document.documentElement);
+  return Object.fromEntries(['--code-bg', '--code-text', '--icode-bg', '--icode-text', '--syn-1']
+    .map(t => { const p = document.createElement('i'); p.style.color = s.getPropertyValue(t).trim();
+                document.body.append(p); const c = getComputedStyle(p).color; p.remove(); return [t, c]; })); }"""
 RENDERERS_READY = """(theme) => { const r = window.okfRendererReadiness;
   return !!r && r.ready && r.themeName === theme
     && document.querySelectorAll('pre > code[class*="language-"]:not(.hljs)').length === 0; }"""
@@ -892,9 +900,7 @@ def open_code_page(chromium, code_server_url):
         page = context.new_page()
         page.goto(code_server_url + path, wait_until="load")
         page.wait_for_function(STUDIO_READY)
-        family, mode = theme.rsplit("-", 1)
-        _choose_appearance(page, "family", family)
-        _choose_appearance(page, "mode", mode)
+        _choose_appearance(page, theme)
         expect(page.locator("html")).to_have_attribute("data-theme", theme)
         return page
 
@@ -928,7 +934,6 @@ def test_code_block_tokens_and_chrome_meet_wcag_aa_contrast_in_every_theme(open_
     # Token spans, plain text in a highlighted block, and the untagged block.
     assert {"span.hljs-keyword", "span.hljs-comment", "span.hljs-string",
             "code.language-python", "code"} <= token_nodes, token_nodes
-    dark = theme.endswith("-dark")
     failing = [(label, row["node"], row["text"], row["fg"], row["bg"], row["ratio"], row["required"])
                for label, rows in measured.items() for row in rows if row["ratio"] < row["required"]]
     assert not failing, f"{theme}: code text below WCAG AA contrast: {failing[:8]}"
@@ -938,21 +943,19 @@ def test_code_block_tokens_and_chrome_meet_wcag_aa_contrast_in_every_theme(open_
     # The <pre> owns padding in every theme; the vendor `pre code.hljs
     # { padding: 1em }` used to double-pad dark tagged code.
     assert boxes["taggedCode"] == boxes["untaggedCode"], f"{theme}: tagged and untagged code differ: {boxes}"
-    if dark:
-        # Dark themes keep github-dark token colours, bar the lifted section.
-        assert boxes["keyword"] == GITHUB_DARK_KEYWORD, f"{theme}: dark tokens changed: {boxes['keyword']}"
-        assert boxes["section"] == DARK_SECTION, f"{theme}: dark section colour: {boxes['section']}"
-    else:
-        # Light code blocks are light: the same surface and ink as inline code.
-        assert (boxes["tagged"]["bg"], boxes["tagged"]["fg"]) == (boxes["inline"]["bg"], boxes["inline"]["fg"]), boxes
+    roles = page.evaluate(_CODE_ROLES)
+    assert (boxes["tagged"]["bg"], boxes["tagged"]["fg"]) == (roles["--code-bg"], roles["--code-text"]), (theme, boxes, roles)
+    assert (boxes["inline"]["bg"], boxes["inline"]["fg"]) == (roles["--icode-bg"], roles["--icode-text"]), (theme, boxes, roles)
+    assert boxes["keyword"] == boxes["section"] == roles["--syn-1"], (theme, boxes, roles)
 
 
-LIGHT_THEMES = tuple(theme for theme in APPEARANCE_THEMES if theme.endswith("-light"))
+# The light palettes (theme.js scheme "light"): Bone only.
+LIGHT_THEMES = ("bone",)
 
-# The dimmed light palettes top out at relative luminance ~0.91 (Technical
-# --okf-bg-elev #f3f5f7). Anything visibly painted brighter than this reads as
-# the glare the user ruled out, pure white (1.0) included.
-GLARE_LUMINANCE = 0.92
+# Bone's brightest surface is --surface #fbf9f5 (relative luminance ~0.949).
+# Anything visibly painted brighter than that reads as the glare the user
+# ruled out, pure white (1.0) included.
+GLARE_LUMINANCE = 0.95
 # Every visible element whose computed background is opaque and brighter than
 # the glare ceiling. A 1x1 canvas parses any CSS colour syntax (oklch, color-mix).
 _GLARING = """(ceiling) => {
@@ -1014,11 +1017,10 @@ def test_light_theme_surfaces_are_never_pure_white(open_code_page, code_server_u
 # ------------------------------------------------ G. type names (Q7 follow-up)
 
 # Type colours (curated hsl 38-54% lightness, hash fallback hsl(h, 62%, 48%))
-# are mid-tones made for fills, strokes, icons and tints. As text they measured
-# 2.3:1 (Reference #95a92d, infobox summary, light) and 3.2:1 (Table indigo,
-# hovered relation target and popover type band, dark). A type's NAME is text
-# in the theme ink; its colour stays beside it in an icon, stripe, underline or
-# tint. The colour cues are asserted too, so the fix cannot drop the identity.
+# measured 2.3-3.2:1 as text. Ledger retires them on the document surfaces: a
+# type's NAME is palette ink, its identity is the name (and icon shape), and
+# no per-type --okf-type-accent, tint or coloured underline is painted. The
+# graph canvas (graph.css/graph.js, lane C) is measured for contrast only.
 _RESOLVE_COLOUR = """(value) => { const probe = document.createElement('i'); probe.style.color = value;
   document.body.append(probe); const colour = getComputedStyle(probe).color; probe.remove(); return colour; }"""
 _TYPE_CUES = """() => {
@@ -1032,11 +1034,11 @@ _TYPE_CUES = """() => {
 
 
 @pytest.mark.parametrize("theme", APPEARANCE_THEMES)
-def test_type_names_meet_wcag_aa_contrast_and_keep_their_colour_cue(open_code_page, code_server_url, theme) -> None:
-    # CODE_CONCEPT is a Reference: the amber type colour.
+def test_type_names_meet_wcag_aa_contrast_and_carry_no_type_colour(open_code_page, code_server_url, theme) -> None:
+    # CODE_CONCEPT is a Reference (formerly the amber type colour).
     page = open_code_page(CODE_CONCEPT, theme)
     measured: dict[str, list[dict]] = {}
-    cues: dict[str, tuple] = {}
+    tinted: dict[str, object] = {}
 
     def measure(label: str, selector: str) -> None:
         measured[label] = page.evaluate(_TEXT_CONTRAST, selector)
@@ -1052,7 +1054,8 @@ def test_type_names_meet_wcag_aa_contrast_and_keep_their_colour_cue(open_code_pa
     measure("concept header type chip", ".okf-page__header .okf-type-chip")
     measure("infobox type", ".okf-infobox__summary .okf-infobox__type")
     info = page.evaluate(_TYPE_CUES)
-    cues["infobox icon keeps the type colour"] = (info["infoboxIcon"], resolve(info["infoboxAccent"]))
+    if info["infoboxAccent"]:
+        tinted["infobox inline type accent"] = info["infoboxAccent"]
 
     goto(CONCEPT)
     target = page.locator("a.okf-relation__target").first
@@ -1065,17 +1068,20 @@ def test_type_names_meet_wcag_aa_contrast_and_keep_their_colour_cue(open_code_pa
     expect(page.locator("#okf-popover .okf-popover__type")).to_be_visible()
     measure("hovered relation target", "a.okf-relation__target:hover")
     hover = target.evaluate("""a => { const t = getComputedStyle(a.querySelector('.okf-relation__title'));
-      return {line: t.textDecorationLine, colour: t.textDecorationColor, accent: a.style.getPropertyValue('--okf-type-accent').trim()}; }""")
+      return {line: t.textDecorationLine, colour: t.textDecorationColor, ink: t.color, accent: a.style.getPropertyValue('--okf-type-accent').trim()}; }""")
     assert "underline" in hover["line"], f"{theme}: hovered relation target has no hover cue: {hover}"
-    cues["relation hover underline is the type colour"] = (hover["colour"], resolve(hover["accent"]))
+    if hover["colour"] != hover["ink"] or hover["accent"]:
+        tinted["relation hover underline"] = hover
     measure("link popover type band", "#okf-popover .okf-popover__type")
     band = page.evaluate("""() => getComputedStyle(document.querySelector('#okf-popover .okf-popover__type')).backgroundColor""")
-    inset = resolve("var(--okf-bg-inset)")
-    assert band != inset, f"{theme}: popover type band lost its type tint ({band})"
+    if band != "rgba(0, 0, 0, 0)":
+        tinted["popover type band fill"] = band
 
     goto(INDEX)
+    # Ledger index rows are grouped under their type's section title; the
+    # per-row type label is not shown, so the section title is the type name.
     measure("index section title", ".okf-section__title")
-    measure("index card type", ".okf-card__type")
+    assert page.evaluate("() => [...document.querySelectorAll('.okf-card__type')].every(e => !e.checkVisibility())")
 
     goto("/__search?q=highlight")
     measure("search result type", ".okf-search-result__type")
@@ -1088,13 +1094,11 @@ def test_type_names_meet_wcag_aa_contrast_and_keep_their_colour_cue(open_code_pa
     page.wait_for_function(GRAPH_SETTLED)
     point = page.evaluate("""() => { const g = window.__okfLoomGraph, n = g.cy.nodes().filter(x => x.data('type') === 'Reference').first(),
       p = n.renderedPosition(), r = document.getElementById('okf-graph').getBoundingClientRect();
-      return {x: r.left + p.x, y: r.top + p.y, id: n.id(), base: n.data('baseColor')}; }""")
+      return {x: r.left + p.x, y: r.top + p.y, id: n.id()}; }""")
     page.mouse.move(point["x"], point["y"])
     page.wait_for_function("id => window.__okfLoomGraph.interaction.snapshot().hovered === id", arg=point["id"])
     expect(page.locator(".okf-graph-tip__type")).to_be_visible()
     measure("graph hover tip type", ".okf-graph-tip__type")
-    stripe = page.evaluate("() => getComputedStyle(document.querySelector('.okf-graph-tip__type')).borderInlineStartColor")
-    cues["graph tip stripe is the node colour"] = (stripe, resolve(point["base"]))
 
     unmeasured = [label for label, rows in measured.items() if not rows]
     assert not unmeasured, f"{theme}: no visible type name measured for {unmeasured}"
@@ -1104,8 +1108,7 @@ def test_type_names_meet_wcag_aa_contrast_and_keep_their_colour_cue(open_code_pa
     failing = [(label, row["node"], row["text"], row["fg"], row["bg"], row["ratio"], row["required"])
                for label, rows in measured.items() for row in rows if row["ratio"] < row["required"]]
     assert not failing, f"{theme}: type names below WCAG AA contrast: {failing[:8]}"
-    lost = {label: pair for label, pair in cues.items() if pair[0] != pair[1]}
-    assert not lost, f"{theme}: type colour cue lost: {lost}"
+    assert not tinted, f"{theme}: a type colour is still painted: {tinted}"
 
 
 
@@ -1194,7 +1197,7 @@ def test_appearance_menu_breaks_lines_only_between_words(open_width, route, widt
     for index in range(advanced.count()):
         if advanced.nth(index).get_attribute("open") is None:
             advanced.nth(index).locator("summary").click()
-    assert menu.locator('input[data-okf-set="family"]').first.is_visible()
+    assert menu.locator('input[data-okf-set="theme"]').first.is_visible()
     box = menu.bounding_box()
     assert box["x"] >= 0 and box["x"] + box["width"] <= width, f"menu leaves the {width}px viewport: {box}"
     breaks = page.evaluate(_MIDWORD_BREAKS, "#okf-appearance-menu")
@@ -1207,7 +1210,6 @@ def test_appearance_menu_breaks_lines_only_between_words(open_width, route, widt
 # the menu under the pointer.
 _MENU_SPOTS = (
     ("group legend", lambda menu: _centre(menu.locator("legend").first)),
-    ("footnote", lambda menu: _centre(menu.locator(".okf-appearance__note"))),
     ("group padding", lambda menu: _corner(menu.locator(".okf-appearance__group").first, 4)),
     ("dialog padding", lambda menu: _corner(menu, 3)),
 )
@@ -1238,10 +1240,10 @@ def test_appearance_menu_stays_open_when_its_non_focusable_parts_are_clicked(ope
         expect(trigger).to_have_attribute("aria-expanded", "true")
         assert page.evaluate(inside), f"focus left the menu after a click on the {name}"
     # The dialog itself is a click focus target, never a Tab stop: Tab goes
-    # on to the first group's checked option.
+    # on to the palette group's checked option.
     assert menu.get_attribute("tabindex") == "-1"
     page.keyboard.press("Tab")
-    assert page.evaluate("() => document.activeElement?.dataset.okfSet") == "mode"
+    assert page.evaluate("() => document.activeElement?.dataset.okfSet") == "theme"
     page.keyboard.press("Escape")
     expect(menu).to_be_hidden()
     expect(trigger).to_be_focused()

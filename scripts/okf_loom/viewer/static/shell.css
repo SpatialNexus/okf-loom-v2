@@ -22,6 +22,10 @@
   color: var(--nav-text);
 }
 .okf-shell .okf-brand-link:hover { color: var(--nav-text); text-decoration: none; }
+/* WCAG 2.5.8: the brand is the bar's only text-link target; a 24px line box
+ * keeps it at the 24px minimum at every width (Ledger's 14px brand face
+ * alone measures ~17-22px). */
+.okf-shell .okf-topbar__brand strong { line-height: 24px; }
 /* Destinations: transparent text controls (no outline) at nav size. */
 .okf-shell__nav .okf-btn {
   min-height: var(--ctl-h);
@@ -194,11 +198,8 @@ html:not([data-okf-js="1"]) #okf-theme { display: none !important; }
      * inline-block enabler): with wrapping they only shatter the name into
      * a 70px column ("18vw" at 390px). */
     max-width: none;
-    /* WCAG 2.5.8: the brand is the only text-link target in the bar; an
-     * inline-block 24px line box gives each wrapped line a 24px target
-     * (Ledger's 14px brand face alone measures ~17px). */
+    /* Inline-block so the 24px line box (above) sizes each wrapped line. */
     display: inline-block;
-    line-height: 24px;
   }
   .okf-shell .okf-topbar__brand .okf-muted { display: none; }
   /* Compact but complete appearance label: keep "Appearance" and the current

@@ -1042,7 +1042,10 @@ pre code.hljs { display: block; overflow-x: auto; }
 /* Code block enhancer (renderers.js initCodeBlocks): the tools row (language
  * micro-label + Copy) owns a strip above the first line instead of covering
  * it (it hid line ends at 390px and in long-line blocks at 1280px). */
-.okf-codewrap { position: relative; margin: 16px 0 0; }
+/* The wrap carries the well colour too: the tools row sits over the <pre>'s
+ * top strip but is the wrap's child, so its labels resolve against the dark
+ * well (not the page) for every reader of computed backgrounds. */
+.okf-codewrap { position: relative; margin: 16px 0 0; background: var(--code-bg); }
 .okf-codewrap > pre { margin: 0; padding-top: 34px; }
 .okf-code-tools {
   position: absolute;
@@ -3273,7 +3276,10 @@ body:has(.okf-graph-loading--error) .okf-cytoscape-fallback-actions { display: f
   .okf-metadata,
   .okf-document-tools,
   .okf-page__infobox { padding-inline: 14px; }
-  body.okf-viewer .okf-concept-viewbar { gap: 12px; padding-inline: 12px; }
+  /* The bar wraps to two rows here (view tabs / Sections): a 4px row gap
+   * keeps the sticky strip compact (~81px at 390px) without shrinking the
+   * targets themselves. */
+  body.okf-viewer .okf-concept-viewbar { gap: 4px 12px; padding-inline: 12px; }
   .okf-stat strong { font-size: 22px; }
   .okf-page-utilities__live { display: none; }
   .okf-reserved { padding: 16px 12px 48px; }
