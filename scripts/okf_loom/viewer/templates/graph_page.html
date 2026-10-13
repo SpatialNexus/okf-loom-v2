@@ -4,7 +4,7 @@
 
   Placeholders (str.replace):
       __LANG__             → document language
-      __THEME_ATTR__       → ` data-theme="<family>-<mode>"` (technical/swiss × light/dark)
+      __THEME_ATTR__       → ` data-theme="<palette>"` (bone | slate | clay | plum)
       __DATA_ATTRS__       → ` data-okf-mode="..." data-okf-enhance="..."` (P1-3)
                              graph.js reads data-okf-mode to decide whether
                              Open-page hrefs need a .html suffix.
@@ -12,11 +12,11 @@
       __BUNDLE_NAME__      → display name
       __STATIC_PREFIX__    → URL prefix for /__static/ assets
        __WIKI_CSS_LINK__    → <link rel="stylesheet" href="...wiki.css">
-       __THEME_CONFIG__     → CSP-safe configured theme/modifier preference JSON
+       __THEME_CONFIG__     → CSP-safe configured appearance JSON (choice: bone | slate | clay | plum | system)
       __GRAPH_CSS_LINK__   → <link rel="stylesheet" href="...graph.css">
       __GRAPH_JS_SRC__     → <script src="...graph.js" defer></script>
       __CDN_SCRIPTS__      → Cytoscape.js CDN tag (or empty if config.cdn=false)
-      __INITIAL_THEME__    → one of the eight concrete Technical/Swiss/Purple/Coffee light/dark themes
+      __INITIAL_THEME__    → the concrete first-paint Ledger palette (bone | slate | clay | plum)
       __INITIAL_LAYOUT__   → "cose" | "concentric" | ...
       __GRAPH_DATA_URL__   → URL to fetch graph.json from (or empty to inline)
       __BACK_LINK__        → URL back to the index

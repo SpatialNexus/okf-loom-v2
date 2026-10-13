@@ -22,108 +22,202 @@
   "use strict";
   document.body.setAttribute("data-okf-js", "1");
 
-  // Theme state (family/mode/Auto/OS, persistence, the Appearance popover)
-  // is owned ENTIRELY by viewer/static/theme.js. This file is a READ-ONLY
-  // consumer: it resolves a canvas palette from the active data-theme and
-  // re-syncs the canvas on `okf-loom:themeChanged`. It never reads or writes
-  // localStorage for theme and never sets data-theme.
+  // Theme state (the Ledger palette choice, System/OS resolution,
+  // persistence, the Appearance popover) is owned ENTIRELY by
+  // viewer/static/theme.js. This file is a READ-ONLY consumer: it resolves
+  // the canvas colours from the active palette's tokens and re-syncs the
+  // canvas on `okf-loom:themeChanged`. It never reads or writes localStorage
+  // for theme and never sets data-theme.
 
-  // ---- Canvas colour constants (P2-5 iter-2) -------------------------------
-  // Cytoscape canvas styles CANNOT read CSS custom properties directly, so
-  // these JS literals follow the design tokens declared in wiki.css :root
-  // and the [data-theme="…"] blocks. KEEP IN SYNC WITH wiki.css TOKENS -
-  // the CSS file is the authoritative source; this block exists so a token
-  // change has ONE obvious place to update in JS. Technical and Swiss retain
-  // their shared-within-a-mode foundation; Purple and Coffee carry their own
-  // editorial/paper canvas palettes. Per resolved theme:
-  //   nodeText     node label text. = --okf-fg.
-  //   nodeBorder   node border. Light-family themes reuse --okf-fg; dark-
-  //                family themes use --okf-bg so the border reads strong
-  //                against the elevated canvas surface.
-  //   bridgeBorder bridge/focus node border. = --okf-fg in every theme.
-  //   edge         edge line + arrow. Technical = semantic slate (#5e6e85
-  //                light, #64748b dark); Swiss = --okf-border-strong
-  //                (#0f172a/#e2e8f0).
-  //   edgeLabel    edge label text. Review feedback: darkened well past
-  //                --okf-fg-muted (light was #64748b ~4.6:1 → #334155
-  //                ~10.4:1) so relationship labels stay legible when the
-  //                auto-fit zooms the graph out. Each theme's value is a
-  //                strengthened take on its fg-muted.
-  //   edgeLabelBg  edge label background (opaque so labels stay readable
-  //                over nodes). = --okf-bg-elev (light family) or --okf-bg
-  //                (dark family).
-  //   select       selection colour. = --okf-select (contrast ratios are
-  //                documented in wiki.css).
-  var _LIGHT = {
-    nodeText: "#0f172a", nodeBorder: "#0f172a", bridgeBorder: "#0f172a",
-    edgeLabel: "#334155", edgeLabelBg: "#f3f5f7",
-    select: "#0b6f6f",
+  // ---- Canvas colours: resolved from the Ledger tokens --------------------
+  // Cytoscape paints on <canvas> and cannot read CSS custom properties, so
+  // the graph reads the active palette's tokens (the wiki.css palette
+  // blocks) with getComputedStyle. The resolved set is cached per data-theme
+  // and dropped on every palette change, so nodes, labels, edges, halos,
+  // badges, glyphs, the minimap and the lens ramps all repaint from the
+  // palette actually on screen. There is no per-theme colour table here: a
+  // palette is defined entirely by its tokens.
+  //   node        --graph-node        neutral round node fill
+  //   nodeIcon    --graph-node-icon   type glyph stroke
+  //   nodeBorder  --border-strong     1.5px node stroke
+  //   nodeText    --graph-label       node label ink
+  //   halo        --graph-halo        label halo and relationship-label plate
+  //   edge        --graph-edge        edge line and arrowhead
+  //   edgeLabel   --text-2            relationship label ink (AA on the halo)
+  //   select      --accent            the selected node's 4px stroke / edge
+  //   cue         --text              path, search and bridge marks (ink)
+  //   raised      --surface-2         neutral hub / hover / focus halos
+  //   chip        --bg-2              count-chip fill
+  //   warn/error/info --status-*      status markers: strokes and glyphs only
+  var GRAPH_TOKENS = {
+    canvas: "--graph-bg", node: "--graph-node", nodeIcon: "--graph-node-icon",
+    nodeBorder: "--border-strong", nodeText: "--graph-label", halo: "--graph-halo",
+    edge: "--graph-edge", edgeLabel: "--text-2", select: "--accent", cue: "--text",
+    muted: "--text-3", raised: "--surface-2", chip: "--bg-2",
+    warn: "--status-warn", error: "--status-error", info: "--status-info"
   };
-  var _DARK = {
-    nodeText: "#e2e8f0", nodeBorder: "#0b1220", bridgeBorder: "#e2e8f0",
-    edgeLabel: "#cbd5e1", edgeLabelBg: "#0b1220",
-    select: "#3ec9c9",
+  // Last-resort values (Bone) for an embedder that loads graph.js without the
+  // Ledger stylesheet; every viewer surface resolves the tokens above.
+  var GRAPH_TOKEN_FALLBACK = {
+    canvas: "#f6f3ed", node: "#d2cabd", nodeIcon: "#1d1a16", nodeBorder: "#b0a696",
+    nodeText: "#1d1a16", halo: "#f6f3ed", edge: "#a39a8b", edgeLabel: "#575047",
+    select: "#a3573a", cue: "#1d1a16", muted: "#6a6258", raised: "#e3ddd2",
+    chip: "#eae5dc", warn: "#7f5410", error: "#9e2f2a", info: "#36597e"
   };
-  var _PURPLE_LIGHT = {
-    nodeText: "#241b36", nodeBorder: "#241b36", bridgeBorder: "#241b36",
-    edgeLabel: "#4a3d59", edgeLabelBg: "#f5f2f9",
-    select: "#5b2a86",
-  };
-  var _PURPLE_DARK = {
-    nodeText: "#f1eafa", nodeBorder: "#181222", bridgeBorder: "#f1eafa",
-    edgeLabel: "#d8cce4", edgeLabelBg: "#181222",
-    select: "#c69cf2",
-  };
-  var _COFFEE_LIGHT = {
-    nodeText: "#33241b", nodeBorder: "#33241b", bridgeBorder: "#33241b",
-    edgeLabel: "#59483c", edgeLabelBg: "#f6f1e8",
-    select: "#7b3f20",
-  };
-  var _COFFEE_DARK = {
-    nodeText: "#f4e7d7", nodeBorder: "#211711", bridgeBorder: "#f4e7d7",
-    edgeLabel: "#d9c9ba", edgeLabelBg: "#211711",
-    select: "#e6aa72",
-  };
-  // Build a per-theme palette: family/mode canvas base plus a graph edge hue.
-  function _palette(base, edge) {
-    var p = Object.assign({}, base);
-    p.edge = edge;
-    return p;
+
+  // Colour arithmetic for the palette-derived lens ramp. Parses the token
+  // values (hex/rgb; anything else is resolved by the canvas engine) and
+  // works in OKLab so equal steps read as equal steps.
+  var _colourCtx = null;
+  function parseColour(value) {
+    var s = String(value || "").trim();
+    if (!s) return null;
+    var m = s.match(/^#([0-9a-f]{3,8})$/i);
+    if (m) {
+      var h = m[1];
+      if (h.length === 3 || h.length === 4) h = h.split("").map(function (ch) { return ch + ch; }).join("");
+      if (h.length !== 6 && h.length !== 8) return null;
+      return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16),
+        h.length === 8 ? parseInt(h.slice(6, 8), 16) / 255 : 1];
+    }
+    m = s.match(/^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:\s*[,/]\s*([\d.]+)(%?))?\s*\)$/i);
+    if (m) return [+m[1], +m[2], +m[3], m[4] == null ? 1 : (m[5] ? m[4] / 100 : +m[4])];
+    try {
+      if (!_colourCtx) { var cv = document.createElement("canvas"); cv.width = cv.height = 1; _colourCtx = cv.getContext("2d"); }
+      if (!_colourCtx) return null;
+      _colourCtx.fillStyle = "#010203"; _colourCtx.fillStyle = s;
+      var out = String(_colourCtx.fillStyle);
+      if (out === "#010203" || out === s) return null;
+      return parseColour(out);
+    } catch (e) { return null; }
   }
-  var GRAPH_COLORS = {
-    // Technical light and dark deliberately use a semantic slate: the
-    // Technical family's decorative border tokens are too quiet for graph
-    // topology. Swiss mirrors its family --okf-border-strong exactly. Edge
-    // opacity remains weight-mapped; only the Technical base hue is lifted.
-    // Soft Light dimmed the light canvas to #f3f5f7, so the light slate is
-    // darkened from #64748b (4.35:1 there) to #5e6e85 (4.75:1 on the canvas,
-    // 4.50:1 on --okf-bg); the dark slate is unchanged.
-    //   technical-light #5e6e85 (lifted) / swiss-light #0f172a (token)
-      //   technical-dark  #64748b (lifted) / swiss-dark  #e2e8f0 (token)
-      //   purple light/dark #76518d / #a583c0; coffee light/dark #8d5a3c / #b78358
-      "technical-light": _palette(_LIGHT, "#5e6e85"),
-      "swiss-light": _palette(_LIGHT, "#0f172a"),
-      "technical-dark": _palette(_DARK, "#64748b"),
-      "swiss-dark": _palette(_DARK, "#e2e8f0"),
-      "purple-light": _palette(_PURPLE_LIGHT, "#76518d"),
-      "purple-dark": _palette(_PURPLE_DARK, "#a583c0"),
-      "coffee-light": _palette(_COFFEE_LIGHT, "#8d5a3c"),
-      "coffee-dark": _palette(_COFFEE_DARK, "#b78358"),
-      };
-  // Ledger palettes (bone/slate/clay/plum) borrow the nearest legacy canvas
-  // palette until the graph is ported to read Ledger tokens (TODO: neutral
-  // nodes + palette-derived lens ramp, per DESIGN.md "Graph").
-  var LEDGER_GRAPH_ALIASES = {
-    bone: "technical-light", slate: "technical-dark", clay: "coffee-dark", plum: "purple-dark",
-  };
-  var LEDGER_DARK = { slate: true, clay: true, plum: true };
-  function themeIsDark(t) { return !!LEDGER_DARK[t] || /-dark$/.test(t || ""); }
+  function colourHex(rgb) {
+    return "#" + rgb.slice(0, 3).map(function (v) {
+      var c = Math.max(0, Math.min(255, Math.round(v))).toString(16);
+      return c.length === 1 ? "0" + c : c;
+    }).join("");
+  }
+  function _srgbToLinear(v) { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+  function _linearToSrgb(v) { return 255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055); }
+  function luminance(rgb) {
+    return 0.2126 * _srgbToLinear(rgb[0]) + 0.7152 * _srgbToLinear(rgb[1]) + 0.0722 * _srgbToLinear(rgb[2]);
+  }
+  function contrastRatio(a, b) {
+    var la = luminance(a), lb = luminance(b);
+    return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+  }
+  function toOklab(rgb) {
+    var r = _srgbToLinear(rgb[0]), g = _srgbToLinear(rgb[1]), b = _srgbToLinear(rgb[2]);
+    var l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+    var m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+    var s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+    return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+      1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+      0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s];
+  }
+  // OKLab -> sRGB (0..255), or null when the colour is outside the gamut.
+  function fromOklab(lab) {
+    var l = Math.pow(lab[0] + 0.3963377774 * lab[1] + 0.2158037573 * lab[2], 3);
+    var m = Math.pow(lab[0] - 0.1055613458 * lab[1] - 0.0638541728 * lab[2], 3);
+    var s = Math.pow(lab[0] - 0.0894841775 * lab[1] - 1.2914855480 * lab[2], 3);
+    var lin = [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+      -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+      -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s];
+    if (lin.some(function (v) { return v < -0.0005 || v > 1.0005; })) return null;
+    return lin.map(function (v) { return _linearToSrgb(Math.max(0, Math.min(1, v))); });
+  }
+  // Lightness/chroma/hue -> sRGB, shedding chroma until the colour fits.
+  function oklchRgb(L, C, h) {
+    L = Math.max(0, Math.min(1, L));
+    for (var c = C; c >= 0; c -= 0.004) {
+      var rgb = fromOklab([L, c * Math.cos(h), c * Math.sin(h)]);
+      if (rgb) return rgb;
+    }
+    return fromOklab([L, 0, 0]) || [L * 255, L * 255, L * 255];
+  }
 
-  // Resolve the palette for the CURRENT data-theme (Bone fallback).
+  // Mix `from` toward `toward` (in sRGB steps of 5%) until it reaches
+  // `ratio` against `bg`; returns `from` unchanged when it already does.
+  function liftToContrast(from, toward, bg, ratio) {
+    for (var t = 0; t <= 1.0001; t += 0.05) {
+      var mixed = [0, 1, 2].map(function (i) { return Math.round(from[i] + (toward[i] - from[i]) * t); });
+      if (contrastRatio(mixed, bg) >= ratio) return mixed;
+    }
+    return toward.slice(0, 3);
+  }
+
+  // The lens ramp: a MUTED colour set derived from the active palette, so a
+  // lens keeps its meaning without breaking the one-accent rule.
+  //   categorical  8 low-chroma hues stepped by the golden angle from the
+  //                accent hue, at about the neutral node's lightness
+  //                (themes/communities, groups).
+  //   sequence(t)  neutral node (t=0) -> a muted accent (t=1), in OKLab
+  //                (freshness, bridging, importance).
+  //   relation     the categorical hues at the edge's lightness (typed
+  //                edges under the Relations/Flow intent).
+  // Every fill keeps the type glyph (--graph-node-icon) at >= 4.5:1.
+  var GOLDEN_ANGLE = 2.399963;
+  function buildLensRamp(pal) {
+    var icon = pal.rgb.nodeIcon, node = toOklab(pal.rgb.node), acc = toOklab(pal.rgb.select);
+    var edge = toOklab(pal.rgb.edge), dark = pal.dark;
+    var accH = Math.atan2(acc[2], acc[1]), accC = Math.hypot(acc[1], acc[2]);
+    function legible(L, C, h) {
+      var rgb = oklchRgb(L, C, h);
+      for (var i = 0; i < 20 && contrastRatio(rgb, icon) < 4.5; i++) {
+        L += dark ? -0.02 : 0.02;
+        rgb = oklchRgb(L, C, h);
+      }
+      return rgb;
+    }
+    var catL = node[0] + (dark ? 0.12 : -0.04), catC = dark ? 0.05 : 0.055;
+    var categorical = [], relation = [];
+    for (var k = 0; k < 8; k++) {
+      categorical.push(colourHex(legible(catL, catC, accH + k * GOLDEN_ANGLE)));
+      relation.push(colourHex(liftToContrast(oklchRgb(edge[0], 0.07, accH + k * GOLDEN_ANGLE), pal.rgb.muted, pal.rgb.canvas, 3.05)));
+    }
+    var hiL = node[0] + (dark ? 0.16 : -0.11), hiC = Math.min(accC * 0.75, 0.09);
+    var lo = node, hi = [hiL, hiC * Math.cos(accH), hiC * Math.sin(accH)];
+    var cache = {};
+    function sequence(t) {
+      t = Math.max(0, Math.min(1, Number(t) || 0));
+      var key = Math.round(t * 100);
+      if (cache[key]) return cache[key];
+      var u = key / 100, lab = [lo[0] + (hi[0] - lo[0]) * u, lo[1] + (hi[1] - lo[1]) * u, lo[2] + (hi[2] - lo[2]) * u];
+      return (cache[key] = colourHex(legible(lab[0], Math.hypot(lab[1], lab[2]), Math.atan2(lab[2], lab[1]))));
+    }
+    return { categorical: categorical, relation: relation, sequence: sequence, empty: pal.canvas };
+  }
+
+  var _graphPaletteCache = null, _graphPaletteKey = null;
+  function invalidateGraphPalette() { _graphPaletteCache = null; _graphPaletteKey = null; }
+  // Resolve the palette for the CURRENT data-theme (cached until the next
+  // palette change). Callers must treat the result as read-only.
   function graphPalette() {
-    var t = document.documentElement.getAttribute("data-theme") || "bone";
-    t = LEDGER_GRAPH_ALIASES[t] || t;
-    return Object.assign({}, GRAPH_COLORS[t] || GRAPH_COLORS["technical-light"]);
+    var key = document.documentElement.getAttribute("data-theme") || "bone";
+    if (_graphPaletteCache && _graphPaletteKey === key) return _graphPaletteCache;
+    var cs = null;
+    try { cs = window.getComputedStyle(document.documentElement); } catch (e) {}
+    var pal = { theme: key, rgb: {} };
+    Object.keys(GRAPH_TOKENS).forEach(function (name) {
+      var rgb = parseColour(cs ? cs.getPropertyValue(GRAPH_TOKENS[name]) : "") || parseColour(GRAPH_TOKEN_FALLBACK[name]);
+      pal.rgb[name] = rgb;
+      pal[name] = colourHex(rgb);
+    });
+    pal.dark = luminance(pal.rgb.canvas) < 0.2;
+    // Edges are meaningful graphics (WCAG 1.4.11): keep --graph-edge's hue
+    // but lift it toward --text-3 until it clears 3:1 on the canvas. The
+    // Ledger edge tokens sit near 2.5:1, so every palette takes a small,
+    // palette-derived lift rather than a hard-coded colour.
+    pal.rgb.edge = liftToContrast(pal.rgb.edge, pal.rgb.muted, pal.rgb.canvas, 3.05);
+    pal.edge = colourHex(pal.rgb.edge);
+    pal.font = (cs && cs.getPropertyValue("--font-body").trim()) || "\"Public Sans\", sans-serif";
+    pal.mono = (cs && cs.getPropertyValue("--font-mono").trim()) || "\"Azeret Mono\", monospace";
+    // Stateful-cue names shared with the synchronisers below.
+    pal.edgeLabelBg = pal.halo;
+    pal.bridgeBorder = pal.cue;
+    pal.ramp = buildLensRamp(pal);
+    _graphPaletteCache = pal; _graphPaletteKey = key;
+    return pal;
   }
 
   // ---- Config from data-* attributes (CSP-safe; no inline script) ------
@@ -592,126 +686,8 @@
   // This file only READS data-theme via graphPalette() and re-syncs the
   // canvas when theme.js dispatches `okf-loom:themeChanged` (see init).
 
-  // ---- Luminance-aware chip foreground (P0-4 / P2-23) ------------------
-  // Port of render.py:_chip_fg(): parses a CSS colour (hsl/hex/rgb/named)
-  // and picks the foreground (black or white) with the higher WCAG
-  // contrast ratio against the background. Previously the graph-view type
-  // chip hardwired #fff (failed on yellow/green/cyan) and the threshold
-  // approach had no margin near the luminance boundary; named CSS colours
-  // bypassed the luminance check entirely.
-  var _NAMED_CSS_COLORS = {
-    aliceblue: [240, 248, 255], antiquewhite: [250, 235, 215],
-    aqua: [0, 255, 255], aquamarine: [127, 255, 212], azure: [240, 255, 255],
-    beige: [245, 245, 220], bisque: [255, 228, 196], black: [0, 0, 0],
-    blanchedalmond: [255, 235, 205], blue: [0, 0, 255], blueviolet: [138, 43, 226],
-    brown: [165, 42, 42], burlywood: [222, 184, 135], cadetblue: [95, 158, 160],
-    chartreuse: [127, 255, 0], chocolate: [210, 105, 30], coral: [255, 127, 80],
-    cornflowerblue: [100, 149, 237], cornsilk: [255, 248, 220], crimson: [220, 20, 60],
-    cyan: [0, 255, 255], darkblue: [0, 0, 139], darkcyan: [0, 139, 139],
-    darkgoldenrod: [184, 134, 11], darkgray: [169, 169, 169], darkgreen: [0, 100, 0],
-    darkgrey: [169, 169, 169], darkkhaki: [189, 183, 107], darkmagenta: [139, 0, 139],
-    darkolivegreen: [85, 107, 47], darkorange: [255, 140, 0], darkorchid: [153, 50, 204],
-    darkred: [139, 0, 0], darksalmon: [233, 150, 122], darkseagreen: [143, 188, 143],
-    darkslateblue: [72, 61, 139], darkslategray: [47, 79, 79], darkslategrey: [47, 79, 79],
-    darkturquoise: [0, 206, 209], darkviolet: [148, 0, 211], deeppink: [255, 20, 147],
-    deepskyblue: [0, 191, 255], dimgray: [105, 105, 105], dimgrey: [105, 105, 105],
-    dodgerblue: [30, 144, 255], firebrick: [178, 34, 34], floralwhite: [255, 250, 240],
-    forestgreen: [34, 139, 34], fuchsia: [255, 0, 255], gainsboro: [220, 220, 220],
-    ghostwhite: [248, 248, 255], gold: [255, 215, 0], goldenrod: [218, 165, 32],
-    gray: [128, 128, 128], green: [0, 128, 0], greenyellow: [173, 255, 47],
-    grey: [128, 128, 128], honeydew: [240, 255, 240], hotpink: [255, 105, 180],
-    indianred: [205, 92, 92], indigo: [75, 0, 130], ivory: [255, 255, 240],
-    khaki: [240, 230, 140], lavender: [230, 230, 250], lavenderblush: [255, 240, 245],
-    lawngreen: [124, 252, 0], lemonchiffon: [255, 250, 205], lightblue: [173, 216, 230],
-    lightcoral: [240, 128, 128], lightcyan: [224, 255, 255],
-    lightgoldenrodyellow: [250, 250, 210], lightgray: [211, 211, 211],
-    lightgreen: [144, 238, 144], lightgrey: [211, 211, 211], lightpink: [255, 182, 193],
-    lightsalmon: [255, 160, 122], lightseagreen: [32, 178, 170], lightskyblue: [135, 206, 250],
-    lightslategray: [119, 136, 153], lightslategrey: [119, 136, 153],
-    lightsteelblue: [176, 196, 222], lightyellow: [255, 255, 224], lime: [0, 255, 0],
-    limegreen: [50, 205, 50], linen: [250, 240, 230], magenta: [255, 0, 255],
-    maroon: [128, 0, 0], mediumaquamarine: [102, 205, 170], mediumblue: [0, 0, 205],
-    mediumorchid: [186, 85, 211], mediumpurple: [147, 112, 219],
-    mediumseagreen: [60, 179, 113], mediumslateblue: [123, 104, 238],
-    mediumspringgreen: [0, 250, 154], mediumturquoise: [72, 209, 204],
-    mediumvioletred: [199, 21, 133], midnightblue: [25, 25, 112], mintcream: [245, 255, 250],
-    mistyrose: [255, 228, 225], moccasin: [255, 228, 181], navajowhite: [255, 222, 173],
-    navy: [0, 0, 128], oldlace: [253, 245, 230], olive: [128, 128, 0],
-    olivedrab: [107, 142, 35], orange: [255, 165, 0], orangered: [255, 69, 0],
-    orchid: [218, 112, 214], palegoldenrod: [238, 232, 170], palegreen: [152, 251, 152],
-    paleturquoise: [175, 238, 238], palevioletred: [219, 112, 147], papayawhip: [255, 239, 213],
-    peachpuff: [255, 218, 185], peru: [205, 133, 63], pink: [255, 192, 203],
-    plum: [221, 160, 221], powderblue: [176, 224, 230], purple: [128, 0, 128],
-    rebeccapurple: [102, 51, 153], red: [255, 0, 0], rosybrown: [188, 143, 143],
-    royalblue: [65, 105, 225], saddlebrown: [139, 69, 19], salmon: [250, 128, 114],
-    sandybrown: [244, 164, 96], seagreen: [46, 139, 87], seashell: [255, 245, 238],
-    sienna: [160, 82, 45], silver: [192, 192, 192], skyblue: [135, 206, 235],
-    slateblue: [106, 90, 205], slategray: [112, 128, 144], slategrey: [112, 128, 144],
-    snow: [255, 250, 250], springgreen: [0, 255, 127], steelblue: [70, 130, 180],
-    tan: [210, 180, 140], teal: [0, 128, 128], thistle: [216, 191, 216],
-    tomato: [255, 99, 71], turquoise: [64, 224, 208], violet: [238, 130, 238],
-    wheat: [245, 222, 179], white: [255, 255, 255], whitesmoke: [245, 245, 245],
-    yellow: [255, 255, 0], yellowgreen: [154, 205, 50]
-  };
-  function _chipFg(bgCss) {
-    if (!bgCss) return "#ffffff";
-    var s = String(bgCss).trim();
-    var rgb = null;
-    var mHsl = s.match(/^hsla?\(\s*(\d+(?:\.\d+)?)\s*(?:deg|rad|turn|grad)?\s*,\s*(\d+(?:\.\d+)?)%\s*,\s*(\d+(?:\.\d+)?)%/);
-    var mRgb = s.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/);
-    var mHex = s.match(/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
-    if (mHsl) {
-      var h = parseFloat(mHsl[1]) % 360;
-      var sat = parseFloat(mHsl[2]) / 100;
-      var l = parseFloat(mHsl[3]) / 100;
-      rgb = _hslToRgb(h, sat, l);
-    } else if (mRgb) {
-      rgb = [parseFloat(mRgb[1]) / 255, parseFloat(mRgb[2]) / 255, parseFloat(mRgb[3]) / 255];
-    } else if (mHex) {
-      var hex = mHex[1];
-      if (hex.length === 3) {
-        hex = hex.charAt(0) + hex.charAt(0) + hex.charAt(1) + hex.charAt(1) + hex.charAt(2) + hex.charAt(2);
-      } else if (hex.length === 8) {
-        // P1-7: strip alpha (#rrggbbaa) - luminance is RGB-only (parity
-        // with the Python port in render.py:_chip_fg).
-        hex = hex.slice(0, 6);
-      }
-      rgb = [
-        parseInt(hex.slice(0, 2), 16) / 255,
-        parseInt(hex.slice(2, 4), 16) / 255,
-        parseInt(hex.slice(4, 6), 16) / 255,
-      ];
-    } else if (_NAMED_CSS_COLORS[s.toLowerCase()]) {
-      var nc = _NAMED_CSS_COLORS[s.toLowerCase()];
-      rgb = [nc[0] / 255, nc[1] / 255, nc[2] / 255];
-    } else {
-      return "#ffffff";
-    }
-    var lum = _relativeLuminance(rgb[0], rgb[1], rgb[2]);
-    // P2-23: pick the higher-contrast foreground (black vs white) instead
-    // of a brittle luminance threshold. Pure black has luminance 0, pure
-    // white has luminance 1.
-    var contrastBlack = (lum + 0.05) / 0.05;        // (lum_bg + 0.05) / (0 + 0.05)
-    var contrastWhite = 1.05 / (lum + 0.05);        // (1 + 0.05) / (lum_bg + 0.05)
-    return contrastBlack >= contrastWhite ? "#000000" : "#ffffff";
-  }
-  function _hslToRgb(h, s, l) {
-    var c = (1 - Math.abs(2 * l - 1)) * s;
-    var x = c * (1 - Math.abs((h / 60) % 2 - 1));
-    var m_ = l - c / 2;
-    var r, g, b;
-    if (h < 60) { r = c; g = x; b = 0; }
-    else if (h < 120) { r = x; g = c; b = 0; }
-    else if (h < 180) { r = 0; g = c; b = x; }
-    else if (h < 240) { r = 0; g = x; b = c; }
-    else if (h < 300) { r = x; g = 0; b = c; }
-    else { r = c; g = 0; b = x; }
-    return [r + m_, g + m_, b + m_];
-  }
-  function _relativeLuminance(r, g, b) {
-    function lin(v) { return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
-    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-  }
+  // Content types are not colour-coded (Ledger), so the graph has no type
+  // chip fills and needs no luminance-picked chip foreground.
   // Theme boot/cycle ownership REMOVED — theme.js resolves the saved
   // preference + Auto/OS and owns the Appearance control. graph.js only
   // re-syncs the canvas when the resolved theme changes (see init).
@@ -1035,34 +1011,35 @@
     // size override never destroys the original mapping (state-ownership).
     // Phase 3: node glyphs. The server ships icon_paths (icon-key → SVG
     // inner markup, one source of truth with the wiki) + a per-node icon
-    // key. Each key becomes a white-stroke SVG data-URI drawn on the
-    // type-coloured node. Shapes stay sparse — the icon is the real
-    // differentiator; shape only marks the big structural families.
+    // key. Each key becomes an SVG data-URI stroked in the palette's
+    // --graph-node-icon and drawn on the neutral round node. The cache is
+    // keyed by glyph AND ink, so a palette change regenerates every glyph
+    // (refreshNodeGlyphs) instead of reusing another palette's stroke.
     var ICON_PATHS = bundle.icon_paths || {};
     var _iconUriCache = {};
     function iconDataUri(key) {
       if (!key || !ICON_PATHS[key]) key = "file";
       if (!ICON_PATHS[key]) return null;
-      if (_iconUriCache[key]) return _iconUriCache[key];
+      var ink = graphPalette().nodeIcon, cacheKey = key + "|" + ink;
+      if (_iconUriCache[cacheKey]) return _iconUriCache[cacheKey];
       // Explicit width/height give the glyph an intrinsic size. Without it,
       // Chrome drew the image about twice too large on HiDPI canvases
       // (devicePixelRatio 2) and the node clipped it to its top-left corner.
       var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"'
-        + ' stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        + ' stroke="' + ink + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
         + ICON_PATHS[key] + '</svg>';
       var uri = "data:image/svg+xml;utf8," + encodeURIComponent(svg);
-      _iconUriCache[key] = uri;
+      _iconUriCache[cacheKey] = uri;
       return uri;
     }
-    var SHAPE_FOR_ICON = {
-      database: "barrel", table: "barrel",            // data at rest
-      server: "round-hexagon",                          // running systems
-      branch: "round-diamond",                          // decisions
-    };
-    function shapeForIcon(key) { return SHAPE_FOR_ICON[key] || "ellipse"; }
+    // Ledger graph nodes are round records: the glyph carries the type, the
+    // shape never does (DESIGN.md "Graph": neutral round nodes).
+    function shapeForIcon() { return "ellipse"; }
 
     function elemFor(n) {
-      var base = n.data.color || palette[n.data.type] || typeColorFor(n.data.type);
+      // Content types are not colour-coded: every node starts on the neutral
+      // --graph-node fill; a lens may recolour it from the muted ramp.
+      var base = graphPalette().node;
       // Review feedback: smaller base node sizes. With the MAX_ZOOM clamp the
       // old 32..80 range rendered as giant discs on small bundles, colliding
       // with labels/edges (reviewer blocker 1). 22..44 reads cleanly.
@@ -1105,25 +1082,29 @@
     function commentCountText(count) { return count > 99 ? "99+" : String(count); }
     function commentPhrase(count) { return count + " active comment" + (count === 1 ? "" : "s"); }
     function commentBadgeDataUri(count) {
-      // A compact outlined speech bubble keeps comments structurally distinct
-      // from the circular broken-link underlay. Exact counts remain in HTML;
-      // only this bounded canvas copy is capped.
+      // A square outlined count chip with a mono figure (Ledger badge): band
+      // fill, 1.2px --border-strong rule, ink figure. Its square silhouette
+      // stays distinct from the broken-link triangle and the round node.
+      // Exact counts remain in HTML; only this bounded canvas copy is capped.
+      // (SVG images cannot reach page fonts, so the mono stack falls back to
+      // the platform monospace inside the data URI.)
       var text = commentCountText(count);
-      var width = text.length > 2 ? 34 : 26;
+      var width = 26;
       var badgePalette = graphPalette();
-      var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="22" viewBox="0 0 ' + width + ' 22">' +
-        '<path d="M2 2h' + (width - 4) + 'v14H10l-5 4v-4H2z" fill="' + badgePalette.edgeLabelBg + '" stroke="' + badgePalette.select + '" stroke-width="2"/>' +
-        '<text x="' + (width / 2) + '" y="12.5" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="' + badgePalette.nodeText + '">' + text + '</text></svg>';
+      var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="18" viewBox="0 0 ' + width + ' 18">' +
+        '<path d="M1 1H' + (width - 1) + 'V17H1Z" fill="' + badgePalette.chip + '" stroke="' + badgePalette.nodeBorder + '" stroke-width="1.2"/>' +
+        '<text x="' + (width / 2) + '" y="12.6" text-anchor="middle" font-family="Azeret Mono,ui-monospace,monospace" font-size="9.5" font-weight="500" fill="' + badgePalette.nodeText + '">' + text + '</text></svg>';
       return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
     }
     function brokenBadgeDataUri() {
-      // Persistent shape + glyph channel for the canvas warning. This is a
-      // filled triangle rather than the comment speech bubble or selection
-      // ring, so broken+comment+selected+hub states remain distinguishable.
+      // Persistent shape + glyph channel for the canvas warning: an outlined
+      // triangle and "!" in the muted error hue (status hues mark strokes and
+      // glyphs, never fills), on the halo so it reads over edges. The shape
+      // keeps broken+comment+selected+hub states distinguishable.
       var badgePalette=graphPalette();
       var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="20" viewBox="0 0 22 20">' +
-        '<path d="M11 1 21 19H1Z" fill="#b91c1c" stroke="'+badgePalette.edgeLabelBg+'" stroke-width="1.5"/>' +
-        '<text x="11" y="15" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="900" fill="'+badgePalette.edgeLabelBg+'">!</text></svg>';
+        '<path d="M11 1.5 20.5 18.5H1.5Z" fill="'+badgePalette.halo+'" stroke="'+badgePalette.error+'" stroke-width="1.6" stroke-linejoin="miter"/>' +
+        '<text x="11" y="15.5" text-anchor="middle" font-family="Azeret Mono,ui-monospace,monospace" font-size="10" font-weight="700" fill="'+badgePalette.error+'">!</text></svg>';
       return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
     }
     // edgeVisible(e): true only when BOTH endpoints are currently shown.
@@ -1603,41 +1584,32 @@
       for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
       return h;
     }
-    // Deterministic type-colour fallback for nodes whose data.color / palette
-    // entry is missing (live SSE before palette refresh, or incomplete data).
-    // Reuses hashHue with the SAME HSL sat/light as the server's
-    // stable_hue → hsl(hue, 62%, 48%) so the fallback is deterministic,
-    // non-gray, and visually consistent with the server's hash-fallback path.
-    // (The exact hue may differ from the server's crc32 for the same name,
-    // but the server always sets data.color for pre-rendered nodes, so this
-    // fallback only fires transiently — any deterministic non-gray colour is
-    // the contract, not a fixed gray.)
-    function typeColorFor(typeName) {
-      return "hsl(" + hashHue(typeName || "concept") + ", 62%, 48%)";
-    }
+    // Lens colours come from the palette-derived muted ramp (graphPalette()
+    // .ramp); there is no type palette on the canvas. A group without a name
+    // stays on the neutral node fill.
+    function neutralNodeColor() { return graphPalette().node; }
     function groupColor(g) {
-      if (!g) return typeColorFor("concept");
-      // Review feedback: when grouping BY TYPE, group colour === the stable
-      // node palette so "Colour by: Group" with "Group by: Type" matches the
-      // palette and never drifts between presets (reviewer blocker 5).
-      if (controlState.groupBy === "type" && palette[g]) return palette[g];
-      return "hsl(" + hashHue(g) + ", 58%, 55%)";
+      if (!g) return neutralNodeColor();
+      // Explicit "Colour by selected group": categorical muted hues. The
+      // index follows the sorted group list so the first eight groups never
+      // share a hue; names outside the list fall back to a stable hash.
+      var cat = graphPalette().ramp.categorical, idx = groupList.indexOf(g);
+      return cat[(idx >= 0 ? idx : hashHue(g)) % cat.length];
     }
-    // Relation-type edge colour (slightly darker/saturated for line contrast).
-    // Phase 3: typed edges are ALWAYS hue-coded, quietly — full saturation
-    // is reserved for the explicit Relations/Focus intent (strong=true).
-    // The muted variant keeps the default canvas calm while still letting
-    // "same relationship = same colour" register peripherally.
+    // Relation-type edge colour. Typed edges always carry their dash pattern
+    // (the non-colour channel); hue is a lens encoding reserved for the
+    // explicit Relations/Flow intent (strong=true). Otherwise every edge is
+    // the neutral --graph-edge.
     function relColor(label, strong) {
-      return strong
-        ? "hsl(" + hashHue(label) + ", 64%, 42%)"
-        : "hsl(" + hashHue(label) + ", 38%, 56%)";
+      var pal = graphPalette();
+      if (!strong) return pal.edge;
+      return pal.ramp.relation[hashHue(label) % pal.ramp.relation.length];
     }
     function relDashClass(label) { return "okf-reld-" + (hashHue(label) % 3 + 1); }
     function importanceColor(w) {
-      // Muted slate (low) → saturated teal (high). Single hue so it reads as
-      // one ordered scale, not a categorical palette (a11y: ordered ramp).
-      return "hsl(186, " + (18 + 52 * w).toFixed(0) + "%, " + (78 - 34 * w).toFixed(0) + "%)";
+      // Neutral (low) → muted accent (high): one ordered ramp, not a
+      // categorical palette (a11y: ordered scale).
+      return graphPalette().ramp.sequence(w);
     }
 
     // ---- Layout tuning derived from the spacing/separation/strength knobs
@@ -1710,9 +1682,8 @@
           selector: "node",
           style: {
             "background-color": "data(color)",
-            // Phase 3 node glyphs: type icon (white stroke SVG data-URI)
-            // centered on the coloured node; shape marks the structural
-            // family (barrel = data, hexagon = service, diamond = decision).
+            // Phase 3 node glyphs: type icon (an SVG data-URI stroked in
+            // --graph-node-icon) centred on the neutral round node.
             "shape": "data(shape)",
             // Resolve image values in JS. Cytoscape treats data(...) inside a
             // multi-background array as a literal URL in some 3.x builds,
@@ -1720,8 +1691,8 @@
             "background-image": function (n) {
               return [n.data("iconUrl") || "none", n.data("commentBadgeUrl") || "none", n.data("brokenBadgeUrl") || "none"];
             },
-            "background-width": ["55%", "34px", "22px"],
-            "background-height": ["55%", "22px", "20px"],
+            "background-width": ["55%", "26px", "22px"],
+            "background-height": ["55%", "18px", "20px"],
             "background-position-x": ["50%", "100%", "0%"],
             "background-position-y": ["50%", "0%", "0%"],
             "background-clip": ["node", "none", "none"],
@@ -1729,6 +1700,7 @@
             "bounds-expansion": 18,
             "label": "data(label)",
               "color": INITIAL_GRAPH_PALETTE.nodeText,
+              "font-family": INITIAL_GRAPH_PALETTE.font,
             // Review feedback: node names read "near-microscopic" at the
             // widened max spread (the auto-fit zooms the big graph out, so the
             // rendered size is font-size × zoom; measured max-range zoom is
@@ -1755,23 +1727,30 @@
             // drove the label-collision pile-up.
             "text-wrap": "ellipsis",
             "text-max-width": 90,
-            // Review feedback: a soft label plate keeps node names legible over
-            // edges and neighbouring nodes (reviewer blocker 1 collisions). The
-            // plate opacity is theme-driven — see syncLabelColour — so light
-            // themes drop the plate entirely (the canvas already has enough
-            // contrast for fg-on-bg-elev labels) while dark themes keep the
-            // 0.85 plate so labels stay crisp over edges at high spread.
+            // Ledger labels: --graph-label ink on a --graph-halo outline, so
+            // names stay legible over edges and neighbours without a plate.
+            // The (square) plate colour is still set so selected/hovered
+            // labels can raise a full halo plate (syncLabelColour).
+              "text-outline-color": INITIAL_GRAPH_PALETTE.halo,
+            "text-outline-width": 2,
+            "text-outline-opacity": 1,
               "text-background-color": INITIAL_GRAPH_PALETTE.edgeLabelBg,
-            "text-background-opacity": 0.85,
+            "text-background-opacity": 0,
             "text-background-padding": 2,
-            "text-background-shape": "roundrectangle",
+            "text-background-shape": "rectangle",
             "width": "data(vizSize)",
             "height": "data(vizSize)",
-            "border-width": 1,
+            // Neutral round record: 1.5px --border-strong stroke.
+            "border-width": 1.5,
               "border-color": INITIAL_GRAPH_PALETTE.nodeBorder,
+            // Cytoscape underlays are round-rectangles; a zero corner radius
+            // makes every halo (hub, hover, search, path, bridge) square.
+            "underlay-shape": "round-rectangle",
+            "underlay-corner-radius": 0,
           },
         },
         {
+          // The accent's one canvas use: the selected node's 4px stroke.
           selector: "node:selected",
             style: { "border-width": 4, "border-color": INITIAL_GRAPH_PALETTE.select },
         },
@@ -1820,11 +1799,12 @@
             "font-size": 11,
             "font-weight": 600,
               "color": INITIAL_GRAPH_PALETTE.edgeLabel,
+              "font-family": INITIAL_GRAPH_PALETTE.font,
             "text-rotation": "autorotate",
               "text-background-color": INITIAL_GRAPH_PALETTE.edgeLabelBg,
             "text-background-opacity": 0.9,
             "text-background-padding": 2,
-            "text-background-shape": "roundrectangle",
+            "text-background-shape": "rectangle",
             "min-zoomed-font-size": 9,
           },
         },
@@ -1832,11 +1812,16 @@
           { selector: "edge.okf-show-label, edge.okf-density-detail-label", style: { "label": "data(label)" } },
           // A compact count chip is always visible for bundled parallel
           // relationships; selecting it opens the lossless semantic list.
+          // Ledger chip: square, band fill, 1px --border-strong rule, mono
+          // figure in ink, never rotated.
           { selector: "edge.okf-multi-edge", style: {
-            "label": "data(bundleLabel)", "font-size": 10, "font-weight": 700,
-            "text-background-opacity": 1, "text-background-padding": 4,
-            "text-background-shape": "roundrectangle", "text-border-width": 1,
-              "text-border-color": INITIAL_GRAPH_PALETTE.select,
+            "label": "data(bundleLabel)", "font-size": 10, "font-weight": 500,
+              "font-family": INITIAL_GRAPH_PALETTE.mono, "color": INITIAL_GRAPH_PALETTE.nodeText,
+            "text-rotation": "none",
+              "text-background-color": INITIAL_GRAPH_PALETTE.chip,
+            "text-background-opacity": 1, "text-background-padding": 3,
+            "text-background-shape": "rectangle", "text-border-width": 1,
+              "text-border-color": INITIAL_GRAPH_PALETTE.nodeBorder,
             "text-border-opacity": 1
           } },
           { selector: "node.okf-density-overview-zero", style: {
@@ -1873,23 +1858,26 @@
         { selector: "edge.okf-reld-1", style: { "line-style": "dashed", "line-dash-pattern": [6, 3] } },
         { selector: "edge.okf-reld-2", style: { "line-style": "dashed", "line-dash-pattern": [2, 3] } },
         { selector: "edge.okf-reld-3", style: { "line-style": "dashed", "line-dash-pattern": [10, 3, 2, 3] } },
-        // Phase 3: degree-zero concepts read as "not yet linked" — dashed
-        // outline + reduced opacity (fcose tiles them into a tray).
+        // Phase 3: degree-zero concepts read as "not yet linked" — a dashed
+        // stroke in the muted warning hue (status hues mark strokes, never
+        // fills); fcose tiles them into a tray.
         { selector: "node.okf-orphan", style: {
             "border-style": "dashed",
             "border-width": 2,
-            "opacity": 0.75,
+              "border-color": INITIAL_GRAPH_PALETTE.warn,
+            "opacity": 0.85,
         } },
-        // Phase 3: top-decile hub halo. A soft accent underlay marks the
-        // small set of structurally central nodes; non-colour-only cue
-        // (shape/size/icon still carry identity), and it composes with
-        // .okf-bridge / .okf-focus-root / .okf-presence-halo (those set
-        // their own underlay/border and win on z-index). Computed
+        // Phase 3: top-decile hub halo. A square --surface-2 underlay marks
+        // the small set of structurally central nodes (neutral, never the
+        // accent); non-colour-only cue (size/icon still carry identity), and
+        // it composes with .okf-bridge / .okf-focus-root / .okf-presence-halo
+        // (those set their own underlay/border and win on z-index). Computed
         // deterministically by degree rank (see applyVisualEncoding).
         { selector: "node.okf-hub", style: {
-                "underlay-color": INITIAL_GRAPH_PALETTE.select,
-            "underlay-opacity": 0.10,
+                "underlay-color": INITIAL_GRAPH_PALETTE.raised,
+            "underlay-opacity": 1,
             "underlay-padding": 7,
+            "underlay-corner-radius": 0,
         } },
         // Phase 3: broken-link indicator. Nodes whose outgoing links
         // include unresolved targets (broken/missing per SPEC §5.3, as
@@ -1910,30 +1898,31 @@
         // soft halo. Separate class from `.dim` so filters and hover
         // compose instead of fighting.
         { selector: ".okf-hover-dim", style: { "opacity": 0.18 } },
-          { selector: "node.okf-search-match", style: { "underlay-color": INITIAL_GRAPH_PALETTE.select, "underlay-opacity": 0.28, "underlay-padding": 7, "border-width": 3 } },
+          { selector: "node.okf-search-match", style: { "underlay-color": INITIAL_GRAPH_PALETTE.raised, "underlay-opacity": 1, "underlay-padding": 7, "border-width": 3, "border-color": INITIAL_GRAPH_PALETTE.cue } },
         { selector: "node.okf-search-nonmatch", style: { "opacity": 0.25 } },
         { selector: "node.okf-hover", style: {
             "width": function (ele) { return (Number(ele.data("vizSize")) || 32) * 1.15; },
             "height": function (ele) { return (Number(ele.data("vizSize")) || 32) * 1.15; },
             "transition-property": REDUCED_MOTION ? "none" : "width height underlay-opacity",
             "transition-duration": REDUCED_MOTION ? "0ms" : "120ms",
-              "underlay-color": INITIAL_GRAPH_PALETTE.select,
-            "underlay-opacity": 0.18,
+              "underlay-color": INITIAL_GRAPH_PALETTE.raised,
+            "underlay-opacity": 1,
             "underlay-padding": 8,
         } },
-        // Phase 4 path tracing (shift-click): the chain lights up in the
-        // selection accent; everything off-path fades further than hover.
+        // Phase 4 path tracing (shift-click): the chain is drawn in ink
+        // (--text), heavier and solid; everything off-path fades further
+        // than hover. The accent stays reserved for the selected node.
         { selector: ".okf-path-dim", style: { "opacity": 0.12 } },
         { selector: "node.okf-path", style: {
             "border-width": 3,
-              "border-color": INITIAL_GRAPH_PALETTE.select,
-              "underlay-color": INITIAL_GRAPH_PALETTE.select,
-            "underlay-opacity": 0.14,
+              "border-color": INITIAL_GRAPH_PALETTE.cue,
+              "underlay-color": INITIAL_GRAPH_PALETTE.raised,
+            "underlay-opacity": 1,
             "underlay-padding": 6,
         } },
         { selector: "edge.okf-path", style: {
-              "line-color": INITIAL_GRAPH_PALETTE.select,
-              "target-arrow-color": INITIAL_GRAPH_PALETTE.select,
+              "line-color": INITIAL_GRAPH_PALETTE.cue,
+              "target-arrow-color": INITIAL_GRAPH_PALETTE.cue,
             "width": 4.5,
             "opacity": 1,
             "line-style": "solid",
@@ -1953,16 +1942,18 @@
         // heavy double-black ring (reviewer blocker 1). Still a non-colour-only
         // SHAPE/halo cue; cross-group bridge edges stay dashed.
         { selector: "node.okf-bridge", style: {
-              "underlay-color": INITIAL_GRAPH_PALETTE.select,
-            "underlay-opacity": 0.16,
+              "underlay-color": INITIAL_GRAPH_PALETTE.raised,
+            "underlay-opacity": 1,
             "underlay-padding": 6,
             "border-width": 2,
+              "border-color": INITIAL_GRAPH_PALETTE.bridgeBorder,
         } },
         { selector: "edge.okf-bridge-edge", style: { "line-style": "dashed" } },
-        // Focus root: strong selection halo so the focused node is unmistakable.
+        // Focus root: the focused (selected) node keeps the accent stroke over
+        // a wide neutral square halo so it is unmistakable.
         { selector: "node.okf-focus-root", style: {
-              "underlay-color": INITIAL_GRAPH_PALETTE.select,
-            "underlay-opacity": 0.38,
+              "underlay-color": INITIAL_GRAPH_PALETTE.raised,
+            "underlay-opacity": 1,
             "underlay-padding": 14,
             "border-width": 4,
               "border-color": INITIAL_GRAPH_PALETTE.select,
@@ -1973,14 +1964,17 @@
         // iter1 CRI-004: presence halo. When the agent's presence.focus
         // points at a concept, graph.js adds this class to that node so the
         // agent is spatially visible on the canvas, not just in the status
-        // chip. The border uses the selection (--okf-select) teal so the
-        // halo is theme-aware and distinct from auto-generated node fills.
+        // chip. The border uses the muted info hue (a status stroke) so the
+        // agent's focus never reads as the reader's own selection.
         { selector: ".okf-presence-halo", style: {
             "border-width": 4,
-              "border-color": INITIAL_GRAPH_PALETTE.select,
-            "border-opacity": 0.9,
+              "border-color": INITIAL_GRAPH_PALETTE.info,
+            "border-opacity": 1,
             "z-index": 20,
           } },
+        // The selected node's 4px accent stroke wins over every state cue
+        // above (path, search, bridge, orphan, presence).
+        { selector: "node:selected", style: { "border-width": 4, "border-style": "solid", "border-color": INITIAL_GRAPH_PALETTE.select } },
       ],
       // Seed with a cheap grid; the real tuned layout runs once via
       // runLayoutNow() AFTER the panel exists, so its overlay-aware fit can
@@ -1995,43 +1989,45 @@
     try { cy.maxZoom(MAX_ZOOM); cy.minZoom(0.06); } catch (e) {}
     var nativeGetElementById=cy.getElementById.bind(cy);
     cy.getElementById=function(id){var found=nativeGetElementById(id);if(found&&found.length)return found;if(typeof id==="string"&&id.indexOf("__")>=0){var endpointMatch=cy.edges().filter(function(edge){return edge.data("source")+"__"+edge.data("target")===id;});if(endpointMatch.length===1)return endpointMatch;}return found;};
-    // Bridge/focus glow + bridge border mirror the theme select colour.
-      function syncBridgeColour() {
-        var pal = graphPalette();
-        cy.style().selector("node.okf-bridge").style("underlay-color", pal.select).update();
-        cy.style().selector("node.okf-bridge").style("border-color", pal.bridgeBorder).update();
-        cy.style().selector("node.okf-focus-root").style("underlay-color", pal.select).update();
-        cy.style().selector("node.okf-focus-root").style("border-color", pal.select).update();
-      }
-
       // Stateful graph cues are not all covered by the base node/edge rules:
       // Cytoscape resolves class selectors after those base rules. Keep their
-      // theme-dependent accent in one consumer-side synchronizer so a theme
-      // event repaints the active path, hover/search/hub/bridge halos, focus,
-      // selection, and bundled-edge count chips as one transaction.
+      // palette-dependent colours in one consumer-side synchronizer so a
+      // palette event repaints the active path, hover/search/hub/bridge
+      // halos, focus, presence, orphans and bundled-edge count chips as one
+      // transaction. Halos are the neutral raised surface; path, search and
+      // bridge marks are ink; the accent stays on the selection.
       function syncStatefulGraphColours(pal) {
         cy.style()
-          .selector("node.okf-search-match, node.okf-hover, node.okf-hub, node.okf-path, node.okf-focus-root, .okf-presence-halo")
-          .style("underlay-color", pal.select)
+          .selector("node.okf-search-match, node.okf-hover, node.okf-hub, node.okf-path, node.okf-focus-root, node.okf-bridge, node.okf-tour-target")
+          .style("underlay-color", pal.raised)
+          // Widths ride along: a base "node" rule appended by an earlier pass
+          // (forced colours) must never thin these cues back to 1.5px.
+          .selector("node.okf-orphan")
+          .style({ "border-color": pal.warn, "border-width": 2, "border-style": "dashed" })
           .selector("node.okf-bridge")
-          .style({ "underlay-color": pal.select, "border-color": pal.bridgeBorder })
-          .selector("node.okf-focus-root, node.okf-path, .okf-presence-halo")
-          .style("border-color", pal.select)
-          .selector("edge.okf-path, edge:selected")
+          .style({ "border-color": pal.cue, "border-width": 2 })
+          .selector("node.okf-search-match, node.okf-path")
+          .style({ "border-color": pal.cue, "border-width": 3, "border-style": "solid" })
+          .selector(".okf-presence-halo")
+          .style({ "border-color": pal.info, "border-width": 4 })
+          .selector("node.okf-focus-root")
+          .style({ "border-color": pal.select, "border-width": 4, "border-style": "solid" })
+          .selector("edge.okf-path")
+          .style({ "line-color": pal.cue, "target-arrow-color": pal.cue })
+          .selector("edge:selected")
           .style({ "line-color": pal.select, "target-arrow-color": pal.select })
           .selector("edge.okf-multi-edge")
-          .style("text-border-color", pal.select)
+          .style({ "text-border-color": pal.nodeBorder, "text-background-color": pal.chip, "color": pal.nodeText })
+          .selector("node:selected")
+          .style({ "border-color": pal.select, "border-width": 4, "border-style": "solid" })
           .update();
       }
 
-    // The theme tweaks the label colour.
-    // P2-72: edge label text-background was hardcoded #ffffff (failed in
-    //   dark mode). P3-11: also re-sync on prefers-color-scheme change so
-    //   users with no explicit theme follow OS colour scheme toggles.
-    // P2-5 (iter-2): all literals now read from the GRAPH_COLORS constants
-    //   block (mirrors wiki.css theme tokens). Selection border + edge
-    //   selection line/arrow are also re-synced here so a theme change
-    //   updates them to the active theme's --okf-select value.
+    // Palette synchronisation. Every colour the canvas paints comes from
+    // graphPalette() (the active palette's resolved tokens), so a
+    // palette change re-applies labels, halos, strokes, edges, badges,
+    // glyphs and the minimap here; repaintLensColours() recolours the lens
+    // encoding itself (see syncGraphTheme).
     function syncBadgeDataUris() {
       // Badge SVG data URLs capture resolved theme values. Rebuild every
       // theme-dependent layer even while forced colours own Cytoscape's
@@ -2050,42 +2046,43 @@
     }
     function syncLabelColour() {
       var pal = graphPalette();
-      cy.style().selector("node").style("color", pal.nodeText).update();
-      cy.style().selector("node").style("border-color", pal.nodeBorder).update();
-      cy.style().selector("node").style("text-background-color", pal.edgeLabelBg).update();
-      // Phase 3 light/dark label plate policy: in LIGHT themes the node
-      // label reads as fg-on-bg-elev (already a high-contrast pairing in
-      // every theme family), so the plate is dropped entirely — the
-      // default canvas reads calmer without semi-transparent boxes under
-      // every node. DARK themes keep the 0.85 plate because dark-on-dark
-      // labels crossing dark edges need the disambiguator. Plate COLOR is
-      // still set above so a theme switch flips cleanly between modes
-      // without a transient unstyled state.
-      var isDark = themeIsDark(document.documentElement.getAttribute("data-theme") || "");
-      cy.style().selector("node").style("text-background-opacity", isDark ? 0.85 : 0).update();
+      cy.style().selector("node").style({
+        "color": pal.nodeText,
+        "border-color": pal.nodeBorder,
+        // Ledger labels: --graph-label on a --graph-halo outline in every
+        // palette. Light palettes need nothing more; on the dark palettes
+        // light labels crossing light edges also get a square --graph-halo
+        // plate at 0.85 so they stay crisp at high spread. The selected,
+        // hovered or toured node's name gets an opaque plate (below).
+        "text-outline-color": pal.halo,
+        "text-outline-width": 2,
+        "text-background-color": pal.edgeLabelBg,
+        "text-background-opacity": pal.dark ? 0.85 : 0
+      }).update();
       cy.style().selector("node:selected, node.okf-hover, node.okf-tour-target").style({
         "color": pal.nodeText,
         "text-background-color": pal.edgeLabelBg,
-        "text-background-opacity": isDark ? 1 : 0.92
+        "text-background-opacity": 1
       }).update();
       cy.style().selector("node.okf-hover-dim, node.dim").style({
         "color": pal.nodeText,
         "text-background-color": pal.edgeLabelBg
       }).update();
       cy.style().selector("node.okf-tour-target").style({
-        "border-color": pal.select, "border-width": 5,
-        "underlay-color": pal.select, "underlay-opacity": 0.28, "underlay-padding": 10
+        "border-color": pal.cue, "border-width": 5,
+        "underlay-color": pal.raised, "underlay-opacity": 1, "underlay-padding": 10
       }).update();
-      cy.style().selector("edge").style("line-color", pal.edge).update();
-      cy.style().selector("edge").style("target-arrow-color", pal.edge).update();
-      cy.style().selector("edge").style("text-background-color", pal.edgeLabelBg).update();
-      cy.style().selector("edge").style("color", pal.edgeLabel).update();
-      cy.style().selector("node:selected").style("border-color", pal.select).update();
-      cy.style().selector("edge:selected").style("line-color", pal.select).update();
-        cy.style().selector("edge:selected").style("target-arrow-color", pal.select).update();
-        syncStatefulGraphColours(pal);
-        syncBridgeColour();
-      }
+      cy.style().selector("edge").style({
+        "line-color": pal.edge,
+        "target-arrow-color": pal.edge,
+        "text-background-color": pal.edgeLabelBg,
+        "color": pal.edgeLabel
+      }).update();
+      // Typed edges carry their (lens) colour in data(relColor); restore the
+      // mapping a forced-colours pass replaced with a system colour.
+      cy.style().selector("edge.okf-rel-edge").style({ "line-color": "data(relColor)", "target-arrow-color": "data(relColor)" }).update();
+      syncStatefulGraphColours(pal);
+    }
       if(reducedMotionQuery){var syncGraphMotion=function(){try{cy.style().selector("node.okf-hover").style("transition-duration",REDUCED_MOTION?"0ms":"120ms").update();}catch(e){}};if(reducedMotionQuery.addEventListener)reducedMotionQuery.addEventListener("change",syncGraphMotion);else if(reducedMotionQuery.addListener)reducedMotionQuery.addListener(syncGraphMotion);}
       function resolvedSystemColor(value){var probe=document.createElement("span");probe.style.color=value;probe.style.position="fixed";probe.style.visibility="hidden";document.body.appendChild(probe);var color=getComputedStyle(probe).color;probe.remove();return color;}
       function syncForcedColorGraph(){
@@ -2096,7 +2093,7 @@
           var highlight=FORCED_COLORS?resolvedSystemColor("Highlight"):graphPalette().select;
           cy.style()
             .selector("node")
-            .style({"color":canvasText,"text-background-color":canvas,"border-color":canvasText,"border-width":FORCED_COLORS?3:2})
+            .style({"color":canvasText,"text-background-color":canvas,"text-outline-color":canvas,"border-color":canvasText,"border-width":FORCED_COLORS?3:1.5})
             .selector("edge")
             // Edge label plates/text follow the system palette too: the
             // theme's edgeLabelBg is no longer white (Soft Light), so it may
@@ -2132,9 +2129,41 @@
       // Theme events and forced-colour media changes share one route. A
       // resolved theme event must never call the ordinary synchronizer while
       // the system palette owns the graph.
-    function syncGraphTheme(){
+    // A palette change also recolours the lens encoding: node fills (neutral
+    // or the muted ramp), typed-edge hues, glyph strokes, legend and index
+    // swatches and the theme-digest bars, so a lens keeps its meaning in the
+    // new palette instead of keeping the previous palette's ramp.
+    var lensPaintReady = false;
+    // elemFor() already stamped every node with this palette's glyph and
+    // neutral fill, so first paint skips the per-node pass; it runs only once
+    // a palette change resolves a new token set.
+    var glyphsPaintedFor = graphPalette();
+    function refreshNodeGlyphs() {
+      var pal = graphPalette();
+      if (pal === glyphsPaintedFor) return;
+      glyphsPaintedFor = pal;
+      var neutral = pal.node;
+      cy.batch(function () {
+        cy.nodes().forEach(function (node) {
+          node.data("iconUrl", iconDataUri(node.data("icon") || "file"));
+          node.data("baseColor", neutral);
+        });
+      });
+    }
+    function repaintLensColours() {
+      refreshNodeGlyphs();
+      if (!lensPaintReady) return;
+      // Recolours nodes and typed edges, then legend, index swatches, the
+      // orphan shelf and the theme-digest bars from the new palette.
+      applyVisualEncoding();
+    }
+    function syncGraphTheme(event){
       if(forcedColorsQuery)FORCED_COLORS=!!forcedColorsQuery.matches;
+      // A palette event invalidates the resolved token set; a forced-colours
+      // media change keeps it (custom properties are not forced).
+      if(event&&event.type==="okf-loom:themeChanged")invalidateGraphPalette();
       syncBadgeDataUris();
+      repaintLensColours();
       if(FORCED_COLORS)syncForcedColorGraph();else syncLabelColour();
       syncMinimap();
       }
@@ -2219,7 +2248,8 @@
           btn.setAttribute("aria-label", label + " (not yet linked)");
           var sw = document.createElement("span");
           sw.className = "okf-node-index__swatch";
-          sw.style.background = n.data.color || "var(--okf-accent)";
+          var shelfNode = cy.getElementById(id);
+          sw.style.background = (shelfNode && shelfNode.length && shelfNode.data("color")) || graphPalette().node;
           btn.appendChild(sw);
           var lbl = document.createElement("span");
           lbl.className = "okf-node-index__label";
@@ -2243,55 +2273,27 @@
         var firstOrphan=list.querySelector('[role=option]');if(firstOrphan)list.setAttribute("aria-activedescendant",firstOrphan.id);
         orphanShelf.appendChild(list);
       }
+    // A legend row: a square swatch in the canvas colour it explains (the
+    // muted lens ramp), or a hollow canvas-coloured square for "no data".
     function legendRow(swatchBg, text) {
       var item = document.createElement("div");
       item.className = "okf-graph-legend__item";
       var sw = document.createElement("span");
       sw.className = "okf-graph-legend__swatch";
-      sw.style.background = swatchBg;
+      if (swatchBg === "transparent") sw.classList.add("okf-graph-legend__swatch--none");
+      else sw.style.background = swatchBg;
+      sw.dataset.swatch = swatchBg;
       var label = document.createElement("span");
       label.textContent = text;
       item.appendChild(sw); item.appendChild(label);
       return item;
     }
-    // Phase 4: type legend rows double as FILTER CHIPS — click toggles the
-    // type's visibility, alt-click solos it (alt-click again shows all).
-    // State lives in controlState.hiddenTypes; applyFilters consumes it.
-    function legendTypeChip(swatchBg, t) {
-      var typeCount=bundle.nodes.filter(function(n){return n.data.type===t;}).length;
-      var item=document.createElement("button");item.type="button";item.className="okf-graph-legend__item okf-graph-legend__item--chip okf-filter-chip";item.dataset.filterValue=t;
-      var sw=document.createElement("span");sw.className="okf-graph-legend__swatch";sw.style.background=swatchBg;item.appendChild(sw);var label=document.createElement("span");label.textContent=t+" ("+typeCount+")";item.appendChild(label);
-      var off = !!controlState.hiddenTypes[t];
-      item.classList.toggle("okf-graph-legend__item--off", off);
-      item.setAttribute("aria-pressed", String(!off));
-      item.title = "Click: show/hide " + t + " · Alt-click: only " + t;
-      function toggle(alt) {
-        var ht = controlState.hiddenTypes,candidate=Object.assign({},ht);
-        if (alt) {
-          var soloed = !ht[t] && Object.keys(palette).some(function (o) { return o !== t && ht[o]; })
-            && Object.keys(palette).every(function (o) { return o === t ? !ht[o] : ht[o]; });
-          candidate={};
-          if (!soloed) {
-            Object.keys(palette).forEach(function (o) { if (o !== t) candidate[o] = true; });
-          }
-        } else {
-          candidate[t] = !candidate[t];
-        }
-        if(!commitHiddenFilterState("Type",ht,candidate))return;
-        applyFilters();
-        updateLegend();
-        updateStatus();
-        writeInteractionUrl("replace");syncMinimap();
-      }
-        item.addEventListener("click", function (e) { toggle(e.altKey); });
-        return item;
-      }
       // P1 graph/type collision fix: a type FILTER chip that encodes type via
       // ICON + text ONLY (no colour swatch). Used in the "Filter types"
       // section so the legend never presents type colours alongside theme
       // colours — one colour variable, one meaning. The toggle/solo behaviour
-      // is identical to legendTypeChip so existing keyboard + click flows are
-      // preserved.
+      // is the type filter's single chip, so keyboard + click flows are
+      // identical in every lens.
       function legendTypeFilterChip(t) {
         var item = document.createElement("button");item.type="button";
         item.className = "okf-graph-legend__item okf-graph-legend__item--chip okf-graph-legend__item--type-filter okf-filter-chip";item.dataset.filterValue=t;
@@ -2375,7 +2377,9 @@
           body.appendChild(legendRow(recencyColor(7), "This month"));
           body.appendChild(legendRow(recencyColor(90), "This quarter"));
           body.appendChild(legendRow(recencyColor(365), "6 months +"));
-          body.appendChild(legendRow(recencyColor(Infinity), "No timestamp"));
+          var undatedRow = legendRow(recencyColor(Infinity), "No timestamp");
+          undatedRow.firstChild.classList.add("okf-graph-legend__swatch--hollow");
+          body.appendChild(undatedRow);
       } else if (controlState.colorMode === "bridge") {
           body.appendChild(legendTitle("Colour: bridging power"));
           body.appendChild(legendRow(bridgeColor(0.1), "On few paths"));
@@ -2390,14 +2394,12 @@
           body.appendChild(legendRow(importanceColor(0.1), "Low"));
           body.appendChild(legendRow(importanceColor(0.5), "Medium"));
           body.appendChild(legendRow(importanceColor(0.95), "High"));
-      } else {
-          body.appendChild(legendTitle("Node colour: type"));
-          var typeFilters=document.createElement("div");typeFilters.className="okf-filter-chips";typeFilters.setAttribute("aria-label","Type filters");Object.keys(palette).sort().forEach(function (t) { typeFilters.appendChild(legendTypeChip(palette[t], t));var solo=document.createElement("button");solo.type="button";solo.className="okf-filter-solo";solo.dataset.filterSoloValue=t;solo.setAttribute("aria-label","Show only "+t);solo.textContent="Only";solo.addEventListener("click",function(){var candidate={};Object.keys(palette).forEach(function(v){candidate[v]=v!==t;});if(!commitHiddenFilterState("Type",controlState.hiddenTypes,candidate))return;applyFilters();updateLegend();updateStatus();writeInteractionUrl("replace");syncMinimap();});typeFilters.appendChild(solo);});var showTypes=document.createElement("button");showTypes.type="button";showTypes.className="okf-filter-showall";showTypes.textContent="Show all";showTypes.addEventListener("click",function(){replaceRecord(controlState.hiddenTypes,{});applyFilters();updateLegend();updateStatus();writeInteractionUrl("replace");syncMinimap();});typeFilters.appendChild(showTypes);body.appendChild(typeFilters);
       }
-        // Types are always filterable. P1 collision fix: the "Filter types"
-        // section shows type ICONS (non-colour encoding) instead of colour
-        // swatches so the legend never mixes type colours with theme colours.
-        if (controlState.colorMode !== "type") {
+        // Without a colour lens the nodes are neutral (content types are not
+        // colour-coded), so there is no colour key; types stay filterable
+        // through the icon chips below in every mode. The "Filter types"
+        // section shows type ICONS (non-colour encoding), never swatches.
+        {
           // Keep the title and filter rows under one semantic owner.  The
           // established legend contract also requires rows to be direct title
           // siblings (capture tooling deliberately does no wrapper traversal).
@@ -2626,7 +2628,27 @@
       // is unaffected by edge elision / filters, so the shelf reflects
       // STRUCTURAL orphans, not "currently-filtered-out" nodes.
       refreshOrphanShelf();
+      syncLensSummaryColours();
     }
+
+    // Keep the theme digest's 2px bars in step with the canvas: the ramp
+    // colour while themes colour the nodes, the neutral rule otherwise.
+    function syncLensSummaryColours() {
+      var on = controlState.colorMode === "community";
+      Array.prototype.forEach.call(document.querySelectorAll("#detail-empty .okf-lens-summary__bar[data-community]"), function (bar) {
+        if (on) bar.style.background = communityColor(Number(bar.getAttribute("data-community")) || 0);
+        else bar.style.removeProperty("background");
+      });
+    }
+    // The starting point a reader picked stays marked (aria-current + the
+    // 2px accent edge) until the selection moves or clears.
+    function syncLensSummaryCurrent() {
+      Array.prototype.forEach.call(document.querySelectorAll("#detail-empty .okf-lens-summary__row[data-target]"), function (rowEl) {
+        if (selectedConceptId && rowEl.getAttribute("data-target") === selectedConceptId) rowEl.setAttribute("aria-current", "true");
+        else rowEl.removeAttribute("aria-current");
+      });
+    }
+    window.addEventListener("okf-loom:graph-selection", syncLensSummaryCurrent);
 
     // Toggle the per-edge `.okf-show-label` class. Labels show in Relations/
     // Focus presets (showEdgeLabels) and for edges touching the currently-
@@ -3417,10 +3439,10 @@
         var id = btn.getAttribute("data-target");
         var sw = btn.querySelector(".okf-node-index__swatch");
         if (!sw || !id) return;
-        var col = (nodeIndex[id] && nodeIndex[id].color) || "var(--okf-accent)";
-        if (controlState.colorBy === "group") col = groupColor(groupOf[id]);
-        else if (controlState.colorBy === "importance") col = importanceColor(nodeWeight(id));
-        sw.style.background = col;
+        // The swatch mirrors the node's CURRENT canvas fill: neutral by
+        // default, the muted lens colour while a colour lens is on.
+        var node = cy.getElementById(id);
+        sw.style.background = (node && node.length && node.data("color")) || graphPalette().node;
       });
     }
 
@@ -3515,29 +3537,15 @@
       communityOf = out;
       return _lensCache.communities;
     }
-      // P1 graph/type collision fix: the type palette (bundle.palette, from
-      // auto_palette) uses golden-angle full-spectrum hues at sat=62%/light=48%.
-      // The OLD communityColor used the SAME golden-angle technique at sat=52%/
-      // light=52%, producing near-identical red/green/purple/gold/teal families
-      // — users could not tell theme colours from type colours on the canvas or
-      // in the legend (one colour variable, two meanings).
-      //
-      // The fix: themes get a DISTINCT cool teal/steel/cyan family ramp so they
-      // read unmistakably as "structural grouping," never "category type."
-      // Lightness is kept in the 32–56% band so white-stroke node icons stay
-      // legible (≥3:1 contrast vs white). Eight stops cycle for >8 communities.
-      var THEME_PALETTE = [
-        "hsl(182, 55%, 32%)", // T1 deep teal
-        "hsl(199, 52%, 42%)", // T2 steel blue
-        "hsl(168, 50%, 36%)", // T3 sea green
-        "hsl(210, 46%, 50%)", // T4 slate blue
-        "hsl(176, 44%, 54%)", // T5 light teal
-        "hsl(195, 48%, 34%)", // T6 dark cyan
-        "hsl(165, 46%, 42%)", // T7 jade
-        "hsl(205, 42%, 56%)", // T8 periwinkle blue
-      ];
+      // Themes (communities) take the palette's muted categorical ramp:
+      // eight low-chroma hues at about the neutral node's lightness, so the
+      // glyph stays >= 4.5:1 and the lens reads as structural grouping, not
+      // a second accent. Content types are never colour-coded, so there is
+      // no type palette to collide with. Eight stops cycle for >8 themes;
+      // the T1, T2… markers carry identity without colour.
       function communityColor(i) {
-        return THEME_PALETTE[((i % THEME_PALETTE.length) + THEME_PALETTE.length) % THEME_PALETTE.length];
+        var cat = graphPalette().ramp.categorical;
+        return cat[((i % cat.length) + cat.length) % cat.length];
       }
       function themeLabel(i) {
         return "T" + (i + 1);
@@ -3585,19 +3593,18 @@
       return Math.max(0, (Date.now() - t) / 86400000);
     }
     function recencyColor(days) {
-      if (!isFinite(days)) return "#94a3b8";               // undated: neutral slate
-      // Fresh teal → aged amber → stale grey-brown over ~180 days.
-      var t = Math.min(1, days / 180);
-      var hue = 175 - 135 * t;                              // 175 (teal) → 40 (amber)
-      var sat = 62 - 30 * t;
-      var light = 46 + 10 * t;
-      return "hsl(" + Math.round(hue) + ", " + Math.round(sat) + "%, " + Math.round(light) + "%)";
+      // Undated concepts are hollow: the canvas colour inside the 1.5px
+      // node stroke ("no data", distinct from every dated step).
+      var ramp = graphPalette().ramp;
+      if (!isFinite(days)) return ramp.empty;
+      // Fresh = the muted accent end of the ordered ramp, fading to the
+      // neutral node fill as a concept ages past ~180 days.
+      return ramp.sequence(1 - Math.min(1, days / 180));
     }
     function bridgeColor(score) {
-      // Muted slate for low scores → strong violet for the top bridgers
-      // (distinct from the teal selection accent).
-      var t = Math.max(0, Math.min(1, score));
-      return "hsl(268, " + Math.round(12 + 60 * t) + "%, " + Math.round(62 - 20 * t) + "%)";
+      // Neutral for concepts on few paths → the muted accent end of the
+      // ordered ramp for the top bridgers.
+      return graphPalette().ramp.sequence(Math.max(0, Math.min(1, score)));
     }
 
     // ====================================================================
@@ -3607,10 +3614,13 @@
     // yFiles): the structure revealed, never the algorithm.
     // ====================================================================
     var LENSES = {
+      // colorMode "type" is the neutral encoding (content types are not
+      // colour-coded): Map, Flow and Explore keep neutral round nodes; the
+      // Themes, Bridges and Recent lenses colour from the muted ramp.
       map: {
         label: "Map", question: "How does this knowledge fit together?",
         state: { spacing: 1, separation: 1, groupStrength: 1, groupBy: "community",
-                 colorMode: "community", sizeMode: "pagerank",
+                 colorMode: "type", sizeMode: "pagerank",
                  focusEnabled: false, relationEdges: false, showEdgeLabels: false,
                  showBridges: false, layout: "cose" },
       },
@@ -3624,7 +3634,7 @@
       flow: {
         label: "Flow", question: "What feeds into what? (reading left → right)",
         state: { spacing: 1, separation: 1, groupStrength: 0, groupBy: "none",
-                 colorMode: "community", sizeMode: "body",
+                 colorMode: "type", sizeMode: "body",
                  focusEnabled: false, relationEdges: true, showEdgeLabels: true,
                  showBridges: false, layout: "dagre" },
       },
@@ -3645,7 +3655,7 @@
       focus: {
         label: "Explore neighborhood", question: "What surrounds the selected concept?",
         state: { focusEnabled: true, focusDepth: 1, groupBy: "none",
-                 colorMode: "community", sizeMode: "body",
+                 colorMode: "type", sizeMode: "body",
                  relationEdges: false, showEdgeLabels: true, showBridges: false },
       },
     };
@@ -3704,12 +3714,15 @@
       var frag = document.createDocumentFragment();
       function heading(text) { frag.appendChild(el("h2", { class: "okf-lens-summary__title" }, [text])); }
       function verdict(text) { frag.appendChild(el("p", { class: "okf-lens-summary__verdict" }, [text])); }
-      function row(id, note, score, barColor) {
+      // A ranked row: hairline record, label, mono figure, and a 2px score
+      // bar along the foot (never a filled bar). The row a reader selected
+      // is current (aria-current + the 2px accent edge in graph.css).
+      function row(id, note, score) {
         var d = nodeIndex[id] || {};
-        var btn = el("button", { type: "button", class: "okf-lens-summary__row" });
-        var bar = el("span", { class: "okf-lens-summary__bar" });
+        var btn = el("button", { type: "button", class: "okf-lens-summary__row", "data-target": id,
+          "aria-current": selectedConceptId && selectedConceptId === id ? "true" : null });
+        var bar = el("span", { class: "okf-lens-summary__bar", "aria-hidden": "true" });
         bar.style.width = Math.round(Math.max(0.04, Math.min(1, score)) * 100) + "%";
-        if (barColor) bar.style.background = barColor;
         btn.appendChild(bar);
         btn.appendChild(el("span", { class: "okf-lens-summary__label" }, [d.label || id]));
         btn.appendChild(el("span", { class: "okf-lens-summary__note" }, [note]));
@@ -3800,10 +3813,13 @@
           if (c.ids.length < 2 && com.list.length > 3) return;
           var ex = exemplar(c);
           var d = nodeIndex[ex] || {};
-          var btn = el("button", { type: "button", class: "okf-lens-summary__row" });
-          var bar = el("span", { class: "okf-lens-summary__bar" });
+          var btn = el("button", { type: "button", class: "okf-lens-summary__row okf-lens-summary__row--theme", "data-target": ex,
+            "aria-current": selectedConceptId && selectedConceptId === ex ? "true" : null });
+          // The theme's 2px bar takes its canvas colour while themes colour
+          // the canvas (syncLensSummaryColours keeps legend and canvas in
+          // step); otherwise it is the neutral rule.
+          var bar = el("span", { class: "okf-lens-summary__bar", "aria-hidden": "true", "data-community": String(c.index) });
           bar.style.width = Math.round(100 * c.ids.length / Math.max(1, com.list[0].ids.length)) + "%";
-          bar.style.background = communityColor(c.index);
           btn.appendChild(bar);
             btn.appendChild(el("span", { class: "okf-lens-summary__label" },
               [themeLabel(c.index) + " \u00b7 around \u201c" + (d.label || ex) + "\u201d"]));
@@ -3816,6 +3832,7 @@
       frag.appendChild(el("p", { class: "okf-lens-summary__hint okf-muted" },
         ["Choose a row to select it on the canvas. Tap or hover concepts to preview connections; keyboard users can press Shift+Space at two concepts to trace a path."]));
       empty.appendChild(frag);
+      syncLensSummaryColours();
     }
 
     function markCustom() {
@@ -3900,7 +3917,7 @@
       edges.forEach(function(pair){var line=document.createElementNS(svg.namespaceURI,"line");line.setAttribute("x1",pts[pair[0]][0]);line.setAttribute("y1",pts[pair[0]][1]);line.setAttribute("x2",pts[pair[1]][0]);line.setAttribute("y2",pts[pair[1]][1]);svg.appendChild(line);});
       pts.forEach(function(p,i){var c=document.createElementNS(svg.namespaceURI,"circle");c.setAttribute("cx",p[0]);c.setAttribute("cy",p[1]);c.setAttribute("r",key==="focus"&&i===2?"5":key==="bridges"&&i===2?"4.5":"3");c.setAttribute("data-rank",String(i));if(key==="recent")c.setAttribute("opacity",String(.3+i*.2));svg.appendChild(c);});
       if(key==="flow")[[25,8],[25,28],[52,18]].forEach(function(p){var a=document.createElementNS(svg.namespaceURI,"path");a.setAttribute("d","M"+(p[0]-3)+" "+(p[1]-2)+" L"+p[0]+" "+p[1]+" L"+(p[0]-3)+" "+(p[1]+2));a.setAttribute("class","okf-preview-arrow");svg.appendChild(a);});
-      if(key==="themes")[[5,5,20,20],[36,4,20,21]].forEach(function(r){var hull=document.createElementNS(svg.namespaceURI,"rect");hull.setAttribute("x",r[0]);hull.setAttribute("y",r[1]);hull.setAttribute("width",r[2]);hull.setAttribute("height",r[3]);hull.setAttribute("rx","7");hull.setAttribute("class","okf-preview-hull");svg.insertBefore(hull,svg.firstChild);});
+      if(key==="themes")[[5,5,20,20],[36,4,20,21]].forEach(function(r){var hull=document.createElementNS(svg.namespaceURI,"rect");hull.setAttribute("x",r[0]);hull.setAttribute("y",r[1]);hull.setAttribute("width",r[2]);hull.setAttribute("height",r[3]);hull.setAttribute("rx","0");hull.setAttribute("class","okf-preview-hull");svg.insertBefore(hull,svg.firstChild);});
       if(key==="focus"){var ring=document.createElementNS(svg.namespaceURI,"circle");ring.setAttribute("cx","30");ring.setAttribute("cy","20");ring.setAttribute("r","13");ring.setAttribute("class","okf-preview-ring");svg.insertBefore(ring,svg.firstChild);}
       return svg;
     }
@@ -3993,7 +4010,8 @@
         });
       // Saket et al. 2014: group colouring aids cluster tasks but costs
       // ~25% accuracy on plain topology tasks — so the evidence says make
-      // it a toggle. Off = colour by type (the auto palette).
+      // it a toggle. Off = the neutral node fill (types are never coloured);
+      // on = the palette's muted categorical ramp.
       ui.themeColors = checkRow(vfs, "Colour by theme", controlState.colorMode === "community", function (c) {
         controlState.colorMode = c ? "community" : "type";
         if (c) controlState.colorBy = "type";
@@ -4247,9 +4265,9 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
       var typeRow = document.createElement("div");
       typeRow.className = "okf-graph-tip__type";
       typeRow.textContent = d.type || "concept";
-      // The node colour is a stripe beside the name (graph.css), not the
-      // name's ink: mid-tone node fills measured 2.4:1 as tip text.
-      typeRow.style.setProperty("--okf-type-accent", d.baseColor || d.color || "");
+      // The node's canvas fill is a stripe beside the name (graph.css), not
+      // the name's ink: neutral by default, the muted lens colour otherwise.
+      typeRow.style.setProperty("--okf-graph-tip-fill", d.color || d.baseColor || "");
       tip.appendChild(typeRow);
       var title = document.createElement("div");
       title.className = "okf-graph-tip__title";
@@ -4467,7 +4485,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
     var minimapWrap=null,minimapCanvas=null,viewportRerunButton=null,fullscreenButton=null,fullscreenGeneration=0,fullscreenPending=false;
     function viewportIcon(name){var svg=document.createElementNS("http://www.w3.org/2000/svg","svg");svg.setAttribute("viewBox","0 0 24 24");svg.setAttribute("aria-hidden","true");svg.classList.add("okf-viewport-icon");var paths={plus:"M12 5v14M5 12h14",minus:"M5 12h14",/* fit: four arrows pointing in at a centre content box (never bare corner brackets: those read as fullscreen) */fit:"M9 9h6v6H9zM3 3l3.5 3.5M6.5 3.5v3h-3M21 3l-3.5 3.5M17.5 3.5v3h3M3 21l3.5-3.5M6.5 20.5v-3h-3M21 21l-3.5-3.5M17.5 20.5v-3h3",/* reset: counter-clockwise circular arrow (rotate-ccw) */reset:"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5",fullscreen:"M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5",exit:"M9 9H4V4M15 9h5V4M9 15H4v5M15 15h5v5",minimap:"M4 5h16v14H4zM8 15l3-4 3 2 3-5",layout:"M12 3a9 9 0 0 1 8 5M20 3v5h-5M12 21a9 9 0 0 1-8-5M4 21v-5h5"};var p=document.createElementNS(svg.namespaceURI,"path");p.setAttribute("d",paths[name]||paths.layout);p.setAttribute("fill","none");p.setAttribute("stroke","currentColor");p.setAttribute("stroke-width","2");p.setAttribute("stroke-linecap","round");p.setAttribute("stroke-linejoin","round");svg.appendChild(p);return svg;}
     function setViewportIcon(button,name){var old=button.querySelector(".okf-viewport-icon"),next=viewportIcon(name);if(old)button.replaceChild(next,old);else button.insertBefore(next,button.firstChild);}
-      function syncMinimap(){if(!minimapCanvas||!minimapWrap||minimapWrap.hidden)return;var ctx=minimapCanvas.getContext("2d");if(!ctx)return;var w=minimapCanvas.width,h=minimapCanvas.height,nodes=cy.nodes().not(".dim");ctx.clearRect(0,0,w,h);if(!nodes.length)return;var pal=graphPalette(),nodeColour=FORCED_COLORS?resolvedSystemColor("CanvasText"):pal.nodeText,selectColour=FORCED_COLORS?resolvedSystemColor("Highlight"):pal.select,bb=nodes.boundingBox(),sx=(w-12)/Math.max(1,bb.w),sy=(h-18)/Math.max(1,bb.h),s=Math.min(sx,sy);ctx.fillStyle=nodeColour;nodes.forEach(function(n){var p=n.position();ctx.beginPath();ctx.arc(6+(p.x-bb.x1)*s,12+(p.y-bb.y1)*s,FORCED_COLORS?3.5:3,0,Math.PI*2);ctx.fill();});var ext=cy.extent(),x=6+(ext.x1-bb.x1)*s,y=12+(ext.y1-bb.y1)*s,rw=Math.max(3,ext.w*s),rh=Math.max(3,ext.h*s);ctx.fillStyle=FORCED_COLORS?"transparent":selectColour+"33";ctx.fillRect(x,y,rw,rh);ctx.strokeStyle=selectColour;ctx.lineWidth=FORCED_COLORS?3:2;ctx.strokeRect(x,y,rw,rh);minimapCanvas.dataset.zoom=String(cy.zoom());minimapCanvas.dataset.nodeCount=String(nodes.length);minimapCanvas.title="Overview map: "+nodes.length+" visible concepts; outlined rectangle is the current viewport.";var label=minimapWrap.querySelector("span");if(label)label.textContent="Overview · "+nodes.length;}
+      function syncMinimap(){if(!minimapCanvas||!minimapWrap||minimapWrap.hidden)return;var ctx=minimapCanvas.getContext("2d");if(!ctx)return;var w=minimapCanvas.width,h=minimapCanvas.height,nodes=cy.nodes().not(".dim");ctx.clearRect(0,0,w,h);if(!nodes.length)return;/* Ledger overview: --text-3 dots on the panel, the viewport as a 1.5px ink frame (no tinted wash); forced colours use system ink and Highlight. */var pal=graphPalette(),nodeColour=FORCED_COLORS?resolvedSystemColor("CanvasText"):pal.muted,frameColour=FORCED_COLORS?resolvedSystemColor("Highlight"):pal.cue,bb=nodes.boundingBox(),sx=(w-12)/Math.max(1,bb.w),sy=(h-18)/Math.max(1,bb.h),s=Math.min(sx,sy);ctx.fillStyle=nodeColour;nodes.forEach(function(n){var p=n.position();ctx.beginPath();ctx.arc(6+(p.x-bb.x1)*s,12+(p.y-bb.y1)*s,FORCED_COLORS?3.5:2.5,0,Math.PI*2);ctx.fill();});var ext=cy.extent(),x=6+(ext.x1-bb.x1)*s,y=12+(ext.y1-bb.y1)*s,rw=Math.max(3,ext.w*s),rh=Math.max(3,ext.h*s);ctx.strokeStyle=frameColour;ctx.lineWidth=FORCED_COLORS?3:1.5;ctx.strokeRect(x,y,rw,rh);minimapCanvas.dataset.zoom=String(cy.zoom());minimapCanvas.dataset.nodeCount=String(nodes.length);minimapCanvas.title="Overview map: "+nodes.length+" visible concepts; outlined rectangle is the current viewport.";var label=minimapWrap.querySelector("span");if(label)label.textContent="Overview · "+nodes.length;}
     // ---- Phase 4: zoom cluster (bottom-right) ---------------------------
     (function buildZoomCluster() {
       var wrap = document.createElement("div");
@@ -4736,12 +4754,11 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
 
       var chip = document.getElementById("detail-type");
       if (chip) {
+        // An outlined mono type badge (graph.css); the type name carries the
+        // distinction, never a fill colour.
         chip.textContent = data.type || "concept";
-        var bg = data.color || palette[data.type] || typeColorFor(data.type);
-        chip.style.background = bg;
-        // P0-4: per-chip foreground via luminance (was hardwired #fff via
-        // --okf-chip-fg, which failed on yellow/green/cyan palette colours).
-        chip.style.color = _chipFg(bg);
+        chip.style.removeProperty("background");
+        chip.style.removeProperty("color");
       }
       setText("detail-title", data.label || conceptId);
       var selectedStatus=document.querySelector(".okf-detail-selected-status");if(selectedStatus)selectedStatus.textContent="Selected: "+(data.label||conceptId);
@@ -5018,7 +5035,9 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
         btn.setAttribute("aria-label", aria);
         var sw = document.createElement("span");
         sw.className = "okf-node-index__swatch";
-        sw.style.background = n.data.color || "var(--okf-accent)";
+        // Neutral until a colour lens repaints it (updateNodeIndexSwatches);
+        // the bundle's type colour is never shown.
+        sw.style.background = graphPalette().node;
         btn.appendChild(sw);
         var lbl = document.createElement("span");
         lbl.className = "okf-node-index__label";
@@ -6037,6 +6056,9 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
     // (`layoutStats.skippedStale`). The tests only READ through it; callers must
     // not treat `cy` as immutable. It adds no inline script (CSP-safe) and does
     // not affect rendering. Field shape may change with the implementation.
+      // Every encoding owner (legend, summary, shelf) now exists, so a later
+      // palette event may repaint the whole lens encoding.
+      lensPaintReady = true;
       try {
         window.__okfLoomGraph = {
           cy: cy,   // live, mutable Cytoscape core — for tests/diagnostics only

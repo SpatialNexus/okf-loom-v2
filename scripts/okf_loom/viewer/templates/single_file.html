@@ -11,15 +11,15 @@
                           types, palette, backlinks, external}
       /*__VIEWER_CSS__*/ → wiki.css + shell.css + graph.css contents (inlined)
       /*__VIEWER_JS__*/  → graph.js (the full viewer logic, inlined)
-      __INITIAL_THEME__  → resolved theme painted on <html data-theme="…"> —
-                            any Technical/Swiss/Purple/Coffee light/dark theme. theme.js (inlined in
-                          <head>) honours a saved user preference + Auto/OS
+      __INITIAL_THEME__  → resolved Ledger palette painted on <html data-theme="…"> —
+                          bone | slate | clay | plum. theme.js (inlined in
+                          <head>) honours a saved user preference + System/OS
                           at boot; otherwise this concrete first-paint value.
-      (retired: appearance modifiers were removed; always empty)
-                          root attributes (same values theme.js resolves for a
-                          visitor with no saved preference; no-JS parity).
+      __THEME_MODIFIER_ATTRS__ → retired placeholder (appearance modifiers were
+                          removed); always replaced with an empty string.
       __INITIAL_LAYOUT__ → "cose" | "concentric" | ...
-      __THEME_CONFIG__   → CSP-safe configured theme/modifier preference JSON;
+      __THEME_CONFIG__   → CSP-safe configured appearance JSON (choice: bone |
+                          slate | clay | plum | system);
                           separate from the concrete first-paint hint.
 
   CDN scripts are emitted only when config["cdn"] is True.
