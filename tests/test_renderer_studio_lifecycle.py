@@ -313,7 +313,7 @@ function classes(initial) {
   return { add: n => values.add(n), remove: n => values.delete(n), contains: n => values.has(n) };
 }
 function makeCase(kind) {
-  const root = {dataset: {theme: "technical-light"}, attrs: {"data-theme": "technical-light"}, classList: classes(["okf-theme-ready"]), hasAttribute(n) { return this.attrs[n] !== undefined; }, getAttribute(n) { return this.attrs[n] || null; }};
+  const root = {dataset: {theme: "bone"}, attrs: {"data-theme": "bone"}, classList: classes(["okf-theme-ready"]), hasAttribute(n) { return this.attrs[n] !== undefined; }, getAttribute(n) { return this.attrs[n] || null; }};
   const target = {hidden: false, matches: () => false, querySelector: () => null, getBoundingClientRect: () => ({width: 20, height: 20})};
   const body = {dataset: {okfCaptureReady: "ready"}, classList: classes(["okf-viewer"]), hidden: false, matches: () => false, querySelector: () => null, getBoundingClientRect: () => ({width: 20, height: 20})};
   const listeners = {};
@@ -335,7 +335,7 @@ function makeCase(kind) {
     okRendererReadiness: {status: "ready", generation: 2},
     okfStudioReadiness: {status: "ready", generation: 1},
     okfLoomStudio: {openPanel() {}, setView() {}},
-    OKFLoomTheme: {getResolvedTheme: () => "technical-light"},
+    OKFLoomTheme: {getResolvedTheme: () => "bone"},
     pump() { const pending = rafs.splice(0); pending.forEach(fn => fn()); },
   };
   if (kind === "delayed-renderer") win.okRendererReadiness = {status: "loading", generation: 1};

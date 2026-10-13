@@ -2269,10 +2269,6 @@ def test_ledger_conn_is_a_hairline_row() -> None:
     assert "color-mix" not in conn_block, ".okf-conn still has a color-mix wash"
 
 
-@pytest.mark.xfail(strict=False, reason=(
-    "needs lane C graph.js (Ledger token-driven canvas); fails on lane B only "
-    "because the old graph.js is still here. The integrator removes this "
-    "xfail once lane C merges"))
 def test_phase1_graph_js_paints_content_types_neutrally() -> None:
     """Ledger: content types are not colour-coded on the canvas. graph.js has
     no type-hash colour or grey fallback; every node starts on the resolved
@@ -2591,10 +2587,6 @@ def test_iter2_graph_node_index_css_comment_is_honest() -> None:
     )
 
 
-@pytest.mark.xfail(strict=False, reason=(
-    "needs lane C graph.js (Ledger token-driven canvas); fails on lane B only "
-    "because the old graph.js is still here. The integrator removes this "
-    "xfail once lane C merges"))
 def test_iter2_graph_selection_color_is_token_governed() -> None:
     """The selection stroke and every canvas colour come from the active
     palette's tokens (getComputedStyle), not a per-theme JS table, and are
@@ -2665,10 +2657,6 @@ def test_ledger_palettes_define_graph_roles() -> None:
     assert ".okf-graph-thumb__edges line { stroke: var(--graph-edge);" in css
 
 
-@pytest.mark.xfail(strict=False, reason=(
-    "needs lane C graph.js (Ledger token-driven canvas); fails on lane B only "
-    "because the old graph.js is still here. The integrator removes this "
-    "xfail once lane C merges"))
 def test_graph_edge_colour_is_each_palette_graph_edge_token() -> None:
     """Graph edges read the palette's own --graph-edge token, defined in
     every Ledger palette block of wiki.css."""

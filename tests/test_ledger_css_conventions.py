@@ -11,9 +11,8 @@ Every viewer stylesheet keeps the Ledger visual system:
   bar (the 2px state bar / hairline Ledger draws with an inset shadow);
 * no gradients.
 
-wiki.css and shell.css are owned by the core lane and must pass. graph.css,
-studio.css and feedback-import.css are ported by the graph and Studio lanes
-in parallel; their cases are xfail(strict=False) until integration.
+The integrated core, graph, Studio and feedback stylesheets all enforce the
+same conventions.
 """
 from __future__ import annotations
 
@@ -26,9 +25,7 @@ import pytest
 STATIC = Path(__file__).resolve().parents[1] / "scripts" / "okf_loom" / "viewer" / "static"
 
 CORE = ("wiki.css", "shell.css")
-PENDING = ("graph.css", "studio.css", "feedback-import.css")
-_PENDING_MARK = pytest.mark.xfail(strict=False, reason="lane C/D in progress")
-FILES = [*CORE, *(pytest.param(name, marks=_PENDING_MARK) for name in PENDING)]
+FILES = (*CORE, "graph.css", "studio.css", "feedback-import.css")
 
 _COLOUR = re.compile(r"#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\(")
 _GRADIENT = re.compile(r"\b(?:repeating-)?(?:linear|radial|conic)-gradient\(")

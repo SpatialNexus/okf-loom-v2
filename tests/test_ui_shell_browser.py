@@ -75,6 +75,28 @@ def test_studio_mounts_one_compact_launcher_in_the_shell(page, server_url: str) 
     assert page.locator(".okf-studio-bar").count() == 0
 
 
+@pytest.mark.parametrize("width", [1440, 390])
+def test_index_feedback_header_stays_compact_in_bone(page, server_url: str, width: int) -> None:
+    page.set_viewport_size({"width": width, "height": 900})
+    page.goto(server_url + "/")
+    page.wait_for_function("() => window.okfStudioReadiness && window.okfStudioReadiness.ready")
+    page.evaluate("() => window.OKFLoomTheme.setTheme('bone')")
+    feedback = page.get_by_role("button", name="Comment on this page", exact=True)
+    expect(feedback).to_be_visible()
+    metrics = feedback.evaluate("""button => {
+      const range = document.createRange();
+      range.selectNodeContents(button);
+      const group = button.closest('.okf-page-feedback');
+      return {lines: range.getClientRects().length, height: group.getBoundingClientRect().height,
+        right: group.getBoundingClientRect().right, width: innerWidth,
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth};
+    }""")
+    assert metrics["lines"] == 1, metrics
+    assert metrics["height"] <= 48, metrics
+    assert metrics["right"] <= width + 1 and metrics["overflow"] <= 1, metrics
+    _capture_evidence(page, f"index-feedback-bone-{width}.png")
+
+
 def test_visible_shell_and_graph_preview_labels_are_preserved_in_accessible_names(
     page, server_url: str,
 ) -> None:
