@@ -3153,6 +3153,18 @@ def _graph_thumbnail_html(graph_data: dict[str, Any], href: str) -> str:
         svg,
         count=1,
     )
+    # Ledger draws the hero preview's records as square dots (sized by the
+    # export's degree-based radius) on the export's own layout; the canonical
+    # export elsewhere keeps its round, type-coloured nodes.
+    def _square(match: re.Match[str]) -> str:
+        cx, cy, r = (float(match.group(i)) for i in (1, 2, 3))
+        side = round(max(4.0, r * 0.9 - 4), 1)
+        return (f'<rect class="okf-graph-thumb__dot" x="{cx - side / 2:.1f}" '
+                f'y="{cy - side / 2:.1f}" width="{side}" height="{side}"{match.group(4)}/>')
+    decorative_svg = re.sub(
+        r'<circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"((?: fill="[^"]*")?)/>',
+        _square, decorative_svg,
+    )
     return ('<figure class="okf-graph-thumb"><a class="okf-graph-thumb__link" '
             f'href="{_esc_attr_qs(href)}">'
             '<span class="sr-only">Open knowledge graph — </span>'

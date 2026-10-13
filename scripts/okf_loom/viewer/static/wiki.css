@@ -4458,7 +4458,37 @@ body.okf-viewer .okf-home-graph > summary {
   font-weight: 600;
   cursor: pointer;
 }
-body.okf-viewer .okf-home-graph .okf-graph-thumb { border-radius: 0; box-shadow: none; }
+body.okf-viewer .okf-home-graph[open] { border-bottom: 0; }
+body.okf-viewer .okf-home-graph .okf-graph-thumb { max-width: none; margin: 0 0 12px; border-radius: 0; box-shadow: none; }
+/* Mini-graph: the canonical export layout drawn as Ledger records — neutral
+ * square dots (render.py squares the decorative hero copy, sized by degree)
+ * joined by hairline edges on the band surface. Type colour, icons, labels,
+ * count chips and arrowheads stay in the full graph. */
+body.okf-viewer .okf-graph-thumb__link { border-block: 1px solid var(--border); }
+body.okf-viewer .okf-graph-thumb__link:hover { background: var(--surface-2); }
+body.okf-viewer .okf-graph-thumb__link:hover figcaption strong { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+body.okf-viewer .okf-graph-thumb svg { margin: 10px 0 10px 10px; border: 1px solid var(--border); background: var(--bg-2); }
+body.okf-viewer .okf-graph-thumb__edges line {
+  stroke: var(--graph-edge);
+  stroke-width: 0.9;
+  stroke-dasharray: none;
+  opacity: 0.7;
+  marker-end: none;
+}
+body.okf-viewer .okf-graph-thumb :is(.okf-graph-export__count, .okf-graph-export__icon,
+  .okf-graph-export__label, .okf-graph-export__label-bg) { display: none; }
+body.okf-viewer .okf-graph-thumb__nodes :is(circle, rect, ellipse, polygon, path) {
+  fill: var(--graph-node);
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+}
+body.okf-viewer .okf-graph-thumb figcaption { padding: 12px 14px; }
+body.okf-viewer .okf-graph-thumb figcaption strong { font-size: 14px; }
+body.okf-viewer .okf-graph-thumb figcaption span { color: var(--text-2); font: 11px/1.5 var(--font-mono); }
+@media (forced-colors: active) {
+  body.okf-viewer .okf-graph-thumb__nodes :is(circle, rect, ellipse, polygon, path) { fill: CanvasText; stroke: Canvas; }
+  body.okf-viewer .okf-graph-thumb__edges line { stroke: CanvasText; }
+}
 @media (min-width: 960px) {
   body.okf-viewer .okf-hero.okf-hero--split {
     grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
@@ -4668,9 +4698,39 @@ html body.okf-viewer .okf-viewswitch__btn[aria-pressed="true"] {
   font-weight: 700;
   border-bottom-color: var(--accent);
 }
+/* Wrap lines is a toggle, not a view: it never takes the tab underline (the
+ * accent means "current view" only). A hairline divides it from the tabs and
+ * a neutral square box reports its pressed state. */
+html body.okf-viewer .okf-viewswitch__btn.okf-source-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding-left: 18px;
+  border-left: 1px solid var(--border-strong);
+  border-bottom-color: transparent;
+  font-weight: 500;
+}
+html body.okf-viewer .okf-viewswitch__btn.okf-source-wrap[hidden] { display: none; }
+html body.okf-viewer .okf-viewswitch__btn.okf-source-wrap::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border: 1px solid var(--text-3);
+  background: transparent;
+}
 html body.okf-viewer .okf-viewswitch__btn.okf-source-wrap[aria-pressed="true"] {
-  font-weight: 600;
-  border-bottom-color: var(--text-3);
+  color: var(--text);
+  font-weight: 500;
+  border-bottom-color: transparent;
+}
+html body.okf-viewer .okf-viewswitch__btn.okf-source-wrap[aria-pressed="true"]::before {
+  border-color: var(--text-2);
+  background: var(--text-2);
+  box-shadow: inset 0 0 0 2px var(--bg-2);
+}
+@media (forced-colors: active) {
+  html body.okf-viewer .okf-viewswitch__btn.okf-source-wrap[aria-pressed="true"]::before { background: CanvasText; }
 }
 html body.okf-viewer .okf-outline-jump__toggle {
   min-height: var(--ctl-h);
