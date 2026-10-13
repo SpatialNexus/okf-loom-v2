@@ -143,7 +143,7 @@ def test_lock_matches_code_pins_versions_and_sri():
     for url in [*pins, *re.findall(r'"(https://cdn\.jsdelivr\.net/npm/[^"]+)"', renderers)]:
         name, version = re.match(r"https://cdn\.jsdelivr\.net/npm/((?:@[^/]+/)?[^@/]+)@([^/]+)/", url).groups()
         code_versions[name] = version
-    lock_versions = {package["name"]: package["version"] for package in lock["packages"]}
+    lock_versions = {package["name"]: package["version"] for package in lock["packages"] if package["license"] != "OFL-1.1"}
     lock_versions["highlight.js"] = lock_versions.pop("@highlightjs/cdn-assets")
     assert code_versions == lock_versions
     assert [ref["version"] for ref in lock["reference_packages"]] == ["11.12.0"]
@@ -322,7 +322,7 @@ def test_offline_site_is_closed_and_licensed(tmp_path, target):
     for name in (vendor.NOTICES_NAME, vendor.BUNDLED_NOTICES_NAME):
         assert (vendor_out / name).read_bytes() == (vendor.VENDOR_ROOT / name).read_bytes()
     licences = sorted(p.relative_to(vendor_out).as_posix() for p in vendor_out.rglob("LICENSE"))
-    assert len(licences) == 9
+    assert len(licences) == 11
     for page in _html_pages(out):
         html = page.read_text(encoding="utf-8")
         assert _csp(html) == [vendor.OFFLINE_PAGE_CSP], page
@@ -504,3 +504,43 @@ def test_bundled_notices_tampering_fails_closed(vendor_copy, damage):
         lock_path.write_text(json.dumps(lock), encoding="utf-8")
     with pytest.raises(vendor.VendorIntegrityError):
         vendor.load_offline_assets()
+
+
+@pytest.mark.parametrize("target", ["static", "spa", "single-file"])
+@pytest.mark.parametrize("assets", ["cdn", "offline"])
+def test_ledger_fonts_and_full_ofl_ship_on_every_target(tmp_path, target, assets):
+    bundle = Bundle.load(write_offline_fixture(tmp_path / "bundle"))
+    out = tmp_path / "site"
+    build_site(bundle, out, target=target, assets=assets)
+    text = ((out / "index.html") if target == "single-file" else
+            (out / "__static" / "ledger-fonts.css")).read_text()
+    assert text.count('src:url(data:font/woff2;base64,') >= 4
+    for family, style, _path in vendor.LEDGER_FACES:
+        assert f'font-family:"{family}";font-style:{style};' in text
+    for path in vendor.LEDGER_LICENSES:
+        assert (vendor.VENDOR_ROOT / path).read_text() in text
+    lock = vendor.load_lock()
+    css = vendor.load_ledger_css().encode()
+    assert lock["derived"][vendor.LEDGER_DERIVED]["sha256"] == vendor.sha256_hex(css)
+
+
+@pytest.mark.parametrize("path", [face[2] for face in vendor.LEDGER_FACES] + list(vendor.LEDGER_LICENSES))
+def test_ledger_corruption_fails_closed_even_in_cdn_mode(vendor_copy, path):
+    target = vendor_copy / path
+    target.write_bytes(target.read_bytes() + b"corrupt")
+    with pytest.raises(vendor.VendorIntegrityError, match="mismatch"):
+        vendor.load_ledger_css(vendor_copy)
+
+
+def test_ledger_derived_hash_and_symlinks_are_verified(vendor_copy):
+    lock_path = vendor_copy / vendor.LOCK_NAME
+    lock = json.loads(lock_path.read_text())
+    lock["derived"][vendor.LEDGER_DERIVED]["sha256"] = "0" * 64
+    lock_path.write_text(json.dumps(lock))
+    with pytest.raises(vendor.VendorIntegrityError, match="derived Ledger"):
+        vendor.load_ledger_css(vendor_copy)
+    path = vendor_copy / vendor.LEDGER_FACES[0][2]
+    path.unlink()
+    path.symlink_to(vendor.VENDOR_ROOT / vendor.LEDGER_FACES[0][2])
+    with pytest.raises(vendor.VendorIntegrityError, match="symlink"):
+        vendor.load_ledger_css(vendor_copy)

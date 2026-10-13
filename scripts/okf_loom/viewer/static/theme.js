@@ -146,7 +146,7 @@
     if (oldMode === "auto") migrated = "system";
     else if (oldMode === "light" || oldMode === "dark") {
       migrated = normalise((oldFamily || "technical") + "-" + oldMode);
-    } else if (oldFamily) {
+    } else if (["technical", "swiss", "coffee", "purple"].indexOf(oldFamily) >= 0 && oldMode === null) {
       // A family without an explicit mode was "family + follow OS".
       migrated = "system";
     } else {
@@ -197,6 +197,7 @@
     dispatch({
       theme: next,
       previousTheme: prev,
+      previous: prev,
       choice: choice,
       previousChoice: prevChoice,
       scheme: schemeOf(next),
@@ -226,6 +227,10 @@
   }
   function resetPreferences() {
     userChoice = null;
+    // Do not resurrect an already-migrated preference on the next boot.
+    removeKey(OLD_FAMILY_KEY);
+    removeKey(OLD_MODE_KEY);
+    removeKey(OLD_THEME_KEY);
     removeKey(KEY);
     apply();
   }
@@ -241,6 +246,7 @@
   // Cross-tab storage changes are external inputs, never a second writer.
   function _onStorage(e) {
     if (!e || (e.key !== KEY && e.key !== null)) return;
+    try { if (e.storageArea && e.storageArea !== localStorage) return; } catch (err) { return; }
     userChoice = e.key === null ? null : normalise(e.newValue);
     apply();
   }

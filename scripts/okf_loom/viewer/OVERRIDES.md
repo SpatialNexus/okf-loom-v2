@@ -96,14 +96,14 @@ of defence apply:
 |------------------|---------|-----------|------------------------------------------------|
 | `name`           | string  | bundle dir name | Display name for the viewer / browser title. |
 | `default_layout` | string  | `"cose"`  | Initial Cytoscape layout: `cose` / `concentric` / `breadthfirst` / `circle` / `grid`. |
-| `theme`          | string  | `"technical-light"` | First-paint concrete theme painted on `<html data-theme>`: `technical-light` / `technical-dark` / `swiss-light` / `swiss-dark`. `viewer/static/theme.js` (the sole owner of theme state) honours a saved user preference and Auto/OS resolution at boot; otherwise this value. A user's validated choice persists to `localStorage["okf-theme-family"]` / `["okf-theme-mode"]` (never the server default). |
+| `theme` | string | `"bone"` | `bone` / `slate` / `clay` / `plum` / `system`. Saved reader choice > configured choice > Bone. `theme.js` alone owns `data-theme` and `localStorage["okf-loom.appearance"]`; System resolves Bone/Slate from the OS before paint and follows changes live. Old light names → Bone, Technical/Swiss dark → Slate, Coffee dark → Clay, Purple dark → Plum, auto → System; v1 aliases still load. Retired contrast/border/density settings are ignored. |
 | `cdn`            | bool    | `true`    | If `false`, omit the Cytoscape.js CDN `<script>` tags from the single-file viewer and the `/__graph` page (for fully offline packaging — supply your own copy in that case). Markdown is rendered server-side by okf-loom's own stdlib renderer, so there is no client-side markdown parser to gate. |
 
 ```json
 {
   "name": "Acme OKF",
   "default_layout": "breadthfirst",
-  "theme": "swiss-dark",
+  "theme": "slate",
   "cdn": true
 }
 ```
@@ -344,3 +344,8 @@ Track wiring against the current spec; do not depend on reserved kinds until the
 
 All three mechanisms compose: a bundle can ship a custom `wiki.css`, a
 `ViewerPlugin`, and a `register("panel", …)` extension at the same time.
+
+Ledger fonts (Public Sans and Azeret Mono, normal/italic) are verified vendored
+assets, not network dependencies. `ledger-fonts.css` embeds all four faces and
+the full SIL OFL notices for live, static, SPA and single-file output. Keep
+`font-src data:` when supplying a compatible CSP; do not widen script policy.

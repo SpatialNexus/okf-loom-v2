@@ -1034,8 +1034,10 @@ reserved for distraction-free document reading. A `Find in graph` region
 combines query and filters; zoom, fit, fullscreen, and reset form one named
 viewport toolbar. A `Graph settings` disclosure holds spacing and layout
 controls, relationship bundles, the type filter, a relationship-label toggle,
-and a 'Colour by theme' toggle
-(the Saket et al. 2014 escape hatch back to type colours). The selected concept's authored body uses the same progressive renderers
+and a 'Colour by theme' toggle. Graph nodes are neutral by default; selection
+uses an accent stroke. Active lenses (communities, recency, bridges, importance
+or groups) use a muted ramp derived from the current palette and repaint on
+every palette change. Content types are never colour-coded. The selected concept's authored body uses the same progressive renderers
 (mermaid/KaTeX/highlight.js) as the wiki pages. Suggested starting points rank
 structural hubs before the theme digest. Hover
 previews, shift-click path tracing, keyboard navigation, clickable
@@ -1051,9 +1053,19 @@ opens Details, and the canvas remains optional. Fit uses actual canvas geometry
 and only intersecting canvas-owned overlays, not controls in other panes.
 Resize follows available space while preserving manually panned view ownership.
 Initial relationship-list setup does not scroll the reader to below-body content.
-Appearance starts with Auto/Light/Dark and Density; family, surfaces, and borders
-are advanced. Existing families remain available, including optional Coffee.
-Native radio semantics and Escape-to-trigger focus restoration remain required.
+Appearance is one native radio group with Bone (default, light), Slate, Clay,
+Plum (dark) and System (Bone for OS light, Slate for OS dark). Each option has a
+label, description and four-colour swatch; a 2px accent bar marks the choice.
+Arrow/Home/End select, Tab leaves the group, and Escape closes the topmost
+Appearance overlay and restores trigger focus. Contrast, border and density
+modifiers are removed. Saved choice > configured choice > Bone; legacy names
+migrate once to `okf-loom.appearance`. `theme.js` is the single runtime writer,
+resolves before first paint, and signals `okf-theme-ready` only after success.
+Storage denial retains in-memory switching; cross-tab and live OS changes work.
+Deduplicated `okf-loom:themeChanged` events on window carry the current and
+previous palette and scheme, including dark-to-dark palette changes.
+Public Sans and Azeret Mono normal/italic faces and full OFL notices are
+self-hosted on every output, including single-file with embedded data fonts.
 The graph key and its counted type/relationship filter controls are owned by
 Graph settings (not a separate canvas legend). Directed edges
 retain a static dash and arrow cue and may animate dash offset while hovered,
@@ -1127,8 +1139,8 @@ Core posture:
 - The bundle on disk is the source of truth and the bus.
 - The browser is a rendered/source/split reading and directing surface.
 - Split is a simultaneous two-pane surface admitted by measurement, not viewport alone: the 900px floor must match and the measured workspace must give each pane at least 300px (607px with the divider). Otherwise a split deep link or a transition falls back to Rendered while preserving source content and the saved split ratio. An automatically paused Split is announced and returns when the room does; an explicit Rendered or Source choice ends that. While Split cannot fit, its button stays operable, is marked `aria-disabled`, and says why.
-- The document workspace (header, tools, Rendered/Source/Split panes) always takes the full width of the article column. The article column is one bounded content column: title, metadata, tools, headings, paragraphs, lists, code, table, and figure blocks share its edges at every width, so wide blocks start and end on the same edges as ordinary text instead of floating centered or overhanging; wide blocks keep local horizontal scrolling, and the column centers in its track when the track is wider than the column. Reading Focus is the one intentional exception: it removes the global and secondary rails and expands the workspace to the full available width with modest page gutters, so Rendered text and the Split panes use the whole viewport the mode exists for; normal reading keeps the bounded column.
-- Space beside the article is allocated by what remains, with a 600px article floor. Related moves below the article before the article would drop under the floor. Comments is a side-by-side rail only if the article keeps that floor after Related has yielded; otherwise it opens as a modal overlay. Non-document pages keep the 1200px rule.
+- The page maximum is 1280px; the normal reading column is 760px. Prose is Public Sans at 16px/1.72 capped at 55ch, while ids, paths, timestamps and figures use Azeret Mono with tabular numerals. Code, tables and figures may use the column width and scroll locally. Reading Focus removes global and secondary rails and expands the workspace to the full available width with modest gutters, but keeps the 55ch prose measure, including in Split.
+- Space beside the article is allocated by what remains, with a 600px article floor. Related moves below the article before the article would drop under the floor. Comments is a side-by-side rail only if the article keeps that floor after Related has yielded; otherwise it opens as a modal overlay. Non-document pages also use the 1280px maximum.
 - Source has a persisted "Wrap lines" control. Unwrapped Source, wide tables and code blocks scroll locally inside labelled, keyboard-focusable regions; the document itself never scrolls sideways.
 - The user does not directly edit Markdown in the browser by default.
 - The user's studio writes are comments and asks.

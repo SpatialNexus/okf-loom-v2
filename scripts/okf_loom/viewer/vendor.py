@@ -3,16 +3,15 @@
 ``okf-loom build|render --assets offline`` replaces every CDN reference in
 static, SPA and single-file output with byte-verified copies of the SAME
 pinned library versions, checked into ``viewer/vendor/`` and described by
-``viewer/vendor/vendor.lock.json``. The default (``cdn``) output never
-touches this module's vendored bytes; the only default-output bytes X1
-changed are ``renderers.js`` (and HTML that inlines it), which carries the
-dormant offline loader.
+``viewer/vendor/vendor.lock.json``. Renderer/graph bytes remain opt-in;
+Ledger fonts are always self-hosted and verified, including default ``cdn``
+output. Their derived CSS embeds four WOFF2 faces and the full OFL texts.
 
 Integrity is checked at BUILD time, before anything is written: each vendored
 file must match its locked size and SHA-256/SHA-384, and every file that the
 CDN mode also loads must match the SRI value pinned in the code
 (``render._CDN_SCRIPTS`` and ``static/renderers.js``). Derived outputs (the
-data-URL KaTeX stylesheet and the concatenated highlight.js bundle) are pure
+data-URL Ledger/KaTeX stylesheets and the concatenated highlight.js bundle) are pure
 transforms whose output hashes are pinned too. Any mismatch raises
 :class:`VendorIntegrityError`; there is no CDN fallback in offline mode.
 
@@ -102,6 +101,16 @@ HLJS_LANGUAGE_DIR = "highlightjs-11.12.0/languages/"
 KATEX_DERIVED = "katex-0.16.47/katex.offline.min.css"
 KATEX_CSS = "katex-0.16.47/katex.min.css"
 KATEX_FONT_DIR = "katex-0.16.47/fonts/"
+
+# Ledger faces are always self-hosted, including the default CDN renderer mode.
+LEDGER_DERIVED = "ledger-fonts.css"
+LEDGER_FACES = (
+    ("Public Sans", "normal", "ledger-public-sans/PublicSans-Variable.woff2"),
+    ("Public Sans", "italic", "ledger-public-sans/PublicSans-Italic-Variable.woff2"),
+    ("Azeret Mono", "normal", "ledger-azeret-mono/AzeretMono-Variable.woff2"),
+    ("Azeret Mono", "italic", "ledger-azeret-mono/AzeretMono-Italic-Variable.woff2"),
+)
+LEDGER_LICENSES = ("ledger-public-sans/LICENSE", "ledger-azeret-mono/LICENSE")
 
 # KaTeX's stylesheet lists woff2, woff and ttf for each face. The offline
 # stylesheet keeps only the woff2 face, inlined as a data: URL, so fonts are
@@ -362,6 +371,44 @@ def cdn_graph_chain() -> list[str]:
 # Derived outputs
 # ---------------------------------------------------------------------------
 
+def derive_ledger_css(verified: dict[str, bytes]) -> bytes:
+    """Embed the four locked faces AND full OFL texts in every output target."""
+    notices = "\n\n".join(verified[path].decode("utf-8") for path in LEDGER_LICENSES)
+    if "*/" in notices or "<" in notices:
+        raise VendorIntegrityError("Ledger font notices cannot be embedded as CSS")
+    faces = ["/* Ledger fonts — SIL OFL 1.1\n" + notices + "\n*/"]
+    for family, style, path in LEDGER_FACES:
+        encoded = base64.b64encode(verified[path]).decode("ascii")
+        faces.append(
+            f'@font-face{{font-family:"{family}";font-style:{style};'
+            f'font-weight:100 900;font-display:swap;'
+            f'src:url(data:font/woff2;base64,{encoded}) format("woff2")}}')
+    return ("\n".join(faces) + "\n").encode("utf-8")
+
+
+def load_ledger_css(root: Path | None = None) -> str:
+    """Verify font inputs and derived output, without loading graph libraries.
+
+    No process cache: a later build must not conceal damaged vendored inputs.
+    The same no-follow reader and lock are used for served and offline assets.
+    """
+    with VendorTree(root) as tree:
+        lock = _parse_lock(tree.read(LOCK_NAME))
+        entries = {entry["dest"]: entry for entry in lock_files(lock)}
+        verified = {}
+        for path in (*LEDGER_LICENSES, *(face[2] for face in LEDGER_FACES)):
+            if path not in entries:
+                raise VendorIntegrityError(f"Ledger input missing from lock: {path}")
+            data = tree.read(path)
+            _check_entry(entries[path], data)
+            verified[path] = data
+        data = derive_ledger_css(verified)
+        expected = (lock.get("derived") or {}).get(LEDGER_DERIVED, {})
+        if expected.get("size") != len(data) or expected.get("sha256") != sha256_hex(data):
+            raise VendorIntegrityError("derived Ledger stylesheet does not match its pinned hash")
+        return data.decode("utf-8")
+
+
 def derive_katex_css(css: bytes, fonts: dict[str, bytes]) -> bytes:
     """KaTeX CSS with each face's sources replaced by one woff2 data: URL."""
     text = css.decode("utf-8")
@@ -566,6 +613,7 @@ def _load_offline_assets(tree: VendorTree) -> OfflineAssets:
     ]
     try:
         derived = {
+            LEDGER_DERIVED: derive_ledger_css(verified),
             KATEX_DERIVED: derive_katex_css(verified[KATEX_CSS], fonts),
             HLJS_DERIVED: derive_hljs_bundle(verified[HLJS_CORE], languages),
         }

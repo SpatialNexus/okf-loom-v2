@@ -28,4 +28,4 @@ studio:                             # live collaborative studio (all ON by defau
   max_sse_clients: 32
   allowed_hosts: [127.0.0.1, localhost]   # invisible cross-origin guard (§15);
                                           # `serve --tunnel` adds its quick-tunnel host at runtime
-  theme: auto                       # auto | swiss-light | swiss-dark | technical-light | technical-dark
+  theme: bone # bone | slate | clay | plum | system (follows OS)

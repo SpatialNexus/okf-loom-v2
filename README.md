@@ -80,11 +80,13 @@ the thread with a reply. [Watch the MP4](docs/media/comment-loop.mp4) (28 s).
 
 ### Restyle the page from one menu
 
-![Screen recording: the Appearance menu switches a documentation page to dark mode, through the Swiss, Purple and Coffee theme families, soft contrast and borders, and back to the defaults](docs/media/appearance.gif)
+![Earlier Appearance menu demonstration; media refresh for Ledger is pending](docs/media/appearance.gif)
 
-One Appearance menu restyles the page live: dark mode, the Swiss, Purple and
-Coffee families, soft contrast and borders, then back to the defaults.
-[Watch the MP4](docs/media/appearance.mp4) (22 s).
+One Appearance menu applies Ledger live: **Bone** (the light default), **Slate**,
+**Clay**, **Plum**, or **System** (Bone in OS light mode, Slate in dark mode).
+Public Sans and Azeret Mono are self-hosted, including offline and single-file
+output. The [earlier MP4](docs/media/appearance.mp4) (22 s) predates Ledger;
+screenshots and recordings will be refreshed separately.
 
 ### Explore the bundle as a graph
 
@@ -176,13 +178,14 @@ explains the larger changes.
 
 **Appearance**
 
-- Four theme families (Technical, the default, plus Swiss, Purple and
-  Coffee), each in light and dark, with Auto following your system setting.
-  They replace v1's five themes.
-- Light themes use softened surfaces rather than paper white, and code
-  blocks stay light in light mode.
-- Soft contrast, interface borders (off by default) and compact (default) or
-  comfortable density.
+- Ledger replaces the old families with Bone, Slate, Clay and Plum, plus System.
+  Bone is the default; a saved reader choice overrides bundle configuration.
+- Square geometry, ruled inventory rows, tabular mono figures and one accent
+  keep structure consistent across palettes. Content types are not colour-coded.
+- Code wells stay dark in every palette. The reading column is 760px with
+  16px/1.72 prose capped at 55ch; Focus expands the workspace, not prose measure.
+- Contrast, border and density modifiers are retired. Public Sans and Azeret
+  Mono (normal and italic) ship locally under SIL OFL 1.1.
 
 **Graph**
 
@@ -233,9 +236,13 @@ removed. OKF 0.1 bundles validate unchanged, and v1 Studio session state
 - **OKF 0.2 is optional.** `scripts/okf-loom upgrade <bundle>` only previews;
   the [migration guide](docs-bundle/how-to/migrate_spec_version.md) covers
   applying it.
-- **Themes.** v1 theme names still load, as aliases: `light` →
-  `technical-light`, `dark` and `midnight` → `technical-dark`, `pastel` and
-  `sepia` → `swiss-light`. Switch to the family names (or `auto`).
+- **Themes.** Old names still load: all old light variants (including v1
+  `light`, `pastel`, `sepia`) → Bone; Technical/Swiss dark (including `dark`,
+  `midnight`) → Slate; Coffee dark → Clay; Purple dark → Plum; `auto` → System.
+  Prefer `bone|slate|clay|plum|system` in `studio.theme` or viewer `theme`.
+  Browser choices migrate once to `okf-loom.appearance`; retired modifier keys
+  are ignored. Saved choice > configured choice > Bone; reset returns to the
+  configured choice. See [migration notes](CHANGELOG.md#unreleased).
 - **Index links.** Your first `index` run rewrites the links in generated
   index blocks from relative (`orders.md`) to bundle-absolute
   (`/datasets/orders.md`), a one-time diff. On GitHub a leading `/` resolves

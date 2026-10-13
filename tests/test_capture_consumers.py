@@ -548,11 +548,11 @@ def test_capture_consumers_use_canonical_dark_theme_setup():
     assert all('click("#okf-theme")' not in source for source in capture_sources)
 
     signals = (SCRIPTS / "capture_signal_controls.py").read_text()
-    assert 'window.OKFLoomTheme.setTheme("technical-dark")' in signals
+    assert 'window.OKFLoomTheme.setTheme("slate")' in signals
     assert 'document.documentElement.dataset.theme' in signals
-    assert '== "technical-dark"' in signals
+    assert '== "slate"' in signals
     assert 'locator("#okf-appearance-menu").is_hidden()' in signals
-    assert signals.index('== "technical-dark"') < signals.index('shot(page, "06-overview-dark-fullpage.png"')
+    assert signals.index('== "slate"') < signals.index('shot(page, "06-overview-dark-fullpage.png"')
 
 
 class FakeChromium:

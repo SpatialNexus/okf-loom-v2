@@ -919,44 +919,17 @@ def direct_appearance(take: _Take, rec: _Screencast) -> None:
     page.locator("#okf-appearance-menu").wait_for(state="visible", timeout=5_000)
     take.hold(700)
 
-    take.caption("Colour mode", "Dark")
-    take.click(_appearance_option(page, "mode", "dark"))
-    take.hold(1300)
-
-    take.click(page.locator("details.okf-appearance__advanced summary"), ms=500)
-    take.hold(600)
-    for family in ("swiss", "purple", "coffee"):
-        take.caption("Family", family.title())
-        take.click(_appearance_option(page, "family", family), ms=450)
+    for palette in ("slate", "clay", "plum", "system", "bone"):
+        take.caption("Palette", palette.title())
+        take.click(_appearance_option(page, "theme", palette), ms=450)
         take.hold(1150)
 
-    take.caption("Colour mode", "Light")
-    take.click(_appearance_option(page, "mode", "light"), ms=650)
-    take.hold(1200)
-    take.caption("Contrast", "Soft")
-    take.click(_appearance_option(page, "contrast", "soft"), ms=650)
-    take.hold(1000)
-    take.caption("Borders", "On")
-    take.click(_appearance_option(page, "border", "on"), ms=500)
-    take.hold(1100)
-
-    take.caption("Back to the defaults", "Reset")
-    reset = page.locator("#okf-appearance-menu .okf-appearance__reset")
-    take.glide(*take.center(page.locator("#okf-appearance-menu"), 0.5, 0.8), 450)
-    for _ in range(6):
-        box = reset.bounding_box()
-        if box and box["y"] + box["height"] <= VIEWPORT["height"] - 12:
-            break
-        take.wheel(120, steps=4, pause=35)
-    take.hold(250)
-    take.click(reset, ms=450)
-    take.hold(900)
     take.keys("Esc")
     page.keyboard.press("Escape")
     take.hold(1600)
     theme = page.evaluate("() => document.documentElement.dataset.theme")
-    if theme != "technical-light":
-        raise RuntimeError(f"reset did not return to technical-light (got {theme!r})")
+    if theme != "bone":
+        raise RuntimeError(f"palette selection did not return to bone (got {theme!r})")
     take.check_public("appearance end")
 
 

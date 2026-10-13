@@ -23,10 +23,36 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Changed
 
-- The v1 theme names are accepted as aliases in `studio.theme` and the
-  viewer `config.json` `theme`: `light` → `technical-light`, `dark` and
-  `midnight` → `technical-dark`, `pastel` and `sepia` → `swiss-light`.
-  Unknown values are still a configuration error.
+- **Ledger appearance:** Bone (default, light), Slate, Clay, Plum (dark), plus
+  System (Bone/Slate following the OS). Square geometry, ruled inventory,
+  neutral content types and palette-derived graph lenses replace the family
+  system. The page maximum is 1280px, reading column 760px, prose 55ch even in
+  full-width Focus. Contrast, border and density modifiers are removed.
+- Public Sans and Azeret Mono normal/italic faces are self-hosted on every
+  output, with verified hashes and full SIL OFL notices. No font network access
+  is needed, even for default CDN builds and single-file output.
+
+### Appearance migration
+
+| Old name | Ledger choice |
+|---|---|
+| `technical-light`, `swiss-light`, `purple-light`, `coffee-light` | `bone` |
+| `technical-dark`, `swiss-dark` | `slate` |
+| `coffee-dark` | `clay` |
+| `purple-dark` | `plum` |
+| `auto` | `system` |
+| v1 `light`, `pastel`, `sepia` (via their previous light aliases) | `bone` |
+| v1 `dark`, `midnight` (via Technical dark) | `slate` |
+
+Old config values still load; unknown Studio values fail closed. Browser legacy
+keys are read only when `okf-loom.appearance` is absent. A saved choice wins over
+configuration, then Bone; configuration is not persisted. Reset clears legacy
+appearance choices too, so they cannot reappear on reload. Retired modifier keys
+are ignored. The public JS API is `setTheme`, `getChoice`, `getResolvedTheme`,
+`getScheme`, `reset` and `on`; old family/mode/modifier setters are removed.
+`okf-loom:themeChanged` stays on window and now represents palette changes,
+including dark-to-dark changes, with current/previous palette and scheme.
+README media refresh is a separate follow-up; no product version bump here.
 
 ## [2.0.0] - 2026-09-24
 
