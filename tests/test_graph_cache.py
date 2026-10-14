@@ -90,6 +90,89 @@ def test_graph_query_interprets_only_one_structure_view(graph_server, query, exp
             assert body == _get(base)[2]
 
 
+def test_slow_graph_render_does_not_block_revision_or_structure_reads(graph_server, monkeypatch):
+    from okf_loom.retrieval import bundle_revision
+    server, base = graph_server
+    original = render._render_graph_documents
+    entered, release = threading.Event(), threading.Event()
+
+    def blocked(bundle):
+        entered.set()
+        assert release.wait(10)
+        return original(bundle)
+
+    monkeypatch.setattr(render, '_render_graph_documents', blocked)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+        cold = pool.submit(_get, base)
+        try:
+            assert entered.wait(10)
+            assert pool.submit(bundle_revision, server.bundle).result(timeout=3)
+            assert pool.submit(_get, base, '/__data/graph.json?view=structure').result(timeout=3)[0] == 200
+        finally:
+            release.set()
+        assert cold.result()[0] == 200
+
+
+def test_stale_graph_flight_cannot_publish_over_new_generation(graph_server, monkeypatch):
+    server, _ = graph_server
+    original = render._render_graph_documents
+    entered, release = threading.Event(), threading.Event()
+    calls = 0
+
+    def blocked(bundle):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            entered.set()
+            assert release.wait(10)
+        return original(bundle)
+
+    monkeypatch.setattr(render, '_render_graph_documents', blocked)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        cold = pool.submit(render._graph_documents, server.bundle, cached=True)
+        try:
+            assert entered.wait(10)
+            source = server.bundle.root / 'a.md'
+            source.write_text(source.read_text().replace('Old content', 'New content'))
+            server.bundle.reload()
+            fresh = render._graph_documents(server.bundle, cached=True)
+            published = server.bundle._graph_documents_cache
+            assert 'New content' in fresh[0]['a']
+        finally:
+            release.set()
+        old = cold.result()
+    assert 'Old content' in old[0]['a'] and 'New content' not in old[0]['a']
+    assert server.bundle._graph_documents_cache is published
+    assert render._graph_documents(server.bundle, cached=True) == fresh
+    assert calls == 2 and server.bundle._graph_documents_inflight == {}
+
+
+def test_failed_graph_flight_releases_waiters_and_allows_retry(graph_server, monkeypatch):
+    server, _ = graph_server
+    original = render._render_graph_documents
+    entered, release = threading.Event(), threading.Event()
+    def failed(bundle):
+        entered.set()
+        assert release.wait(10)
+        raise ValueError('render failed')
+    monkeypatch.setattr(render, '_render_graph_documents', failed)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        owner = pool.submit(render._graph_documents, server.bundle, cached=True)
+        try:
+            assert entered.wait(10)
+            with server.bundle._derived_lock:
+                flight = next(iter(server.bundle._graph_documents_inflight.values()))
+            waiter = pool.submit(flight.result)
+        finally:
+            release.set()
+        for request in (owner, waiter):
+            with pytest.raises(ValueError, match='render failed'):
+                request.result(timeout=3)
+    assert server.bundle._graph_documents_inflight == {}
+    monkeypatch.setattr(render, '_render_graph_documents', original)
+    assert 'Old content' in render._graph_documents(server.bundle, cached=True)[0]['a']
+
+
 def test_graph_single_flight_across_requests_and_html(graph_server, monkeypatch):
     server, base = graph_server
     original = render._render_graph_documents

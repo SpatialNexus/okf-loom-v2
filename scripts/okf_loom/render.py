@@ -31,6 +31,8 @@ from .portable_feedback_export import (
 )
 
 import functools
+import copy
+from concurrent.futures import Future
 import json
 import hashlib
 import base64
@@ -1957,21 +1959,59 @@ def _graph_documents(bundle: Bundle, *, cached: bool) -> tuple[dict[str, str], d
         return _render_graph_documents(bundle)
     from .retrieval import bundle_revision
 
-    # Bundle's generation lock makes a cold render single-flight with its graph
-    # and revision derivations, and excludes mutator publication. The cache is
-    # owned by this snapshot, not the server: swapping/reloading a Bundle drops
-    # it; in-place mutations advance the generation/revision. One entry only.
+    def current_key():
+        # Called only under _derived_lock; covers every content-pure input.
+        return (bundle._source_generation, bundle_revision(bundle), bundle.root.resolve(),
+                tuple((rel, doc.path.resolve()) for rel, doc in sorted(
+                    {**bundle.indexes, **bundle.logs}.items())))
+
+    # _derived_lock owns only key capture, flight registration and publication.
+    # Never wait on a Future or notify its waiters while holding _derived_lock;
+    # no flight/Future lock is held when acquiring _derived_lock. Rendering runs
+    # on detached inputs, so retained mutations cannot mix generations mid-body.
     with bundle._derived_lock:
-        key = (bundle._source_generation, bundle_revision(bundle), bundle.root.resolve(),
-               tuple((rel, doc.path.resolve()) for rel, doc in sorted(
-                   {**bundle.indexes, **bundle.logs}.items())))
+        key = current_key()
         entry = getattr(bundle, '_graph_documents_cache', None)
-        if entry is None or entry[0] != key:
-            entry = (key, _render_graph_documents(bundle))
-            bundle._graph_documents_cache = entry
-        bodies, documents = entry[1]
-        # Callers own their projection; never expose mutable cache containers.
-        return dict(bodies), {path: dict(document) for path, document in documents.items()}
+        owner = False
+        if entry is not None and entry[0] == key:
+            result = entry[1]
+            pending = None
+        else:
+            flights = getattr(bundle, '_graph_documents_inflight', None)
+            if flights is None:
+                flights = bundle._graph_documents_inflight = {}
+            pending = flights.get(key)
+            if pending is None:
+                concepts = {}
+                for cid, concept in bundle.concepts.items():
+                    detached = copy.copy(concept)
+                    detached.frontmatter = copy.deepcopy(concept.frontmatter)
+                    concepts[cid] = detached
+                snapshot = Bundle(root=bundle.root, concepts=concepts,
+                                  indexes={rel: copy.copy(doc) for rel, doc in bundle.indexes.items()},
+                                  logs={rel: copy.copy(doc) for rel, doc in bundle.logs.items()})
+                pending = flights[key] = Future()
+                owner = True
+    if owner:
+        try:
+            result = _render_graph_documents(snapshot)
+            with bundle._derived_lock:
+                # A stale flight still serves its captured snapshot to its own
+                # callers, but can never overwrite a newer generation's cache.
+                if current_key() == key:
+                    bundle._graph_documents_cache = (key, result)
+                del flights[key]
+        except BaseException as error:
+            with bundle._derived_lock:
+                flights.pop(key, None)
+            pending.set_exception(error)
+            raise
+        pending.set_result(result)
+    elif pending is not None:
+        result = pending.result()
+    bodies, documents = result
+    # One published entry per bundle; callers never own its mutable containers.
+    return dict(bodies), {path: dict(document) for path, document in documents.items()}
 
 
 def build_graph_data(
