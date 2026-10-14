@@ -5730,11 +5730,11 @@
         : (c.anchor && (c.anchor.exact || c.anchor.ref));
       if (quote) row.appendChild(el("q", { class: "okf-anchor-row__quote", text: quote }));
       if (view.action && !editing) {
-        // P1-4: recovery actions (Re-anchor / Choose text) are the key path
-        // off a broken anchor, so they carry primary weight. Jump (resolved)
-        // and Details stay quiet — they are not recovery.
+        // Recovery stays outlined: several broken anchors can share the
+        // drawer, whose composer owns the one filled primary action.
+        // Jump (resolved) and Details remain quiet tertiary actions.
         const isRecovery = view.action !== "Jump" && view.action !== "Details";
-        const actionCls = "okf-comment__action okf-anchor-row__action" + (isRecovery ? " okf-anchor-row__action--primary" : "");
+        const actionCls = (isRecovery ? "okf-btn" : "okf-comment__action") + " okf-anchor-row__action";
         const action = el("button", { type: "button", class: actionCls, text: view.action, dataset: { focusKey: "anchor-" + view.action.toLowerCase().replace(/\s+/g, "-") } });
         action.addEventListener("click", function () {
           if (view.action === "Jump") {
