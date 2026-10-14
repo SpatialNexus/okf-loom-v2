@@ -3722,7 +3722,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         # neither bundle content nor a user path can select vendor files.
         from .viewer.vendor import LEDGER_FACES, load_ledger_files
         if name in {face[2] for face in LEDGER_FACES}:
-            return self._send_bytes(200, load_ledger_files()[name], content_type="font/woff2")
+            return self._send_static_bytes(load_ledger_files()[name], content_type="font/woff2")
         # Prevent path traversal. Normalize, then reject anything still
         # containing a separator or a traversal token after normalization.
         # ``unquote`` already ran in ``_route`` (we parse the decoded path),
@@ -3754,12 +3754,26 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
                     )
                 body = override.read_bytes()
                 ctype = _content_type_for(name)
-                return self._send_bytes(200, body, content_type=ctype)
+                return self._send_static_bytes(body, content_type=ctype)
         if name in list_served_static():
             body = load_static(name, self.bundle).encode("utf-8")
             ctype = _content_type_for(name)
-            return self._send_bytes(200, body, content_type=ctype)
+            return self._send_static_bytes(body, content_type=ctype)
         return self._send_text(404, f"Unknown static asset: {name}", content_type="text/plain")
+
+    def _send_static_bytes(self, body: bytes, *, content_type: str) -> None:
+        # Hash the final representation, not file metadata: generated font CSS
+        # and active-code overrides share this path. Keep loading/verifying on
+        # every request so even edits preserving mtime/size cannot hide changes
+        # or bypass vendor integrity checks. No viewer-specific data is added.
+        etag = '"' + hashlib.sha256(body).hexdigest() + '"'
+        # Commas inside an opaque quoted tag are not list separators.
+        validators = [value.strip() for field in self.headers.get_all("If-None-Match", [])
+                      for value in re.findall(r'(?:[^",]|"[^"]*")+', field)]
+        not_modified = any(value == "*" or value.removeprefix("W/") == etag for value in validators)
+        self._send_bytes(304 if not_modified else 200, b"" if not_modified else body,
+                         content_type=content_type,
+                         extra_headers={"Cache-Control": "no-cache", "ETag": etag})
 
     def _handle_bundle_asset(self, rel: str) -> None:
         """Serve a bundle-local media file (screenshots, diagrams, video, PDF).
@@ -3969,7 +3983,10 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
             self.close_connection = True
         self.send_response(code)
         self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(body)))
+        # A 304 has no body; its Content-Length, if sent, must describe the
+        # selected 200 representation, not the empty wire body (RFC 9110).
+        if code != 304:
+            self.send_header("Content-Length", str(len(body)))
         if close:
             self.send_header("Connection", "close")
         if not extra_headers or "Cache-Control" not in extra_headers:

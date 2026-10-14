@@ -27,6 +27,9 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Changed
 
+- Live static assets now use final-byte strong ETags and body-free conditional
+  GET/HEAD responses. `Cache-Control: no-cache` still requires revalidation on
+  every reuse, so toolkit edits, overrides and generated font CSS stay fresh.
 - Live document pages, document data and search reuse bounded, content-keyed
   heading render work without changing canonical-source or section-link checks.
 - Live graph reads reuse single-flight, generation-owned rendered bodies while
