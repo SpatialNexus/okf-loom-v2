@@ -287,6 +287,11 @@ def test_manifest_uses_selected_checkout_and_complete_source_closure(tmp_path: P
     for required in ("scripts/okf_loom/_yaml_compat.py", "scripts/okf_loom/config.py",
                      "scripts/okf_loom/ignore.py"):
         assert required in paths
+    from okf_loom.viewer import vendor
+    font_inputs = {vendor.LOCK_NAME, *vendor.LEDGER_LICENSES,
+                   *(face[2] for face in vendor.LEDGER_FACES)}
+    prefix = "scripts/okf_loom/viewer/vendor/"
+    assert {path.removeprefix(prefix) for path in paths if path.startswith(prefix)} == font_inputs
     manifest = benchmark._source_manifest(alternate)
     assert str(TOOLKIT_ROOT) not in json.dumps(manifest, sort_keys=True)
     assert manifest["paths"] == list(paths)

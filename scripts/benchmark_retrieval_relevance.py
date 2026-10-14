@@ -48,6 +48,16 @@ def measured_source_paths(checkout: Path) -> tuple[str, ...]:
             path for path in directory.rglob("*")
             if path.is_file() and path.suffix.lower() in suffixes
         )
+    # Default portable builds self-host Ledger fonts even in CDN mode. Read
+    # the selected checkout's lock, not imported constants from the caller.
+    vendor = root / "scripts/okf_loom/viewer/vendor"
+    lock_path = vendor / "vendor.lock.json"
+    if lock_path.is_file():
+        candidates.append(lock_path)
+        lock = json.loads(lock_path.read_text(encoding="utf-8"))
+        for package in lock["packages"]:
+            if package["name"] in {"Public Sans", "Azeret Mono"}:
+                candidates.extend(vendor / entry["dest"] for entry in package["files"])
     paths = tuple(sorted({path.relative_to(root).as_posix() for path in candidates if path.is_file()}))
     if "scripts/benchmark_retrieval_relevance.py" not in paths:
         raise ValueError("benchmark harness is missing from selected checkout")
