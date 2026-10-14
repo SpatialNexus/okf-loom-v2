@@ -27,6 +27,8 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Changed
 
+- Live document pages, document data and search reuse bounded, content-keyed
+  heading render work without changing canonical-source or section-link checks.
 - **Ledger appearance:** Bone (default, light), Slate, Clay, Plum (dark), plus
   System (Bone/Slate following the OS). Square geometry, ruled inventory,
   neutral content types and palette-derived graph lenses replace the family

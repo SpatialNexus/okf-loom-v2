@@ -4,6 +4,7 @@ import json
 import posixpath
 import re
 from collections import Counter
+from functools import lru_cache
 from html.parser import HTMLParser
 from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
@@ -90,16 +91,42 @@ def passage_heading_fragment(concept: 'Concept', passage: 'Passage') -> str | No
     return prover[0](passage) if prover is not None else None
 
 
+# Cache only path-independent, renderer-owned facts, never concepts, source
+# closures, passages or authorization. Exact text keys avoid digest collisions;
+# the fixed renderer options are part of each separate cache's identity. Large
+# bodies still render normally but cannot evict/retain unbounded input. Each
+# cache holds at most 64 bodies of 256 Ki characters plus O(body) heading facts.
+# functools' LRU lock protects publication/eviction under ThreadingHTTPServer.
+# Concurrent misses may compute twice, but publish only immutable values.
+_NAVIGATION_CACHE_ENTRIES = 64
+_NAVIGATION_CACHE_BODY_CHARS = 256 * 1024
+
+
+@lru_cache(maxsize=_NAVIGATION_CACHE_ENTRIES)
+def _cached_section_headings(body: str):
+    from .viewer.markdown import render_blocks_with_owners
+
+    rendered, owners = render_blocks_with_owners(body)
+    identities = _RenderedHeadingIds()
+    identities.feed(rendered)
+    return (
+        tuple((owner['start'], identities.headings.get(owner['nonce']))
+              for owner in owners if owner['kind'] == 'heading'),
+        frozenset(fragment for fragment, count in identities.ids.items() if count == 1),
+        tuple(identities.labels.items()),
+    )
+
+
 def _concept_section_prover(concept: 'Concept'):
     """Precompute the shared source-owned proof inputs for exactly one concept.
 
-    One renderer pass per concept; the returned closure applies the identical
-    per-passage checks as :func:`passage_heading_fragment`. ``None`` means the
+    Renderer facts are shared by exact body text; source alignment and offsets
+    are always derived afresh. The closure applies the identical per-passage
+    checks as :func:`passage_heading_fragment`. ``None`` means the
     concept's body does not align with its source, so no passage of this
     concept can ever prove a heading.
     """
     from .retrieval import _body_start
-    from .viewer.markdown import render_blocks_with_owners
 
     lines = concept.raw_text.replace('\r\n', '\n').split('\n')
     start = _body_start(lines)
@@ -116,10 +143,11 @@ def _concept_section_prover(concept: 'Concept'):
     offsets = [0]
     for line in lines[start:]:
         offsets.append(offsets[-1] + len(line) + 1)
-    rendered, owners = render_blocks_with_owners(body)
-    headings = [owner for owner in owners if owner['kind'] == 'heading']
-    identities = _RenderedHeadingIds()
-    identities.feed(rendered)
+    render_headings = (_cached_section_headings
+                       if len(body) <= _NAVIGATION_CACHE_BODY_CHARS
+                       else _cached_section_headings.__wrapped__)
+    headings, unique_ids, heading_labels = render_headings(body)
+    labels = dict(heading_labels)
 
     def prove(passage: 'Passage') -> str | None:
         if not (start < passage.heading_line <= passage.line_start
@@ -138,21 +166,21 @@ def _concept_section_prover(concept: 'Concept'):
         passage_end = (offsets[passage.line_end - 1 - start]
                        + (passage.char_end if passage.char_end is not None
                           else len(lines[passage.line_end - 1])))
-        target = next((owner for owner in headings if owner['start'] == heading_start), None)
+        target = next((owner for owner in headings if owner[0] == heading_start), None)
         if target is None:
             return None
         # Retrieval's section grammar is deliberately unchanged. If a passage
         # crosses a renderer-only heading (e.g. Setext), no single section is proven.
-        if any(heading_start < owner['start'] < passage_end for owner in headings):
+        if any(heading_start < owner[0] < passage_end for owner in headings):
             return None
-        fragment = identities.headings.get(target['nonce'])
+        fragment = target[1]
         # Count all ids, including footnotes and recursively rendered quote headings.
         # The shipped duplicate suffixer can collide with an authored suffixed title.
-        return fragment if fragment and identities.ids[fragment] == 1 else None
+        return fragment if fragment and fragment in unique_ids else None
 
     def label(fragment: str) -> str:
         """Renderer-owned display label for one proven heading id."""
-        text = identities.labels.get(fragment, "")
+        text = labels.get(fragment, "")
         if not text or len(text) > MAX_SECTION_NAVIGATION_HEADING_CHARS:
             return ""
         return text if _text_is_transport_safe(text) else ""
@@ -304,10 +332,20 @@ def build_section_navigation(bundle: 'Bundle') -> dict | None:
         return payload
 
 
+@lru_cache(maxsize=_NAVIGATION_CACHE_ENTRIES)
+def _cached_heading_fragments(body: str) -> frozenset[str]:
+    from .viewer.markdown import markdown_to_html
+    return frozenset(html.unescape(value) for value in re.findall(
+        r'<h[1-6] id="([^"]+)"', markdown_to_html(body)))
+
+
 def heading_fragments(body: str) -> set[str]:
     """Use the shipped renderer's actual heading grammar/slug identities."""
-    from .viewer.markdown import markdown_to_html
-    return {html.unescape(value) for value in re.findall(r'<h[1-6] id="([^"]+)"', markdown_to_html(body))}
+    render_fragments = (_cached_heading_fragments
+                        if len(body) <= _NAVIGATION_CACHE_BODY_CHARS
+                        else _cached_heading_fragments.__wrapped__)
+    # Preserve the caller-owned mutable set contract, not the cached value.
+    return set(render_fragments(body))
 
 
 def resolve_document_link(source: str, href: str) -> tuple[str, str] | None:
