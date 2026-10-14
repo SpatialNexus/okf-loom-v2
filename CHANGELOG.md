@@ -10,6 +10,10 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Graph JSON tolerates unknown query parameters (including cache-busters);
+  only `view` is interpreted: absent means full, one `structure` means body-free,
+  and other or repeated values return `400 invalid_request`. The route reference
+  now records both views and graph/static final-byte ETag revalidation.
 - Graph first frames avoid redundant default-URL restyling and a discarded grid
   layout; initial lens/theme updates are batched without changing settled positions.
 - Graph canvas labels remeasure and redraw once when Ledger fonts load late,

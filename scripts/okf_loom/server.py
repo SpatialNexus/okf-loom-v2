@@ -3282,7 +3282,8 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
 
     def _handle_graph_json(self, query: dict[str, list[str]] | None = None) -> None:
         query = query or {}
-        if query and query != {"view": ["structure"]}:
+        structure = query.get("view") == ["structure"]
+        if "view" in query and not structure:
             return self._send_json(400, {"ok": False, "error": "invalid_request"})
         bundle, _palette, _plugin, config = self._state_snapshot()
         display_name = getattr(self.server, "name", None) or config.get("name") or bundle.name
@@ -3305,9 +3306,9 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
             name=display_name,
             comment_summary=comment_summary,
             cache_bodies=True,
-            include_bodies=not query,
+            include_bodies=not structure,
         )
-        if query:
+        if structure:
             del data["bodies"]
             del data["documents"]
         from .retrieval import MAX_RESPONSE_BYTES, canonical_json_bytes

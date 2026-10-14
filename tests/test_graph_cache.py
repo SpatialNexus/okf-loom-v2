@@ -54,6 +54,27 @@ def test_cached_graph_is_byte_identical_to_uncached(root):
     assert canonical_json_bytes(render.build_graph_data(bundle, cache_bodies=True)) == expected
 
 
+@pytest.mark.parametrize('query, expected, structure', [
+    ('?cache_buster=1', 200, False),
+    ('?view=structure&cache_buster=1', 200, True),
+    ('?view=unknown', 400, False),
+    ('?view=', 400, False),
+    ('?view=structure&view=structure', 400, False),
+    ('', 200, False),
+])
+def test_graph_query_interprets_only_one_structure_view(graph_server, query, expected, structure):
+    _, base = graph_server
+    status, _, body = _get(base, '/__data/graph.json' + query)
+    assert status == expected
+    data = json.loads(body)
+    if expected == 400:
+        assert data == {'ok': False, 'error': 'invalid_request'}
+    else:
+        assert ('bodies' not in data and 'documents' not in data) is structure
+        if not structure:
+            assert body == _get(base)[2]
+
+
 def test_graph_single_flight_across_requests_and_html(graph_server, monkeypatch):
     server, base = graph_server
     original = render._render_graph_documents
