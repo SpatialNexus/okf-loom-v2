@@ -1804,10 +1804,6 @@ def _artifact_record(
         "viewport": {"width": width, "height": height},
         "resolved_theme": theme_state.get("resolved_theme") or "unresolved",
         "theme_resolution": theme_state.get("resolution") or "unavailable",
-        "modifiers": {
-            "contrast": theme_state.get("contrast") or "unresolved",
-            "border": theme_state.get("border") or "unresolved",
-        },
         "theme_family": family or "unresolved",
         "theme_mode": mode or "unresolved",
         "theme_preference": family or "unresolved",
@@ -2350,10 +2346,8 @@ def _theme_state(page: Any, *, javascript: bool) -> dict[str, Any]:
               return {
                   resolved_theme: root.getAttribute('data-theme'),
                   runtime_resolved_theme: t && typeof t.getResolvedTheme === 'function' ? t.getResolvedTheme() : null,
-                  resolved_mode: t && typeof t.getResolvedMode === 'function' ? t.getResolvedMode() : null,
-                  contrast: root.getAttribute('data-okf-contrast'),
-                border: root.getAttribute('data-okf-border'),
-                family: t && typeof t.getChoice === 'function' ? t.getChoice() : null,
+                  resolved_mode: t && typeof t.getScheme === 'function' ? t.getScheme() : null,
+                  choice: t && typeof t.getChoice === 'function' ? t.getChoice() : null,
                   mode: t && typeof t.getChoice === 'function' ? (t.getChoice() === 'system' ? 'system' : t.getScheme()) : null,
                   ready: root.classList.contains('okf-theme-ready'),
                   resolution: t ? 'resolved' : 'unavailable',
@@ -2366,9 +2360,7 @@ def _theme_state(page: Any, *, javascript: bool) -> dict[str, Any]:
         "resolved_theme": root.get_attribute("data-theme"),
         "runtime_resolved_theme": None,
         "resolved_mode": None,
-        "contrast": root.get_attribute("data-okf-contrast"),
-        "border": root.get_attribute("data-okf-border"),
-        "family": None, "mode": None, "ready": False,
+        "choice": None, "mode": None, "ready": False,
         "storageAccess": None, "storageKeys": None,
         "resolution": "server-painted-hint",
     }
@@ -2402,12 +2394,12 @@ def _assert_theme_state(page: Any, spec: ScenarioSpec) -> dict[str, Any]:
                 },
             })
         expected_family, expected_mode = _scenario_theme_preference(spec)
-        if state.get("family") != expected_family or state.get("mode") != expected_mode:
+        if state.get("choice") != expected_family or state.get("mode") != expected_mode:
             raise CaptureFailure({
                 "code": "theme-preference-mismatch", "phase": "theme-assertion",
                 "scenario": spec.id,
-                "expected": {"family": expected_family, "mode": expected_mode},
-                "actual": {"family": state.get("family"), "mode": state.get("mode")},
+                "expected": {"choice": expected_family, "mode": expected_mode},
+                "actual": {"choice": state.get("choice"), "mode": state.get("mode")},
             })
         if spec.storage == "denied" and state.get("storageAccess") != "denied":
             raise CaptureFailure({
@@ -3857,7 +3849,7 @@ def _validate_capture_set(
             if (
                 theme_state.get("ready") is not True
                 or theme_state.get("resolution") != "resolved"
-                or theme_state.get("family") != family
+                or theme_state.get("choice") != family
                 or theme_state.get("mode") != mode
                 or theme_state.get("runtime_resolved_theme") != spec.resolved_theme
                 or theme_state.get("resolved_mode") != _palette_scheme(spec.resolved_theme)

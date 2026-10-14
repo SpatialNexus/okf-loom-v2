@@ -52,7 +52,11 @@ Old config values still load; unknown Studio values fail closed. Browser legacy
 keys are read only when `okf-loom.appearance` is absent. A saved choice wins over
 configuration, then Bone; configuration is not persisted. Reset clears legacy
 appearance choices too, so they cannot reappear on reload. Retired modifier keys
-are ignored. The public JS API is `setTheme`, `getChoice`, `getResolvedTheme`,
+are ignored. Type-colour overrides in `.okf-loom/viewer/palette.json` are
+retired and ignored by Ledger: types remain neutral and graph lenses use the
+active palette's muted ramp. Existing files need not be deleted; compatibility
+payloads may still contain their values, but the built-in viewer does not paint
+them. The public JS API is `setTheme`, `getChoice`, `getResolvedTheme`,
 `getScheme`, `reset` and `on`; old family/mode/modifier setters are removed.
 `okf-loom:themeChanged` stays on window and now represents palette changes,
 including dark-to-dark changes, with current/previous palette and scheme.

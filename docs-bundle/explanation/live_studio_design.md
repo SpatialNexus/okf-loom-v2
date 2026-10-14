@@ -269,8 +269,9 @@ shaped it:
   layout, community colour and centrality size. Layout proximity is only
   legible when other channels confirm it (Venturini, Jacomy and Jensen
   2021). Colouring by type restates what readers already know, so type
-  moved to the node **icon** and colour shows **detected communities**
-  (deterministic Louvain modularity).
+  moved to the node **icon**. Map stays neutral; the Themes lens uses a
+  muted, palette-derived ramp for **detected communities** (deterministic
+  Louvain modularity).
 * **Importance is encoded explicitly.** Raw degree finds loud nodes, not
   important ones, and readers take *position* as importance unless a metric
   is encoded (McGrath, Blythe and Krackhardt 1997). Map sizes nodes by
@@ -278,7 +279,7 @@ shaped it:
 * **Group colouring has a cost, so it can be turned off.** Group encodings
   help cluster tasks but cost about 25% accuracy on plain topology tasks
   (Saket et al. 2014). The **Colour by theme** toggle in Graph settings
-  switches back to type colours.
+  returns nodes to neutral colours when turned off, never to type colours.
 * **Positions are deterministic.** Layouts that move on every load are a
   common complaint about note graphs, and stable positions matter when
   readers re-find nodes (Archambault and Purchase 2012–13). Initial
@@ -304,7 +305,7 @@ shaped it:
 
 | Lens | Question it answers | Encoding |
 |---|---|---|
-| Map (default) | How does this knowledge fit together? | force layout; colour = community, size = PageRank, icon = type |
+| Map (default) | How does this knowledge fit together? | force layout; neutral nodes, size = PageRank, icon = type |
 | Themes | What are the main topic areas, and which barely touch? | strong community grouping; ranked themes with a gap verdict |
 | Flow | What feeds into what? | dagre layered layout (fallback: directed breadthfirst); typed edges with labels |
 | Bridges | Which concepts hold the areas together? | colour and size = betweenness; top bridgers highlighted |

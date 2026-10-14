@@ -150,6 +150,12 @@ and sibling `.<destination-name>.capture-authority` before retrying; do not
 blindly delete recovery. Driver output is suppressed rather than copying
 potentially sensitive diagnostics into evidence.
 
+Ledger capture observations use `theme_state.choice` for the effective
+appearance preference and `resolved_theme` / `resolved_mode` for the painted
+palette and scheme. Retired contrast/border modifier fields are not emitted.
+The existing scenario and manifest `theme_family` / `theme_mode` columns are
+compatibility names for choice and scheme/System, not active family axes.
+
 Schema **4** identifies `source_provenance.kind: selected-commit`, with protocol,
 selected `commit`/`tree`/`object_format`, driver `path`/Git blob `oid`/`sha256`, and
 the verified inventory digest. Complete `input_inventory` and equal before/after

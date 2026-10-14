@@ -139,10 +139,11 @@ Visit:
 http://127.0.0.1:8787/__graph
 ```
 
-The default **Map** lens uses a force-directed fCoSE layout: nodes use
-type icons, **detected themes** (community detection) supply colour, and
-PageRank supplies size. Other lenses change the layout, colour, or
-ranking to answer their own questions.
+The default **Map** lens uses a force-directed fCoSE layout: nodes are
+neutral, type icons identify content types, and PageRank supplies size.
+The **Themes** lens colours detected communities with a muted ramp derived
+from the active palette. Other lenses change the layout, colour, or ranking
+to answer their own questions.
 
 The tour never starts automatically. In **Graph settings**, choose
 **Take a 45-second graph tour** when you want an introduction. The

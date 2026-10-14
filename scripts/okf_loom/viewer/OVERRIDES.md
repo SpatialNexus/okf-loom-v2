@@ -1,6 +1,7 @@
 # OKF Viewer — Extension & Override Points
 
-The viewer supports five extension mechanisms. All override files live under
+The viewer supports four active extension mechanisms; §3 records the retired
+type-colour override. All override files live under
 `<bundle_root>/.okf-loom/viewer/`, so a bundle can be self-contained without
 forking okf-loom.
 
@@ -56,37 +57,19 @@ page surfaces. Each file replacement wins at its documented cascade position.
 .okf-loom/viewer/static/wiki.css   ← replaces the bundled stylesheet
 ```
 
-## 3. Type palette overrides
+## 3. Retired type palette overrides
 
-`.okf-loom/viewer/palette.json` maps a concept type to any CSS colour. It is
-**merged over** the auto-generated palette (which hashes each type name to
-a stable HSL hue — no BigQuery-specific hardcoding).
+Type-colour overrides in `.okf-loom/viewer/palette.json` are **retired and
+ignored by Ledger**. Content types use neutral labels and icons on every
+built-in surface; graph lenses use a muted ramp derived from the active
+appearance palette, not colours assigned to types.
 
-```json
-{
-  "BigQuery Table": "#3b82f6",
-  "Reference": "#10b981",
-  "custom_type": "#a855f7"
-}
-```
-
-**Security (P1-41).** Palette values are interpolated into inline
-`style="background:<color>"` attributes in the rendered HTML. HTML-escaping
-alone does not stop CSS injection (a value like
-`red;position:fixed;top:0` has no HTML-unsafe characters), so two layers
-of defence apply:
-
-1. **Gate.** Palette overrides are only loaded when the **effective
-   active-code gate** (see §5) is open — i.e. the bundle declares
-   `allow_active_code: true` AND the operator consents. When the gate is
-   closed, only the auto-generated palette is used; a bundle cannot
-   recolour the UI on its own.
-2. **Validation.** Even with the gate open, every value must match a strict
-   CSS-colour allowlist (`#rgb` / `#rrggbb` / `#rrggbbaa` hex,
-   `rgb()` / `rgba()` / `hsl()` / `hsla()`, or a named CSS colour).
-   Values that do not match (e.g. `red;position:fixed;top:0`,
-   `url(data:...)`, `javascript:...`) are dropped fail-closed; the key is
-   not emitted. A benign palette should not ship broken CSS anyway.
+Existing files need not be deleted. The loader may still merge validated
+values into compatibility data under the active-code gate, but built-in
+renderers do not interpolate them into inline styles or paint them. This
+is not an appearance configuration mechanism: select Bone, Slate, Clay,
+Plum or System through `config.json` (§4) or the Appearance control.
+Custom executable templates, styles and plugins remain subject to §5.
 
 ## 4. Viewer config
 
