@@ -10,6 +10,8 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- On touch screens the code-block Copy button no longer covers the first
+  line of code, and stays in view while a long line is scrolled sideways.
 - Graph JSON tolerates unknown query parameters (including cache-busters);
   only `view` is interpreted: absent means full, one `structure` means body-free,
   and other or repeated values return `400 invalid_request`. The route reference

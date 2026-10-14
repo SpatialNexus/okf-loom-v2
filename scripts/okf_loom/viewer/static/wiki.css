@@ -1032,13 +1032,19 @@ pre code.hljs { display: block; overflow-x: auto; }
 /* The wrap carries the well colour too: the tools row sits over the <pre>'s
  * top strip but is the wrap's child, so its labels resolve against the dark
  * well (not the page) for every reader of computed backgrounds. */
-.okf-codewrap { position: relative; margin: 16px 0 0; background: var(--code-bg); }
-.okf-codewrap > pre { margin: 0; padding-top: 34px; }
+/* The tools row is an in-flow strip (ordered before the <pre>), so a 44px
+ * coarse-pointer Copy target grows the strip instead of covering the first
+ * line. Inside a code scroll port it is sticky at the port's left edge, so a
+ * horizontally scrolled long line never carries Copy out of view. */
+.okf-codewrap { position: relative; display: flex; flex-direction: column; margin: 16px 0 0; background: var(--code-bg); }
+.okf-codewrap > pre { margin: 0; padding-top: 0; }
 .okf-code-tools {
-  position: absolute;
-  top: 8px;
-  left: 16px;
-  right: 8px;
+  order: -1;
+  position: sticky;
+  left: 0;
+  box-sizing: border-box;
+  padding: 8px 8px 6px 16px;
+  background: var(--code-bg);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1240,7 +1246,7 @@ pre code.hljs { display: block; overflow-x: auto; }
   background: var(--bg-2);
 }
 /* The code scroll port is a transparent carrier: the well is the surface. */
-.okf-prose > .okf-content-scrollport--code { border: 0; background: transparent; }
+.okf-prose > .okf-content-scrollport--code { border: 0; background: transparent; container-type: inline-size; }
 .okf-content-scrollport:focus-visible { outline: var(--okf-focus-width) solid var(--focus); outline-offset: var(--okf-focus-offset); }
 .okf-content-scrollport--scrolls { box-shadow: inset 0 -2px 0 0 var(--border-strong); }
 .okf-content-scrollport--code > pre,
@@ -1252,7 +1258,10 @@ pre code.hljs { display: block; overflow-x: auto; }
   margin: 0;
   overflow: visible;
 }
-.okf-content-scrollport--code > .okf-codewrap { min-width: 100%; margin: 0; }
+/* The wrap spans the scrolled width so its sticky tools strip (one port
+ * width, 100cqi) can stay pinned while the code scrolls beneath. */
+.okf-content-scrollport--code > .okf-codewrap { width: max-content; min-width: 100%; margin: 0; }
+.okf-content-scrollport--code > .okf-codewrap > .okf-code-tools { width: 100cqi; }
 .okf-content-scrollport--diagram > div { min-width: max-content; }
 .okf-content-scrollport--diagram svg,
 .okf-content-scrollport--diagram canvas { max-width: none; }

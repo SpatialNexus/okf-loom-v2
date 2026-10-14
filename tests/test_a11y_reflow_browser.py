@@ -1475,8 +1475,9 @@ _MIDWORD_BREAKS = r"""(root) => { const out = [];
 def open_width(chromium, code_server_url):
     contexts = []
 
-    def _open(path: str, width: int):
-        context = chromium.new_context(viewport={"width": width, "height": 844})
+    def _open(path: str, width: int, *, coarse: bool = False):
+        options = {"is_mobile": True, "has_touch": True} if coarse else {}
+        context = chromium.new_context(viewport={"width": width, "height": 844}, **options)
         contexts.append(context)
         page = context.new_page()
         page.add_init_script("localStorage.setItem('okfGraphTourDone', '1')")
@@ -1500,6 +1501,35 @@ def test_code_block_badge_and_copy_never_cover_code_text(open_width, width) -> N
     result = page.evaluate(_CODE_TOOLS_OVER_TEXT)
     assert result["reached"] >= 2, f"fixture lines do not reach the tools at {width}px: {result}"
     assert not result["covered"], f"code tools cover code text at {width}px: {result['covered']}"
+
+
+@pytest.mark.parametrize("width", NARROW_WIDTHS)
+def test_coarse_code_copy_stays_clear_and_reachable_while_code_scrolls(open_width, width) -> None:
+    """On touch screens the 44px Copy target overflowed its 34px strip onto the
+    first code line, and scrolling a long line carried Copy out of view."""
+    page = open_width(LONG_LINE_CONCEPT, width, coarse=True)
+    page.wait_for_function(CODE_READY)
+    result = page.evaluate(_CODE_TOOLS_OVER_TEXT)
+    assert not result["covered"], f"coarse code tools cover code text at {width}px: {result['covered']}"
+    state = page.evaluate("""() => {
+      const out = [];
+      document.querySelectorAll('.okf-prose .okf-content-scrollport--code').forEach((port, i) => {
+        if (port.scrollWidth <= port.clientWidth + 1) return;
+        const button = port.querySelector('.okf-code-copy');
+        port.scrollLeft = port.scrollWidth;
+        const box = button.getBoundingClientRect(), view = port.getBoundingClientRect();
+        out.push({i, height: Math.round(box.height), opacity: getComputedStyle(button).opacity,
+                  inside: box.left >= view.left - 0.5 && box.right <= view.right + 0.5});
+      });
+      return out; }""")
+    assert state, "fixture has no horizontally scrolling code block"
+    for row in state:
+        assert row["height"] >= 44 and row["opacity"] == "1" and row["inside"], row
+    button = page.locator(".okf-prose .okf-content-scrollport--code .okf-code-copy").first
+    button.evaluate("e => e.scrollIntoView({block: 'center'})")  # clear of the sticky chrome
+    box = button.bounding_box()
+    assert page.evaluate("([x, y]) => document.elementFromPoint(x, y)?.classList.contains('okf-code-copy')",
+                         [box["x"] + box["width"] / 2, box["y"] + box["height"] / 2])
 
 
 @pytest.mark.parametrize("width", NARROW_WIDTHS)
