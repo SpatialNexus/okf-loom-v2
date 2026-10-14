@@ -254,3 +254,123 @@ def test_tour_is_explicit_topmost_and_denial_safe(page, server_url: str) -> None
     page.keyboard.press("Escape")
     expect(invitation).to_be_focused()
     assert page.evaluate("() => window.OKFOverlayStack.top()?.id !== 'graph-tour'")
+
+
+def _coarse_page(page, url: str):
+    """A 390px touch context (coarse pointer) sharing the page's browser."""
+    context = page.context.browser.new_context(
+        viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True)
+    coarse = context.new_page()
+    coarse.add_init_script("try { localStorage.setItem('okfGraphTourDone', '1'); } catch (e) {}")
+    coarse.goto(url, wait_until="domcontentloaded")
+    coarse.wait_for_function("() => window.__okfLoomGraph?.layoutStats?.lastAppliedSeq >= 1")
+    return context, coarse
+
+
+_SMALL_TARGETS_JS = """selectors => {
+  const small = [];
+  for (const selector of selectors) {
+    for (const el of document.querySelectorAll(selector)) {
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height || el.closest('[hidden]')) continue;
+      if (r.height < 44 - 0.5) small.push([selector, (el.textContent || '').trim().slice(0, 30), Math.round(r.height)]);
+    }
+  }
+  return small;
+}"""
+
+
+def test_coarse_pointer_graph_controls_are_44px_targets(page, docs_server_url: str) -> None:
+    """D2: at 390 with a coarse pointer the All concepts summary, its rows,
+    the ranked starting points and the Graph settings controls are 44px."""
+    context, coarse = _coarse_page(page, docs_server_url + "/__graph")
+    try:
+        coarse.locator('[data-graph-pane="concepts"]').click()
+        expect(coarse.locator(".okf-node-index > summary")).to_be_visible()
+        small = coarse.evaluate(_SMALL_TARGETS_JS, [".okf-node-index > summary", ".okf-node-index__item"])
+        assert small == [], small
+        coarse.locator('[data-graph-pane="details"]').click()
+        coarse.evaluate("() => { document.querySelector('.okf-signal__advanced').open = true; }")
+        small = coarse.evaluate(_SMALL_TARGETS_JS, [
+            ".okf-lens-summary__row", ".okf-signal__advanced > summary", ".okf-signal__row--check",
+            ".okf-signal select", '.okf-signal input[type="range"]', ".okf-edge-bundle-index summary",
+            ".okf-graph-tour-replay"])
+        assert small == [], small
+    finally:
+        context.close()
+
+
+def test_graph_settings_disclosure_matches_its_sibling_summaries(page, docs_server_url: str) -> None:
+    """Graph settings opens like Explore with lenses: the native marker on
+    the left in body type, not a hidden marker with a trailing glyph; the
+    tour replay is a Ledger button in the body face."""
+    _open(page, docs_server_url, 1440)
+    seen = page.evaluate("""() => {
+      const look = el => { const cs = getComputedStyle(el);
+        return {display: cs.display, list: cs.listStyleType, family: cs.fontFamily, after: getComputedStyle(el, '::after').content}; };
+      const replay = getComputedStyle(document.querySelector('.okf-graph-tour-replay'));
+      return {settings: look(document.querySelector('.okf-signal__advanced > summary')),
+              lenses: look(document.querySelector('.okf-signal__lenses > summary')),
+              replay: {family: replay.fontFamily, border: replay.borderTopStyle}};
+    }""")
+    assert seen["settings"] == seen["lenses"], seen
+    assert seen["settings"]["list"] == "disclosure-closed", seen
+    assert "Public Sans" in seen["replay"]["family"] and seen["replay"]["border"] != "outset", seen
+
+
+def test_graph_390_title_and_tools_share_the_pane_gutter(page, docs_server_url: str) -> None:
+    """The route title and Find in graph sit on the 12px gutter of the pane
+    tabs, not an 8px one."""
+    _open(page, docs_server_url, 390)
+    edges = page.evaluate("""() => {
+      const left = sel => { const el = document.querySelector(sel);
+        const cs = getComputedStyle(el); return el.getBoundingClientRect().left + parseFloat(cs.paddingLeft); };
+      return {title: left('.okf-graph-route-title'), tools: left('.okf-graph-tools'),
+              tabs: document.querySelector('.okf-graph-mobile-nav').getBoundingClientRect().left};
+    }""")
+    # The pane-tab row's box edge is the shell gutter at this width.
+    assert edges["title"] == edges["tools"] == edges["tabs"] == 12, edges
+
+
+def test_single_file_short_canvas_keeps_zoom_clear_of_concept_index(tmp_path, page) -> None:
+    """With the Search & context drawer open the single-file canvas is short:
+    the zoom controls become a bottom-left row and never cover All concepts;
+    closing the drawer restores the right-hand column."""
+    from okf_loom import Bundle
+    from okf_loom.render import render_single_file
+    from test_viewer_browser import DOCS_BUNDLE
+
+    out = tmp_path / "single.html"
+    render_single_file(Bundle.load(DOCS_BUNDLE), out)
+    page.set_viewport_size({"width": 1440, "height": 900})
+    page.add_init_script("try { localStorage.setItem('okfGraphTourDone', '1'); } catch (e) {}")
+    page.goto(out.as_uri() + "#okf-graph", wait_until="domcontentloaded")
+    page.wait_for_function("() => window.okfGraphCaptureState && window.okfGraphCaptureState().layoutSettled")
+    page.wait_for_function("() => !document.getElementById('okf-single-search-toggle').disabled")
+    geometry_js = """() => {
+      const graph = document.getElementById('okf-graph');
+      const g = graph.getBoundingClientRect();
+      const s = document.querySelector('#okf-graph > .okf-node-index > summary').getBoundingClientRect();
+      const buttons = [...document.querySelectorAll('#okf-graph > .okf-graph-zoom button')]
+        .filter(b => b.offsetParent !== null).map(b => b.getBoundingClientRect());
+      const overlap = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+      return {short: graph.hasAttribute('data-okf-graph-short'), height: g.height,
+              covers: buttons.some(b => overlap(b, s)),
+              rightEdge: Math.max(...buttons.map(b => b.right)) > g.right - 60};
+    }"""
+    wide = page.evaluate(geometry_js)
+    assert not wide["short"] and not wide["covers"] and wide["rightEdge"], wide
+
+    page.locator("#okf-single-search-toggle").click()
+    # Results grow the drawer to its cap and leave a short canvas.
+    page.fill("#okf-single-query", "comment")
+    page.locator("#okf-single-search form button[type='submit']").click()
+    page.wait_for_function("() => document.querySelectorAll('[data-single-results] > li').length > 3")
+    page.wait_for_function("() => document.getElementById('okf-graph').hasAttribute('data-okf-graph-short')")
+    short = page.evaluate(geometry_js)
+    assert short["short"] and not short["covers"], short
+
+    page.locator("[data-single-search-close]").click()
+    page.wait_for_function("() => !document.getElementById('okf-graph').hasAttribute('data-okf-graph-short')")
+    restored = page.evaluate(geometry_js)
+    assert not restored["covers"] and restored["rightEdge"], restored

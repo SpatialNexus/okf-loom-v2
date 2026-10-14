@@ -4,17 +4,31 @@
  * both are inlined) and the full-page graph view template. The shared
  * wiki.css already covers .okf-graph, .okf-detail, the type chips etc;
  * this file holds only the graph-specific overrides.
+ *
+ * Ledger (DESIGN.md "Graph"): graph.js paints the canvas from the palette
+ * tokens -- neutral round nodes, --graph-edge edges, --graph-label names on a
+ * --graph-halo outline, and a muted ramp only while a colour lens is on.
+ * Around it the chrome is square and hairline-ruled, figures and micro-labels
+ * are mono, floating layers take --shadow-pop (the only elevation) and no
+ * border, and the accent marks state only: the selected node's stroke, the
+ * info panel's left edge, the current starting point and 2px state bars.
+ * Every colour is a token. Each selector is declared once per context: edit
+ * the rule in place rather than appending an override.
  */
 
+/* Field height for the graph tool rows: 34px, 44px on coarse pointers. */
+:root { --okf-graph-field-h: 34px; }
+/* Coarse pointers raise it to 44px (the coarse block at the end of this file). */
+
 #okf-graph {
-  background: var(--okf-bg-elev);
+  background: var(--graph-bg);
   /* Phase 4: the hover tooltip + zoom cluster are absolutely positioned
    * children of the canvas container. */
   position: relative;
 }
 .okf-viewer--graph .okf-studio-bar {
   box-sizing: border-box;
-  flex: 1 1 0;
+  flex: 0 0 auto;
   width: auto;
   min-width: 0;
   max-width: 100%;
@@ -57,11 +71,10 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-mobile-nav,body.okf-vi
  * (shell.css compact block): brand row, search growth, and the full honest
  * Appearance label. Only graph-owned chrome keeps graph.css narrow rules. */
 body.okf-viewer--graph[data-okf-narrow-reflow] .okf-studio-bar__group{display:flex!important;flex-wrap:wrap!important;gap:4px!important}
-body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-mobile-nav{box-sizing:border-box!important;position:relative!important;z-index:1001!important;width:100%!important;max-width:var(--okf-effective-vw)!important;display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:4px!important;padding:4px 8px!important}
+body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-mobile-nav{box-sizing:border-box!important;position:relative!important;width:100%!important;max-width:var(--okf-effective-vw)!important;display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:4px!important;padding:4px 8px!important}
 body.okf-viewer--graph[data-okf-narrow-reflow] .okf-layout{box-sizing:border-box!important;display:block!important;width:var(--okf-effective-vw)!important;min-width:0!important;max-width:var(--okf-effective-vw)!important;overflow-x:hidden!important}
 body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-mobile-nav{inset:auto!important;height:auto!important;margin:0!important;visibility:visible!important;opacity:1!important}
 body.okf-viewer--graph[data-okf-narrow-reflow] .okf-topbar__controls>*,body.okf-viewer--graph[data-okf-narrow-reflow] .okf-studio-bar__group>*{box-sizing:border-box!important;min-width:0!important;max-width:100%!important;white-space:normal!important;overflow-wrap:anywhere}
-body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
 
 /* Legend overlay showing type → colour */
 .okf-graph-legend {
@@ -69,7 +82,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   bottom: 10px;
   left: 10px;
   background: var(--okf-bg-elev);
-  border: 1px solid var(--okf-border);
+  border: 0;
   border-radius: 0;
   padding: 4px 8px;
   font-size: 0.75rem;
@@ -135,13 +148,17 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   gap: 6px;
   padding: 1px 0;
 }
+/* Legend swatches are squares in the canvas colour they explain. */
 .okf-graph-legend__swatch {
   display: inline-block;
+  flex: 0 0 auto;
   width: 10px;
   height: 10px;
   border-radius: 0;
   border: 1px solid var(--okf-border-strong);
 }
+.okf-graph-legend__swatch--hollow { background: var(--graph-bg); }
+.okf-graph-legend__swatch--none { visibility: hidden; }
 /* P1 graph/type collision fix: type-filter chips use a type ICON (inherits
  * currentColor) instead of a colour swatch, so the legend never mixes type
  * colours with theme colours. */
@@ -181,7 +198,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
 .okf-collaborators { margin: 0; }
 .okf-collaborators__compact { margin: 0; color: var(--okf-fg); font-size: var(--okf-text-sm); font-weight: 650; overflow-wrap: anywhere; }
 .okf-collaborators__compact::before, .okf-collaborators__list li::before { content: "◇"; margin-inline-end: 5px; color: var(--okf-fg); }
-.okf-collaborators__title { min-height: 44px; padding-block: var(--okf-space-2); margin: 0; color: var(--okf-fg); font-size: var(--okf-text-sm); font-weight: 750; text-transform: uppercase; letter-spacing: .06em; cursor: pointer; }
+.okf-collaborators__title { min-height: 44px; padding-block: var(--okf-space-2); margin: 0; color: var(--label-color); font-family: var(--font-label); font-size: 11px; font-weight: var(--label-weight); text-transform: uppercase; letter-spacing: var(--label-track); cursor: pointer; }
 .okf-collaborators__title:focus-visible { outline: 2px solid var(--okf-accent); outline-offset: 2px; }
 .okf-collaborators__list { display: grid; gap: 4px; padding: 0 0 var(--okf-space-2); margin: 0; list-style: none; color: var(--okf-fg-muted); font-size: var(--okf-text-sm); overflow-wrap: anywhere; }
 .okf-collaborators__list strong { color: var(--okf-fg); }
@@ -251,13 +268,14 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   width: min(240px, 60vw);
   max-height: calc(100% - 20px);
   background: var(--okf-bg-elev);
-  border: 1px solid var(--okf-border);
+  border: 0;
   border-radius: 0;
   box-shadow: var(--shadow-pop);
   font-size: var(--okf-text-sm);
 }
 .okf-node-index > summary {
   cursor: pointer;
+  font-size: 13px;
   font-weight: 600;
   padding: var(--okf-space-2) var(--okf-space-3);
   list-style: none;
@@ -266,7 +284,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   gap: var(--okf-space-2);
 }
 .okf-node-index > summary::-webkit-details-marker { display: none; }
-.okf-node-index__count { color: var(--okf-fg-muted); font-weight: 400; font-size: var(--okf-text-xs); }
+.okf-node-index__count { color: var(--okf-fg-muted); font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 400; font-size: var(--okf-text-xs); }
 .okf-node-index__hint { margin: 0 var(--okf-space-3) var(--okf-space-1); }
 .okf-node-index__list {
   max-height: min(50vh, 360px);
@@ -282,7 +300,8 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   gap: var(--okf-space-2);
   padding: var(--okf-space-1) var(--okf-space-2);
   border-radius: 0;
-  border: 1px solid transparent;
+  border: 0;
+  border-inline-start: 2px solid transparent;
   background: transparent;
   color: var(--okf-fg);
   font: inherit;
@@ -292,13 +311,13 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   width: 100%;
 }
 .okf-node-index__item:hover {
-  background: var(--okf-bg-inset);
-  border-color: var(--okf-border);
+  background: var(--okf-hover-fill);
+  border-color: transparent;
 }
 .okf-node-index__swatch {
   display: inline-block;
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   border-radius: 0;
   flex-shrink: 0;
   border: 1px solid var(--okf-border-strong);
@@ -318,25 +337,16 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   height: 1.25rem;
   padding: 0 0.3rem;
   flex-shrink: 0;
-  border: 1px solid var(--okf-accent);
+  border: 1px solid var(--okf-border-strong);
   border-radius: 0;
-  background: var(--okf-bg-elev);
+  background: var(--okf-bg-inset);
   color: var(--okf-fg);
+  font-family: var(--font-mono);
   font-size: var(--okf-text-xs);
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1;
   font-variant-numeric: tabular-nums;
   margin-left: var(--okf-space-1);
-}
-.okf-node-index__comments::after {
-  content: "";
-  width: 0.3rem;
-  height: 0.3rem;
-  margin: 0 -0.05rem -0.55rem 0.1rem;
-  border-left: 1px solid var(--okf-accent);
-  border-bottom: 1px solid var(--okf-accent);
-  background: var(--okf-bg-elev);
-  transform: skewY(-35deg);
 }
 
 /* ---- iter2 CRI2-006 / §13.7: LOD "Show all" pill ----------------------- *
@@ -352,7 +362,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   z-index: 20;
   max-width: calc(100% - 20px);
   background: var(--okf-bg-elev);
-  border: 1px solid var(--okf-border-strong);
+  border: 0;
   border-radius: 0;
   padding: 6px 14px;
   font: inherit;
@@ -364,7 +374,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.okf-graph-lod-pill:hover { border-color: var(--okf-accent); color: var(--okf-accent); }
+.okf-graph-lod-pill:hover { border-color: transparent; background: var(--okf-hover-fill); color: var(--okf-fg); }
 .okf-graph-lod-pill:focus-visible {
   outline: 2px solid var(--okf-accent);
   outline-offset: 2px;
@@ -376,9 +386,12 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
 }
 
 .okf-graph-legend__title {
-  font-weight: 600;
-  color: var(--okf-fg-muted);
-  font-size: var(--okf-text-xs);
+  font-family: var(--font-label);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-track);
+  text-transform: uppercase;
+  color: var(--label-color);
   padding-bottom: 2px;
 }
 .okf-graph-legend__title:not(:first-child) { margin-top: 6px; }
@@ -423,32 +436,16 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
 }
 .okf-signal__lenses .okf-signal__seg { flex: 1 1 auto; }
 .okf-signal__advanced { margin-top: var(--okf-space-2); }
+/* Graph settings opens like its sibling disclosures (Explore with lenses,
+ * Themes in this graph): the native marker on the left, body type, ink. */
 .okf-signal__advanced > summary {
-  cursor: pointer;
-  font-weight: 600;
-  font-size: var(--okf-text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--okf-fg-muted);
-  list-style: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--okf-space-1);
-  width: 100%;
   min-height: 44px;
-  padding: 8px 2px;
-  white-space: normal;
+  padding-block: .65rem;
+  cursor: pointer;
+  color: var(--okf-fg);
+  font-weight: 650;
   overflow-wrap: anywhere;
 }
-.okf-signal__advanced > summary::-webkit-details-marker { display: none; }
-.okf-signal__advanced > summary::after {
-  content: "▸";
-  color: var(--okf-fg-muted);
-  transition: transform 0.15s ease;
-}
-.okf-signal__advanced[open] > summary::after { transform: rotate(90deg); }
-.okf-signal__advanced > summary:hover { color: var(--okf-accent); }
 .okf-signal__advanced > summary:focus-visible { outline: 2px solid var(--okf-accent); outline-offset: 2px; }
 .okf-signal__body {
   max-height: min(52vh, 440px);
@@ -471,11 +468,12 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
 }
 .okf-signal__group > legend {
   padding: 0;
-  font-weight: 600;
-  font-size: var(--okf-text-xs);
-  letter-spacing: 0.02em;
+  font-family: var(--font-label);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-track);
   text-transform: uppercase;
-  color: var(--okf-fg-muted);
+  color: var(--label-color);
 }
 /* Preset segmented radio group: real radios (keyboard/arrow navigable),
  * visually presented as pills. */
@@ -490,10 +488,13 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   opacity: 0;
   margin: 0;
 }
+/* Square outlined choices; the left edge is reserved for the 2px state bar. */
 .okf-signal__seg-item span {
   display: inline-block;
   padding: 3px var(--okf-space-2);
   border: 1px solid var(--okf-border-strong);
+  border-inline-start-width: 2px;
+  border-inline-start-color: transparent;
   border-radius: 0;
   font-size: var(--okf-text-xs);
   cursor: pointer;
@@ -513,8 +514,8 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   outline: 2px solid var(--okf-accent);
   outline-offset: 2px;
 }
-.okf-lens-choice{display:grid!important;grid-template-columns:60px minmax(0,1fr);grid-template-rows:auto auto;align-items:center;gap:2px var(--okf-space-2);min-height:52px;padding:5px 7px!important;text-align:left!important;border-radius:0!important}.okf-lens-choice .okf-lens-preview{grid-row:1/3;display:block;color:currentColor;background:var(--okf-bg-inset);border:1px solid currentColor;border-radius:0}.okf-lens-preview line{stroke:currentColor;stroke-width:1.8;opacity:.8}.okf-lens-preview circle{fill:currentColor;stroke:var(--okf-bg-elev);stroke-width:1.5}.okf-lens-preview .okf-preview-arrow{fill:none;stroke:currentColor;stroke-width:1.8}.okf-lens-preview .okf-preview-hull,.okf-lens-preview .okf-preview-ring{fill:none;stroke:currentColor;stroke-width:1.5;stroke-dasharray:3 2}.okf-lens-preview--bridges line:nth-of-type(2),.okf-lens-preview--bridges line:nth-of-type(3){stroke-width:4}.okf-lens-preview--recent line{stroke-dasharray:2 2}.okf-lens-choice b{display:block;font-size:var(--okf-text-sm);line-height:1.1}.okf-lens-choice small{display:block;font-size:.68rem;line-height:1.2;color:var(--okf-fg-muted);font-weight:500;overflow-wrap:anywhere}.okf-signal__seg-item input:checked+.okf-lens-choice small{color:inherit;opacity:1}
-.okf-filter-chips{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}.okf-filter-chip-group{display:inline-flex;min-width:0}.okf-filter-chip,.okf-filter-solo,.okf-filter-showall{min-height:36px;padding:5px 10px;background:var(--okf-bg-elev);color:var(--okf-fg);border:1px solid var(--okf-border-strong);font:inherit;font-size:var(--okf-text-xs);font-weight:650;cursor:pointer}.okf-filter-chip{border-radius:0}.okf-filter-solo{border-left:0;border-radius:0;color:var(--okf-fg-muted);font-weight:500}.okf-filter-showall{flex-basis:100%;width:max-content;max-width:max-content;border-radius:0;color:var(--okf-accent)}.okf-filter-chip.is-off{border-style:dashed;text-decoration:line-through;text-decoration-thickness:2px;color:var(--okf-fg-subtle)}.okf-filter-chip.is-off::after{content:" · off";font-weight:500}.okf-filter-chip[aria-pressed=true]{background:transparent}.okf-filter-chips button:focus-visible{outline:2px solid var(--okf-accent);outline-offset:2px}
+.okf-lens-choice{display:grid!important;grid-template-columns:60px minmax(0,1fr);grid-template-rows:auto auto;align-items:center;gap:2px var(--okf-space-2);min-height:52px;padding:5px 7px!important;text-align:left!important;border:1px solid var(--okf-border-strong);border-inline-start-width:2px;border-inline-start-color:transparent;border-radius:0!important}.okf-lens-choice .okf-lens-preview{grid-row:1/3;display:block;color:var(--okf-fg-muted);background:var(--okf-bg-inset);border:1px solid var(--okf-border);border-radius:0}.okf-lens-preview line{stroke:currentColor;stroke-width:1.8;opacity:.8}.okf-lens-preview circle{fill:currentColor;stroke:var(--okf-bg-elev);stroke-width:1.5}.okf-lens-preview .okf-preview-arrow{fill:none;stroke:currentColor;stroke-width:1.8}.okf-lens-preview .okf-preview-hull,.okf-lens-preview .okf-preview-ring{fill:none;stroke:currentColor;stroke-width:1.5;stroke-dasharray:3 2}.okf-lens-preview--bridges line:nth-of-type(2),.okf-lens-preview--bridges line:nth-of-type(3){stroke-width:4}.okf-lens-preview--recent line{stroke-dasharray:2 2}.okf-lens-choice b{display:block;font-size:var(--okf-text-sm);line-height:1.1}.okf-lens-choice small{display:block;font-size:.68rem;line-height:1.2;color:var(--okf-fg-muted);font-weight:500;overflow-wrap:anywhere}
+.okf-filter-chips{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}.okf-filter-chip-group{display:inline-flex;min-width:0}.okf-filter-chip,.okf-filter-solo,.okf-filter-showall{min-height:36px;padding:5px 10px;background:var(--okf-bg-elev);color:var(--okf-fg);border:1px solid var(--okf-border-strong);font:inherit;font-size:var(--okf-text-xs);font-weight:650;cursor:pointer}.okf-filter-chip{border-radius:0}.okf-filter-solo{border-left:0;border-radius:0;color:var(--okf-fg-muted);font-weight:500}.okf-filter-showall{flex-basis:100%;width:max-content;max-width:max-content;border-radius:0}.okf-filter-chip:hover,.okf-filter-solo:hover,.okf-filter-showall:hover{background:var(--okf-hover-fill)}.okf-filter-chip.is-off{border-style:dashed;text-decoration:line-through;text-decoration-thickness:2px;color:var(--okf-fg-subtle)}.okf-filter-chip.is-off::after{content:" · off";font-weight:500}.okf-filter-chip[aria-pressed=true]{background:transparent}.okf-filter-chips button:focus-visible{outline:2px solid var(--okf-accent);outline-offset:2px}
 .okf-signal__row {
   display: flex;
   flex-direction: column;
@@ -528,7 +529,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   cursor: pointer;
 }
 .okf-signal__row-label { color: var(--okf-fg); }
-.okf-signal__row-value { font-weight: 600; color: var(--okf-accent); }
+.okf-signal__row-value { font-family: var(--font-mono); font-weight: 500; color: var(--okf-fg); }
 .okf-signal__row-hint { margin: 2px 0 0; }
 .okf-signal__row select,
 .okf-signal__row input[type="range"] { width: 100%; }
@@ -547,7 +548,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
   font-size: var(--okf-text-sm);
   cursor: pointer;
 }
-.okf-signal__btn:hover:not(:disabled) { border-color: var(--okf-accent); color: var(--okf-accent); }
+.okf-signal__btn:hover:not(:disabled) { background: var(--okf-hover-fill); border-color: var(--okf-border-strong); color: var(--okf-fg); }
 .okf-signal__btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .okf-signal__btn[hidden] { display: none; }
 .okf-signal :disabled,
@@ -577,19 +578,21 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom{z-index:1002}
 /* Lens summary — the ranked answers panel (renders in
  * #detail-empty whenever no node is selected). */
 .okf-lens-summary { box-sizing:border-box; width:100%; min-width:0; max-width:100%; text-align: left !important; margin-top: var(--okf-space-2) !important; overflow-x:hidden; }
+/* Micro-label heads over hairline ranked rows with mono figures. */
 .okf-lens-summary__title {
-  margin: 0 0 4px;
-  font-size: var(--okf-text-xs);
-  font-weight: 700;
+  margin: var(--okf-space-4) 0 var(--okf-space-2);
+  font-family: var(--font-label);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-track);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--okf-fg-muted);
+  color: var(--label-color);
 }
 .okf-lens-summary__verdict {
   margin: 0 0 var(--okf-space-3);
-  font-size: var(--okf-text-base);
+  font-size: 14.5px;
   color: var(--okf-fg);
-  line-height: 1.5;
+  line-height: 1.55;
 }
 /* Ranked rows are hairline records: label, mono figure, and the score as a
  * 2px bar along the foot (never a filled bar). The current starting point
@@ -636,7 +639,8 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
 }
 .okf-lens-summary__label {
   position: relative;
-  font-weight: 600;
+  font-size: 13.5px;
+  font-weight: 500;
   overflow: hidden;
   white-space: normal;
   display: -webkit-box;
@@ -652,18 +656,20 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
 }
 .okf-lens-summary__note {
   position: relative;
-  color: var(--okf-fg-muted);
+  color: var(--okf-fg-subtle);
   flex: 0 1 auto;
   min-width: 4rem;
   max-width: 38%;
   text-align: right;
-  font-size: var(--okf-text-xs);
+  font-family: var(--font-mono);
+  font-size: 11px;
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
   font-variant-numeric: tabular-nums;
 }
 .okf-lens-summary__hint { margin-top: var(--okf-space-3); font-size: var(--okf-text-xs); }
+.okf-graph-theme-digest { margin-top: var(--okf-space-3); }
 
 .okf-signal__status {
   margin: var(--okf-space-1) 0 0;
@@ -683,7 +689,7 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
 .okf-edge-bundle-index {
   position: absolute; z-index: 12; right: .75rem; top: 4.5rem;
   max-width: min(22rem, calc(100% - 1.5rem));
-  padding: .45rem .6rem; border: 1px solid var(--okf-border-strong);
+  padding: .45rem .6rem; border: 0;
   background: var(--okf-bg-elev); box-shadow: var(--shadow-pop);
 }
 .okf-edge-bundle-index summary { cursor: pointer; font-weight: 700; }
@@ -758,13 +764,14 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
   gap: 4px;
   padding: 6px 10px;
   background: var(--okf-bg-elev);
-  border: 1px solid var(--okf-border-strong);
+  border: 0;
   border-radius: 0;
   box-shadow: var(--shadow-pop);
   font-size: var(--okf-text-sm);
   max-height: 40vh;
   overflow-y: auto;
 }
+.okf-graph-orphans[hidden] { display: none; }
 .okf-graph-orphans__head {
   display: flex;
   align-items: baseline;
@@ -772,6 +779,7 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
   flex-wrap: wrap;
 }
 .okf-graph-orphans__title {
+  font-family: var(--font-mono);
   font-weight: 600;
   color: var(--okf-fg);
   font-variant-numeric: tabular-nums;
@@ -791,8 +799,9 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
 
 /* ---- Phase 3: keyboard node index broken-link marker -------------------- *
  * A non-colour "!" badge appended to node-index entries whose concept has
- * unresolved outgoing links. Mirrors the canvas red underlay without
- * relying on colour alone (a11y: not colour-only). */
+ * unresolved outgoing links. Mirrors the canvas warning underlay without
+ * relying on colour alone (a11y: not colour-only). The muted error hue
+ * colours the glyph and its outline only, never a fill. */
 .okf-node-index__warn {
   display: inline-flex;
   align-items: center;
@@ -800,9 +809,11 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
   width: 16px;
   height: 16px;
   flex-shrink: 0;
+  border: 1px solid var(--okf-error);
   border-radius: 0;
-  background: var(--okf-error);
-  color: var(--okf-error-on);
+  background: transparent;
+  color: var(--okf-error);
+  font-family: var(--font-mono);
   font-size: var(--okf-text-xs);
   font-weight: 700;
   line-height: 1;
@@ -810,12 +821,14 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
 
 /* ---- Phase 3: tooltip broken-link warning row --------------------------- *
  * The hover tooltip's broken-link count row (mirrors the canvas underlay +
- * the node-index "!"; non-colour channel for the cue). */
+ * the node-index "!"; non-colour channel for the cue), drawn as a 2px status
+ * bar. */
 .okf-graph-tip__warn {
   margin-top: 6px;
   padding: 3px 6px;
-  background: var(--okf-error-bg);
-  border: 1px solid var(--okf-error);
+  background: transparent;
+  border: 0;
+  border-inline-start: 2px solid var(--okf-error);
   border-radius: 0;
   color: var(--okf-error);
   font-size: var(--okf-text-xs);
@@ -829,40 +842,42 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
   max-width: 280px;
   padding: 10px 12px;
   background: var(--okf-bg-elev);
-  border: 1px solid var(--okf-border-strong);
+  border: 0;
   border-radius: 0;
   box-shadow: var(--shadow-pop);
   pointer-events: none;
   font-size: var(--okf-text-sm);
   line-height: 1.4;
 }
-/* Type name in muted ink beside a stripe in the node's canvas fill (graph.js
- * sets --okf-graph-tip-fill): neutral by default, the muted lens colour when
- * a lens is on. Never the name's ink. */
+/* The type as a mono micro-label beside a 2px stripe in the node's canvas
+ * fill (graph.js sets --okf-graph-tip-fill): neutral by default, the muted
+ * lens colour when a lens is on. Never the name's ink. */
 .okf-graph-tip__type {
-  font-size: var(--okf-text-xs);
-  font-weight: 700;
+  font-family: var(--font-label);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--okf-fg-muted);
-  border-inline-start: 3px solid var(--okf-graph-tip-fill, currentColor);
+  letter-spacing: var(--label-track);
+  color: var(--label-color);
+  border-inline-start: 2px solid var(--okf-graph-tip-fill, currentColor);
   padding-inline-start: 6px;
 }
 .okf-graph-tip__title { font-weight: 700; margin-top: 2px; }
 .okf-graph-tip__desc { color: var(--okf-fg-muted); margin-top: 4px; }
 .okf-graph-tip__meta {
   color: var(--okf-fg-muted);
+  font-family: var(--font-mono);
   font-size: var(--okf-text-xs);
   margin-top: 6px;
   font-variant-numeric: tabular-nums;
 }
 .okf-graph-canvas-proxy{position:absolute;inset:8px;z-index:1;pointer-events:none;border:2px solid transparent;border-radius:0}
-.okf-graph-canvas-proxy:focus-visible{outline:3px solid var(--okf-select,var(--okf-accent));outline-offset:-3px}
+.okf-graph-canvas-proxy:focus-visible{outline:3px solid var(--okf-focus-color);outline-offset:-3px}
 .okf-node-index__item.is-active{border-inline-start:2px solid var(--accent);font-weight:700}
-.okf-graph-actions{position:absolute;z-index:32;display:flex;gap:2px;max-width:calc(100% - 16px);padding:4px;background:var(--okf-bg-elev);border:1px solid var(--okf-border-strong);border-radius:0;box-shadow:var(--shadow-pop)}
+.okf-graph-actions{position:absolute;z-index:32;display:flex;gap:2px;max-width:calc(100% - 16px);padding:4px;background:var(--okf-bg-elev);border:0;border-radius:0;box-shadow:var(--shadow-pop)}
 .okf-graph-actions[hidden]{display:none}
 .okf-graph-actions button{min-height:32px;padding:4px 8px;color:var(--okf-fg);background:transparent;border:0;border-radius:0;white-space:nowrap;cursor:pointer}
-.okf-graph-actions button:hover{background:var(--okf-bg-inset)}
+.okf-graph-actions button:hover{background:var(--okf-hover-fill);border-color:var(--okf-border-strong);color:var(--okf-fg);box-shadow:none}
 .okf-graph-actions button:focus-visible{outline:2px solid var(--okf-accent);outline-offset:1px}
 @media (max-width:480px){
   .okf-graph-actions{position:fixed!important;inset:auto 8px calc(env(safe-area-inset-bottom,0px) + 8px) 8px!important;display:grid;grid-template-columns:1fr;gap:4px;max-width:none!important;max-height:min(60vh,20rem);overflow-y:auto;overscroll-behavior:contain;padding:8px;z-index:1100}
@@ -883,16 +898,17 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
   }
   .okf-detail__header > .okf-graph-actions button:first-child { display: none; }
 }
-.okf-graph-focusbar{position:absolute;top:56px;left:50%;z-index:31;display:flex;align-items:center;gap:var(--okf-space-2);max-width:calc(100% - 32px);padding:6px 8px;background:var(--okf-bg-elev);border:2px solid var(--okf-accent);border-radius:0;box-shadow:var(--shadow-pop);font-size:var(--okf-text-sm);transform:translateX(-50%)}
+.okf-graph-focusbar{position:absolute;top:56px;left:50%;z-index:31;display:flex;align-items:center;gap:var(--okf-space-2);max-width:calc(100% - 32px);padding:6px 8px;background:var(--okf-bg-elev);border:0;border-radius:0;box-shadow:var(--shadow-pop);font-size:var(--okf-text-sm);transform:translateX(-50%)}
 .okf-graph-focusbar[hidden]{display:none}.okf-graph-focusbar label{display:flex;align-items:center;gap:4px;white-space:nowrap}.okf-graph-focusbar select,.okf-graph-focusbar button{min-height:32px;color:var(--okf-fg);background:var(--okf-bg-elev);border:1px solid var(--okf-border-strong);border-radius:0}
 .okf-detail-path{margin:0 0 var(--okf-space-4);padding:var(--okf-space-3) 0;border-block:1px solid var(--okf-border)}.okf-detail-path h3,.okf-detail-path p{margin-block:0 var(--okf-space-2)}
 .okf-detail-path__chain{display:flex;align-items:center;gap:var(--okf-space-2);padding:0;margin:0 0 var(--okf-space-3);list-style:none;overflow-x:auto}.okf-detail-path__chain li{display:flex;align-items:center;gap:var(--okf-space-2)}
 .okf-detail-path__node{color:var(--okf-accent);background:transparent;border:0;padding:4px;font-weight:700;cursor:pointer}.okf-detail-path__relation{display:inline-flex;padding:2px 6px;background:var(--okf-bg-inset);border-radius:0;color:var(--okf-fg-muted);font-size:var(--okf-text-xs);white-space:nowrap}.okf-detail-path__relation--reverse{border:1px dashed var(--okf-border-strong);color:var(--okf-fg)}
 .okf-detail-relationships{margin-block:0 var(--okf-space-4);padding-block:0 var(--okf-space-3);border-bottom:1px solid var(--okf-border)}.okf-detail-relationships h3{margin:0 0 var(--okf-space-2)}.okf-detail-selected-status{margin:0 0 var(--okf-space-2);font-weight:750}.okf-detail-relationships__list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,15rem),1fr));gap:var(--okf-space-2);width:100%;margin:0;padding:0 0 var(--okf-space-2);list-style:none;overflow-x:visible}.okf-detail-relationships__list li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 8px;width:100%;min-width:0;max-width:100%;padding:8px;border:2px solid var(--okf-border-strong);border-radius:0;background:var(--okf-bg-inset)}.okf-detail-relationships__key{color:var(--okf-fg-muted);font-size:var(--okf-text-xs);font-weight:700}.okf-detail-relationships__list button{min-height:36px;padding:3px 0;border:0;background:transparent;color:var(--okf-accent);font:inherit;font-weight:650;text-align:left;white-space:normal}.okf-detail-relationships__list button:focus-visible{outline:2px solid var(--okf-accent);outline-offset:2px}
-@media(max-width:640px){.okf-graph-focusbar{left:8px;right:8px;max-width:none;transform:none;flex-wrap:wrap}.okf-graph-focusbar select,.okf-graph-focusbar button{min-height:44px}}
+@media(max-width:640px){.okf-graph-focusbar{left:8px;right:8px;transform:none;flex-wrap:wrap}.okf-graph-focusbar select,.okf-graph-focusbar button{min-height:44px}}
 @media(prefers-reduced-motion:reduce){.okf-graph-focusbar,.okf-detail-path{transition:none!important}}
 
-/* ---- Phase 4: zoom cluster (bottom-right) ------------------------------ */
+/* ---- Phase 4: zoom cluster (bottom-right) ------------------------------ *
+ * Viewport controls: outlined squares, no shadow, neutral hover. */
 .okf-graph-zoom {
   position: absolute;
   right: 14px;
@@ -915,20 +931,30 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
-  box-shadow: var(--shadow-pop);
+  box-shadow: none;
 }
 .okf-graph-zoom button:hover {
-  border-color: var(--okf-accent);
-  color: var(--okf-accent);
+  border-color: var(--okf-border-strong);
+  background: var(--okf-hover-fill);
+  color: var(--okf-fg);
+  box-shadow: none;
 }
+.okf-graph-zoom button:focus-visible { outline: 2px solid var(--okf-focus-ring); outline-offset: 2px; }
+/* A short canvas (the single-file Search & context drawer open, a short
+ * window) cannot fit the column beside All concepts: graph.js marks it and
+ * the cluster becomes a row along the bottom-left edge, with its tooltips
+ * above the buttons. */
+#okf-graph[data-okf-graph-short] > .okf-graph-zoom { flex-direction: row; left: 14px; right: auto; }
+#okf-graph[data-okf-graph-short] > .okf-graph-zoom button[data-tooltip]::after { top: auto; right: auto; bottom: calc(100% + 8px); left: 0; transform: none; }
+#okf-graph[data-okf-graph-short] > .okf-graph-minimap { right: auto; left: 14px; bottom: 66px; }
 .okf-viewport-icon{width:20px;height:20px;display:block}.okf-graph-zoom button.is-running .okf-viewport-icon{animation:okf-viewport-spin .8s linear infinite}.okf-graph-zoom button.is-failed{border-width:2px;border-color:var(--okf-error);color:var(--okf-error)}@keyframes okf-viewport-spin{to{transform:rotate(360deg)}}
 .okf-viewport-label{display:none}
-.okf-graph-minimap{position:absolute;right:58px;bottom:14px;z-index:24;width:160px;height:116px;background:var(--okf-bg-elev);border:2px solid var(--okf-border-strong);border-radius:0;box-shadow:var(--shadow-pop);overflow:hidden;pointer-events:none}.okf-graph-minimap[hidden]{display:none}.okf-graph-minimap>span{display:block;height:16px;padding-inline:5px;color:var(--okf-fg);font-size:10px;font-weight:700;line-height:16px;background:var(--okf-bg-inset)}.okf-graph-minimap canvas{display:block;width:160px;height:100px}
-.okf-graph-search-status{margin-inline-start:6px;color:var(--okf-fg-muted);font-size:var(--okf-text-xs)}.okf-graph-search-clear{min-height:32px;margin-inline-start:4px;background:transparent;color:var(--okf-accent);border:0;cursor:pointer}.okf-graph-search-clear[hidden]{display:none}
-@media(max-width:640px){html,body,.okf-viewer--graph,.okf-layout,.okf-layout>.okf-graph,.okf-layout>.okf-detail{box-sizing:border-box;max-width:100%;min-width:0;overflow-x:hidden}.okf-graph-zoom{right:8px;bottom:8px}.okf-graph-zoom button,.okf-filter-chips button,.okf-graph-search-clear{min-width:44px;min-height:44px}.okf-graph-minimap{right:60px;bottom:8px;width:120px;height:92px}.okf-graph-minimap canvas{width:120px;height:76px}.okf-signal__seg{grid-template-columns:1fr}.okf-lens-choice{grid-template-columns:44px minmax(0,1fr)}.okf-lens-preview{width:44px;height:32px}.okf-filter-chip-group{max-width:100%}.okf-filter-chip{min-width:0;overflow-wrap:anywhere}.okf-filter-showall{min-width:88px}.okf-graph-focusbar{top:8px;max-width:calc(100% - 16px)}.okf-graph-actions{max-width:calc(100% - 16px)}.okf-detail-relationships__list{display:grid;grid-template-columns:minmax(0,1fr);width:100%;overflow-x:visible;overscroll-behavior-inline:auto}.okf-detail-relationships__list li{width:100%;max-width:100%;min-width:0;grid-template-columns:minmax(4.5rem,auto) minmax(0,1fr);flex:none}.okf-detail-relationships__list button{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:break-word}}
+.okf-graph-minimap{position:absolute;right:58px;bottom:14px;z-index:24;width:160px;height:116px;background:var(--okf-bg-elev);border:0;border-radius:0;box-shadow:var(--shadow-pop);overflow:hidden;pointer-events:none}.okf-graph-minimap[hidden]{display:none}.okf-graph-minimap>span{display:block;height:16px;padding-inline:5px;font-family:var(--font-label);font-size:var(--label-size);font-weight:var(--label-weight);letter-spacing:var(--label-track);text-transform:uppercase;line-height:16px;color:var(--label-color);background:var(--okf-bg-inset);border-bottom:1px solid var(--okf-border)}.okf-graph-minimap canvas{display:block;width:160px;height:100px}
+.okf-graph-search-status{margin-inline-start:6px;color:var(--okf-fg-muted);font-size:var(--okf-text-xs)}.okf-viewer--graph .okf-graph-search-status:empty{display:none}.okf-graph-search-clear{min-height:32px;margin-inline-start:4px;background:transparent;color:var(--okf-accent);border:0;cursor:pointer}.okf-graph-search-clear[hidden]{display:none}
+@media(max-width:640px){html,body,.okf-viewer--graph,.okf-layout,.okf-layout>.okf-graph,.okf-layout>.okf-detail{box-sizing:border-box;max-width:100%;min-width:0;overflow-x:hidden}.okf-graph-zoom{right:8px;bottom:8px}.okf-graph-zoom button,.okf-filter-chips button,.okf-graph-search-clear{min-width:44px;min-height:44px}.okf-graph-minimap{right:60px;bottom:8px;width:120px;height:92px}.okf-graph-minimap canvas{width:120px;height:76px}.okf-signal__seg{grid-template-columns:1fr}.okf-lens-choice{grid-template-columns:44px minmax(0,1fr)}.okf-lens-preview{width:44px;height:32px}.okf-filter-chip-group{max-width:100%}.okf-filter-chip{min-width:0;overflow-wrap:anywhere}.okf-filter-showall{min-width:88px}.okf-graph-focusbar{top:8px;max-width:calc(100% - 16px)}.okf-graph-actions{max-width:calc(100% - 16px)}.okf-detail-relationships__list{display:grid;grid-template-columns:minmax(0,1fr);width:100%;overflow-x:visible;overscroll-behavior-inline:auto}.okf-detail-relationships__list li{width:100%;max-width:100%;flex:none}.okf-detail-relationships__list button{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:break-word}}
 @media(max-width:360px){.okf-detail-relationships__list li{grid-template-columns:minmax(0,1fr)}.okf-detail-relationships__key{margin-top:4px}.okf-detail-relationships__key:first-child{margin-top:0}}
 .okf-graph-viewport-toolbar{display:none}
-@media(forced-colors:active){.okf-graph-minimap{display:none!important}.okf-graph-zoom button[aria-label="Show minimap"]{display:none}.okf-filter-chip,.okf-filter-solo,.okf-filter-showall,.okf-lens-preview{forced-color-adjust:auto;border:2px solid CanvasText}.okf-filter-chip.is-off{border-style:dashed}.okf-filter-chip.is-off::after{content:" · off"}.okf-filter-chip[aria-pressed=true]{outline:3px double Highlight;box-shadow:none}.okf-lens-preview line,.okf-lens-preview circle,.okf-preview-arrow,.okf-preview-hull,.okf-preview-ring{stroke:CanvasText!important}.okf-lens-preview circle{fill:Canvas!important}.okf-graph-actions,.okf-graph-focusbar{border:3px solid Highlight}.okf-node-index__item.is-active{outline:3px dotted Highlight;outline-offset:-3px}.okf-detail-path__message::before{content:"Highlighted path: ";font-weight:700}.okf-graph-canvas-proxy:focus-visible{outline:4px double Highlight}}
+@media(forced-colors:active){.okf-graph-minimap{display:none!important}.okf-graph-zoom button[aria-label="Show minimap"]{display:none}.okf-filter-chip,.okf-filter-solo,.okf-filter-showall,.okf-lens-preview{forced-color-adjust:auto;border:2px solid CanvasText}.okf-filter-chip.is-off{border-style:dashed}.okf-filter-chip.is-off::after{content:" · off"}.okf-filter-chip[aria-pressed=true]{outline:3px double Highlight;box-shadow:none}.okf-lens-preview line,.okf-lens-preview circle,.okf-preview-arrow,.okf-preview-hull,.okf-preview-ring{stroke:CanvasText!important}.okf-lens-preview circle{fill:Canvas!important}.okf-node-index__item.is-active{outline:3px dotted Highlight;outline-offset:-3px}.okf-detail-path__message::before{content:"Highlighted path: ";font-weight:700}.okf-graph-canvas-proxy:focus-visible{outline:4px double Highlight}}
 
 /* ---- Phase 5: live "graph updated" chip --------------------------------- */
 .okf-graph-updated {
@@ -942,7 +968,7 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
   gap: var(--okf-space-2);
   padding: 6px 12px;
   background: var(--okf-bg-elev);
-  border: 1px solid var(--okf-accent);
+  border: 0;
   border-radius: 0;
   box-shadow: var(--shadow-pop);
   font-size: var(--okf-text-sm);
@@ -955,6 +981,8 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
   cursor: pointer;
   font-size: var(--okf-text-sm);
   padding: 0 2px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .okf-graph-updated button:hover { text-decoration: underline; }
 
@@ -966,7 +994,8 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
   width: min(340px, calc(100% - 2 * var(--okf-space-3)));
   padding: 18px;
   background: var(--okf-bg-elev);
-  border: 1px solid var(--okf-accent);
+  border: 0;
+  border-top: 2px solid var(--okf-border-strong);
   border-radius: 0;
   box-shadow: var(--shadow-pop);
   font-size: var(--okf-text-sm);
@@ -982,6 +1011,8 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
   margin: var(--okf-space-3);
   flex: 0 0 auto;
 }
+/* In the detail pane the tour is an in-flow band, not a floating layer. */
+.okf-graph-tour.okf-graph-tour--detail { box-shadow: none; border: 1px solid var(--okf-border); border-top: 2px solid var(--okf-border-strong); }
 /* The detail pane is intentionally hidden at 641–900, while the tour remains
  * nonmodal. In that band its same semantic surface overlays the bounded canvas. */
 .okf-graph > .okf-graph-tour--detail {
@@ -993,9 +1024,11 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
 .okf-graph-tour strong { display: block; margin-bottom: 4px; font-size: var(--okf-text-base); }
 .okf-graph-tour p { margin: 0 0 10px; color: var(--okf-fg-muted); }
 .okf-graph-tour__nav { display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: var(--okf-space-2); }
-.okf-graph-tour__dots { color: var(--okf-fg-muted); font-size: var(--okf-text-xs); }
-/* The tour's Next is the view's one filled primary action. */
-.okf-graph-tour__nav button, .okf-graph-tour__close {
+.okf-graph-tour__dots { color: var(--okf-fg-muted); font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--okf-text-xs); }
+/* The tour's Next is the view's one filled primary action; Back and Skip are
+ * outlined secondaries (the two-class selector outranks the nav button rule,
+ * so no !important is needed). */
+.okf-graph-tour__nav button {
   background: var(--okf-action-primary-bg);
   color: var(--okf-action-primary-fg);
   border: none;
@@ -1006,21 +1039,26 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
   font-weight: 600;
   cursor: pointer;
 }
+.okf-graph-tour__nav .okf-graph-tour__back,
+.okf-graph-tour__nav .okf-graph-tour__skip { background: transparent; color: var(--okf-fg); border: 1px solid var(--okf-border-strong); }
 .okf-graph-tour__close {
   position: absolute;
   top: 6px;
   right: 8px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
   background: none;
   border: none;
+  border-radius: 0;
   color: var(--okf-fg-muted);
-  cursor: pointer;
   font-size: 1.35rem;
-  padding: 0;
+  font-weight: 600;
+  cursor: pointer;
 }
-.okf-graph-tour__back, .okf-graph-tour__skip { background: transparent!important; color: var(--okf-fg)!important; border: 1px solid var(--okf-border-strong)!important; }
 .okf-graph-tour button:focus-visible, .okf-graph-tour-replay:focus-visible { outline: 3px solid var(--okf-accent); outline-offset: 2px; }
 .okf-graph-tour-replay { min-height: 44px; }
-[data-tour-anchor="true"] { outline: 3px solid var(--okf-accent); outline-offset: 3px; }
+[data-tour-anchor="true"] { outline: 2px solid var(--okf-focus-ring); outline-offset: 3px; }
 [data-tour-anchor="true"] { position: relative; }
 [data-tour-anchor="true"]::after { content: ""; position: absolute; z-index: 45; width: 10px; height: 10px; right: 8px; top: 8px; border-radius: 0; background: var(--okf-accent); border: 3px solid var(--okf-bg-elev); box-sizing: content-box; pointer-events: none; }
 .okf-graph-tour__handle { display: none; }
@@ -1031,26 +1069,40 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
 .okf-signal__seg-item input:checked + .okf-lens-choice b { color: var(--okf-fg); }
 .okf-signal__seg-item input:checked + .okf-lens-choice small { color: var(--okf-fg-muted); opacity: 1; }
 /* The lens preview is a miniature canvas with its own band inset in every
- * state. Unselected pictures draw in --text-2 and the selected one in ink
- * (--text); both are gated to >= 4.5:1 on --bg-2 in every Ledger palette.
- * Forced colours repaint it in CanvasText. */
-.okf-lens-choice .okf-lens-preview { color: var(--okf-fg-muted); }
+ * state. Unselected pictures draw in --text-2 (the .okf-lens-preview rule
+ * above) and the selected one in ink (--text); both are gated to >= 4.5:1 on
+ * --bg-2 in every Ledger palette. Forced colours repaint it in CanvasText. */
 .okf-signal__seg-item input:checked + .okf-lens-choice .okf-lens-preview { color: var(--okf-fg); }
 .okf-signal__seg-item input:checked + .okf-lens-choice .okf-lens-preview line { opacity: 1; }
 
 /* Palette-aware graph chrome: these rules frame active lenses, selection,
  * tools, and detail UI; the canvas itself is painted by graph.js. */
-.okf-graph-canvas-proxy:focus-visible {
-  outline-color: var(--okf-focus-color);
-}
 .okf-detail__header { padding-bottom: var(--okf-space-3); border-bottom: 2px solid var(--okf-accent-bg); }
+/* Selected concept: the record opens on a 2px --border-strong rule; the
+ * type is an outlined mono micro-label, never a colour. */
+.okf-detail #detail-content > .okf-detail__header {
+  padding-top: var(--okf-space-3);
+  border-top: 2px solid var(--okf-border-strong);
+  border-bottom: 1px solid var(--okf-border);
+}
+.okf-detail #detail-type.okf-type-chip {
+  display: inline-block;
+  padding: 3px 7px;
+  border: 1px solid var(--okf-border-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--okf-fg-muted);
+  font-family: var(--font-label);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-track);
+  text-transform: uppercase;
+}
+.okf-detail #detail-id { font-family: var(--font-mono); font-size: 11.5px; color: var(--okf-fg-subtle); }
 .okf-detail__connection-summary { padding-block: var(--okf-space-3); border-block: 1px solid var(--okf-border); }
-.okf-graph-zoom button:hover, .okf-graph-actions button:hover { box-shadow: none; }
-.okf-graph-tip, .okf-graph-tour, .okf-graph-actions { box-shadow: var(--shadow-pop); }
 @media (forced-colors: active) {
   .okf-graph-canvas-proxy:focus-visible,
-  .okf-signal__seg-item input:checked + .okf-lens-choice,
-  .okf-graph-tip, .okf-graph-tour, .okf-graph-actions { box-shadow: none; }
+  .okf-signal__seg-item input:checked + .okf-lens-choice { box-shadow: none; }
   [data-theme] .okf-detail { background: Canvas; }
 }
 
@@ -1060,15 +1112,16 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
   max-width: none;
   margin: var(--okf-space-3) var(--okf-space-3) 0;
   padding: 6px 10px;
-  border: 1px solid var(--okf-border-strong);
+  /* Info panel: a band with the accent's left edge (both density tiers). */
+  border: 1px solid var(--okf-border);
+  border-inline-start: 2px solid var(--accent);
   border-radius: 0;
   background: var(--okf-bg-inset);
   color: var(--okf-fg-muted);
-  font-size: var(--okf-text-xs);
-  line-height: 1.25;
+  font-size: 12px;
+  line-height: 1.4;
   text-wrap: balance;
 }
-.okf-graph-density--detail { border-color: var(--okf-accent); color: var(--okf-fg); }
 
 /* ---- Phase 4: legend rows as type filter chips -------------------------- */
 .okf-graph-legend__item--chip { cursor: pointer; border-radius: 0; padding: 1px 4px; }
@@ -1082,6 +1135,7 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
 .okf-single-search {
   flex: 0 0 auto;
   padding: var(--okf-space-4) max(var(--okf-space-4), calc((100vw - var(--okf-maxw)) / 2));
+  border-top: 2px solid var(--okf-border-strong);
   border-bottom: 1px solid var(--okf-border);
   background: var(--okf-bg);
   max-height: min(72vh, 760px);
@@ -1092,17 +1146,95 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
 }
 .okf-single-search__summary[hidden] { display: none; }
 .okf-single-search__head h2, .okf-single-search__summary h3 { margin: 0; font-family: var(--okf-font-display); }
+.okf-single-search__head h2 { font-size: 20px; letter-spacing: -0.015em; }
 .okf-single-search__head p { margin: var(--okf-space-1) 0 var(--okf-space-3); color: var(--okf-fg-muted); }
 .okf-single-search__form, .okf-single-search__status, .okf-single-search__summary,
 .okf-single-search > .okf-search-results-list, .okf-single-search > .okf-copy-fallback { max-width: var(--okf-maxw); margin-left: auto; margin-right: auto; }
+.okf-single-search__form .okf-field > span,
+.okf-single-search .okf-search-modes > legend {
+  font-family: var(--font-label);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-track);
+  text-transform: uppercase;
+  color: var(--label-color);
+}
 .okf-single-search__query { display: flex; gap: var(--okf-space-2); }
-.okf-single-search__query input { flex: 1; min-width: 0; min-height: 44px; padding: var(--okf-space-2); border: 1px solid var(--okf-border-strong); border-radius: 0; background: var(--okf-bg-elev); color: var(--okf-fg); font: inherit; }
-.okf-single-search__status { min-height: 1.5em; color: var(--okf-fg-muted); }
+.okf-single-search__query input { flex: 1; min-width: 0; min-height: var(--okf-graph-field-h); padding: var(--okf-space-2); border: 1px solid var(--input-border); border-radius: 0; background: var(--input-bg); color: var(--input-text); font: inherit; }
+.okf-single-search__status { min-height: 1.5em; font-family: var(--font-mono); font-size: 11.5px; color: var(--okf-fg-subtle); }
 .okf-single-search__summary { padding-top: var(--okf-space-3); border-top: 1px solid var(--okf-border); }
 .okf-single-search [data-mode-field][hidden] { display: none; }
 .okf-single-search .okf-search-result h4 { margin: 0 0 var(--okf-space-1); font-size: var(--okf-text-md); }
 .okf-graph-context-actions { margin-top: var(--okf-space-2); }
-.okf-graph-copy-fallback { position: fixed; right: var(--okf-space-4); bottom: var(--okf-space-4); z-index: 70; width: min(34rem, calc(100vw - 2 * var(--okf-space-4))); padding: var(--okf-space-3); background: var(--okf-bg-elev); border: 1px solid var(--okf-border-strong); box-shadow: var(--shadow-pop); }
+.okf-graph-copy-fallback { position: fixed; right: var(--okf-space-4); bottom: var(--okf-space-4); z-index: 70; width: min(34rem, calc(100vw - 2 * var(--okf-space-4))); padding: var(--okf-space-3); background: var(--okf-bg-elev); border: 0; border-radius: 0; box-shadow: var(--shadow-pop); }
+
+/* Single-file banners sit on the same column as the index and the Search &
+ * context drawer (the page column itself, not the document gutter). */
+.okf-viewer--singlefile .okf-studio-fallback-banner {
+  padding-inline: max(var(--okf-space-4), calc((100vw - var(--okf-maxw)) / 2));
+}
+
+/* Single-file Index: the Ledger inventory ruler on the portable list —
+ * row number / record (title over mono type and id) / summary, hairline
+ * rows, ink titles. Row numbers are CSS counters, so they follow the list. */
+.okf-viewer--singlefile .okf-single-index__list {
+  display: block;
+  margin: var(--okf-space-5) 0 0;
+  padding: 0;
+  border-top: 1px solid var(--okf-border-strong);
+  counter-reset: okf-single-row;
+}
+.okf-viewer--singlefile .okf-single-index__list > li {
+  display: grid;
+  grid-template-columns: var(--ledger-col-n, 42px) minmax(0, 1.05fr) minmax(0, 1.9fr);
+  grid-template-areas: "n title summary" "n meta summary";
+  grid-template-rows: auto 1fr;
+  column-gap: var(--ledger-col-gap, 22px);
+  align-items: start;
+  padding: 12px 0;
+  border-top: 0;
+  border-bottom: 1px solid var(--okf-border);
+  counter-increment: okf-single-row;
+}
+.okf-viewer--singlefile .okf-single-index__list > li::before {
+  content: counter(okf-single-row, decimal-leading-zero);
+  grid-area: n;
+  padding-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--okf-fg-subtle);
+}
+.okf-viewer--singlefile .okf-single-index__entry { grid-area: title; border-radius: 0; }
+.okf-viewer--singlefile .okf-single-index__entry > strong {
+  color: var(--card-title-color);
+  font-size: var(--card-title-size);
+  font-weight: var(--card-title-weight);
+  letter-spacing: var(--card-title-track);
+}
+.okf-viewer--singlefile .okf-single-index__list > li > span {
+  grid-area: meta;
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--okf-fg-subtle);
+  overflow-wrap: anywhere;
+}
+.okf-viewer--singlefile .okf-single-index__list > li > p {
+  grid-area: summary;
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--okf-fg-muted);
+}
+@media (max-width: 900px) {
+  .okf-viewer--singlefile .okf-single-index__list > li {
+    grid-template-columns: var(--ledger-col-n, 42px) minmax(0, 1fr);
+    grid-template-areas: "n title" "n meta" "n summary";
+    grid-template-rows: auto auto auto;
+  }
+  .okf-viewer--singlefile .okf-single-index__list > li > p { margin-top: 6px; }
+}
 
 @media (max-width: 900px) {
   .okf-viewer--graph .okf-topbar { height: auto; min-height: var(--okf-topbar-h); padding: var(--okf-space-2) var(--okf-space-3); flex-wrap: wrap; align-items: center; }
@@ -1160,7 +1292,7 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
   /* Topbar controls wrap instead of truncating ("Force n…") (reviewer #10).
    * Scoped to graph contexts since graph.css only loads on the graph page and
    * the single-file viewer. */
-  .okf-viewer--graph .okf-graph-tools { flex-wrap: wrap; row-gap: var(--okf-space-2); }
+  .okf-viewer--graph .okf-graph-tools { flex-wrap: wrap; }
   .okf-viewer--graph .okf-graph-tools #okf-search { flex: 1 1 100%; }
   .okf-viewer--graph .okf-graph-tools select { flex: 1 1 auto; min-width: 8.5rem; }
   .okf-single-search { max-height: none; overflow: visible; padding: var(--okf-space-3); }
@@ -1198,24 +1330,26 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
   }
   .okf-layout[data-mobile-pane="details"] > .okf-detail,
   .okf-layout[data-mobile-pane="concepts"] > .okf-graph {
-    height: 100%;
-    min-height: 0;
     overflow-y: auto;
     overscroll-behavior-y: contain;
     -webkit-overflow-scrolling: touch;
   }
+  /* The concepts pane sizes itself below; the details pane fills the layout. */
+  .okf-layout[data-mobile-pane="details"] > .okf-detail { height: 100%; }
   .okf-layout[data-mobile-pane="graph"]{overflow-y:auto;overscroll-behavior-y:contain}
   body.okf-viewer--graph > .okf-topbar, .okf-viewer--graph .okf-topbar { box-sizing: border-box!important; width: 100%!important; min-width: 0!important; max-width: 100vw!important; overflow: visible!important; }
   .okf-viewer--graph .okf-topbar__brand{height:auto!important;white-space:normal!important;display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:start!important;gap:6px!important;padding:8px!important}.okf-viewer--graph .okf-topbar__brand .okf-brand-link,.okf-viewer--graph .okf-topbar__brand>strong{min-width:0}.okf-viewer--graph .okf-topbar__brand strong{display:block!important;max-width:none!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;overflow-wrap:anywhere}.okf-viewer--graph .okf-topbar__brand .okf-muted{display:none!important}
   .okf-mobile-secondary{display:block;width:100%;min-width:0;border-top:1px solid var(--okf-border)}
-  .okf-mobile-secondary__summary{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:4px;padding:6px 8px;background:var(--okf-bg-elev)}
+  .okf-mobile-secondary__summary{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:6px;padding:6px 8px;background:var(--okf-bg-elev)}
   .okf-mobile-secondary__summary>*{box-sizing:border-box;min-width:0;min-height:44px;max-width:100%}
   .okf-mobile-secondary__summary [aria-label*="command palette" i]{white-space:nowrap!important}
   .okf-mobile-secondary__summary [aria-label*="command palette" i] kbd{display:none}
   .okf-mobile-secondary__summary [aria-label^="Live updates connection"]{width:auto!important;min-width:64px;overflow:visible;white-space:nowrap!important;font-size:var(--okf-text-sm);color:var(--okf-fg)}
-  .okf-mobile-mode{display:inline-flex;align-items:center;min-height:32px!important;padding:3px 7px;border:1px solid var(--okf-border-strong);border-radius:0;font-size:11px;font-weight:750;line-height:1.15;white-space:normal;text-align:end}
+  /* The mode indicator (Local / Static / Live) is a plain status word, as
+   * on wide screens, not a boxed control. */
+  .okf-mobile-mode{display:inline-flex;align-items:center;padding:3px 7px;border:0;border-radius:0;font-weight:750;white-space:normal;text-align:end}
   .okf-live-label{margin-inline-start:5px;font-weight:700;color:currentColor}
-  .okf-mobile-secondary__toggle{display:block;width:auto;min-width:44px;padding:6px 8px;color:var(--okf-fg);background:transparent;border:1px solid var(--okf-border-strong);border-radius:0;font:inherit;font-weight:600;white-space:nowrap!important;overflow-wrap:normal!important}
+  .okf-mobile-secondary__toggle{width:auto;min-width:44px;padding:6px 8px;color:var(--okf-fg);background:var(--okf-bg-inset);border:1px solid var(--okf-border-strong);border-radius:0;font:inherit;font-weight:600;white-space:nowrap!important;overflow-wrap:normal!important}
   .okf-mobile-secondary__toggle:focus-visible{outline:2px solid var(--okf-accent);outline-offset:2px}
   .okf-mobile-secondary__controls{display:block;width:100%}
   .okf-mobile-secondary__controls[hidden]{display:none!important}
@@ -1352,7 +1486,7 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
 }
 
 @media (forced-colors: active) {
-  .okf-graph-tour, [data-tour-anchor="true"] { border: 3px solid Highlight; forced-color-adjust: auto; }
+  [data-tour-anchor="true"] { border: 3px solid Highlight; forced-color-adjust: auto; }
   .okf-graph-tour button:focus-visible { outline: 3px double Highlight; }
   .okf-graph-tour .okf-graph-tour__nav .okf-graph-tour__next { color: ButtonText; background: ButtonFace; border: 2px solid ButtonText; forced-color-adjust: auto; }
   .okf-graph-tour .okf-graph-tour__nav .okf-graph-tour__next:disabled { color: GrayText; border: 2px solid GrayText; opacity: 1; }
@@ -1422,10 +1556,6 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
     width: 100%;
     min-height: 44px !important;
   }
-  .okf-mobile-secondary__summary {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    gap: 6px;
-  }
   .okf-mobile-secondary__summary > *,
   .okf-mobile-secondary__summary [aria-label*="command palette" i],
   .okf-mobile-secondary__toggle,
@@ -1438,15 +1568,10 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
     font-size: 14px !important;
     line-height: 1.2;
   }
-  .okf-mobile-mode {
-    border-color: var(--okf-border-strong);
-    background: transparent;
-  }
-  .okf-mobile-secondary__toggle { background: var(--okf-bg-inset); }
+  .okf-mobile-mode { background: transparent; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .okf-signal__advanced > summary::after { transition: none !important; }
   /* Phase 3: the orphan shelf, hub halo, and broken-link badge are static
    * (no transitions introduced). This guard exists so any future motion
    * enhancement is gated from the start. */
@@ -1464,7 +1589,7 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
 @media (forced-colors: active) {
   .okf-detail-selected-status,.okf-detail-relationships__list li{border-color:CanvasText}
   .okf-graph-legend__swatch {
-    border: 2px solid CanvasText;
+    border: 1px solid CanvasText;
     background: Canvas !important;
   }
   .okf-graph-legend__item--type-filter .okf-graph-legend__type-icon {
@@ -1478,24 +1603,42 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
    * Contrast), so the broken-link red underlay may not read as a warning.
    * The textual channels (tooltip warn row, detail-panel "Broken links"
    * row, node-index "!" badge) carry the warning independently. The "!"
-   * badge keeps its visible CanvasText border so it stays readable. */
+   * badge keeps its visible CanvasText border so it stays readable; the
+   * tooltip row keeps its 2px status bar in CanvasText. */
   .okf-node-index__warn {
     border: 1px solid CanvasText;
     background: Canvas !important;
     color: CanvasText;
   }
   .okf-graph-tip__warn {
-    border: 2px solid CanvasText;
+    border-inline-start-color: CanvasText;
     color: CanvasText;
     background: Canvas !important;
   }
-  .okf-node-index__comments,
-  .okf-node-index__comments::after {
+  .okf-node-index__comments {
     border-color: CanvasText;
     background: Canvas !important;
     color: CanvasText;
-    }
   }
+  /* Floating layers lose --shadow-pop; a CanvasText frame replaces it. */
+  .okf-node-index,
+  .okf-graph-tip,
+  .okf-graph-tour,
+  .okf-graph-actions,
+  .okf-graph-focusbar,
+  .okf-graph-lod-pill,
+  .okf-graph-updated,
+  .okf-graph-orphans,
+  .okf-graph-copy-fallback,
+  #okf-graph > .okf-graph-legend,
+  #okf-graph > .okf-edge-bundle-index { border: 1px solid CanvasText; box-shadow: none; }
+  /* State bars stay visible as Highlight. */
+  .okf-graph-density,
+  .okf-lens-summary__row[aria-current="true"],
+  .okf-signal__seg-item input:checked + span,
+  .okf-signal__seg-item input:checked + .okf-lens-choice { border-inline-start-color: Highlight; }
+  .okf-lens-summary__bar { background: CanvasText; }
+}
 
 /* Mobile graph stacking contract: the Appearance popover is a non-modal
  * theme.js overlay, so graph chrome must stay below its fixed surface without
@@ -1509,7 +1652,21 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom { z-index: 40 !im
 /* F06/F07/F16: composite alternatives, progressive identity labels, and a
  * conventional named viewport toolbar.  Options remain programmatically
  * focusable for compatibility, but only each listbox participates in Tab. */
-.okf-graph-tools > h2 { margin: 0; font-size: var(--okf-text-sm); }
+/* Find in graph: the heading sits on the field's centre line; the field's
+ * own label is a mono micro-label above it. */
+.okf-viewer--graph .okf-graph-tools > h2 {
+  display: flex;
+  align-items: center;
+  align-self: end;
+  min-height: var(--okf-graph-field-h);
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--okf-fg);
+  white-space: nowrap;
+}
 .okf-graph-tools__filter[hidden] { display: none !important; }
 .okf-graph-skip-links { display: contents; }
 .okf-graph-skip-links .okf-skip-link:nth-child(2):focus { inset-inline-start: 12rem; }
@@ -1549,7 +1706,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom { z-index: 40 !im
   max-width: 13rem;
   padding: 5px 8px;
   transform: translateY(-50%);
-  border: 1px solid var(--okf-border-strong);
+  border: 0;
   border-radius: 0;
   background: var(--okf-bg-elev);
   color: var(--okf-fg);
@@ -1569,7 +1726,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom { z-index: 40 !im
   .okf-graph-zoom button[data-tooltip]::after { display: none; }
 }
 @media (forced-colors: active) {
-  .okf-graph-zoom button[data-tooltip]::after { border: 1px solid CanvasText; background: Canvas; color: CanvasText; }
+  .okf-graph-zoom button[data-tooltip]::after { background: Canvas; color: CanvasText; }
 }
 @media (prefers-reduced-motion: reduce) {
   .okf-graph-zoom button[data-tooltip]::after { transition: none !important; }
@@ -1601,6 +1758,18 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
   max-width: 100%;
   overflow-x: hidden;
 }
+/* Route heading: a record title over a hairline, not a page title. */
+.okf-viewer--graph .okf-graph-route-title {
+  padding: 12px 20px;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+}
+@media (max-width: 640px) {
+  .okf-viewer--graph .okf-graph-route-title { padding: 4px var(--okf-space-3); font-size: var(--okf-text-base); }
+}
 @media (min-width: 900px) {
   /* Unlike document pages, the desktop graph is an application workspace:
    * bound the shell to the viewport and keep canvas/detail overflow local. */
@@ -1618,14 +1787,26 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
   display: flex;
   align-items: end;
   flex-wrap: wrap;
-  gap: var(--okf-space-2) var(--okf-space-3);
+  gap: 6px var(--okf-space-4);
   width: 100%;
   min-width: 0;
-  padding: var(--okf-space-2) max(var(--okf-space-4), calc((100vw - var(--okf-page-maxw, 1320px)) / 2));
+  padding: 10px max(var(--okf-space-4), calc((100vw - var(--okf-page-maxw, 1320px)) / 2)) 12px;
   border-bottom: 1px solid var(--okf-border);
-  background: var(--okf-bg);
+  background: var(--okf-bg-inset);
 }
-.okf-graph-tools label { display: grid; gap: 3px; min-width: 0; font-size: var(--okf-text-xs); font-weight: 700; color: var(--okf-fg-muted); }
+.okf-graph-tools label { display: grid; gap: 5px; min-width: 0; font-size: var(--okf-text-xs); font-weight: 700; color: var(--okf-fg-muted); }
+/* graph.js retires the legacy type select (and its label) once the lens
+ * panel owns type filtering; the grid display must not resurrect it. */
+.okf-graph-tools label[hidden] { display: none !important; }
+.okf-viewer--graph .okf-graph-tools label > span {
+  font-family: var(--font-label);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-track);
+  text-transform: uppercase;
+  line-height: 1.3;
+  color: var(--label-color);
+}
 .okf-graph-tools__search { flex: 1 1 20rem; /* Cap the stretch: a full-row
   input reads as an empty search bar; a bounded one keeps the row composed
   (label, input, type filter) on wide canvases. */ max-width: 28rem; }
@@ -1635,20 +1816,25 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
-  min-height: 40px;
-  padding: 6px 10px;
-  border: 1px solid var(--okf-border-strong);
-  border-radius: 0;
-  background: var(--okf-bg-elev);
-  color: var(--okf-fg);
   font: inherit;
 }
+.okf-viewer--graph .okf-graph-tools input,
+.okf-viewer--graph .okf-graph-tools select {
+  min-height: var(--okf-graph-field-h);
+  padding: 5px 10px;
+  border: 1px solid var(--input-border);
+  border-radius: 0;
+  background: var(--input-bg);
+  color: var(--input-text);
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+.okf-viewer--graph .okf-graph-tools input::placeholder { color: var(--okf-fg-subtle); opacity: 1; }
 .okf-graph-tools input:focus-visible,
 .okf-graph-tools select:focus-visible { outline: 2px solid var(--okf-accent); outline-offset: 2px; }
-.okf-graph-tools__reset { min-height: 40px; }
+.okf-viewer--graph .okf-graph-tools__reset { min-height: var(--okf-graph-field-h); }
 .okf-viewer--graph .okf-global-nav { flex-wrap: wrap; min-width: 0; overflow: visible; }
 .okf-viewer--graph .okf-layout { min-width: 0; max-width: 100%; }
-.okf-viewer--graph .okf-studio-bar { flex: 0 0 auto; }
 .okf-viewer--graph .okf-layout > .okf-detail {
   /* The Lenses bar is sticky inside this scrollport.  Reserve its occupied
    * band when browser automation, keyboard focus, or an anchor link scrolls
@@ -1683,7 +1869,6 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
   .okf-viewer--graph .okf-global-nav > * { min-width: 44px; min-height: 44px; }
   .okf-viewer--graph .okf-global-nav .okf-btn { padding-inline: var(--okf-space-2); }
   .okf-viewer--graph .okf-graph-tools {
-    align-items: stretch;
     padding-inline: var(--okf-space-3);
   }
   .okf-graph-tools__search { flex-basis: 100%; }
@@ -1751,7 +1936,8 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
 
 @media (max-width: 640px) {
   .okf-viewer--graph .okf-global-nav > * { min-height: 44px !important; }
-  .okf-viewer--graph .okf-graph-tools { padding-inline: var(--okf-space-2); }
+  /* Same 12px gutter as the pane tabs and the Concepts pane. */
+  .okf-viewer--graph .okf-graph-tools { padding-inline: var(--okf-space-3); }
   .okf-viewer--graph .okf-layout { overflow-y: auto; overscroll-behavior-y: contain; }
   .okf-viewer--graph .okf-layout[data-mobile-pane="details"] > .okf-detail { min-height: calc(100dvh - 11rem); }
   .okf-viewer--graph .okf-layout[data-mobile-pane="graph"] > .okf-graph { height: 50dvh; min-height: 360px; }
@@ -1902,365 +2088,15 @@ body.okf-viewer--graph[data-okf-single-destination="index"] {
   overflow-y: visible;
 }
 
-/* ==== Ledger graph structure ===========================================
- * The graph page in the Ledger system (DESIGN.md "Graph"). graph.js paints
- * the canvas from the palette tokens: neutral round nodes, --graph-edge
- * edges, --graph-label names on a --graph-halo outline, and a muted ramp
- * only while a colour lens is on. Around it the chrome is square and
- * hairline-ruled, figures are mono, floating layers take --shadow-pop (the
- * only elevation), and the accent marks state only: the selected node's
- * stroke, the info panel's left edge, the current starting point and 2px
- * state bars. Every colour below is a token. */
-:root { --okf-graph-field-h: 34px; }
-@media (pointer: coarse) { :root { --okf-graph-field-h: 44px; } }
-
-#okf-graph,
-.okf-viewer--graph .okf-layout > .okf-graph { background: var(--graph-bg); }
-.okf-graph-orphans[hidden] { display: none; }
-
-/* Route heading: a record title over a hairline, not a page title. */
-.okf-viewer--graph .okf-graph-route-title {
-  padding: 12px 20px;
-  font-family: var(--font-display);
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.015em;
-  line-height: 1.2;
-}
-@media (max-width: 640px) {
-  .okf-viewer--graph .okf-graph-route-title { padding: 4px var(--okf-space-2); font-size: var(--okf-text-base); }
-}
-
-/* Find in graph: the heading sits on the field's centre line; the field's
- * own label is a mono micro-label above it. */
-.okf-viewer--graph .okf-graph-tools {
-  align-items: end;
-  gap: 6px var(--okf-space-4);
-  padding-block: 10px 12px;
-  background: var(--okf-bg-inset);
-}
-.okf-viewer--graph .okf-graph-tools > h2 {
-  display: flex;
-  align-items: center;
-  align-self: end;
-  min-height: var(--okf-graph-field-h);
-  margin: 0;
-  font-family: var(--font-body);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.2;
-  color: var(--okf-fg);
-  white-space: nowrap;
-}
-.okf-viewer--graph .okf-graph-tools label { gap: 5px; }
-.okf-viewer--graph .okf-graph-tools label > span {
-  font-family: var(--font-label);
-  font-size: var(--label-size);
-  font-weight: var(--label-weight);
-  letter-spacing: var(--label-track);
-  text-transform: uppercase;
-  line-height: 1.3;
-  color: var(--label-color);
-}
-.okf-viewer--graph .okf-graph-tools input,
-.okf-viewer--graph .okf-graph-tools select {
-  min-height: var(--okf-graph-field-h);
-  padding: 5px 10px;
-  border: 1px solid var(--input-border);
-  border-radius: 0;
-  background: var(--input-bg);
-  color: var(--input-text);
-  font-family: var(--font-body);
-  font-size: 13px;
-}
-.okf-viewer--graph .okf-graph-tools input::placeholder { color: var(--okf-fg-subtle); opacity: 1; }
-.okf-viewer--graph .okf-graph-tools__reset { min-height: var(--okf-graph-field-h); }
-/* graph.js retires the legacy type select (and its label) once the lens
- * panel owns type filtering; the grid display must not resurrect it. */
-.okf-graph-tools label[hidden] { display: none !important; }
-/* An empty match-count note must not add a grid row under the field (it
- * pushed the field off the heading's centre line). */
-.okf-viewer--graph .okf-graph-search-status:empty { display: none; }
-
-/* Floating layers over the canvas: panel surface, no border, the 1px
- * --shadow-pop ring as their only elevation. */
-.okf-node-index,
-.okf-graph-tip,
-.okf-graph-tour,
-.okf-graph-actions,
-.okf-graph-focusbar,
-.okf-graph-minimap,
-.okf-graph-lod-pill,
-.okf-graph-updated,
-.okf-graph-orphans,
-.okf-graph-copy-fallback,
-#okf-graph > .okf-graph-legend,
-#okf-graph > .okf-edge-bundle-index,
-.okf-graph-zoom button[data-tooltip]::after {
-  border: 0;
-  border-radius: 0;
-  background: var(--okf-bg-elev);
-  box-shadow: var(--shadow-pop);
-}
-.okf-graph-tour { border-top: 2px solid var(--okf-border-strong); }
-.okf-graph-tour.okf-graph-tour--detail { box-shadow: none; border: 1px solid var(--okf-border); border-top: 2px solid var(--okf-border-strong); }
-.okf-graph-tour__dots,
-.okf-graph-orphans__title,
-.okf-node-index__count,
-.okf-graph-tip__meta { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-[data-tour-anchor="true"] { outline: 2px solid var(--okf-focus-ring); outline-offset: 3px; }
-.okf-graph-lod-pill:hover { border-color: transparent; background: var(--okf-hover-fill); color: var(--okf-fg); }
-.okf-graph-updated button { color: var(--okf-accent); text-decoration: underline; text-underline-offset: 2px; }
-.okf-graph-actions button:hover,
-.okf-signal__btn:hover:not(:disabled) { background: var(--okf-hover-fill); border-color: var(--okf-border-strong); color: var(--okf-fg); }
-
-/* Viewport controls: outlined squares, no shadow, neutral hover. */
-.okf-graph-zoom button {
-  border: 1px solid var(--okf-border-strong);
-  border-radius: 0;
-  background: var(--okf-bg-elev);
-  color: var(--okf-fg);
-  box-shadow: none;
-}
-.okf-graph-zoom button:hover { border-color: var(--okf-border-strong); background: var(--okf-hover-fill); color: var(--okf-fg); }
-.okf-graph-zoom button:focus-visible { outline: 2px solid var(--okf-focus-ring); outline-offset: 2px; }
-.okf-graph-zoom button.is-failed { border-color: var(--okf-error); color: var(--okf-error); }
-
-/* Overview map: micro-label head on the band. */
-.okf-graph-minimap > span {
-  font-family: var(--font-label);
-  font-size: var(--label-size);
-  font-weight: var(--label-weight);
-  letter-spacing: var(--label-track);
-  text-transform: uppercase;
-  color: var(--label-color);
-  background: var(--okf-bg-inset);
-  border-bottom: 1px solid var(--okf-border);
-}
-
-/* All concepts index: a floating record list. */
-.okf-node-index > summary { font-size: 13px; }
-.okf-node-index__item { border: 0; border-inline-start: 2px solid transparent; border-radius: 0; }
-.okf-node-index__item:hover { background: var(--okf-hover-fill); border-color: transparent; }
-.okf-node-index__item.is-active { border-inline-start-color: var(--accent); }
-.okf-node-index__swatch { width: 9px; height: 9px; border-radius: 0; border: 1px solid var(--okf-border-strong); }
-.okf-node-index__comments {
-  border: 1px solid var(--okf-border-strong);
-  border-radius: 0;
-  background: var(--okf-bg-inset);
-  color: var(--okf-fg);
-  font-family: var(--font-mono);
-  font-weight: 500;
-}
-.okf-node-index__comments::after { display: none; }
-/* Broken links: the muted error hue on the glyph and its outline only. */
-.okf-node-index__warn {
-  border: 1px solid var(--okf-error);
-  border-radius: 0;
-  background: transparent;
-  color: var(--okf-error);
-  font-family: var(--font-mono);
-}
-
-/* Hover card: the type as a mono micro-label beside a 2px stripe in the
- * node's canvas fill; the broken-link row is a 2px status bar. */
-.okf-graph-tip__type {
-  font-family: var(--font-label);
-  font-size: var(--label-size);
-  font-weight: var(--label-weight);
-  letter-spacing: var(--label-track);
-  color: var(--label-color);
-  border-inline-start-width: 2px;
-}
-.okf-graph-tip__warn {
-  border: 0;
-  border-inline-start: 2px solid var(--okf-error);
-  border-radius: 0;
-  background: transparent;
-  color: var(--okf-error);
-}
-
-/* Info panel (detail density notice): a band with the accent's left edge. */
-.okf-graph-density,
-.okf-graph-density--detail {
-  border: 1px solid var(--okf-border);
-  border-inline-start: 2px solid var(--accent);
-  border-radius: 0;
-  background: var(--okf-bg-inset);
-  color: var(--okf-fg-muted);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-/* Lens summary: micro-label heads, hairline ranked rows, mono figures. */
-.okf-lens-summary__title {
-  margin: var(--okf-space-4) 0 var(--okf-space-2);
-  font-family: var(--font-label);
-  font-size: var(--label-size);
-  font-weight: var(--label-weight);
-  letter-spacing: var(--label-track);
-  text-transform: uppercase;
-  color: var(--label-color);
-}
-.okf-lens-summary__verdict { font-size: 14.5px; line-height: 1.55; }
-.okf-lens-summary__label { font-size: 13.5px; font-weight: 500; }
-.okf-lens-summary__note {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--okf-fg-subtle);
-  font-variant-numeric: tabular-nums;
-}
-.okf-graph-theme-digest { margin-top: var(--okf-space-3); }
-
-/* Lens and graph settings: mono micro-label heads, square outlined choices. */
-.okf-signal__advanced > summary,
-.okf-signal__group > legend,
-.okf-graph-legend__title,
-.okf-collaborators__title {
-  font-family: var(--font-label);
-  font-size: var(--label-size);
-  font-weight: var(--label-weight);
-  letter-spacing: var(--label-track);
-  text-transform: uppercase;
-  color: var(--label-color);
-}
-.okf-collaborators__title { font-size: 11px; }
-.okf-signal__row-value { color: var(--okf-fg); font-family: var(--font-mono); font-weight: 500; }
-.okf-signal__seg-item span,
-.okf-lens-choice { border: 1px solid var(--okf-border-strong); border-inline-start-width: 2px; border-inline-start-color: transparent; border-radius: 0; }
-.okf-signal__seg-item input:checked + span,
-.okf-signal__seg-item input:checked + .okf-lens-choice { border-inline-start-color: var(--accent); }
-.okf-lens-choice .okf-lens-preview { background: var(--okf-bg-inset); border: 1px solid var(--okf-border); }
-.okf-filter-showall { color: var(--okf-fg); }
-.okf-filter-chip:hover,
-.okf-filter-solo:hover,
-.okf-filter-showall:hover { background: var(--okf-hover-fill); }
-
-/* Legend swatches are squares in the canvas colour they explain. */
-.okf-graph-legend__swatch { width: 10px; height: 10px; flex: 0 0 auto; border: 1px solid var(--okf-border-strong); }
-.okf-graph-legend__swatch--hollow { background: var(--graph-bg); }
-.okf-graph-legend__swatch--none { visibility: hidden; }
-
-/* Selected concept: the record opens on a 2px --border-strong rule; the
- * type is an outlined mono micro-label, never a colour. */
-.okf-detail #detail-content > .okf-detail__header {
-  padding-top: var(--okf-space-3);
-  border-top: 2px solid var(--okf-border-strong);
-  border-bottom: 1px solid var(--okf-border);
-}
-.okf-detail #detail-type.okf-type-chip {
-  display: inline-block;
-  padding: 3px 7px;
-  border: 1px solid var(--okf-border-strong);
-  border-radius: 0;
-  background: transparent;
-  color: var(--okf-fg-muted);
-  font-family: var(--font-label);
-  font-size: var(--label-size);
-  font-weight: var(--label-weight);
-  letter-spacing: var(--label-track);
-  text-transform: uppercase;
-}
-.okf-detail #detail-id { font-family: var(--font-mono); font-size: 11.5px; color: var(--okf-fg-subtle); }
-
-/* Single-file Index: the Ledger inventory ruler on the portable list —
- * row number / record (title over mono type and id) / summary, hairline
- * rows, ink titles. Row numbers are CSS counters, so they follow the list. */
-.okf-viewer--singlefile .okf-single-index__list {
-  display: block;
-  margin: var(--okf-space-5) 0 0;
-  padding: 0;
-  border-top: 1px solid var(--okf-border-strong);
-  counter-reset: okf-single-row;
-}
-.okf-viewer--singlefile .okf-single-index__list > li {
-  display: grid;
-  grid-template-columns: var(--ledger-col-n, 42px) minmax(0, 1.05fr) minmax(0, 1.9fr);
-  grid-template-areas: "n title summary" "n meta summary";
-  grid-template-rows: auto 1fr;
-  column-gap: var(--ledger-col-gap, 22px);
-  align-items: start;
-  padding: 12px 0;
-  border-top: 0;
-  border-bottom: 1px solid var(--okf-border);
-  counter-increment: okf-single-row;
-}
-.okf-viewer--singlefile .okf-single-index__list > li::before {
-  content: counter(okf-single-row, decimal-leading-zero);
-  grid-area: n;
-  padding-top: 2px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  color: var(--okf-fg-subtle);
-}
-.okf-viewer--singlefile .okf-single-index__entry { grid-area: title; border-radius: 0; }
-.okf-viewer--singlefile .okf-single-index__entry > strong {
-  color: var(--card-title-color);
-  font-size: var(--card-title-size);
-  font-weight: var(--card-title-weight);
-  letter-spacing: var(--card-title-track);
-}
-.okf-viewer--singlefile .okf-single-index__list > li > span {
-  grid-area: meta;
-  margin-top: 3px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--okf-fg-subtle);
-  overflow-wrap: anywhere;
-}
-.okf-viewer--singlefile .okf-single-index__list > li > p {
-  grid-area: summary;
-  margin: 0;
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: var(--okf-fg-muted);
-}
-@media (max-width: 900px) {
-  .okf-viewer--singlefile .okf-single-index__list > li {
-    grid-template-columns: var(--ledger-col-n, 42px) minmax(0, 1fr);
-    grid-template-areas: "n title" "n meta" "n summary";
-    grid-template-rows: auto auto auto;
-  }
-  .okf-viewer--singlefile .okf-single-index__list > li > p { margin-top: 6px; }
-}
-
-/* Single-file Search & context drawer: a band with a 2px record rule. */
-.okf-single-search { background: var(--okf-bg); border-top: 2px solid var(--okf-border-strong); }
-.okf-single-search__head h2 { font-size: 20px; letter-spacing: -0.015em; }
-.okf-single-search__form .okf-field > span,
-.okf-single-search .okf-search-modes > legend {
-  font-family: var(--font-label);
-  font-size: var(--label-size);
-  font-weight: var(--label-weight);
-  letter-spacing: var(--label-track);
-  text-transform: uppercase;
-  color: var(--label-color);
-}
-.okf-single-search__query input {
-  min-height: var(--okf-graph-field-h);
-  border: 1px solid var(--input-border);
-  background: var(--input-bg);
-  color: var(--input-text);
-}
-.okf-single-search__status { font-family: var(--font-mono); font-size: 11.5px; color: var(--okf-fg-subtle); }
-
-@media (forced-colors: active) {
-  .okf-node-index,
-  .okf-graph-tip,
-  .okf-graph-tour,
-  .okf-graph-actions,
-  .okf-graph-focusbar,
-  .okf-graph-lod-pill,
-  .okf-graph-updated,
-  .okf-graph-orphans,
-  .okf-graph-copy-fallback,
-  #okf-graph > .okf-graph-legend,
-  #okf-graph > .okf-edge-bundle-index { border: 1px solid CanvasText; box-shadow: none; }
-  .okf-graph-density,
-  .okf-lens-summary__row[aria-current="true"],
-  .okf-signal__seg-item input:checked + span,
-  .okf-signal__seg-item input:checked + .okf-lens-choice { border-inline-start-color: Highlight; }
-  .okf-lens-summary__bar { background: CanvasText; }
-  .okf-node-index__warn { color: CanvasText; border-color: CanvasText; }
+/* Coarse pointers: every graph and single-file control is a 44px target.
+ * Last in the file so it follows the base rules it enlarges. */
+@media (pointer: coarse) {
+  :root { --okf-graph-field-h: 44px; }
+  .okf-node-index > summary { padding-block: 12px; }
+  .okf-node-index__item,
+  .okf-lens-summary__row,
+  .okf-signal__row--check,
+  .okf-signal select,
+  .okf-signal input[type="range"] { min-height: 44px; }
+  .okf-edge-bundle-index summary { padding-block: 12px; }
 }
