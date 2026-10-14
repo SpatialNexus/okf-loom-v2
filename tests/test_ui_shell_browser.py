@@ -244,6 +244,26 @@ def test_live_first_paint_stays_stable_after_studio_boot(server_url, route, widt
                                 '[data-okf-outline-jump-placeholder]').count() == 0
             if route != "/":
                 assert page.locator('.okf-concept-viewbar [data-okf-outline-jump]').count() == 1
+                # View tabs on one row share one label line: no tab (Split was
+                # inline-flex below 900px) pins its label to the top of the
+                # 44px coarse target while its neighbours centre theirs.
+                tabs = page.evaluate("""() => [...document.querySelectorAll('.okf-concept-viewbar .okf-viewswitch__btn')]
+                  .filter(b => b.getClientRects().length).map(b => {
+                    const box = b.getBoundingClientRect(), text = document.createRange();
+                    text.selectNodeContents(b);
+                    return {label: b.textContent.trim(), top: box.top, height: box.height,
+                            textTop: text.getBoundingClientRect().top};
+                  })""")
+                assert {"Rendered", "Source", "Split"} <= {tab["label"] for tab in tabs}, tabs
+                rows: dict[int, list] = {}
+                for tab in tabs:
+                    rows.setdefault(round(tab["top"]), []).append(tab)
+                for row in rows.values():
+                    offsets = [tab["textTop"] - tab["top"] for tab in row]
+                    assert max(offsets) - min(offsets) <= 0.5, tabs
+                    assert len({round(tab["height"], 1) for tab in row}) == 1, tabs
+                if coarse:
+                    assert all(tab["height"] >= 43.5 for tab in tabs), tabs
             expect(page.locator('.okf-studio-launcher')).to_be_visible()
             assert page.evaluate("matchMedia('(pointer: coarse)').matches") is coarse
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
