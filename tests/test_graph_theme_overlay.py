@@ -487,6 +487,94 @@ def test_graph_chrome_is_square_and_starting_points_are_hairline_rows(
     assert abs(proof["headCentre"] - proof["fieldCentre"]) <= 2, proof
 
 
+_DEPTH_SELECT_JS = """() => {
+  const select = document.querySelector('.okf-signal select[aria-label="Depth"]');
+  const root = getComputedStyle(document.documentElement);
+  const resolve = value => {
+    const probe = document.createElement('span');
+    probe.style.color = value;
+    document.body.appendChild(probe);
+    const result = getComputedStyle(probe).color;
+    probe.remove();
+    return result;
+  };
+  const cs = getComputedStyle(select);
+  return {
+    disabled: select.disabled, focusVisible: select.matches(':focus-visible'),
+    height: select.getBoundingClientRect().height, font: cs.fontFamily, size: cs.fontSize,
+    radius: cs.borderTopLeftRadius, border: [cs.borderTopWidth, cs.borderTopStyle, cs.borderTopColor],
+    background: cs.backgroundColor, color: cs.color, outline: [cs.outlineStyle, cs.outlineWidth, cs.outlineColor],
+    shadow: cs.boxShadow,
+    inputBorder: resolve(root.getPropertyValue('--input-border').trim()),
+    inputBg: resolve(root.getPropertyValue('--input-bg').trim()),
+    inputText: resolve(root.getPropertyValue('--input-text').trim()),
+    ring: resolve(root.getPropertyValue('--okf-accent').trim()),
+  };
+}"""
+
+
+def _reveal_depth_select(page):
+    select = page.locator('.okf-signal select[aria-label="Depth"]')
+    select.wait_for(state="attached")
+    details = page.get_by_role("navigation", name="Graph panes").get_by_role("button", name="Details", exact=True)
+    if details.is_visible() and details.get_attribute("aria-pressed") != "true":
+        details.click()
+    page.evaluate("() => document.querySelectorAll('.okf-detail details').forEach(d => { d.open = true; })")
+    select.scroll_into_view_if_needed()
+    return select
+
+
+def _explore_neighbourhood(page) -> None:
+    page.evaluate("""() => {
+      const G = window.__okfLoomGraph;
+      G.interaction.dispatch({type: 'SELECT', id: G.cy.nodes().filter(n => n.degree() > 0).first().id(),
+                              source: 'test', quietUrl: true});
+    }""")
+    _apply_lens(page, "focus")
+    page.wait_for_function("() => !document.querySelector('.okf-signal select[aria-label=\"Depth\"]').disabled")
+
+
+def test_graph_settings_depth_select_is_a_ledger_field(server_url: str, page) -> None:
+    """Graph settings' Depth select is a Ledger field in every palette: body
+    type, --input tokens, a square 1px outline, no shadow, the accent focus
+    ring, a 44px coarse target and a system outline under forced colours."""
+    _open_graph(page, server_url)
+    select = _reveal_depth_select(page)
+    _explore_neighbourhood(page)
+    for palette in PALETTES:
+        _set_palette(page, palette)
+        seen = page.evaluate(_DEPTH_SELECT_JS)
+        assert seen["disabled"] is False, (palette, seen)
+        assert "Public Sans" in seen["font"] and seen["size"] == "13px", (palette, seen)
+        assert seen["radius"] == "0px" and seen["shadow"] == "none", (palette, seen)
+        assert seen["border"][:2] == ["1px", "solid"] and seen["border"][2] == seen["inputBorder"], (palette, seen)
+        assert seen["background"] == seen["inputBg"] and seen["color"] == seen["inputText"], (palette, seen)
+        assert 32 <= seen["height"] < 44, (palette, seen)
+    page.keyboard.press("Tab")
+    select.focus()
+    focused = page.evaluate(_DEPTH_SELECT_JS)
+    assert focused["focusVisible"], focused
+    assert focused["outline"] == ["solid", "2px", focused["ring"]], focused
+
+    page.emulate_media(forced_colors="active")
+    page.wait_for_function("() => matchMedia('(forced-colors: active)').matches")
+    forced = page.evaluate(_DEPTH_SELECT_JS)
+    assert forced["border"][:2] == ["1px", "solid"], forced
+    assert forced["border"][2] != forced["background"], forced
+    assert forced["outline"][0] == "solid" and forced["outline"][1] == "2px", forced
+
+    coarse = page.context.browser.new_context(viewport={"width": 390, "height": 844},
+                                              is_mobile=True, has_touch=True)
+    try:
+        phone = coarse.new_page()
+        _open_graph(phone, server_url)
+        assert phone.evaluate("matchMedia('(pointer: coarse)').matches")
+        _reveal_depth_select(phone)
+        assert phone.evaluate(_DEPTH_SELECT_JS)["height"] >= 44
+    finally:
+        coarse.close()
+
+
 _SELECTED_LENS_PREVIEW_JS = """() => {
   const cv = document.createElement('canvas'); cv.width = cv.height = 1;
   const cx = cv.getContext('2d', {willReadFrequently: true});
