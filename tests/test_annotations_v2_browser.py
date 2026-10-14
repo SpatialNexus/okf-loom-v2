@@ -2350,7 +2350,12 @@ def test_broken_anchor_recovery_is_outlined_with_one_drawer_primary(server_url, 
     send = drawer.get_by_role("button", name="Send", exact=True)
     expect(send).to_be_visible()
     expect(send).to_be_enabled()
-    send_background = send.evaluate("button => getComputedStyle(button).backgroundColor")
+    # Enabling Send starts its background transition; settle it before comparing
+    # colours in separate browser tasks so Send cannot disagree with itself.
+    send_background = send.evaluate("""async button => {
+        await Promise.all(button.getAnimations().map(animation => animation.finished));
+        return getComputedStyle(button).backgroundColor;
+    }""")
     assert send_background != "rgba(0, 0, 0, 0)", "Send must own a filled primary"
     filled = drawer.locator("button:visible").evaluate_all("""(buttons, primary) =>
         buttons.filter(button => getComputedStyle(button).backgroundColor === primary).length
