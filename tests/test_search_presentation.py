@@ -299,6 +299,12 @@ def test_portable_adapters_render_shared_results_with_capability_actions(
             summary = disclosure.locator(":scope > summary")
             expect(summary).to_have_text("Evidence and context")
             assert disclosure.evaluate("details => details.open") is False
+            # R11: one filled primary per view (the Search submit); every
+            # row's Open stays an outlined button.
+            open_action = item.get_by_role("link", name="Open", exact=True)
+            expect(open_action).to_have_count(1)
+            open_markup = open_action.evaluate("a => a.outerHTML")
+            assert "okf-btn" in open_markup and "okf-btn--primary" not in open_markup, open_markup
             passage = item.get_by_role("button", name="Copy passage", exact=True)
             expect(passage).to_have_attribute("data-search-action", "copy-passage")
             summary.click()
