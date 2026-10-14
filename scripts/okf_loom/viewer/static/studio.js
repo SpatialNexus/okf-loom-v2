@@ -513,7 +513,8 @@
   // ====================================================================
   // 3. Studio bar
   // ====================================================================
-  const bar = el("div", { class: "okf-concept-viewbar", role: "region", "aria-label": "Document view" });
+  const bar = document.querySelector("[data-okf-viewbar-placeholder]") ||
+    el("div", { class: "okf-concept-viewbar", role: "region", "aria-label": "Document view" });
   const leftGroup = el("div", { class: "okf-studio-home__group" });
   const rightGroup = el("div", { class: "okf-studio-home__group" });
   const studioSlot = document.querySelector("[data-okf-studio-capability='available']");
@@ -760,7 +761,14 @@
       studioSlot.hidden = false;
     }
     if (isConceptPage()) {
-      bar.replaceChildren(viewSwitch);
+      // The outline owner may already have mounted Sections in the SSR bar.
+      // Keep that connected node (or its inert placeholder) when filling it.
+      const sections = bar.querySelector("[data-okf-outline-jump], [data-okf-outline-jump-placeholder]");
+      bar.replaceChildren(viewSwitch, ...(sections ? [sections] : []));
+      bar.removeAttribute("data-okf-viewbar-placeholder");
+      bar.removeAttribute("aria-hidden");
+      bar.setAttribute("role", "region");
+      bar.setAttribute("aria-label", "Document view");
       const topbar = $(".okf-topbar");
       if (topbar && topbar.parentNode) topbar.parentNode.insertBefore(bar, topbar.nextSibling);
       else document.body.insertBefore(bar, document.body.firstChild);
@@ -804,8 +812,16 @@
     if (!host || pageFeedback) return;
     const inGraph = host.id === "okf-detail-actions-slot";
     const noun = inGraph ? "concept" : "page";
-    const group = el("div", { class: "okf-page-feedback" + (inGraph ? " okf-page-feedback--graph" : ""), role: "group",
+    const placeholder = document.querySelector("[data-okf-page-feedback-placeholder]");
+    const group = placeholder || el("div", { class: "okf-page-feedback" + (inGraph ? " okf-page-feedback--graph" : ""), role: "group",
       "aria-label": inGraph ? "Concept feedback" : "Page feedback" });
+    if (placeholder) {
+      group.replaceChildren();
+      group.removeAttribute("data-okf-page-feedback-placeholder");
+      group.removeAttribute("aria-hidden");
+      group.setAttribute("role", "group");
+      group.setAttribute("aria-label", "Page feedback");
+    }
     const comment = el("button", { type: "button", class: "okf-btn okf-page-feedback__comment",
       "aria-controls": "okf-panel", text: "Comment on this " + noun });
     comment.addEventListener("click", openPageComposer);
@@ -905,7 +921,10 @@
       if (hero && hero.classList) hero.classList.remove("okf-hero--feedback");
       pageFeedback.group.remove(); pageFeedback = null;
     }
-    if (studioSlot) { studioSlot.replaceChildren(); studioSlot.hidden = true; }
+    if (studioSlot) {
+      studioSlot.replaceChildren(); studioSlot.hidden = true;
+      studioSlot.dataset.okfStudioCapability = "unavailable";
+    }
     if (bar.parentNode) bar.parentNode.removeChild(bar);
   }
 

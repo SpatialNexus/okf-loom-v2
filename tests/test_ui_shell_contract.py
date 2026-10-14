@@ -76,6 +76,23 @@ def test_portable_shell_reserves_but_does_not_advertise_studio(
         assert "hidden" in studio
         assert studio.get("data-okf-studio-capability") == "unavailable"
         assert ">Studio<" not in html
+        for page in output.rglob("*.html"):
+            assert "data-okf-viewbar-placeholder" not in page.read_text(encoding="utf-8")
+
+
+def test_live_shell_emits_only_inert_launcher_placeholder():
+    from okf_loom.render import _application_shell_html
+
+    html = _application_shell_html(
+        name="Proof", bundle_href="/", search_href="/__search", index_href="/",
+        graph_href="/__graph", current="index", mode="serve",
+    )
+    probe = _ShellProbe()
+    probe.feed(html)
+    studio = dict(probe.items)["studio"]
+    assert studio["data-okf-studio-capability"] == "available" and "hidden" in studio
+    assert 'class="okf-studiobtn okf-studio-launcher" disabled tabindex="-1" aria-hidden="true"' in html
+    assert 'class="okf-studio-launcher__label">Studio</span>' in html
 
 
 def test_single_file_uses_target_honest_shared_shell(

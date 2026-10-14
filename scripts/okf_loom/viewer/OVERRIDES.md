@@ -42,6 +42,15 @@ Two built-in elements carry behaviour that an override should keep:
 - In `single_file.html`, `#okf-single-index` and `#detail-content` are the
   destinations of the concept-list links (`?selected=<id>#detail-content`).
 
+Live shell markup includes inert launcher, document viewbar/Sections and index
+feedback placeholders. Their final responsive size is reserved before first
+paint only when the parser-blocking theme runtime has marked JavaScript
+available; portable and no-JS targets reserve no Studio space. Studio fills
+those slots in place, while `document-outline.js` owns the Sections control.
+The live loading/failure notice remains visible until a successful boot but
+sits outside document flow, so settling boot does not displace authored content.
+Custom templates without the placeholders keep the legacy client mount path.
+
 ## 2. Static asset overrides
 
 Drop a file at `.okf-loom/viewer/static/<file>` to replace the built-in asset.

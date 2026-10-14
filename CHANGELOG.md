@@ -10,6 +10,10 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Live pages reserve inert Studio launcher, document viewbar and index page
+  feedback geometry before first paint. Studio fills those slots in place, and its truthful
+  loading/failure notice no longer shifts the authored page when boot settles.
+  Portable and no-JS pages do not reserve inactive Studio chrome.
 - Split view now clears the "Loading source…" notice whenever the source pane
   is populated, including by a concurrent document or live-update load. A
   redundant request no longer leaves a loading or failure notice above source

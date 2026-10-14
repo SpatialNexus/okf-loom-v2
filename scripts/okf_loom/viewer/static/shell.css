@@ -113,6 +113,27 @@ html:not([data-okf-js="1"]) #okf-theme { display: none !important; }
 .okf-shell__studio-slot:not([hidden]),
 .okf-shell__appearance { display: inline-flex; align-items: center; }
 .okf-shell__studio-slot[hidden] { display: none; }
+/* Reserve the final launcher only on scripted live pages. The hidden slot
+ * stays inert (including the accessibility tree) until Studio fills it. */
+html[data-okf-js="1"] .okf-shell__studio-slot[data-okf-studio-capability="available"][hidden] {
+  display: inline-flex;
+  align-items: center;
+  visibility: hidden;
+}
+[data-okf-outline-jump-placeholder] { visibility: hidden; }
+html :is([data-okf-viewbar-placeholder], [data-okf-page-feedback-placeholder]) { display: none; }
+html[data-okf-js="1"] :is([data-okf-viewbar-placeholder], [data-okf-page-feedback-placeholder]) {
+  display: flex;
+  visibility: hidden;
+}
+/* The truthful loading/failure notice must not displace the authored page
+ * and then pull it back at boot. Keep it visible at its normal static
+ * position, but outside flow. No-JS notes retain their ordinary flow. */
+html[data-okf-js="1"] body[data-okf-mode="serve"] > .okf-live-studio-fallback {
+  position: absolute;
+  inset-inline: 0;
+  z-index: 11;
+}
 .okf-shell :is(a, button):focus-visible,
 [data-okf-route-heading]:focus-visible {
   outline: 2px solid var(--focus);
@@ -181,7 +202,7 @@ html:not([data-okf-js="1"]) #okf-theme { display: none !important; }
    * vs pane tabs top ~197px) despite the launcher already preceding them
    * in the shared nav's keyboard order. Document routes are unchanged:
    * DOM order already put Studio last among the shell's own controls. */
-  body.okf-viewer .okf-shell__studio-slot:not([hidden]) { flex: 0 0 auto; }
+  body.okf-viewer .okf-shell__studio-slot[data-okf-studio-capability="available"] { flex: 0 0 auto; }
   body.okf-viewer .okf-shell__appearance { order: -2; flex: 0 0 auto; width: auto; }
   /* Honest full identity: a long bundle name wraps instead of the cryptic
    * "okf-lo…" ellipsis cut (the same honesty rule the graph route already

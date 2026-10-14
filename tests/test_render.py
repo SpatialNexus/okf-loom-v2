@@ -4093,7 +4093,7 @@ def _render_root_index(bundle_root: _Path, *, mode: str) -> str:
 def test_v2_spotlight_present_on_root_index_with_demo(tmp_path: _Path) -> None:
     """Root index of a bundle containing the demo concept shows the spotlight."""
     html = _render_root_index(_index_with_demo(tmp_path), mode="serve")
-    assert 'class="okf-hero okf-hero--split"' in html, (
+    assert 'class="okf-hero okf-hero--split okf-hero--feedback"' in html, (
         "hero must carry the --split modifier when the spotlight is present"
     )
     assert 'class="okf-v2-spotlight"' in html
