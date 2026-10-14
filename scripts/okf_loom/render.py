@@ -2575,11 +2575,15 @@ def _render_not_found_page(*, name: str, path: str, config: dict[str, Any]) -> s
         graph_href="/__graph", current=None, mode="serve",
         appearance_choice=configured_theme,
     )
+    # The shared inline product icon from the BUILT-IN index template, so the
+    # recovery page does not request a missing /favicon.ico either.
+    icon = re.search(r'<link rel="icon"[^>]*>', load_template("index_page.html"))
     return (
         '<!doctype html><html lang="en"'
         f' data-theme="{_esc_attr_qs(initial_theme)}"><head>'
         '<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
         f'<title>Page not found — {_esc(name)}</title>'
+        + (icon.group(0) if icon else '')
         + _ledger_fonts_head("/__static", mode="serve")
         + '<link rel="stylesheet" href="/__static/wiki.css">'
         '<link rel="stylesheet" href="/__static/shell.css">'

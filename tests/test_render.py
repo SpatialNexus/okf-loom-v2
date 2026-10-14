@@ -3761,6 +3761,37 @@ def test_all_rendering_outputs_emit_product_favicon(tmp_path: _Path) -> None:
         assert '<link rel="icon" href="data:image/svg+xml,' in html
 
 
+def test_product_favicon_is_one_square_ledger_mark_in_every_emitter(tmp_path: _Path) -> None:
+    """Every built-in template and every Python-built page carries the SAME
+    inline icon: a square Ledger ink tile (Bone ``--text``) framed in
+    ``--border-strong`` with Bone ``--bg`` bars. No rounded corners, no
+    retired teal, and no request (it stays a ``data:`` URL)."""
+    from okf_loom.render import _render_not_found_page, load_template
+
+    pattern = re.compile(r'<link rel="icon"[^>]*>')
+    links = {
+        name: pattern.findall(load_template(name))
+        for name in ("index_page.html", "concept_page.html", "search_page.html",
+                     "graph_page.html", "single_file.html")
+    }
+    bundle_path = _build_bundle_with(tmp_path, {"c.md": "---\ntype: Guide\ntitle: C\n---\n\nBody.\n"})
+    single_path = tmp_path / "single.html"
+    render_single_file(Bundle.load(bundle_path), single_path)
+    links["single output"] = pattern.findall(single_path.read_text(encoding="utf-8"))
+    links["concept output"] = pattern.findall(_render_concept_html(bundle_path, "c"))
+    links["not found"] = pattern.findall(_render_not_found_page(name="T", path="x", config={}))
+    assert all(len(found) == 1 for found in links.values()), links
+    icons = {found[0] for found in links.values()}
+    assert len(icons) == 1, links
+    icon = icons.pop()
+    assert icon.startswith('<link rel="icon" href="data:image/svg+xml,')
+    assert "rx=" not in icon and "0c7373" not in icon and "round" not in icon
+    # Bone tokens: --text tile, --border-strong frame, --bg bars.
+    assert "fill='%231d1a16'" in icon
+    assert "stroke='%23b0a696'" in icon
+    assert "stroke='%23f6f3ed'" in icon
+
+
 def test_phase2_onthispage_headingless_emits_stable_hidden_host(tmp_path: _Path) -> None:
     """F8: a body with no headings still emits the stable outline host —
     hidden, marked ``data-okf-outline-empty``, carrying no jump links — so the
