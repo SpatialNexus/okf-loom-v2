@@ -2003,6 +2003,30 @@
       // layout still runs once after the chrome exists, through its sole owner.
       layout: { name: "preset", animate: false, fit: false },
     });
+    // Canvas metrics/label textures are keyed by the font-family string, not
+    // by FontFace load state. A style().update() with the same string therefore
+    // keeps fallback measurements AND textures. Re-key through the supported
+    // stylesheet API once after late Ledger faces settle: a repeated generic
+    // fallback is typographically identical, but invalidates both cache layers.
+    // Never await fonts on the first-frame/layout path or rerun the layout.
+    if (document.fonts) {
+      var lateSans = INITIAL_GRAPH_PALETTE.font.indexOf("Public Sans") >= 0 && !document.fonts.check('600 13px "Public Sans"');
+      var lateMono = INITIAL_GRAPH_PALETTE.mono.indexOf("Azeret Mono") >= 0 && !document.fonts.check('500 10px "Azeret Mono"');
+      var fontMountGeneration = graphMountGeneration;
+      if (lateSans || lateMono) document.fonts.ready.then(function () {
+        if (fontMountGeneration !== graphMountGeneration || cy.destroyed()) return;
+        var sansLoaded = lateSans && document.fonts.check('600 13px "Public Sans"');
+        var monoLoaded = lateMono && document.fonts.check('500 10px "Azeret Mono"');
+        if (!sansLoaded && !monoLoaded) return;
+        var pal = graphPalette(), style = cy.style();
+        if (sansLoaded) style.selector("node, edge").style("font-family", pal.font + ", sans-serif");
+        // This later selector preserves the distinct bundled-edge mono face
+        // even when the new base edge rule was appended after its original rule.
+        style.selector("edge.okf-multi-edge").style("font-family", pal.mono + (monoLoaded ? ", monospace" : ""));
+        style.update();
+        cy.forceRender();
+      });
+    }
     // Review feedback: clamp zoom. cy.fit on a small/collapsed cluster used to
     // over-zoom (font-size scales with zoom → giant labels). maxZoom caps both
     // user and programmatic zoom; overlayAwareFit() also respects it.
