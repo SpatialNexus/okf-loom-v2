@@ -676,6 +676,11 @@
           if (rendered && typeof rendered.bindFunctions === "function") {
             rendered.bindFunctions(el);
           }
+          // Mermaid creates a shared body tooltip with an inline 2px radius.
+          // Let the viewer's square geometry rule own it, not vendor defaults.
+          document.querySelectorAll("body > div.mermaidTooltip").forEach(function (tooltip) {
+            tooltip.style.removeProperty("border-radius");
+          });
         });
       }));
     }).catch(function (error) {

@@ -143,14 +143,14 @@
     var migrated = null;
     var oldFamily = readKey(OLD_FAMILY_KEY);
     var oldMode = readKey(OLD_MODE_KEY);
-    if (oldMode === "auto") migrated = "system";
-    else if (oldMode === "light" || oldMode === "dark") {
-      migrated = normalise((oldFamily || "technical") + "-" + oldMode);
-    } else if (["technical", "swiss", "coffee", "purple"].indexOf(oldFamily) >= 0 && oldMode === null) {
-      // A family without an explicit mode was "family + follow OS".
-      migrated = "system";
-    } else {
+    if (oldFamily === null && oldMode === null) {
       migrated = normalise(readKey(OLD_THEME_KEY));
+    } else {
+      // The axes owned the old preference whenever either key existed,
+      // even if corrupt. Do not resurrect a stale single-key preference.
+      if (["technical", "swiss", "coffee", "purple"].indexOf(oldFamily) < 0) oldFamily = "technical";
+      migrated = oldMode === "light" || oldMode === "dark"
+        ? normalise(oldFamily + "-" + oldMode) : "system";
     }
     if (migrated) {
       // Module state first: if storage became write-only the page still

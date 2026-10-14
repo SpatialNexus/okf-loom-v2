@@ -49,8 +49,7 @@ def _production_shaped_row(
     theme_state = {
         "resolved_theme": spec.resolved_theme, "runtime_resolved_theme": spec.resolved_theme,
         "resolved_mode": capture._palette_scheme(spec.resolved_theme),
-        "family": family, "mode": mode, "ready": True, "resolution": "resolved",
-        "contrast": spec.contrast, "border": spec.border,
+        "choice": family, "mode": mode, "ready": True, "resolution": "resolved",
         "storageAccess": "denied" if spec.storage == "denied" else "available",
         "storageKeys": [],
     }
@@ -1932,8 +1931,8 @@ def test_default_runtime_assertion_checks_storage_and_palette(storage: str, os_m
     class ThemePage:
         def evaluate(self, _script, *_args):
             return {"resolved_theme": "bone", "runtime_resolved_theme": "bone",
-                    "resolved_mode": "light", "family": "bone", "mode": "light",
-                    "ready": True, "resolution": "resolved", "contrast": None, "border": None,
+                    "resolved_mode": "light", "choice": "bone", "mode": "light",
+                    "ready": True, "resolution": "resolved",
                     "storageAccess": "denied" if storage == "denied" else "available",
                     "storageKeys": [] if storage == "none" else None}
 
@@ -1948,7 +1947,7 @@ def test_failure_matrix_routes_to_typed_fallback_and_success_never_downgrades(
         capture, "_assert_theme_state",
         lambda _page, _spec: {
             "resolved_theme": "bone", "resolution": "resolved",
-            "family": "bone", "mode": "auto", "contrast": "normal", "border": "on",
+            "choice": "bone", "mode": "auto",
             "ready": True,
         },
     )
@@ -1996,7 +1995,7 @@ def test_artifact_provenance_binds_revision_tree_inventory_viewport_target_theme
         input_inventory=[{"path": "scripts/capture_ui_overhaul.py", "type": "regular", "tracked": True}],
         input_inventory_digest="inventory-1",
         runtime={"generation": 4, "metadata": {"revision": "bundle-1", "pageRevision": "bundle-1", "readinessPhase": "ready"}},
-        theme_state={"resolved_theme": "bone", "contrast": "normal", "border": "on", "resolution": "resolved"},
+        theme_state={"resolved_theme": "bone", "choice": "bone", "resolution": "resolved"},
         browser={"engine": "chromium", "javascript": True, "zoom_percent": 100},
     )
     assert row["head"] == "head-1" and row["tree"] == "tree-1" and row["clean"] is True
@@ -2005,7 +2004,8 @@ def test_artifact_provenance_binds_revision_tree_inventory_viewport_target_theme
     assert row["target"] == "document" and row["scenario"] == spec.id
     assert row["resolved_theme"] == "bone"
     assert row["theme_resolution"] == "resolved"
-    assert row["modifiers"] == {"contrast": "normal", "border": "on"}
+    assert "modifiers" not in row
+    assert row["theme_state"]["choice"] == "bone"
     assert row["browser_assertion"] == spec.assertion
     assert row["runtime"]["revision"] == "bundle-1"
 
@@ -2177,7 +2177,7 @@ def test_final_capture_validation_rejects_missing_or_mismatched_expected_revisio
         expected_revision="bundle-1", input_inventory=inventory,
         input_inventory_digest=digest,
             runtime={"generation": 1, "metadata": {"revision": "bundle-1", "pageRevision": "bundle-1"}},
-        theme_state={"resolved_theme": "bone", "resolution": "resolved", "contrast": "normal", "border": "on"},
+        theme_state={"resolved_theme": "bone", "resolution": "resolved"},
         browser={"engine": "chromium", "javascript": True},
     )
     row["file"] = spec.artifact
@@ -2576,9 +2576,9 @@ def test_js_capture_spec_passes_and_requires_expected_source_revision(tmp_path: 
             if "okfCaptureRevision" in _script:
                 return {"body": "bundle-1", "root": "bundle-1"}
             return {
-                "resolved_theme": "bone", "contrast": "normal", "border": "on",
+                "resolved_theme": "bone",
                 "runtime_resolved_theme": "bone", "resolved_mode": "light",
-                "family": "bone", "mode": "light", "ready": True,
+                "choice": "bone", "mode": "light", "ready": True,
                 "resolution": "resolved", "storageAccess": "available", "storageKeys": [],
             }
 
@@ -2616,8 +2616,8 @@ def test_js_capture_does_not_accept_recorded_revision_without_matching_runtime_p
                 return {"body": "bundle-other", "root": "bundle-other"}
             return {
                 "resolved_theme": "bone", "runtime_resolved_theme": "bone",
-                "resolved_mode": "light", "contrast": "normal", "border": "on",
-                "family": "bone", "mode": "light", "ready": True,
+                "resolved_mode": "light",
+                "choice": "bone", "mode": "light", "ready": True,
                 "resolution": "resolved", "storageAccess": "available", "storageKeys": [],
             }
 
@@ -2650,7 +2650,7 @@ def test_artifact_record_rejects_revision_that_was_only_recorded(tmp_path: Path)
             input_inventory=[{"path": "source.py", "type": "regular", "tracked": True}],
             input_inventory_digest="i",
             runtime={"generation": 1, "metadata": {"revision": "bundle-1"}},
-            theme_state={"resolved_theme": "bone", "resolution": "resolved", "contrast": "normal", "border": "on"},
+            theme_state={"resolved_theme": "bone", "resolution": "resolved"},
             browser={"engine": "chromium", "javascript": True},
         )
     assert caught.value.diagnostic["code"] == "revision-missing"

@@ -405,6 +405,10 @@ def test_inline_reply_edited_after_uncertain_does_not_promise_no_duplicate(studi
     expect(retry).to_be_enabled()
     expect(box).to_be_enabled()
     expect(status).to_have_text(UNCERTAIN_REPLY)
+    expect(status).to_have_attribute('data-tone', 'warn')
+    assert status.get_attribute('style') is None
+    assert status.evaluate("n => getComputedStyle(n).borderRadius") == '0px'
+    assert status.evaluate("n => getComputedStyle(n).boxShadow").endswith('2px 0px 0px 0px inset')
     assert [row["body"] for row in _replies(bundle, root["id"])] == ["Uncertain reply draft."]
 
     box.fill("Changed reply text.")

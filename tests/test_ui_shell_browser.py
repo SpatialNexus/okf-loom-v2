@@ -64,6 +64,131 @@ def page():
             browser.close()
 
 
+@pytest.mark.parametrize("route", ["/missing-concept", "/__feedback-import"])
+@pytest.mark.parametrize("choice,dark,expected", [("plum", False, "plum"), ("system", True, "slate")])
+def test_auxiliary_pages_resolve_saved_appearance_before_first_paint(page, server_url, route, choice, dark, expected):
+    page.emulate_media(color_scheme="dark" if dark else "light")
+    page.add_init_script("localStorage.setItem('okf-loom.appearance', " + repr(choice) + ");"
+                         "requestAnimationFrame(() => { window.__firstPalette = document.documentElement.dataset.theme; });")
+    errors = []
+    page.on("console", lambda msg: errors.append(msg.text) if msg.type == "error" and "Content Security Policy" in msg.text else None)
+    response = page.goto(server_url + route)
+    assert response.status == (404 if route.startswith('/missing') else 200)
+    page.wait_for_function("() => window.__firstPalette && window.OKFLoomTheme")
+    assert page.evaluate("window.__firstPalette") == expected
+    expect(page.locator('html')).to_have_attribute('data-theme', expected)
+    scripts = page.locator('head script[src$="/theme.js"]')
+    expect(scripts).to_have_count(1)
+    assert scripts.get_attribute('defer') is None and scripts.get_attribute('async') is None
+    assert page.evaluate("() => { const config = document.getElementById('okf-theme-config');"
+                         "return !!config && !!(config.compareDocumentPosition(document.querySelector('script[src$=\"/theme.js\"]')) & Node.DOCUMENT_POSITION_FOLLOWING); }")
+    page.locator('#okf-theme').click()
+    page.locator('label[for="okf-appearance-theme-clay"]').click()
+    expect(page.locator('html')).to_have_attribute('data-theme', 'clay')
+    assert errors == []
+
+
+def test_composer_outcomes_use_square_two_pixel_status_bars(page, server_url):
+    page.goto(server_url + '/tables/orders')
+    page.wait_for_function('() => window.okfStudioReadiness && window.okfStudioReadiness.ready')
+    page.locator('.okf-studio-launcher').click()
+    page.locator('#okf-panel').get_by_role('button', name='Comments', exact=True).click()
+    held = {}
+    page.route('**/__comment', lambda route: held.update(route=route))
+    page.get_by_role('textbox', name='Comment for agent').fill('Status styling proof.')
+    page.get_by_role('button', name='Send', exact=True).click()
+    status = page.locator('.okf-composer__status')
+    expect(status).to_have_attribute('data-tone', 'info')
+    def check_bar(tone):
+        painted = status.evaluate("""(n, tone) => {
+          const s = getComputedStyle(n), p = document.createElement('i');
+          p.style.color = `var(--status-${tone})`; document.body.append(p);
+          const colour = getComputedStyle(p).color; p.remove();
+          return {inline: n.getAttribute('style'), radius: s.borderRadius, shadow: s.boxShadow,
+            colour, bg: s.backgroundColor};
+        }""", tone)
+        assert painted['inline'] is None and painted['radius'] == '0px', painted
+        assert painted['shadow'] == painted['colour'] + ' 2px 0px 0px 0px inset', painted
+        assert painted['bg'] == 'rgba(0, 0, 0, 0)', painted
+    check_bar('info')
+    assert 'route' in held
+    held['route'].fulfill(status=403, content_type='application/json', body='{"ok":false,"error":"forbidden"}')
+    expect(status).to_have_attribute('data-tone', 'error')
+    check_bar('error')
+
+
+def test_forced_colours_toast_retains_a_complete_frame(page, server_url):
+    page.emulate_media(forced_colors='active')
+    page.goto(server_url + '/')
+    page.wait_for_function('() => window.okfStudioReadiness && window.okfStudioReadiness.ready')
+    page.evaluate("window.okfLoomStudio._toast('Status message', {tone:'warn',sticky:true})")
+    toast = page.locator('.okf-toast').first
+    assert toast.evaluate("""n => { const s = getComputedStyle(n);
+      return ['Top','Right','Bottom','Left'].every(side => parseFloat(s['border' + side + 'Width']) >= 1
+        && s['border' + side + 'Style'] === 'solid' && s['border' + side + 'Color'] !== s.backgroundColor); }""")
+
+
+def test_focus_is_a_neutral_modifier_and_removes_the_empty_tools_band(page, server_url):
+    page.goto(server_url + '/tables/orders')
+    page.wait_for_function('() => window.okfStudioReadiness && window.okfStudioReadiness.ready')
+    focus = page.get_by_role('button', name='Focus view', exact=True)
+    focus.click()
+    expect(focus).to_have_attribute('aria-pressed', 'true')
+    assert not page.locator('.okf-document-tools').is_visible()
+    styles = page.locator('.okf-viewswitch__btn[aria-pressed="true"]').evaluate_all("""buttons => buttons.map(b => {
+      const s = getComputedStyle(b); return {name: b.textContent, weight: s.fontWeight,
+        bar: s.borderBottomColor, square: getComputedStyle(b, '::before').backgroundColor}; })""")
+    active = next(s for s in styles if s['name'] == 'Rendered')
+    toggle = next(s for s in styles if s['name'] == 'Focus view')
+    assert active['weight'] == '700' and toggle['weight'] == '500', styles
+    assert toggle['bar'] == 'rgba(0, 0, 0, 0)' and toggle['square'] != 'rgba(0, 0, 0, 0)', styles
+
+
+@pytest.mark.parametrize('width', [1440, 390])
+def test_drawer_quick_actions_stack_and_buttons_share_the_control_standard(page, server_url, width):
+    page.set_viewport_size({'width': width, 'height': 900})
+    page.goto(server_url + '/tables/orders')
+    page.wait_for_function('() => window.okfStudioReadiness && window.okfStudioReadiness.ready')
+    page.locator('.okf-studio-launcher').click()
+    actions = page.locator('#okf-panel .okf-studio-quick-action')
+    assert actions.count() > 0
+    assert actions.evaluate_all("""nodes => nodes.every(n => {
+      const [intent, outcome] = n.children;
+      return outcome.getBoundingClientRect().top >= intent.getBoundingClientRect().bottom - 1;
+    })""")
+    activity = page.locator('#okf-panel').get_by_role('button', name='Agent activity', exact=True)
+    assert activity.evaluate("b => getComputedStyle(b).borderTopStyle") == 'solid'
+    page.locator('#okf-panel').get_by_role('button', name='Comments', exact=True).click()
+    toggle = page.get_by_role('button', name='Show archived', exact=True)
+    send = page.get_by_role('button', name='Send', exact=True)
+    assert toggle.evaluate("b => getComputedStyle(b).fontSize") == send.evaluate("b => getComputedStyle(b).fontSize")
+    assert toggle.bounding_box()['height'] == send.bounding_box()['height']
+
+
+def test_phone_attention_does_not_add_a_third_shell_row(page, server_url):
+    page.set_viewport_size({'width': 390, 'height': 844})
+    page.goto(server_url + '/')
+    page.wait_for_function('() => window.okfLoomStudio && window.okfLoomStudio.state.eventsReady')
+    page.evaluate("window.okfLoomLive.emit('activity', {event_id:'repair-attention',type:'activity',action:'update',ts:new Date().toISOString()})")
+    launcher = page.locator('.okf-studio-launcher')
+    expect(launcher).to_have_attribute('data-attention', 'pending')
+    expect(launcher).to_have_accessible_name(re.compile(r'Needs attention'))
+    assert page.locator('.okf-shell').bounding_box()['height'] <= 115
+    assert launcher.bounding_box()['y'] == page.locator('.okf-shell__search-form').bounding_box()['y']
+
+
+def test_recent_pages_popover_is_anchored_below_the_search_field(page, server_url):
+    page.goto(server_url + '/tables/orders')
+    page.locator('.okf-shell__search-form input').focus()
+    menu = page.locator('.okf-search-live')
+    expect(menu).to_be_visible()
+    field = page.locator('.okf-shell__search-form').bounding_box()
+    popup = menu.bounding_box()
+    assert abs(popup['x'] - field['x']) < 1
+    assert abs(popup['y'] - field['y'] - field['height']) < 1
+    assert popup['width'] < 400
+
+
 def test_studio_mounts_one_compact_launcher_in_the_shell(page, server_url: str) -> None:
     page.goto(server_url + "/")
     page.wait_for_function("() => window.okfStudioReadiness && window.okfStudioReadiness.ready")

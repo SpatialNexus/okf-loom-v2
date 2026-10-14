@@ -112,7 +112,7 @@
   --border-strong: #b0a696;
   --text: #1d1a16;
   --text-2: #575047;
-  --text-3: #6a6258;
+  --text-3: #675f55;
   --accent: #a3573a;
   --accent-hover: #8c4a30;
   --on-accent: #ffffff;
@@ -484,12 +484,6 @@
   --okf-path-cue: var(--text);
   --okf-error-cue: var(--status-error);
   --okf-status-cue: var(--status-info);
-  /* Retired Soft Contrast tokens still read by graph/Studio CSS. */
-  --okf-soft-bg-inset: var(--bg-2);
-  --okf-soft-border: var(--border);
-  --okf-soft-border-strong: var(--border-strong);
-  --okf-soft-active-fill: transparent;
-  --okf-soft-shadow: none;
   /* Content types are not colour-coded: every type accent is --text-3. */
   --okf-type-accent: var(--text-3);
   /* Type */
@@ -679,14 +673,6 @@ a[data-okf-broken] { color: var(--status-error); text-decoration: line-through; 
 .okf-search-form { display: contents; }
 input::placeholder,
 textarea::placeholder { color: var(--text-3); opacity: 1; }
-
-/* Raised hover surfaces (--surface-2) lift tertiary text one step: --text-3
- * clears AA on canvas, band and panel, but on Bone's raised surface it is
- * 4.4:1, so any row or control that turns --surface-2 on hover re-maps it. */
-:is(.okf-card, .okf-search-results-list > li, .okf-type-nav__link, .okf-appearance__opt,
-  .okf-search-live__option, .okf-graph-thumb__link, .okf-subdirs a, .okf-conn,
-  .okf-prevnext__link, .okf-entity-chip, .okf-th-sortable, .okf-table tbody tr):hover,
-.okf-search-live__option[aria-selected="true"] { --text-3: var(--text-2); }
 
 /* ---- Labels and chips -------------------------------------------------------
  * The mono micro-label carries column heads, badges and eyebrows. Tags and
@@ -982,6 +968,7 @@ details.okf-frontmatter td code { white-space: pre-wrap; word-break: break-word;
 .okf-prose :is(h1, h2, h3, h4):hover .okf-heading-anchor,
 .okf-heading-anchor:focus-visible { opacity: 1; }
 .okf-heading-anchor:hover { color: var(--accent-text); }
+body > div.mermaidTooltip { border-radius: 0; }
 
 /* Inline code: the quiet raised chip. */
 .okf-prose code {
@@ -1836,8 +1823,8 @@ sup.okf-footnote-ref { line-height: 0; }
 
 /* View tabs (Rendered / Source / Split / Focus view). Studio mounts the bar
  * (studio.css owns its stickiness); Ledger draws text tabs on the band: the
- * selected view is bold with a 2px accent underline. "Wrap lines" is a
- * toggle, marked neutrally, so the accent only ever means "current view". */
+ * selected view is bold with a 2px accent underline. Wrap and Focus are
+ * modifier toggles, marked neutrally, so accent only means "current view". */
 body.okf-viewer .okf-concept-viewbar {
   gap: 18px;
   min-height: 48px;
@@ -1864,7 +1851,7 @@ body.okf-viewer .okf-viewswitch__btn[aria-pressed="true"] {
   color: var(--text);
   font-weight: 700;
 }
-body.okf-viewer .okf-viewswitch__btn.okf-source-wrap {
+body.okf-viewer .okf-viewswitch__btn:is(.okf-source-wrap, .okf-focus-toggle) {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -1872,8 +1859,8 @@ body.okf-viewer .okf-viewswitch__btn.okf-source-wrap {
   border-left: 1px solid var(--border-strong);
   border-bottom-color: transparent;
 }
-body.okf-viewer .okf-viewswitch__btn.okf-source-wrap[hidden] { display: none; }
-body.okf-viewer .okf-viewswitch__btn.okf-source-wrap::before {
+body.okf-viewer .okf-viewswitch__btn:is(.okf-source-wrap, .okf-focus-toggle)[hidden] { display: none; }
+body.okf-viewer .okf-viewswitch__btn:is(.okf-source-wrap, .okf-focus-toggle)::before {
   content: "";
   flex: none;
   width: 9px;
@@ -1881,8 +1868,8 @@ body.okf-viewer .okf-viewswitch__btn.okf-source-wrap::before {
   border: 1px solid var(--text-3);
   background: transparent;
 }
-body.okf-viewer .okf-viewswitch__btn.okf-source-wrap[aria-pressed="true"] { border-bottom-color: transparent; color: var(--text); font-weight: 500; }
-body.okf-viewer .okf-viewswitch__btn.okf-source-wrap[aria-pressed="true"]::before {
+body.okf-viewer .okf-viewswitch__btn:is(.okf-source-wrap, .okf-focus-toggle)[aria-pressed="true"] { border-bottom-color: transparent; color: var(--text); font-weight: 500; }
+body.okf-viewer .okf-viewswitch__btn:is(.okf-source-wrap, .okf-focus-toggle)[aria-pressed="true"]::before {
   border-color: var(--text-2);
   background: var(--text-2);
   box-shadow: inset 0 0 0 2px var(--bg-2);
@@ -2492,8 +2479,8 @@ details.okf-frontmatter[open] { padding-bottom: var(--okf-space-2); }
   position: sticky;
   top: var(--okf-topbar-h);
   z-index: 8;
-  margin-inline: -8px;
-  padding: 8px;
+  margin-inline: 0;
+  padding: 8px 0;
   border-bottom: 1px solid var(--border);
   background: var(--bg);
 }
@@ -2512,7 +2499,7 @@ details.okf-frontmatter[open] { padding-bottom: var(--okf-space-2); }
 .okf-search-query input {
   flex: 1;
   min-width: 0;
-  min-height: 44px;
+  min-height: var(--ctl-h);
   padding: 0 12px;
   border: 1px solid var(--input-border);
   border-radius: 0;
@@ -2521,7 +2508,7 @@ details.okf-frontmatter[open] { padding-bottom: var(--okf-space-2); }
   font: 400 16px/1.25 var(--font-body);
 }
 .okf-search-submit {
-  min-height: 44px;
+  min-height: var(--ctl-h);
   margin-left: -1px;
   padding: 0 var(--okf-space-4);
   border: 1px solid var(--primary-border);
@@ -2546,13 +2533,33 @@ details.okf-frontmatter[open] { padding-bottom: var(--okf-space-2); }
 }
 .okf-search-modes legend {
   margin-bottom: var(--okf-space-2);
+  padding: 0;
   color: var(--text-2);
   font: var(--label-weight) var(--label-size)/1.4 var(--font-label);
   letter-spacing: var(--label-track);
   text-transform: uppercase;
 }
 .okf-search-mode { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; vertical-align: top; cursor: pointer; }
-.okf-search-mode input { inline-size: 1.05rem; block-size: 1.05rem; margin: 0; accent-color: var(--accent); }
+.okf-search-mode input {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  flex: none;
+  inline-size: 14px;
+  block-size: 14px;
+  margin: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
+  background: var(--input-bg);
+  cursor: inherit;
+}
+.okf-search-mode input::before { content: ""; inline-size: 6px; block-size: 6px; }
+.okf-search-mode input:checked::before { background: var(--text); }
+.okf-search-mode input:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+@media (forced-colors: active) {
+  .okf-search-mode input { border-color: CanvasText; }
+  .okf-search-mode input:checked::before { background: CanvasText; forced-color-adjust: none; }
+}
 .okf-search-mode span { display: grid; color: var(--text); font-size: 13px; font-weight: 600; }
 .okf-search-mode small { max-width: 11rem; color: var(--text-2); font-size: 11px; font-weight: 400; line-height: 1.2; }
 .okf-search-mode:has(input:disabled) { cursor: not-allowed; }
@@ -2794,6 +2801,7 @@ details.okf-frontmatter[open] { padding-bottom: var(--okf-space-2); }
   position: absolute;
   inset: 100% 0 auto;
   z-index: 40;
+  width: max(100%, min(22rem, calc(100vw - 24px)));
   max-height: min(60vh, 28rem);
   overflow-y: auto;
   border: 0;
@@ -3417,7 +3425,7 @@ body:has(.okf-graph-loading--error) .okf-cytoscape-fallback-actions { display: f
   .okf-appearance__opt:has(> input:checked) :is(.okf-appearance__label, .okf-appearance__sub, .okf-appearance__tag) { color: HighlightText; }
   .okf-appearance__swatch,
   .okf-appearance-trigger__swatch { forced-color-adjust: none; }
-  body.okf-viewer .okf-viewswitch__btn.okf-source-wrap[aria-pressed="true"]::before { background: CanvasText; }
+  body.okf-viewer .okf-viewswitch__btn:is(.okf-source-wrap, .okf-focus-toggle)[aria-pressed="true"]::before { background: CanvasText; }
   .okf-local-graph__swatch { background: CanvasText; }
   /* Scroll cues: no fill, a crisp system-colour edge line. */
   .okf-tablewrap__cue { background: none; }
@@ -3442,21 +3450,22 @@ body:has(.okf-graph-loading--error) .okf-cytoscape-fallback-actions { display: f
   .okf-graph-thumb__link { scroll-behavior: auto; }
 }
 
-/* ---- Coarse pointers keep 44px targets whatever the chrome density ---------- */
+/* ---- Coarse pointers keep 44px targets, including inline navigation -------- */
 @media (pointer: coarse) {
-  .okf-btn,
-  .okf-type-nav__link,
-  .okf-index-browse__controls select,
-  .okf-viewswitch__btn,
-  .okf-local-graph__node,
-  .okf-appearance__opt,
-  .okf-onthispage > summary,
-  .okf-onthispage__link,
-  .okf-recent__item,
-  .okf-sidebar-intent,
-  .okf-table-filter,
-  .okf-table-copy,
-  .okf-code-copy { min-height: 44px; }
+  body.okf-viewer :is(.okf-btn, .okf-type-nav__link, .okf-index-browse__controls select,
+    .okf-viewswitch__btn, .okf-local-graph__node, .okf-appearance__opt,
+    .okf-onthispage > summary, .okf-onthispage__link, .okf-onthispage__filter,
+    .okf-recent__item, .okf-sidebar-intent, .okf-sidebar-panel__toggle,
+    .okf-table-filter, .okf-table-copy, .okf-code-copy, .okf-heading-anchor,
+    .okf-breadcrumb a, .okf-conn__title, .okf-card__link, .okf-card__comments,
+    .okf-v2-spotlight__tertiary, .okf-search-mode, .okf-search-disclosure > summary,
+    .okf-page-context > details > summary, .okf-search-query input, .okf-search-submit) {
+    min-height: 44px;
+    min-inline-size: 44px;
+  }
+  :is(.okf-heading-anchor, .okf-breadcrumb a, .okf-conn__title, .okf-card__link,
+    .okf-card__comments, .okf-v2-spotlight__tertiary) { display: inline-flex; align-items: center; }
+  .okf-heading-anchor { opacity: 1; }
   .okf-type-nav__link,
   .okf-onthispage__link,
   .okf-recent__item,

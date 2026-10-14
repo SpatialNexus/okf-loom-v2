@@ -100,6 +100,111 @@ def open_page(chromium, server_url):
         context.close()
 
 
+@pytest.fixture(scope='module')
+def coarse_server_url(tmp_path_factory):
+    bundle = copy_bundle(DEMO_BUNDLE, tmp_path_factory.mktemp('coarse-targets') / 'bundle')
+    concept = bundle / 'tables/orders.md'
+    concept.write_text(concept.read_text() + ''.join(f'\n## Extra section {i}\n\nText.\n' for i in range(12)))
+    for path in ['demo/annotations_v2_showcase.md', 'explanation/v2_release_notes.md']:
+        file = bundle / path
+        file.parent.mkdir(exist_ok=True)
+        file.write_text('---\ntype: Reference\ntitle: Coarse proof\n---\n# Coarse proof\n')
+    with live_server(bundle) as base:
+        yield base
+
+
+@pytest.mark.parametrize('route,selectors', [
+    (CONCEPT, ['.okf-sidebar-panel__toggle', '.okf-heading-anchor', '.okf-breadcrumb a',
+               '.okf-conn__title', '.okf-viewswitch__btn', '.okf-onthispage__filter',
+               '.okf-toast__action', '.okf-toast__close']),
+    (INDEX, ['.okf-card__link', '.okf-card__comments', '.okf-v2-spotlight__tertiary']),
+    (SEARCH, ['.okf-search-mode', '.okf-search-disclosure > summary',
+              '.okf-search-query input', '.okf-search-submit']),
+])
+def test_core_coarse_pointer_targets_are_44px_at_390(chromium, coarse_server_url, route, selectors):
+    server_url = coarse_server_url
+    context = chromium.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True, has_touch=True)
+    try:
+        page = context.new_page()
+        page.goto(server_url + CONCEPT)
+        page.wait_for_function(STUDIO_READY)
+        assert page.evaluate("matchMedia('(pointer: coarse)').matches")
+        # Produce a real comment so inventory comment links are exposed.
+        page.locator('.okf-studio-launcher').click()
+        page.locator('#okf-panel').get_by_role('button', name='Comments', exact=True).click()
+        comment = f'Coarse-pointer target proof for {route}.'
+        page.get_by_role('textbox', name='Comment for agent').fill(comment)
+        page.get_by_role('button', name='Send', exact=True).click()
+        # Wait on the persistent canonical card, not a short-lived toast.
+        expect(page.locator('.okf-comment__body', has_text=comment)).to_be_visible(timeout=15000)
+        page.goto(server_url + route)
+        page.wait_for_function(STUDIO_READY)
+        if route == CONCEPT:
+            page.locator('.okf-onthispage > summary').click()
+            disclosure = page.locator('.okf-connections-disclosure > summary')
+            if disclosure.count():
+                disclosure.click()
+            page.evaluate("""() => {
+              const action = document.createElement('button'); action.className = 'okf-toast__action';
+              action.textContent = 'View comment';
+              action.addEventListener('click', () => { window.__coarseAction = true; });
+              window.okfLoomStudio._toast(action, {sticky: true});
+            }""")
+        for selector in selectors:
+            targets = page.locator(selector).evaluate_all("""nodes => nodes.filter(n => n.checkVisibility()).map(n => {
+              const r = n.getBoundingClientRect(); return {text: n.textContent, width: r.width, height: r.height};
+            })""")
+            assert targets, f'{route}: no visible target for {selector}'
+            assert all(t['width'] >= 43.5 and t['height'] >= 43.5 for t in targets), (route, selector, targets)
+        if route == CONCEPT:
+            page.locator('.okf-toast__action').click()
+            assert page.evaluate('window.__coarseAction')
+            page.locator('.okf-toast__close').click()
+            expect(page.locator('.okf-toast__action')).to_have_count(0)
+        overflow = page.evaluate(_OVERFLOW)
+        assert overflow['scrollWidth'] <= overflow['innerWidth'] + 1, overflow
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize('theme', ['bone', 'slate', 'clay', 'plum'])
+def test_ledger_hover_press_and_breadcrumb_cues_remain_visible(open_page, theme):
+    page = open_page(CONCEPT, DESKTOP)
+    _choose_appearance(page, theme)
+    separators = page.locator('.okf-breadcrumb__sep')
+    assert separators.count() > 0
+    for i in range(separators.count()):
+        expect(separators.nth(i)).to_be_visible()
+    rows = page.evaluate(_TEXT_CONTRAST, '.okf-breadcrumb__sep')
+    assert rows and all(row['ratio'] >= 4.5 for row in rows), rows
+    page.locator('.okf-studio-launcher').click()
+    button = page.locator('#okf-panel').get_by_role('button', name='Comments', exact=True)
+    colour = 'b => getComputedStyle(b).backgroundColor'
+    idle = button.evaluate(colour)
+    button.hover()
+    hovered = button.evaluate(colour)
+    page.mouse.down()
+    pressed = button.evaluate(colour)
+    page.mouse.up()
+    assert idle != hovered and hovered != pressed, (theme, idle, hovered, pressed)
+
+
+def test_search_modes_keep_native_keyboard_semantics_with_square_indicators(open_page):
+    page = open_page(SEARCH, DESKTOP)
+    radios = page.locator('.okf-search-mode input')
+    first = radios.first
+    first.focus()
+    page.keyboard.press('ArrowRight')
+    expect(radios.nth(1)).to_be_checked()
+    expect(radios.nth(1)).to_be_focused()
+    assert first.evaluate("r => getComputedStyle(r).borderRadius") == '0px'
+    assert page.locator('.okf-search-query input').bounding_box()['height'] == 32
+    page.emulate_media(forced_colors='active')
+    visible = radios.nth(1).evaluate("""r => { const s = getComputedStyle(r), dot = getComputedStyle(r, '::before');
+      return s.borderTopStyle === 'solid' && dot.backgroundColor !== s.backgroundColor; }""")
+    assert visible
+
+
 def _settle(page) -> None:
     """Wait until scrolling and CSS transitions are at rest (frame state, not time)."""
     settled = page.evaluate("""() => new Promise(resolve => {

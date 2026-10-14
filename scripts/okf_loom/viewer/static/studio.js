@@ -573,7 +573,7 @@
   // and deliberately separate from live.js's capability-bound browser-session
   // publisher. It also mirrors the canonical agent row (renderPresence syncs
   // aria-pressed), so an agent reporting watching via the CLI moves it too.
-  // Visible label "Watching" + an eye glyph + an accessible name.
+  // Visible label "Watching" + a square status glyph + an accessible name.
   const watchingToggle = el("button", { type: "button", class: "okf-studiobtn okf-watch-toggle",
     "aria-pressed": "false", "aria-label": "Agent watching, currently off",
     "aria-describedby": "okf-watch-toggle-note",
@@ -582,7 +582,7 @@
   // control, not only to those who hover it.
   watchingToggle.appendChild(el("span", { id: "okf-watch-toggle-note", class: "okf-sr-only",
     text: "Status flag only. It does not start an agent; an external agent must be running to act on comments." }));
-  watchingToggle.appendChild(el("span", { class: "okf-watch-toggle__icon", "aria-hidden": "true", text: "\u25C9" }));
+  watchingToggle.appendChild(el("span", { class: "okf-watch-toggle__icon", "aria-hidden": "true", text: "\u25A0" }));
   watchingToggle.appendChild(el("span", { class: "okf-watch-toggle__label", text: "Watching" }));
   watchingToggle.disabled = !CAN_CONTROL_SESSION;
   watchingToggle.hidden = !CAN_CONTROL_SESSION;
@@ -698,7 +698,7 @@
     applySourceWrap();
   });
   viewSwitch.appendChild(wrapBtn);
-  const focusViewBtn = el("button", { type: "button", class: "okf-viewswitch__btn",
+  const focusViewBtn = el("button", { type: "button", class: "okf-viewswitch__btn okf-focus-toggle",
     "aria-pressed": state.focusView ? "true" : "false", text: "Focus view" });
   function setFocusView(active) {
     state.focusView = !!active;
@@ -4188,16 +4188,6 @@
     status.textContent = cs.message;
     const tone = cs.tone || "info";
     status.setAttribute("data-tone", tone);
-    // E: caution/non-fatal outcomes (uncertain, accepted-refresh-needed) use the
-    // amber --okf-warn token; red is reserved for genuine rejection, green for
-    // success.
-    var accent = "var(--okf-accent)", bg = "transparent";
-    if (tone === "error") { accent = "var(--okf-error)"; bg = "var(--okf-error-bg)"; }
-    else if (tone === "success") { accent = "var(--okf-ok)"; bg = "var(--okf-ok-bg)"; }
-    else if (tone === "warn") { accent = "var(--okf-warn)"; bg = "var(--okf-warn-bg)"; }
-    status.setAttribute("style",
-      "margin:0;padding:6px 10px;border-left:3px solid " + accent + ";background:" + bg + ";" +
-      "border-radius:4px;font-size:var(--okf-text-xs);color:var(--okf-fg);line-height:1.4;word-break:break-word");
   }
   function setComposerStatus(message, tone) {
     state.composerStatus = message ? { message: message, tone: tone || "info" } : null;
@@ -4219,13 +4209,6 @@
     status.textContent = message;
     var t = tone || "info";
     status.setAttribute("data-tone", t);
-    var accent = "var(--okf-accent)", bg = "transparent";
-    if (t === "error") { accent = "var(--okf-error)"; bg = "var(--okf-error-bg)"; }
-    else if (t === "warn") { accent = "var(--okf-warn)"; bg = "var(--okf-warn-bg)"; }
-    else if (t === "success") { accent = "var(--okf-ok)"; bg = "var(--okf-ok-bg)"; }
-    status.setAttribute("style",
-      "margin:0;padding:6px 10px;border-left:3px solid " + accent + ";background:" + bg + ";" +
-      "border-radius:4px;font-size:var(--okf-text-xs);color:var(--okf-fg);line-height:1.4;word-break:break-word");
   }
   // Visual P1: lifecycle toasts are tagged by operation identity so a terminal
   // transition (success, or a newer outcome) clears any prior composer toast —
@@ -8743,7 +8726,7 @@
       panels[impl.id] = Object.assign({ __builtin: false }, impl);
       // Add a bar toggle for non-builtin panels.
       if (!impl.__builtin && !impl._btn) {
-        const btn = el("button", { type: "button", class: "okf-iconbtn", "aria-expanded": "false", "aria-controls": "okf-panel", text: impl.label });
+        const btn = el("button", { type: "button", class: "okf-studiobtn", "aria-expanded": "false", "aria-controls": "okf-panel", text: impl.label });
         btn.addEventListener("click", () => togglePanel(impl.id));
         impl._btn = btn;
         panels[impl.id]._btn = btn;

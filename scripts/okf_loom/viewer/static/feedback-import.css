@@ -150,7 +150,7 @@
 .okf-fbi__facts {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
-  gap: 0 var(--okf-space-4);
+  gap: 0;
   margin: 0;
   font-size: 13px;
   border-top: 1px solid var(--border-strong);
@@ -162,7 +162,7 @@
   font-size: 11.5px;
   font-weight: 400;
 }
-.okf-fbi__facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.okf-fbi__facts dd { margin: 0; padding-left: var(--okf-space-4); min-width: 0; overflow-wrap: anywhere; }
 .okf-fbi code { font-family: var(--font-mono); font-size: 0.9em; overflow-wrap: anywhere; }
 /* A command-line flag stays one token (never "--no-" / "edit"). */
 .okf-fbi code.okf-fbi__flag { white-space: nowrap; overflow-wrap: normal; }
@@ -247,7 +247,7 @@
   .okf-fbi__panel { padding: var(--okf-space-4); }
   .okf-fbi__facts { grid-template-columns: minmax(0, 1fr); }
   .okf-fbi__facts dt { padding-bottom: 0; border-bottom: 0; }
-  .okf-fbi__facts dd { padding-top: 2px; }
+  .okf-fbi__facts dd { padding-top: 2px; padding-left: 0; }
   .okf-fbi .okf-fbi__actions .okf-btn { flex: 1 1 auto; min-height: 44px; }
 }
 @media (pointer: coarse) {

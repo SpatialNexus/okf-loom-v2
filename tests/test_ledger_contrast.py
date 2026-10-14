@@ -70,6 +70,7 @@ TEXT_PAIRS = [
     ("--text", "--surface-2", 4.5),          # hovered rows, raised controls
     ("--text-2", "--bg-2", 4.5),             # header band, view bar, fallback banner
     ("--text-3", "--surface", 4.5),          # spotlight, menus, popovers
+    ("--text-3", "--surface-2", 4.5),        # hovered/selected rows, palette kbd
     ("--text-2", "--surface", 4.5),
     ("--accent-text", "--bg-2", 4.5),        # links in the header band
     ("--accent-text", "--surface-2", 4.5),   # hovered row number
@@ -122,20 +123,6 @@ def test_focus_ring_and_state_bar_clear_3_to_1(palette: str, fg: str, bg: str) -
     tokens = PAL[palette]
     measured = ratio(tokens[fg], tokens[bg])
     assert measured >= 3.0, f"{palette}: {fg} on {bg} = {measured:.2f}"
-
-
-def test_tertiary_text_on_raised_hover_is_lifted() -> None:
-    """Bone's --text-3 is below AA on --surface-2, so every surface that turns
-    --surface-2 on hover re-maps --text-3 to --text-2 (which clears it)."""
-    assert ratio(PAL["bone"]["--text-3"], PAL["bone"]["--surface-2"]) < 4.5  # why the remap exists
-    css = WIKI.read_text(encoding="utf-8")
-    remap = re.search(r"([^{}]*)\{\s*--text-3:\s*var\(--text-2\);\s*\}", css)
-    assert remap, "hover remap of --text-3 missing"
-    for surface in (".okf-card", ".okf-search-results-list > li", ".okf-type-nav__link",
-                    ".okf-appearance__opt", ".okf-search-live__option", ".okf-conn"):
-        assert surface in remap.group(1), surface
-    for palette in PALETTES:
-        assert ratio(PAL[palette]["--text-2"], PAL[palette]["--surface-2"]) >= 4.5
 
 
 def test_print_palette_is_light_paper_with_readable_code() -> None:

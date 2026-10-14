@@ -430,6 +430,17 @@ def lifecycle_page():
 
 
 @pytest.mark.browser
+def test_mermaid_shared_tooltip_uses_square_viewer_geometry(lifecycle_server, lifecycle_page):
+    lifecycle_page.goto(lifecycle_server + '/playbooks/refund_flow')
+    lifecycle_page.wait_for_function("() => window.okfRendererReadiness && window.okfRendererReadiness.ready")
+    expect(lifecycle_page.locator('div.mermaid svg')).to_have_count(1)
+    tooltip = lifecycle_page.locator('body > div.mermaidTooltip')
+    expect(tooltip).to_have_count(1)
+    assert tooltip.evaluate("t => getComputedStyle(t).borderRadius") == '0px'
+    assert tooltip.evaluate("t => t.style.borderRadius") == ''
+
+
+@pytest.mark.browser
 def test_studio_ready_status_follows_usable_api(lifecycle_server: str, lifecycle_page) -> None:
     lifecycle_page.goto(lifecycle_server + "/tables/orders", wait_until="domcontentloaded")
     lifecycle_page.wait_for_function(
