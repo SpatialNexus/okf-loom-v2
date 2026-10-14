@@ -2729,8 +2729,8 @@ def _render_not_found_page(*, name: str, path: str, config: dict[str, Any]) -> s
         f' data-theme="{_esc_attr_qs(initial_theme)}"><head>'
         '<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
         f'<title>Page not found — {_esc(name)}</title>'
-        '<link rel="stylesheet" href="/__static/ledger-fonts.css">'
-        '<link rel="stylesheet" href="/__static/wiki.css">'
+        + _ledger_fonts_head("/__static")
+        + '<link rel="stylesheet" href="/__static/wiki.css">'
         '<link rel="stylesheet" href="/__static/shell.css">'
         '</head><body class="okf-viewer okf-viewer--notfound" data-okf-mode="serve">'
         '<a class="okf-skip-link" href="#okf-main">Skip to content</a>'
@@ -2822,7 +2822,7 @@ def render_feedback_import_page(*, name: str, config: dict[str, Any], availabili
         f'<meta http-equiv="Content-Security-Policy" content="{_RESERVED_CSP}">\n'
         f'<title>Import a feedback note — {_esc(name)}</title>\n'
         + (icon.group(0) + '\n' if icon else '')
-        + '<link rel="stylesheet" href="/__static/ledger-fonts.css">\n'
+        + _ledger_fonts_head("/__static") +
         '<link rel="stylesheet" href="/__static/wiki.css">\n'
         '<link rel="stylesheet" href="/__static/shell.css">\n'
         '<link rel="stylesheet" href="/__static/feedback-import.css">\n'
@@ -3422,7 +3422,8 @@ def render_single_file(
         '</head>',
         _single_source_revisions_script(bundle)
         + '</head>', 1)
-    css = (load_static("ledger-fonts.css", bundle) + "\n"
+    from .viewer.vendor import load_ledger_css
+    css = (load_ledger_css(inline=True) + "\n"
            + load_static("wiki.css", bundle) + "\n" + load_static("shell.css", bundle)
            + "\n" + load_static("graph.css", bundle))
     # Bundle renderers.js too so the single-file detail panel gets
@@ -3883,8 +3884,13 @@ def _emit_site(
             html = offline_assets.finalize_page(html)
         _atomic_write_text(path, html)
 
+    from .viewer.vendor import load_ledger_files
     static_dir = root / "__static"
     static_dir.mkdir(parents=True, exist_ok=True)
+    for rel, data in load_ledger_files().items():
+        target_path = static_dir / rel
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        _atomic_write_bytes(target_path, data)
     for asset_name in list_builtin_static():
         _atomic_write_text(static_dir / asset_name, load_static(asset_name, bundle))
     if portable_feedback is not None:
@@ -4192,6 +4198,18 @@ def _type_icons_block() -> str:
             + payload + '</script>\n'
         )
     return _TYPE_ICONS_BLOCK_CACHE
+
+
+def _ledger_fonts_head(static_prefix: str) -> str:
+    """Start upright prose/UI fonts early; italics remain demand-loaded."""
+    from .viewer.vendor import LEDGER_FACES
+    prefix = _esc_attr_qs(static_prefix)
+    preloads = "".join(
+        f'<link rel="preload" href="{prefix}/{path}" as="font" '
+        'type="font/woff2" crossorigin>\n'
+        for _family, style, path in LEDGER_FACES if style == "normal"
+    )
+    return preloads + f'<link rel="stylesheet" href="{prefix}/ledger-fonts.css">\n'
 
 
 def _static_prefix_for(mode: str, source_cid: ConceptId | None = None) -> str:
@@ -4625,7 +4643,7 @@ def _render_concept_page(
         f'data-okf-capture-revision="{_esc_attr_qs(revision)}"'
     )
 
-    css_link = (f'<link rel="stylesheet" href="{static_prefix}/ledger-fonts.css">'
+    css_link = (_ledger_fonts_head(static_prefix) +
                 f'<link rel="stylesheet" href="{static_prefix}/wiki.css">')
     shell_css_link = f'<link rel="stylesheet" href="{static_prefix}/shell.css">'
     # theme.js is parser-blocking (no defer) in <head> so it resolves
@@ -5839,7 +5857,7 @@ def render_reserved_document(document: str, body: str, *, mode: str,
         f'<meta http-equiv="Content-Security-Policy" content="{_RESERVED_CSP}">\n'
         f'<title>{_esc(document)} — {_esc(display)}</title>\n'
         + icon_html +
-        f'<link rel="stylesheet" href="{prefix}/ledger-fonts.css">\n'
+        _ledger_fonts_head(prefix) +
         f'<link rel="stylesheet" href="{prefix}/wiki.css">\n'
         f'<link rel="stylesheet" href="{prefix}/shell.css">\n'
         + _theme_config_html(configured_theme) + '\n'
@@ -6234,7 +6252,7 @@ def _render_index_page(
                   f'data-okf-revision="{_esc_attr_qs(revision)}" data-okf-capture-revision="{_esc_attr_qs(revision)}" '
                   f'data-okf-concept-routes="{_esc_attr_qs(routes_json)}"')
 
-    css_link = (f'<link rel="stylesheet" href="{static_prefix}/ledger-fonts.css">'
+    css_link = (_ledger_fonts_head(static_prefix) +
                 f'<link rel="stylesheet" href="{static_prefix}/wiki.css">')
     shell_css_link = f'<link rel="stylesheet" href="{static_prefix}/shell.css">'
     # theme.js in <head> before first paint (no FOUC); see concept page.
@@ -6733,7 +6751,7 @@ def _render_search_page(
         f'data-okf-capture-query="{_esc_attr_qs(query)}" data-okf-revision="{_esc_attr_qs(bundle_revision(bundle))}"'
     )
 
-    css_link = (f'<link rel="stylesheet" href="{static_prefix}/ledger-fonts.css">'
+    css_link = (_ledger_fonts_head(static_prefix) +
                 f'<link rel="stylesheet" href="{static_prefix}/wiki.css">')
     shell_css_link = f'<link rel="stylesheet" href="{static_prefix}/shell.css">'
     # theme.js in <head> before first paint (no FOUC); see concept page.
@@ -6927,7 +6945,7 @@ def _render_graph_page(
                   f'data-okf-studio="{("1" if mode == "serve" else "0")}" '
                   f'data-okf-revision="{_esc_attr_qs(revision)}" data-okf-capture-revision="{_esc_attr_qs(revision)}" data-okf-capture-ready="loading"')
 
-    css_link = (f'<link rel="stylesheet" href="{static_prefix}/ledger-fonts.css">'
+    css_link = (_ledger_fonts_head(static_prefix) +
                 f'<link rel="stylesheet" href="{static_prefix}/wiki.css">')
     shell_css_link = f'<link rel="stylesheet" href="{static_prefix}/shell.css">'
     graph_css_link = f'<link rel="stylesheet" href="{static_prefix}/graph.css">'

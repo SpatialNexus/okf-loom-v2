@@ -5,7 +5,8 @@ static, SPA and single-file output with byte-verified copies of the SAME
 pinned library versions, checked into ``viewer/vendor/`` and described by
 ``viewer/vendor/vendor.lock.json``. Renderer/graph bytes remain opt-in;
 Ledger fonts are always self-hosted and verified, including default ``cdn``
-output. Their derived CSS embeds four WOFF2 faces and the full OFL texts.
+output. Their small linked CSS references four WOFF2 files and includes the
+full OFL texts; only single-file output embeds the faces as data URLs.
 
 Integrity is checked at BUILD time, before anything is written: each vendored
 file must match its locked size and SHA-256/SHA-384, and every file that the
@@ -371,23 +372,29 @@ def cdn_graph_chain() -> list[str]:
 # Derived outputs
 # ---------------------------------------------------------------------------
 
-def derive_ledger_css(verified: dict[str, bytes]) -> bytes:
-    """Embed the four locked faces AND full OFL texts in every output target."""
+def derive_ledger_css(verified: dict[str, bytes], *, inline: bool = True) -> bytes:
+    """Four locked faces and full OFL texts; data URLs only for single-file.
+
+    swap allows readable fallback text at first paint. The upright body/UI
+    faces are preloaded separately; italic faces load only when needed.
+    """
     notices = "\n\n".join(verified[path].decode("utf-8") for path in LEDGER_LICENSES)
     if "*/" in notices or "<" in notices:
         raise VendorIntegrityError("Ledger font notices cannot be embedded as CSS")
     faces = ["/* Ledger fonts — SIL OFL 1.1\n" + notices + "\n*/"]
     for family, style, path in LEDGER_FACES:
-        encoded = base64.b64encode(verified[path]).decode("ascii")
+        source = path
+        if inline:
+            source = "data:font/woff2;base64," + base64.b64encode(verified[path]).decode("ascii")
         faces.append(
             f'@font-face{{font-family:"{family}";font-style:{style};'
             f'font-weight:100 900;font-display:swap;'
-            f'src:url(data:font/woff2;base64,{encoded}) format("woff2")}}')
+            f'src:url({source}) format("woff2")}}')
     return ("\n".join(faces) + "\n").encode("utf-8")
 
 
-def load_ledger_css(root: Path | None = None) -> str:
-    """Verify font inputs and derived output, without loading graph libraries.
+def load_ledger_files(root: Path | None = None) -> dict[str, bytes]:
+    """Verify font inputs and both CSS outputs, without loading graph libraries.
 
     No process cache: a later build must not conceal damaged vendored inputs.
     The same no-follow reader and lock are used for served and offline assets.
@@ -402,11 +409,23 @@ def load_ledger_css(root: Path | None = None) -> str:
             data = tree.read(path)
             _check_entry(entries[path], data)
             verified[path] = data
-        data = derive_ledger_css(verified)
-        expected = (lock.get("derived") or {}).get(LEDGER_DERIVED, {})
+        _check_ledger_css(lock, verified)
+        return verified
+
+
+def _check_ledger_css(lock: dict[str, Any], verified: dict[str, bytes]) -> None:
+    pin = (lock.get("derived") or {}).get(LEDGER_DERIVED, {})
+    # Keep the original embedded pin stable; its external variant is pinned
+    # alongside it so vendor refresh tooling preserves both as one unit.
+    for inline, expected in ((True, pin), (False, pin.get("external", {}))):
+        data = derive_ledger_css(verified, inline=inline)
         if expected.get("size") != len(data) or expected.get("sha256") != sha256_hex(data):
             raise VendorIntegrityError("derived Ledger stylesheet does not match its pinned hash")
-        return data.decode("utf-8")
+
+
+def load_ledger_css(root: Path | None = None, *, inline: bool = False) -> str:
+    """Verified served CSS by default; self-contained CSS only when requested."""
+    return derive_ledger_css(load_ledger_files(root), inline=inline).decode("utf-8")
 
 
 def derive_katex_css(css: bytes, fonts: dict[str, bytes]) -> bytes:
@@ -612,6 +631,7 @@ def _load_offline_assets(tree: VendorTree) -> OfflineAssets:
         if rel.startswith(HLJS_LANGUAGE_DIR) and rel.endswith(".min.js")
     ]
     try:
+        _check_ledger_css(lock, verified)
         derived = {
             LEDGER_DERIVED: derive_ledger_css(verified),
             KATEX_DERIVED: derive_katex_css(verified[KATEX_CSS], fonts),

@@ -3695,6 +3695,11 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         self._send_json(200, {"comments": comments})
 
     def _handle_static(self, name: str) -> None:
+        # Exact built-in font allowlist before normalization or overrides:
+        # neither bundle content nor a user path can select vendor files.
+        from .viewer.vendor import LEDGER_FACES, load_ledger_files
+        if name in {face[2] for face in LEDGER_FACES}:
+            return self._send_bytes(200, load_ledger_files()[name], content_type="font/woff2")
         # Prevent path traversal. Normalize, then reject anything still
         # containing a separator or a traversal token after normalization.
         # ``unquote`` already ran in ``_route`` (we parse the decoded path),

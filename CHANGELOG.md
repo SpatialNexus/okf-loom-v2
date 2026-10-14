@@ -10,6 +10,8 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Reduce Ledger first-paint CSS cost with preloaded self-hosted font files on serve/static/SPA; retain embedded single-file fonts, offline integrity and benchmark inputs.
+
 - Split view now clears the "Loading source…" notice whenever the source pane
   is populated, including by a concurrent document or live-update load. A
   redundant request no longer leaves a loading or failure notice above source
