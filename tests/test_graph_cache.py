@@ -211,6 +211,7 @@ def test_graph_watcher_and_cli_mutator_invalidate_live_cache(tmp_path):
             time.sleep(.1)
         assert updated[1]['ETag'] != first[1]['ETag']
         assert _get(base, etag=updated[1]['ETag'])[0] == 304
+        assert json.loads(updated[2])['bundle_revision'].encode() in _get(base, '/__graph')[2]
         subprocess.run(okf_module_argv('set-frontmatter', '--bundle', str(root),
                                      '--id', 'a', '--key', 'title', '--value', 'Mutator title'),
                        env=okf_subprocess_env(), check=True, capture_output=True)
@@ -223,4 +224,6 @@ def test_graph_watcher_and_cli_mutator_invalidate_live_cache(tmp_path):
             time.sleep(.1)
         assert latest[1]['ETag'] != updated[1]['ETag']
         assert _get(base, etag=latest[1]['ETag'])[0] == 304
-        assert b'Mutator title' in _get(base, '/__graph')[2]
+        page = _get(base, '/__graph')[2]
+        assert b'Mutator title' in page
+        assert json.loads(latest[2])['bundle_revision'].encode() in page
