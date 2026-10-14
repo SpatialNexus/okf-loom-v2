@@ -7078,10 +7078,9 @@
     });
   }
   // ---- Phase 5: index engagement (recency rail + comment chips) --------
-  // Runs on index pages only, after loadGraph()/loadComments() resolve
+  // Runs after the structure-only graph view/loadComments() resolve
   // (called from both — idempotent; the rail rebuilds so labels upgrade
-  // once graph data lands). Everything reads state the studio already
-  // fetched, so this costs no extra requests.
+  // once structure lands). Non-index connection chips use the same view.
   // F14: reader words for the machine event verbs on the human-facing
   // recency rail — the same mapping the SSR rows own in render.py
   // (_RECENT_READER_VERBS / _RECENT_CHANNEL_ACTORS / _recent_row_reader_text).
@@ -8206,6 +8205,7 @@
     if (window.OKFOverlayStack) window.OKFOverlayStack.push(paletteState.overlay);
     paletteState.input.value = "";
     refreshPaletteList("");
+    if (!state.graphReady) void loadGraph();
     paletteState._lastFocus = document.activeElement;
     setTimeout(() => paletteState.input.focus(), 20);
   }
@@ -9147,21 +9147,63 @@
   // ====================================================================
   // 11. Graph cache (palette + local graph refresh + presence)
   // ====================================================================
-  async function loadGraph() {
-    try {
-      const res = await fetch("/__data/graph.json", { headers: { Accept: "application/json" } });
-      if (!res.ok) return;
-      const graph = await res.json();
-      if (!graph || !Array.isArray(graph.nodes)) return;
-      state.graph = graph;
-      state.graphReady = true;
-      buildIndexEngagement();
-    } catch (e) { /* palette still works with commands only */ }
+  const fullGraphPage = ((document.getElementById("okf-graph") || {}).dataset || {}).graphUrl === "/__data/graph.json"
+    || window.OKF_LOOM_GRAPH_DATA_URL === "/__data/graph.json";
+  let studioGraphGeneration = 0;
+  let studioGraphPending = null;
+  function acceptStudioGraph(graph) {
+    if (!graph || !Array.isArray(graph.nodes)) return;
+    state.graph = graph;
+    state.graphReady = true;
+    buildIndexEngagement();
+    if (paletteState.open) refreshPaletteList(paletteState.input.value);
   }
+  function needsGraphStructure() {
+    // Visible comment chips/recency need structure, never document bodies.
+    // Backlinks already come from /__data/doc. Other pages acquire only when
+    // the command palette is opened; badges do not read state.graph.
+    return document.body.classList.contains("okf-viewer--index") || !!$(".okf-conn[data-concept-id]");
+  }
+  async function loadGraph(refresh = false) {
+    if (!refresh && studioGraphPending) return studioGraphPending;
+    const own = ++studioGraphGeneration;
+    let acquisition;
+    if (fullGraphPage) {
+      if (!window.okfGraphData) {
+        const pending = fetch("/__data/graph.json", { cache: "no-cache", headers: { Accept: "application/json" } })
+          .catch((error) => { throw Object.assign(new Error("Graph data request failed."), { okfPhase: "graph-fetch", okfCode: "network-failure", cause: error }); })
+          .then((res) => {
+            if (!res.ok) throw Object.assign(new Error("HTTP " + res.status), { okfPhase: "graph-http", okfCode: "network-failure" });
+            return res.json().catch((error) => { throw Object.assign(new Error("Graph JSON is malformed."), { okfPhase: "graph-json", okfCode: "network-failure", cause: error }); });
+          });
+        window.okfGraphData = pending;
+        pending.catch(() => { if (window.okfGraphData === pending) window.okfGraphData = null; });
+      }
+      acquisition = window.okfGraphData;
+    } else {
+      acquisition = fetch("/__data/graph.json?view=structure", { cache: "no-cache", headers: { Accept: "application/json" } })
+        .then((res) => { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); });
+    }
+    const pending = acquisition.then((graph) => {
+      if (own === studioGraphGeneration) acceptStudioGraph(graph);
+    }).catch(() => { /* palette still works with commands only */ });
+    studioGraphPending = pending;
+    await pending;
+    if (studioGraphPending === pending) studioGraphPending = null;
+  }
+  window.addEventListener("okf-loom:graph-data", (event) => {
+    // Only accepted latest-wins graph refreshes publish this event.
+    ++studioGraphGeneration;
+    acceptStudioGraph(event.detail);
+    rebuildMarginMarkers();
+  });
   function refreshGraph() {
-    // Called by live.js on a `graph` event. Reload graph cache + rebuild
-    // local sidebar pills + margin markers.
-    loadGraph().then(() => { rebuildMarginMarkers(); });
+    // On the graph page, graph.js owns refresh/deadline/latest-wins and
+    // publishes accepted data above. Never start a second request here.
+    if (fullGraphPage) return;
+    if (state.graphReady || needsGraphStructure() || paletteState.open) {
+      void loadGraph(true).then(() => { rebuildMarginMarkers(); });
+    }
   }
 
   // ====================================================================
@@ -11538,7 +11580,7 @@
     // iter1 CRI-004: stamp data-concept-id on list/search rows so presence
     // focus can highlight them (also runs on index/search pages).
     stampConceptIds();
-    loadGraph();
+    if (fullGraphPage || needsGraphStructure()) void loadGraph();
     loadComments();
     wireLive();
     // iter1 CRI-002: apply text-range marks for any pre-existing comments
@@ -11555,6 +11597,8 @@
         // reconcile canonical state, re-apply marks, restore editor DOM.
         window.addEventListener("pagehide", function () {
           abortAnnotationOperations("pagehide");
+          ++studioGraphGeneration;
+          studioGraphPending = null;
           state.annotationGeneration++;
           state.annotationEditor = null;
           // R6-9: the selection-mode banner + body class + dataset describe an

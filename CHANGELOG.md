@@ -29,6 +29,12 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 - Live document pages, document data and search reuse bounded, content-keyed
   heading render work without changing canonical-source or section-link checks.
+- Live graph reads reuse single-flight, generation-owned rendered bodies while
+  recomputing clock-sensitive metadata; index/graph HTML skip unused bodies.
+  Graph JSON now has final-byte strong
+  ETags and revalidates with `no-cache`; Studio shares the graph page's initial
+  request and uses body-free structure only for visible badges/recency or an
+  opened command palette on other pages.
 - **Ledger appearance:** Bone (default, light), Slate, Clay, Plum (dark), plus
   System (Bone/Slate following the OS). Square geometry, ruled inventory,
   neutral content types and palette-derived graph lenses replace the family

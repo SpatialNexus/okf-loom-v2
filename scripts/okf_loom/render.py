@@ -1928,13 +1928,65 @@ def _graph_grouping_metadata(concept: Concept) -> dict[str, str]:
     return out
 
 
+def _render_graph_documents(bundle: Bundle) -> tuple[dict[str, str], dict[str, Any]]:
+    """Content-pure graph HTML; never cache clock-sensitive metadata here."""
+    bodies = {
+        concept_id_to_str(c.id): _decorate_content_scrollports(
+            normalize_document_links(
+                _demote_headings(join_source_footnotes(markdown_to_html(c.body), c)),
+                concept_id_to_str(c.id) + '.md', 'serve',
+            )
+        )
+        for c in sorted(bundle.concepts.values(), key=lambda c: c.id)
+    }
+    documents = {
+        rel.as_posix(): {
+            "document": rel.as_posix(),
+            "html": normalize_document_links(
+                markdown_to_html(getattr(doc, 'body', doc.raw_text)), rel.as_posix(), 'serve',
+            ),
+        }
+        for rel, doc in sorted({**bundle.indexes, **bundle.logs}.items())
+        if doc.path.resolve().is_relative_to(bundle.root.resolve())
+    }
+    return bodies, documents
+
+
+def _graph_documents(bundle: Bundle, *, cached: bool) -> tuple[dict[str, str], dict[str, Any]]:
+    if not cached:
+        return _render_graph_documents(bundle)
+    from .retrieval import bundle_revision
+
+    # Bundle's generation lock makes a cold render single-flight with its graph
+    # and revision derivations, and excludes mutator publication. The cache is
+    # owned by this snapshot, not the server: swapping/reloading a Bundle drops
+    # it; in-place mutations advance the generation/revision. One entry only.
+    with bundle._derived_lock:
+        key = (bundle._source_generation, bundle_revision(bundle), bundle.root.resolve(),
+               tuple((rel, doc.path.resolve()) for rel, doc in sorted(
+                   {**bundle.indexes, **bundle.logs}.items())))
+        entry = getattr(bundle, '_graph_documents_cache', None)
+        if entry is None or entry[0] != key:
+            entry = (key, _render_graph_documents(bundle))
+            bundle._graph_documents_cache = entry
+        return entry[1]
+
+
 def build_graph_data(
     bundle: Bundle,
     *,
     name: str | None = None,
     comment_summary: CommentSummaryV1 | None = None,
+    cache_bodies: bool = False,
+    include_bodies: bool = True,
 ) -> dict[str, Any]:
     """Serialise a Bundle into the JSON shape consumed by the viewer.
+
+    Live callers may cache only content-pure body/document HTML with
+    ``cache_bodies``. Name, palette, graph structure, comment counts and
+    clock-sensitive metadata are always derived afresh. ``include_bodies=False``
+    skips that HTML entirely for structural consumers; portable payloads keep
+    the default full projection.
 
     Shape (consumed by ``viewer/static/graph.js``):
         {
@@ -2025,7 +2077,7 @@ def build_graph_data(
         _unresolved_by_src[link.source] = _unresolved_by_src.get(link.source, 0) + 1
 
     nodes: list[dict[str, Any]] = []
-    bodies: dict[str, str] = {}
+    bodies, documents = _graph_documents(bundle, cached=cache_bodies) if include_bodies else ({}, {})
     # Phase 3 PRE-PASS: degree per node, mirroring the dedup loop's
     # invariants (drop None targets, self-loops, dangling endpoints, and
     # duplicate (src,tgt) pairs). Computing it BEFORE the node loop lets
@@ -2060,9 +2112,8 @@ def build_graph_data(
         # renderer escapes raw HTML and neutralises dangerous URL schemes.
         # Apply heading demotion for consistent document outline across
         # all render targets (concept pages AND single-file/graph views).
-        bodies[cid_str] = _decorate_content_scrollports(
-            normalize_document_links(_demote_headings(join_source_footnotes(markdown_to_html(c.body), c)), cid_str + '.md', 'serve')
-        )
+        # Content-pure body HTML is acquired above; metadata_html below is
+        # deliberately recomputed at the request's current clock time.
         # Sanitize resource URL through _safe_url to prevent javascript:/data:
         # XSS via the graph view (graph.js assigns data.resource to a.href).
         safe_resource = ""
@@ -2282,12 +2333,7 @@ def build_graph_data(
         "external": external,
         "bodies": bodies,
         # Navigation documents are not graph concepts or synthetic nodes.
-        "documents": {
-            rel.as_posix(): {"document": rel.as_posix(),
-                            "html": normalize_document_links(markdown_to_html(getattr(doc, 'body', doc.raw_text)), rel.as_posix(), 'serve')}
-            for rel, doc in sorted({**bundle.indexes, **bundle.logs}.items())
-            if doc.path.resolve().is_relative_to(bundle.root.resolve())
-        },
+        "documents": documents,
         "types": types,
         "palette": palette,
         "backlinks": backlinks,
@@ -5769,7 +5815,7 @@ def _render_index_page(
     graph_thumbnail = ""
     if not sub:
         graph_thumbnail = ('<details class="okf-home-graph"><summary>Preview graph</summary>'
-                           + _graph_thumbnail_html(build_graph_data(bundle, name=name), graph_href_root)
+                           + _graph_thumbnail_html(build_graph_data(bundle, name=name, include_bodies=mode != 'serve'), graph_href_root)
                            + '</details>')
     hero_v2 = _v2_spotlight_html(bundle, mode, graph_href_root) if not sub else ""
     hero_modifier = " okf-hero--split" if hero_v2 else ""
@@ -6711,7 +6757,7 @@ def _render_graph_page(
         '</li>'
         for concept in recent
     )
-    graph_data = build_graph_data(bundle, name=name)
+    graph_data = build_graph_data(bundle, name=name, include_bodies=mode != 'serve')
     nojs_relationships = "".join(
         "<li>" + _esc(relation["label"]) + " — " + _esc(relation["type"])
         + ": " + _esc(relation["source"]) + " → " + _esc(relation["target"]) + "</li>"

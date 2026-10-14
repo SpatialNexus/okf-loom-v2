@@ -2752,7 +2752,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         if path in ("/__graph", "/__graph.html"):
             return self._handle_graph()
         if path == "/__data/graph.json":
-            return self._handle_graph_json()
+            return self._handle_graph_json(query)
         if path == "/__data/content.json":
             return self._handle_content_json()
         if path == "/__data/summary":
@@ -3271,7 +3271,10 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
             ) if isinstance(relations, list) else 0,
         })
 
-    def _handle_graph_json(self) -> None:
+    def _handle_graph_json(self, query: dict[str, list[str]] | None = None) -> None:
+        query = query or {}
+        if query and query != {"view": ["structure"]}:
+            return self._send_json(400, {"ok": False, "error": "invalid_request"})
         bundle, _palette, _plugin, config = self._state_snapshot()
         display_name = getattr(self.server, "name", None) or config.get("name") or bundle.name
         comment_summary = None
@@ -3292,8 +3295,28 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
             bundle,
             name=display_name,
             comment_summary=comment_summary,
+            cache_bodies=True,
+            include_bodies=not query,
         )
-        self._send_json(200, data, extra_headers={"Cache-Control": "no-store"})
+        if query:
+            del data["bodies"]
+            del data["documents"]
+        from .retrieval import MAX_RESPONSE_BYTES, canonical_json_bytes
+        try:
+            body = canonical_json_bytes(data)
+        except Exception:
+            return self._send_json(200, data, extra_headers={"Cache-Control": "no-store"})
+        if len(body) > MAX_RESPONSE_BYTES:
+            return self._send_json(200, data, extra_headers={"Cache-Control": "no-store"})
+        # No authority/viewer-specific fields: local and public ingress share
+        # this read-only projection. Hash final bytes, not just the revision:
+        # comment counts and stale_after metadata can change independently.
+        etag = '"' + hashlib.sha256(body).hexdigest() + '"'
+        headers = {"Cache-Control": "no-cache", "ETag": etag}
+        validators = [value.strip() for value in self.headers.get("If-None-Match", "").split(",")]
+        not_modified = any(value == "*" or value.removeprefix("W/") == etag for value in validators)
+        self._send_bytes(304 if not_modified else 200, b"" if not_modified else body,
+                         content_type="application/json; charset=utf-8", extra_headers=headers)
 
     def _handle_content_json(self) -> None:
         data = _content_index_json(self.bundle)

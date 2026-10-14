@@ -328,6 +328,29 @@ Track wiring against the current spec; do not depend on reserved kinds until the
 All three mechanisms compose: a bundle can ship a custom `wiki.css`, a
 `ViewerPlugin`, and a `register("panel", …)` extension at the same time.
 
+## 7. Live graph acquisition seam
+
+On live graph pages, `window.okfGraphData` is a promise for the full
+`/__data/graph.json` projection. Whichever of graph.js or studio.js needs it
+first creates it; the other reuses it. Failed initial acquisition clears the
+promise for retry; pagehide clears it and fences late Studio completions.
+An accepted initial acquisition also emits the event below, so a BFCache
+restart reconciles Studio without a second request. This is an acquisition
+seam, not a mutable graph-state API;
+Studio does not depend on the diagnostic `window.__okfLoomGraph` hook.
+
+Graph.js retains ownership of refresh aborts, deadlines and latest-wins
+admission. Only an accepted refresh replaces the promise and emits
+`okf-loom:graph-data` with the accepted projection as `event.detail`; Studio
+reconciles that event instead of issuing another full request. Non-graph live
+pages use `?view=structure` (no bodies or reserved-document HTML) when visible
+connection/comment chips or index recency need it, or lazily when the command
+palette opens. Accepted structural live updates refresh those consumers.
+
+Portable viewers retain their existing transport: single-file uses embedded
+`window.BUNDLE`; static/SPA graph pages read their emitted graph JSON. This
+seam adds no assets, origins, CSP permissions or portable requests.
+
 Ledger fonts (Public Sans and Azeret Mono, normal/italic) are verified vendored
 assets, not external network dependencies. For live, static and SPA pages,
 `ledger-fonts.css` references relative WOFF2 files under

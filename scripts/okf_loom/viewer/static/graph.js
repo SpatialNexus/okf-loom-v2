@@ -398,6 +398,7 @@
     window.addEventListener("pagehide",function(){
       graphPageActive = false;
       graphRequestGeneration++;
+      if (DATA_URL === "/__data/graph.json") window.okfGraphData = null;
       if (graphInitialController) graphInitialController.abort();
       if (graphRefreshController) graphRefreshController.abort();
       if (graphRefreshDebounceTimer) clearTimeout(graphRefreshDebounceTimer);
@@ -758,13 +759,21 @@
   function acquireBundle(controller) {
     if (window.BUNDLE) return Promise.resolve(window.BUNDLE);
     if (!DATA_URL) return Promise.reject(new Error("no bundle data"));
-    return fetch(DATA_URL, { signal: controller.signal, cache: "no-store", headers: { Accept: "application/json" } }).catch(function (error) {
+    // Live graph and Studio share initial acquisition, regardless of script
+    // order. Portable DATA_URL/window.BUNDLE paths retain their own transport.
+    if (DATA_URL === "/__data/graph.json" && window.okfGraphData) return window.okfGraphData;
+    var acquisition = fetch(DATA_URL, { signal: controller.signal, cache: "no-cache", headers: { Accept: "application/json" } }).catch(function (error) {
       if (error && error.name === "AbortError") throw error;
       throw Object.assign(new Error("Graph data request failed."), { okfPhase: "graph-fetch", okfCode: "network-failure", cause: error });
     }).then(function (r) {
       if (!r.ok) throw Object.assign(new Error("HTTP " + r.status), { okfPhase: "graph-http", okfCode: "network-failure" });
       return r.json().catch(function (error) { throw Object.assign(new Error("Graph JSON is malformed."), { okfPhase: "graph-json", okfCode: "network-failure", cause: error }); });
     });
+    if (DATA_URL === "/__data/graph.json") {
+      window.okfGraphData = acquisition;
+      acquisition.catch(function () { if (window.okfGraphData === acquisition) window.okfGraphData = null; });
+    }
+    return acquisition;
   }
 
   function startInitialAcquisition() {
@@ -774,7 +783,12 @@
     graphInitialController = controller;
     return acquireBundle(controller).then(function (bundle) {
       if (!graphPageActive || controller.signal.aborted || own !== graphRequestGeneration) return;
-      init(graphCandidate(bundle));
+      bundle = graphCandidate(bundle);
+      init(bundle);
+      if (DATA_URL === "/__data/graph.json") {
+        window.okfGraphData = Promise.resolve(bundle);
+        window.dispatchEvent(new CustomEvent("okf-loom:graph-data", { detail: bundle }));
+      }
     }).catch(function (err) {
       if (!graphPageActive || controller.signal.aborted || own !== graphRequestGeneration || (err && err.name === "AbortError")) return;
     // Surface the stack in the console — a swallowed init error is
@@ -5589,13 +5603,17 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
           var deadlineTimer = setTimeout(function () { controller.abort("deadline"); classifyDeadline(); }, GRAPH_REFRESH_DEADLINE);
           refreshStats.started++;
           publishGraphCaptureReady("loading");
-          return fetch(DATA_URL, { signal: controller.signal, cache: "no-store", headers: { Accept: "application/json" } })
+          return fetch(DATA_URL, { signal: controller.signal, cache: "no-cache", headers: { Accept: "application/json" } })
             .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
               .then(function (fresh) {
             // A newer refresh started while this one was in flight → this
             // response is stale; never let it mutate graph/detail/status.
                 if (!graphPageActive || controller.signal.aborted || requestOwner !== graphRequestGeneration || seq !== _graphRefreshSeq) { refreshStats.skippedStale++; return; }
                   fresh = graphCandidate(fresh);
+                  if (DATA_URL === "/__data/graph.json") {
+                    window.okfGraphData = Promise.resolve(fresh);
+                    window.dispatchEvent(new CustomEvent("okf-loom:graph-data", { detail: fresh }));
+                  }
                   delete document.body.dataset.okfGraphRefreshError;
                   var previousNodeIds = bundle.nodes.map(function (n) { return n.data.id; }).sort().join("\n");
                   var freshNodeIds = fresh.nodes.map(function (n) { return n.data.id; }).sort().join("\n");
