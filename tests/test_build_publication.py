@@ -15,6 +15,46 @@ def tree_bytes(root: Path) -> dict:
 
 
 @pytest.mark.parametrize("target", ["static", "spa", "single-file"])
+def test_unchanged_activity_snapshot_builds_are_byte_identical_across_clocks(tmp_path, monkeypatch, target):
+    import json
+    from datetime import datetime, timezone
+    from okf_loom import render
+
+    source = tmp_path / "bundle"
+    source.mkdir()
+    (source / "note.md").write_text("---\ntype: Note\ntitle: A note\n---\n# A note\nUnchanged.\n")
+    session = source / ".okf-loom/session"
+    session.mkdir(parents=True, mode=0o700)
+    (session / "..sidecar-transaction.okf-lock").touch(mode=0o600)
+    (session / "events.jsonl").write_text(json.dumps({
+        "event_id": "edit-1", "type": "changed", "ids": ["note"],
+        "origin": "disk", "ts": "2026-10-13T10:00:00Z",
+    }) + "\n")
+    bundle = Bundle.load(source)
+    clock = datetime(2026, 10, 13, 10, 1, tzinfo=timezone.utc)
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return clock.astimezone(tz) if tz else clock.replace(tzinfo=None)
+
+    monkeypatch.setattr(render, "datetime", Clock)
+    outputs = []
+    for hour in (11, 18):
+        clock = datetime(2026, 10, 13, hour, tzinfo=timezone.utc)
+        out = tmp_path / (f"site-{hour}.html" if target == "single-file" else f"site-{hour}")
+        build_site(bundle, out, target=target)
+        outputs.append(tree_bytes(out))
+        if target != "single-file":
+            index = (out / "index.html").read_text()
+            assert 'datetime="2026-10-13T10:00:00Z"' in index
+            assert '>2026-10-13 10:00 UTC</time>' in index
+        else:
+            assert b'2026-10-13T10:00:00Z' in (out / "index.html").read_bytes()
+    assert outputs[0] == outputs[1]
+
+
+@pytest.mark.parametrize("target", ["static", "spa", "single-file"])
 @pytest.mark.parametrize("destination", ["equal", "ancestor", "normalized"])
 def test_build_source_overlap_refuses_without_writes(tmp_path, target, destination):
     source = tmp_path / "bundle"

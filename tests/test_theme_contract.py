@@ -29,6 +29,10 @@ def test_allowlists_defaults_and_css_parity():
     for palette in PALETTES:
         assert f'[data-theme="{palette}"]' in read("wiki.css")
     assert 'var DEFAULT_CHOICE = "bone"' in js
+    assert set(re.findall(r'api\.setTheme\("([a-z]+)"\)', read("studio.js"))) == set(CHOICES)
+    assert '|| "bone"' in read("capture-readiness.js")
+    from test_theme_js_logic import run
+    assert run()[0]["legacy"] == config._LEGACY_THEME_MIGRATIONS
 
 
 @pytest.mark.parametrize("old,new", config._LEGACY_THEME_MIGRATIONS.items())
@@ -93,10 +97,23 @@ def test_generated_config_and_docs_choices():
     assert {v.strip() for v in comment[1].split('|')} == set(CHOICES)
     for choice in CHOICES:
         assert config.StudioConfig.from_dict({"theme": choice}).theme == choice
-    for name in ("index_page.html", "search_page.html"):
+    root = Path(__file__).resolve().parents[1]
+    yaml = (root / "docs-bundle/okf-loom.config.yaml").read_text()
+    # Read just the theme line; a parenthesised description is not a choice.
+    line = next(line for line in yaml.splitlines() if line.strip().startswith("theme:"))
+    choices = re.sub(r'\s*\([^)]*\)', '', line.split('#', 1)[1])
+    assert {v.strip() for v in choices.split('|')} == set(CHOICES)
+    docs = (root / "docs-bundle/reference/config_yaml.md").read_text()
+    row = next(line for line in docs.splitlines() if line.startswith('| `theme` |'))
+    choices = row.split('|')[4].split('.', 1)[0]
+    assert set(re.findall(r'`([a-z]+)`', choices)) == set(CHOICES)
+    for name in ("index_page.html", "search_page.html", "graph_page.html", "concept_page.html"):
         text = (Path(assets.__file__).parent / "templates" / name).read_text()
         line = next(line for line in text.splitlines() if "__THEME_ATTR__" in line)
-        assert all(p in line for p in PALETTES)
+        choices = re.search(r'data-theme="([^"]+)"', line)[1]
+        if choices == '<palette>':
+            choices = line.rsplit('(', 1)[1].rstrip(')')
+        assert {v.strip() for v in choices.split('|')} == set(PALETTES)
 
 
 @pytest.mark.parametrize("value,expected", [

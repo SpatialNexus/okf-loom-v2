@@ -48,7 +48,8 @@ sb.window=sb;
 vm.runInNewContext(source, sb);
 const api=sb.OKFLoomTheme;
 function snap() {return {choice:api.getChoice(), theme:api.getResolvedTheme(), scheme:api.getScheme(),
- attrs:{...attrs}, storage:{...store}, events:events.slice(), ready:classes.includes('okf-theme-ready')};}
+ attrs:{...attrs}, storage:{...store}, events:events.slice(), legacy:api.LEGACY_THEMES,
+ ready:classes.includes('okf-theme-ready')};}
 const result=[snap()];
 for(const a of opts.actions || []) {
  if(a.os != null) {mq.matches=a.os;osListener({matches:a.os});}
@@ -112,9 +113,22 @@ def test_corrupt_new_key_blocks_stale_migration(value):
     assert state["choice"] == "plum" and state["storage"][KEY] == value
 
 
-def test_corrupt_config_and_legacy_do_not_invent_preferences():
+def test_corrupt_config_does_not_invent_preferences():
     assert run(config="{oops", bootstrap={"theme": []})[0]["choice"] == "bone"
-    assert run(storage={"okf-theme-family": "bogus"})[0]["choice"] == "bone"
+
+
+@pytest.mark.parametrize("axes,expected", [
+    ({"okf-theme-family": "coffee", "okf-theme-mode": "bogus"}, "system"),
+    ({"okf-theme-family": "bogus", "okf-theme-mode": "dark"}, "slate"),
+    ({"okf-theme-family": "bogus"}, "system"),
+    ({"okf-theme-family": "coffee"}, "system"),
+    ({"okf-theme-mode": "dark"}, "slate"),
+    ({"okf-theme-mode": ""}, "system"),
+    ({"okf-theme-family": "", "okf-theme-mode": "light"}, "bone"),
+])
+def test_present_legacy_axes_default_corruption_without_reading_stale_theme(axes, expected):
+    state = run(storage={"okf-theme": "purple-dark", **axes}, dark=True)[0]
+    assert state["choice"] == state["storage"][KEY] == expected
 
 
 @pytest.mark.parametrize("deny_read", [False, True])

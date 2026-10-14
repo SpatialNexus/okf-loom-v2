@@ -1786,201 +1786,6 @@ def build_annotation_projection(source: str, body: str, rendered_html: str,
 
 
 # ---------------------------------------------------------------------------
-# Chip foreground color (luminance-aware contrast)
-# ---------------------------------------------------------------------------
-
-import re as _re_chip
-
-
-# P2-23: small named-CSS-colour map so palette overrides using bare names
-# (``red``, ``navy``, …) get the same luminance-aware fg treatment as
-# ``hsl()``. assets.py:_sanitize_css_color already allows the full CSS3
-# named set, so without this map ``_chip_fg`` fell through to the white
-# default for every named colour (e.g. ``yellow`` chips rendered as
-# white-on-yellow). The map is intentionally limited to the high-contrast
-# common names; ``transparent`` / ``currentcolor`` stay on the white
-# fallback (they have no computable luminance).
-_NAMED_CSS_COLORS: dict[str, tuple[int, int, int]] = {
-    "aliceblue": (240, 248, 255), "antiquewhite": (250, 235, 215),
-    "aqua": (0, 255, 255), "aquamarine": (127, 255, 212),
-    "azure": (240, 255, 255), "beige": (245, 245, 220),
-    "bisque": (255, 228, 196), "black": (0, 0, 0),
-    "blanchedalmond": (255, 235, 205), "blue": (0, 0, 255),
-    "blueviolet": (138, 43, 226), "brown": (165, 42, 42),
-    "burlywood": (222, 184, 135), "cadetblue": (95, 158, 160),
-    "chartreuse": (127, 255, 0), "chocolate": (210, 105, 30),
-    "coral": (255, 127, 80), "cornflowerblue": (100, 149, 237),
-    "cornsilk": (255, 248, 220), "crimson": (220, 20, 60),
-    "cyan": (0, 255, 255), "darkblue": (0, 0, 139),
-    "darkcyan": (0, 139, 139), "darkgoldenrod": (184, 134, 11),
-    "darkgray": (169, 169, 169), "darkgreen": (0, 100, 0),
-    "darkgrey": (169, 169, 169), "darkkhaki": (189, 183, 107),
-    "darkmagenta": (139, 0, 139), "darkolivegreen": (85, 107, 47),
-    "darkorange": (255, 140, 0), "darkorchid": (153, 50, 204),
-    "darkred": (139, 0, 0), "darksalmon": (233, 150, 122),
-    "darkseagreen": (143, 188, 143), "darkslateblue": (72, 61, 139),
-    "darkslategray": (47, 79, 79), "darkslategrey": (47, 79, 79),
-    "darkturquoise": (0, 206, 209), "darkviolet": (148, 0, 211),
-    "deeppink": (255, 20, 147), "deepskyblue": (0, 191, 255),
-    "dimgray": (105, 105, 105), "dimgrey": (105, 105, 105),
-    "dodgerblue": (30, 144, 255), "firebrick": (178, 34, 34),
-    "floralwhite": (255, 250, 240), "forestgreen": (34, 139, 34),
-    "fuchsia": (255, 0, 255), "gainsboro": (220, 220, 220),
-    "ghostwhite": (248, 248, 255), "gold": (255, 215, 0),
-    "goldenrod": (218, 165, 32), "gray": (128, 128, 128),
-    "green": (0, 128, 0), "greenyellow": (173, 255, 47),
-    "grey": (128, 128, 128), "honeydew": (240, 255, 240),
-    "hotpink": (255, 105, 180), "indianred": (205, 92, 92),
-    "indigo": (75, 0, 130), "ivory": (255, 255, 240),
-    "khaki": (240, 230, 140), "lavender": (230, 230, 250),
-    "lavenderblush": (255, 240, 245), "lawngreen": (124, 252, 0),
-    "lemonchiffon": (255, 250, 205), "lightblue": (173, 216, 230),
-    "lightcoral": (240, 128, 128), "lightcyan": (224, 255, 255),
-    "lightgoldenrodyellow": (250, 250, 210),
-    "lightgray": (211, 211, 211), "lightgreen": (144, 238, 144),
-    "lightgrey": (211, 211, 211), "lightpink": (255, 182, 193),
-    "lightsalmon": (255, 160, 122), "lightseagreen": (32, 178, 170),
-    "lightskyblue": (135, 206, 250),
-    "lightslategray": (119, 136, 153),
-    "lightslategrey": (119, 136, 153),
-    "lightsteelblue": (176, 196, 222), "lightyellow": (255, 255, 224),
-    "lime": (0, 255, 0), "limegreen": (50, 205, 50),
-    "linen": (250, 240, 230), "magenta": (255, 0, 255),
-    "maroon": (128, 0, 0), "mediumaquamarine": (102, 205, 170),
-    "mediumblue": (0, 0, 205), "mediumorchid": (186, 85, 211),
-    "mediumpurple": (147, 112, 219), "mediumseagreen": (60, 179, 113),
-    "mediumslateblue": (123, 104, 238),
-    "mediumspringgreen": (0, 250, 154),
-    "mediumturquoise": (72, 209, 204),
-    "mediumvioletred": (199, 21, 133),
-    "midnightblue": (25, 25, 112), "mintcream": (245, 255, 250),
-    "mistyrose": (255, 228, 225), "moccasin": (255, 228, 181),
-    "navajowhite": (255, 222, 173), "navy": (0, 0, 128),
-    "oldlace": (253, 245, 230), "olive": (128, 128, 0),
-    "olivedrab": (107, 142, 35), "orange": (255, 165, 0),
-    "orangered": (255, 69, 0), "orchid": (218, 112, 214),
-    "palegoldenrod": (238, 232, 170), "palegreen": (152, 251, 152),
-    "paleturquoise": (175, 238, 238),
-    "palevioletred": (219, 112, 147), "papayawhip": (255, 239, 213),
-    "peachpuff": (255, 218, 185), "peru": (205, 133, 63),
-    "pink": (255, 192, 203), "plum": (221, 160, 221),
-    "powderblue": (176, 224, 230), "purple": (128, 0, 128),
-    "rebeccapurple": (102, 51, 153), "red": (255, 0, 0),
-    "rosybrown": (188, 143, 143), "royalblue": (65, 105, 225),
-    "saddlebrown": (139, 69, 19), "salmon": (250, 128, 114),
-    "sandybrown": (244, 164, 96), "seagreen": (46, 139, 87),
-    "seashell": (255, 245, 238), "sienna": (160, 82, 45),
-    "silver": (192, 192, 192), "skyblue": (135, 206, 235),
-    "slateblue": (106, 90, 205), "slategray": (112, 128, 144),
-    "slategrey": (112, 128, 144), "snow": (255, 250, 250),
-    "springgreen": (0, 255, 127), "steelblue": (70, 130, 180),
-    "tan": (210, 180, 140), "teal": (0, 128, 128),
-    "thistle": (216, 191, 216), "tomato": (255, 99, 71),
-    "turquoise": (64, 224, 208), "violet": (238, 130, 238),
-    "wheat": (245, 222, 179), "white": (255, 255, 255),
-    "whitesmoke": (245, 245, 245), "yellow": (255, 255, 0),
-    "yellowgreen": (154, 205, 50),
-}
-
-
-def _relative_luminance_rgb(r: float, g: float, b: float) -> float:
-    """WCAG relative luminance for an RGB triple where each channel is in [0, 1]."""
-    def _lin(v: float) -> float:
-        return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
-    return 0.2126 * _lin(r) + 0.7152 * _lin(g) + 0.0722 * _lin(b)
-
-
-def _contrast_ratio(lum_fg: float, lum_bg: float) -> float:
-    """WCAG contrast ratio between two relative luminances."""
-    light, dark = max(lum_fg, lum_bg), min(lum_fg, lum_bg)
-    return (light + 0.05) / (dark + 0.05)
-
-
-def _chip_fg(bg_css: str) -> str:
-    """Compute a readable foreground color for a chip with the given CSS background.
-
-    Picks black or white based on which gives the higher WCAG contrast ratio
-    against the background (P2-23: replaces the brittle luminance threshold
-    of 0.18, which had no margin near the boundary). Handles ``hsl()``,
-    ``rgb()``/``rgba()``, ``#hex`` (3/6/8-digit), and the common CSS named
-    colours; unparseable values fall back to ``#ffffff``.
-
-    P1-7: hex and ``rgb()``/``rgba()`` inputs are now parsed (previously
-    only ``hsl()`` and named colours were, so palette overrides using hex
-    like ``#ffff00`` fell through to ``#ffffff`` and produced invisible
-    white-on-yellow chips). The parse order and math mirror the JS port
-    ``graph.js:_chipFg`` exactly so a palette override yields the same fg
-    in the server-rendered concept page and the client-rendered graph view
-    (contract-runtime-parity invariant).
-
-    The dark-foreground choice is pure black (``#000000``) rather than a
-    softened ``#1a1a2e`` — pure black passes WCAG AA for every hue in the
-    auto-palette (verified across 0..360 deg at ``hsl(h, 62%, 48%)``).
-    """
-    if not isinstance(bg_css, str):
-        return "#ffffff"
-    s = bg_css.strip()
-    rgb: tuple[float, float, float] | None = None
-    m = _re_chip.match(r"hsla?\(\s*(\d+(?:\.\d+)?)\s*(?:deg|rad|turn|grad)?\s*,\s*(\d+(?:\.\d+)?)%\s*,\s*(\d+(?:\.\d+)?)%", s)
-    if m:
-        h = float(m.group(1)) % 360
-        sat = float(m.group(2)) / 100.0
-        l = float(m.group(3)) / 100.0
-        c = (1 - abs(2 * l - 1)) * sat
-        x = c * (1 - abs((h / 60) % 2 - 1))
-        m_ = l - c / 2
-        if h < 60:
-            r, g, b = c, x, 0
-        elif h < 120:
-            r, g, b = x, c, 0
-        elif h < 180:
-            r, g, b = 0, c, x
-        elif h < 240:
-            r, g, b = 0, x, c
-        elif h < 300:
-            r, g, b = x, 0, c
-        else:
-            r, g, b = c, 0, x
-        rgb = (r + m_, g + m_, b + m_)
-    else:
-        # P1-7: parse rgb()/rgba() (alpha is ignored — luminance is RGB).
-        m_rgb = _re_chip.match(r"rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)", s)
-        m_hex = _re_chip.match(
-            r"#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$", s, _re_chip.IGNORECASE
-        )
-        if m_rgb:
-            rgb = (
-                float(m_rgb.group(1)) / 255.0,
-                float(m_rgb.group(2)) / 255.0,
-                float(m_rgb.group(3)) / 255.0,
-            )
-        elif m_hex:
-            h = m_hex.group(1)
-            if len(h) == 3:
-                # Expand shorthand: #abc → #aabbcc.
-                h = "".join(ch * 2 for ch in h)
-            elif len(h) == 8:
-                # Strip alpha (#rrggbbaa) — luminance is RGB-only.
-                h = h[:6]
-            rgb = (
-                int(h[0:2], 16) / 255.0,
-                int(h[2:4], 16) / 255.0,
-                int(h[4:6], 16) / 255.0,
-            )
-        else:
-            named = _NAMED_CSS_COLORS.get(s.lower())
-            if named is not None:
-                rgb = (named[0] / 255.0, named[1] / 255.0, named[2] / 255.0)
-    if rgb is None:
-        return "#ffffff"
-    lum_bg = _relative_luminance_rgb(*rgb)
-    # P2-23: pick the higher-contrast foreground instead of using a brittle
-    # luminance threshold. Black has luminance 0, white has luminance 1.
-    contrast_black = _contrast_ratio(0.0, lum_bg)
-    contrast_white = _contrast_ratio(1.0, lum_bg)
-    return "#000000" if contrast_black >= contrast_white else "#ffffff"
-
-# ---------------------------------------------------------------------------
 # Bundle → graph JSON
 # ---------------------------------------------------------------------------
 
@@ -2732,7 +2537,8 @@ def _render_not_found_page(*, name: str, path: str, config: dict[str, Any]) -> s
         '<link rel="stylesheet" href="/__static/ledger-fonts.css">'
         '<link rel="stylesheet" href="/__static/wiki.css">'
         '<link rel="stylesheet" href="/__static/shell.css">'
-        '</head><body class="okf-viewer okf-viewer--notfound" data-okf-mode="serve">'
+        + _theme_config_html(configured_theme)
+        + '</head><body class="okf-viewer okf-viewer--notfound" data-okf-mode="serve">'
         '<a class="okf-skip-link" href="#okf-main">Skip to content</a>'
         + shell
         + '<main id="okf-main" class="okf-index okf-notfound" tabindex="-1">'
@@ -3079,9 +2885,10 @@ def _recent_time_text(ts: str, now: datetime | None = None) -> str:
     ``<time datetime>`` attribute and, as ``YYYY-MM-DD HH:MM UTC``, on its
     ``title`` (:func:`_recent_time_title`). wiki.js re-renders the same text
     against the reader's clock (``okfRelativeTime``), and the live Studio
-    rail uses the same format, so a static build never shows stale
-    build-time phrasing once scripts run. Unparseable values show the raw
-    record (nothing invented).
+    rail uses the same format. Builds emit the UTC title as initial text
+    instead, keeping unchanged exports byte-identical across clocks and
+    useful without JavaScript. Unparseable values show the raw record
+    (nothing invented).
     """
     instant = parse_instant(ts)
     if instant is None:
@@ -6013,7 +5820,7 @@ def _render_index_page(
                 '<span class="sr-only"> · </span>'
                 f'<time class="okf-recent__time" datetime="{_esc_attr_qs(row["ts"])}" '
                 f'title="{_esc_attr_qs(_recent_time_title(row["ts"]))}">'
-                f'{_esc(_recent_time_text(row["ts"]))}</time></a></li>'
+                f'{_esc(_recent_time_text(row["ts"]) if mode == "serve" else _recent_time_title(row["ts"]))}</time></a></li>'
             )
         engagement_html = (
             '<section class="okf-recent" id="okf-recent-rail" '
