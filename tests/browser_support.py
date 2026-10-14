@@ -320,6 +320,9 @@ def free_port():
         return sock.getsockname()[1]
 
 
+PROBE_TIMEOUT = 5  # seconds per readiness request
+
+
 def wait_for_server(proc, base, *, timeout=20, log_path=None):
     deadline = time.monotonic() + timeout
     reason = "startup deadline exceeded"
@@ -328,7 +331,10 @@ def wait_for_server(proc, base, *, timeout=20, log_path=None):
             reason = f"server exited before readiness (rc={proc.returncode})"
             break
         try:
-            with urllib.request.urlopen(base + "/", timeout=min(1, max(.01, deadline - time.monotonic()))) as response:
+            # A cold first render of a large bundle (docs-bundle) on a loaded
+            # host can take several seconds; a 1s probe abandoned it every
+            # time. Each probe may wait up to 5s, still bounded by the deadline.
+            with urllib.request.urlopen(base + "/", timeout=min(PROBE_TIMEOUT, max(.01, deadline - time.monotonic()))) as response:
                 if response.status == 200:
                     return
         except (urllib.error.URLError, OSError):
