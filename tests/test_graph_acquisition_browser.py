@@ -97,6 +97,62 @@ def test_plain_document_acquires_structure_only_when_palette_opens(tmp_path, pag
         assert page.locator('.okf-palette__item', has_text='Palette target').count() == 1
 
 
+@pytest.mark.parametrize('route', ['/', '/tables/orders'])
+def test_bfcache_pageshow_restarts_discarded_structure_acquisition(acquisition_server, page, route):
+    """Focused lifecycle proof: the first acquisition is held across pagehide,
+    a case real Chromium BFCache admission may refuse with a network in flight."""
+    base, _ = acquisition_server
+    page.add_init_script('''(() => {
+      const native = window.fetch.bind(window);
+      window.structureAcquisitions = 0;
+      window.fetch = (url, options) => {
+        if (String(url) === '/__data/graph.json?view=structure') {
+          if (++window.structureAcquisitions === 1) return new Promise(resolve => {
+            window.releaseOldStructure = () => resolve(new Response(JSON.stringify(
+              {nodes: [], bundle_revision: 'discarded-before-restore'}), {status: 200}));
+          });
+        }
+        return native(url, options);
+      };
+    })();''')
+    page.goto(base + route, wait_until='load')
+    _wait_for_studio(page)
+    assert page.evaluate('window.structureAcquisitions') == 1
+    assert not page.evaluate('window.okfLoomStudio.state.graphReady')
+    page.evaluate('''async () => {
+      dispatchEvent(new PageTransitionEvent('pagehide', {persisted: true}));
+      window.releaseOldStructure();
+      await new Promise(resolve => setTimeout(resolve, 50));
+      dispatchEvent(new PageTransitionEvent('pageshow', {persisted: false}));
+    }''')
+    assert not page.evaluate('window.okfLoomStudio.state.graphReady')
+    assert page.evaluate('window.structureAcquisitions') == 1
+    page.evaluate("dispatchEvent(new PageTransitionEvent('pageshow', {persisted: true}))")
+    page.wait_for_function('() => window.okfLoomStudio.state.graphReady')
+    assert page.evaluate('window.structureAcquisitions') == 2
+    assert page.evaluate("window.okfLoomStudio.state.graph.bundle_revision !== 'discarded-before-restore'")
+    assert page.evaluate('window.okfLoomStudio.state.graph.nodes.length > 0')
+
+
+def test_bfcache_plain_document_preserves_lazy_structure_rule(tmp_path, page):
+    (tmp_path / 'a.md').write_text('---\ntype: note\n---\nPlain body\n')
+    with live_server(tmp_path) as base:
+        requests = []
+        page.on('request', lambda request: requests.append(request.url)
+                if urlparse(request.url).path == '/__data/graph.json' else None)
+        page.goto(base + '/a', wait_until='load')
+        _wait_for_studio(page)
+        page.evaluate('''() => {
+          dispatchEvent(new PageTransitionEvent('pagehide', {persisted: true}));
+          dispatchEvent(new PageTransitionEvent('pageshow', {persisted: true}));
+        }''')
+        page.wait_for_timeout(300)
+        assert requests == []
+        page.evaluate('() => window.okfLoomStudio.openPalette()')
+        page.wait_for_function('() => window.okfLoomStudio.state.graphReady')
+        assert [urlparse(url).query for url in requests] == ['view=structure']
+
+
 def test_graph_refresh_publishes_latest_data_to_studio_without_second_fetch(acquisition_server, page):
     base, bundle = acquisition_server
     requests = []

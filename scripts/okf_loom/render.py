@@ -31,6 +31,8 @@ from .portable_feedback_export import (
 )
 
 import functools
+import copy
+from concurrent.futures import Future
 import json
 import hashlib
 import base64
@@ -1957,19 +1959,59 @@ def _graph_documents(bundle: Bundle, *, cached: bool) -> tuple[dict[str, str], d
         return _render_graph_documents(bundle)
     from .retrieval import bundle_revision
 
-    # Bundle's generation lock makes a cold render single-flight with its graph
-    # and revision derivations, and excludes mutator publication. The cache is
-    # owned by this snapshot, not the server: swapping/reloading a Bundle drops
-    # it; in-place mutations advance the generation/revision. One entry only.
+    def current_key():
+        # Called only under _derived_lock; covers every content-pure input.
+        return (bundle._source_generation, bundle_revision(bundle), bundle.root.resolve(),
+                tuple((rel, doc.path.resolve()) for rel, doc in sorted(
+                    {**bundle.indexes, **bundle.logs}.items())))
+
+    # _derived_lock owns only key capture, flight registration and publication.
+    # Never wait on a Future or notify its waiters while holding _derived_lock;
+    # no flight/Future lock is held when acquiring _derived_lock. Rendering runs
+    # on detached inputs, so retained mutations cannot mix generations mid-body.
     with bundle._derived_lock:
-        key = (bundle._source_generation, bundle_revision(bundle), bundle.root.resolve(),
-               tuple((rel, doc.path.resolve()) for rel, doc in sorted(
-                   {**bundle.indexes, **bundle.logs}.items())))
+        key = current_key()
         entry = getattr(bundle, '_graph_documents_cache', None)
-        if entry is None or entry[0] != key:
-            entry = (key, _render_graph_documents(bundle))
-            bundle._graph_documents_cache = entry
-        return entry[1]
+        owner = False
+        if entry is not None and entry[0] == key:
+            result = entry[1]
+            pending = None
+        else:
+            flights = getattr(bundle, '_graph_documents_inflight', None)
+            if flights is None:
+                flights = bundle._graph_documents_inflight = {}
+            pending = flights.get(key)
+            if pending is None:
+                concepts = {}
+                for cid, concept in bundle.concepts.items():
+                    detached = copy.copy(concept)
+                    detached.frontmatter = copy.deepcopy(concept.frontmatter)
+                    concepts[cid] = detached
+                snapshot = Bundle(root=bundle.root, concepts=concepts,
+                                  indexes={rel: copy.copy(doc) for rel, doc in bundle.indexes.items()},
+                                  logs={rel: copy.copy(doc) for rel, doc in bundle.logs.items()})
+                pending = flights[key] = Future()
+                owner = True
+    if owner:
+        try:
+            result = _render_graph_documents(snapshot)
+            with bundle._derived_lock:
+                # A stale flight still serves its captured snapshot to its own
+                # callers, but can never overwrite a newer generation's cache.
+                if current_key() == key:
+                    bundle._graph_documents_cache = (key, result)
+                del flights[key]
+        except BaseException as error:
+            with bundle._derived_lock:
+                flights.pop(key, None)
+            pending.set_exception(error)
+            raise
+        pending.set_result(result)
+    elif pending is not None:
+        result = pending.result()
+    bodies, documents = result
+    # One published entry per bundle; callers never own its mutable containers.
+    return dict(bodies), {path: dict(document) for path, document in documents.items()}
 
 
 def build_graph_data(
@@ -2543,6 +2585,7 @@ def _application_shell_html(
     mode: str,
     appearance_choice: str = _DEFAULT_CONFIGURED_THEME,
     search_query: str = "",
+    studio_available: bool = True,
 ) -> str:
     """Bridge renderer-owned route state into the canonical shell model."""
     if current not in {None, "search", "index", "graph"}:
@@ -2555,14 +2598,15 @@ def _application_shell_html(
             index_href=index_href,
             graph_href=graph_href,
             current=current,  # type: ignore[arg-type]
-            studio_available=mode == "serve",
+            studio_available=mode == "serve" and studio_available,
             search_query=search_query,
         ),
         _appearance_control_html(appearance_choice),
     )
 
 
-def _render_not_found_page(*, name: str, path: str, config: dict[str, Any]) -> str:
+def _render_not_found_page(*, name: str, path: str, config: dict[str, Any],
+                           studio_available: bool = True) -> str:
     """Minimal live document recovery using the canonical application shell.
 
     No concept lookup, suggestions, or query-string reflection belongs here.
@@ -2573,6 +2617,7 @@ def _render_not_found_page(*, name: str, path: str, config: dict[str, Any]) -> s
     shell = _application_shell_html(
         name=name, bundle_href="/", search_href="/__search", index_href="/",
         graph_href="/__graph", current=None, mode="serve",
+        studio_available=studio_available,
         appearance_choice=configured_theme,
     )
     # The shared inline product icon from the BUILT-IN index template, so the
@@ -2617,7 +2662,8 @@ FEEDBACK_IMPORT_RETENTION = (
 
 
 def render_feedback_import_page(*, name: str, config: dict[str, Any], availability: str,
-                                max_note_bytes: int, preview_ttl_seconds: int) -> str:
+                                max_note_bytes: int, preview_ttl_seconds: int,
+                                studio_available: bool = True) -> str:
     """Local operator page for importing one portable feedback note (X2).
 
     Live-server only (never emitted by a build). ``availability`` is
@@ -2633,6 +2679,7 @@ def render_feedback_import_page(*, name: str, config: dict[str, Any], availabili
     shell = _application_shell_html(
         name=name, bundle_href="/", search_href="/__search", index_href="/",
         graph_href="/__graph", current=None, mode="serve",
+        studio_available=studio_available,
         appearance_choice=configured_theme,
     )
     icon = re.search(r'<link rel="icon"[^>]*>', load_template("index_page.html"))
@@ -4329,6 +4376,7 @@ def _render_concept_page(
     body_plugin: Any = None,
     comment_summary: CommentSummaryV1 | None = None,
     portable_feedback: dict[str, str] | None = None,
+    studio_available: bool = True,
 ) -> str:
     template = load_template("concept_page.html", bundle)
     if mode != 'serve':
@@ -4483,9 +4531,10 @@ def _render_concept_page(
         graph_href=f"{root_prefix}__graph{'.html' if mode == 'static' else ''}",
         current="index",
         mode=mode,
+        studio_available=studio_available,
         appearance_choice=configured_theme,
     )
-    if mode == "serve":
+    if mode == "serve" and studio_available:
         # The local viewbar has the same responsive geometry before Studio
         # fills it. No-JS and portable readers must not inherit empty chrome.
         first_heading = _ONTHISPAGE_HEADING_RE.search(body_html)
@@ -5687,7 +5736,7 @@ def _reserved_document_links(rendered: str, document: str, mode: str,
 
 def render_reserved_document(document: str, body: str, *, mode: str,
                              config: dict[str, Any], bundle: Bundle | None = None,
-                             name: str | None = None) -> str:
+                             name: str | None = None, studio_available: bool = True) -> str:
     """Reserved Markdown (log) reading page in the shared application shell.
 
     The page is a real reading destination: language, viewport, theme, skip
@@ -5708,6 +5757,7 @@ def render_reserved_document(document: str, body: str, *, mode: str,
     shell_html = _application_shell_html(
         name=display, bundle_href=home, search_href=f"{root_prefix}__search{suffix}",
         index_href=home, graph_href=graph_href, current="index", mode=mode,
+        studio_available=studio_available,
         appearance_choice=configured_theme,
     )
     rendered = _reserved_document_links(markdown_to_html(body), document, mode, bundle)
@@ -5775,6 +5825,7 @@ def _render_index_page(
     index_file,
     comment_summary: CommentSummaryV1 | None = None,
     engagement_events: list[dict[str, Any]] | None = None,
+    studio_available: bool = True,
 ) -> str:
     template = load_template("index_page.html", bundle)
     if mode != 'serve':
@@ -6182,6 +6233,7 @@ def _render_index_page(
         graph_href=graph_link,
         current="index",
         mode=mode,
+        studio_available=studio_available,
         appearance_choice=configured_theme,
     )
 
@@ -6205,7 +6257,7 @@ def _render_index_page(
         .replace("__APPLICATION_SHELL__", shell_html)
         .replace("__INDEX_TITLE__", _esc(title))
         .replace('__INDEX_TITLE_ANCHOR__', title_anchor)
-          .replace("__HERO_MODIFIER__", hero_modifier + (" okf-hero--feedback" if mode == "serve" else ""))
+          .replace("__HERO_MODIFIER__", hero_modifier + (" okf-hero--feedback" if mode == "serve" and studio_available and index_file is not None else ""))
           .replace("__PAGE_FEEDBACK_PLACEHOLDER__", (
               # Both final layouts are reserved; theme.js marks whether this
               # session may comment before first paint and shell.css keeps
@@ -6217,7 +6269,7 @@ def _render_index_page(
               'data-okf-feedback-variant="read-only" disabled tabindex="-1">View comments</button>'
               '<p class="okf-page-feedback__note" data-okf-feedback-variant="read-only">'
               'This session is read-only: comments can be read here but not added.</p></div>'
-              if mode == "serve" else ""
+              if mode == "serve" and studio_available and index_file is not None else ""
           ))
           .replace("__HERO_V2__", hero_v2)
           .replace("__INDEX_INTRO__", intro)
@@ -6326,6 +6378,7 @@ def _render_search_page(
     sections: dict[str, str] | None = None,
     section_navigation: dict[str, Any] | None = None,
     now: Any = None,
+    studio_available: bool = True,
 ) -> str:
     from datetime import datetime
     from .retrieval import bundle_revision
@@ -6690,6 +6743,7 @@ def _render_search_page(
         graph_href=graph_link,
         current="search",
         mode=mode,
+        studio_available=studio_available,
         appearance_choice=configured_theme,
         search_query=query,
     )
@@ -6775,6 +6829,7 @@ def _render_graph_page(
     name: str,
     config: dict[str, Any],
     offline_assets: Any = None,
+    studio_available: bool = True,
 ) -> str:
     template = load_template("graph_page.html", bundle)
     if mode != 'serve':
@@ -6873,6 +6928,7 @@ def _render_graph_page(
         graph_href=("/__graph" if mode in ("serve", "spa") else "__graph.html"),
         current="graph",
         mode=mode,
+        studio_available=studio_available,
         appearance_choice=configured_theme,
     )
 

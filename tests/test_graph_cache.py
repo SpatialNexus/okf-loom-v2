@@ -18,11 +18,14 @@ from okf_loom.retrieval import canonical_json_bytes
 from test_server_smoke import _start_server
 
 
-def _get(base, path='/__data/graph.json', etag=None):
+def _get(base, path='/__data/graph.json', etag=None, *, validators=(), method='GET'):
     from urllib.parse import urlparse
     url = urlparse(base)
     conn = http.client.HTTPConnection(url.hostname, url.port, timeout=20)
-    conn.request('GET', path, headers={'If-None-Match': etag} if etag else {})
+    conn.putrequest(method, path)
+    for value in ((etag,) if etag else validators):
+        conn.putheader('If-None-Match', value)
+    conn.endheaders()
     response = conn.getresponse()
     result = response.status, dict(response.getheaders()), response.read()
     conn.close()
@@ -52,6 +55,122 @@ def test_cached_graph_is_byte_identical_to_uncached(root):
     expected = canonical_json_bytes(render.build_graph_data(bundle))
     assert canonical_json_bytes(render.build_graph_data(bundle, cache_bodies=True)) == expected
     assert canonical_json_bytes(render.build_graph_data(bundle, cache_bodies=True)) == expected
+
+
+def test_cached_graph_documents_are_isolated_from_caller_mutation(graph_server):
+    server, _ = graph_server
+    first = render.build_graph_data(server.bundle, cache_bodies=True)
+    expected = canonical_json_bytes(first)
+    first['bodies']['a'] = '<script>tampered</script>'
+    first['documents']['index.md']['html'] = 'tampered'
+    first['documents']['index.md']['document'] = 'other.md'
+    first['documents']['injected.md'] = {'html': 'tampered'}
+    first['bodies'].clear()
+    assert canonical_json_bytes(render.build_graph_data(server.bundle, cache_bodies=True)) == expected
+
+
+@pytest.mark.parametrize('query, expected, structure', [
+    ('?cache_buster=1', 200, False),
+    ('?view=structure&cache_buster=1', 200, True),
+    ('?view=unknown', 400, False),
+    ('?view=', 400, False),
+    ('?view=structure&view=structure', 400, False),
+    ('', 200, False),
+])
+def test_graph_query_interprets_only_one_structure_view(graph_server, query, expected, structure):
+    _, base = graph_server
+    status, _, body = _get(base, '/__data/graph.json' + query)
+    assert status == expected
+    data = json.loads(body)
+    if expected == 400:
+        assert data == {'ok': False, 'error': 'invalid_request'}
+    else:
+        assert ('bodies' not in data and 'documents' not in data) is structure
+        if not structure:
+            assert body == _get(base)[2]
+
+
+def test_slow_graph_render_does_not_block_revision_or_structure_reads(graph_server, monkeypatch):
+    from okf_loom.retrieval import bundle_revision
+    server, base = graph_server
+    original = render._render_graph_documents
+    entered, release = threading.Event(), threading.Event()
+
+    def blocked(bundle):
+        entered.set()
+        assert release.wait(10)
+        return original(bundle)
+
+    monkeypatch.setattr(render, '_render_graph_documents', blocked)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+        cold = pool.submit(_get, base)
+        try:
+            assert entered.wait(10)
+            assert pool.submit(bundle_revision, server.bundle).result(timeout=3)
+            assert pool.submit(_get, base, '/__data/graph.json?view=structure').result(timeout=3)[0] == 200
+        finally:
+            release.set()
+        assert cold.result()[0] == 200
+
+
+def test_stale_graph_flight_cannot_publish_over_new_generation(graph_server, monkeypatch):
+    server, _ = graph_server
+    original = render._render_graph_documents
+    entered, release = threading.Event(), threading.Event()
+    calls = 0
+
+    def blocked(bundle):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            entered.set()
+            assert release.wait(10)
+        return original(bundle)
+
+    monkeypatch.setattr(render, '_render_graph_documents', blocked)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        cold = pool.submit(render._graph_documents, server.bundle, cached=True)
+        try:
+            assert entered.wait(10)
+            source = server.bundle.root / 'a.md'
+            source.write_text(source.read_text().replace('Old content', 'New content'))
+            server.bundle.reload()
+            fresh = render._graph_documents(server.bundle, cached=True)
+            published = server.bundle._graph_documents_cache
+            assert 'New content' in fresh[0]['a']
+        finally:
+            release.set()
+        old = cold.result()
+    assert 'Old content' in old[0]['a'] and 'New content' not in old[0]['a']
+    assert server.bundle._graph_documents_cache is published
+    assert render._graph_documents(server.bundle, cached=True) == fresh
+    assert calls == 2 and server.bundle._graph_documents_inflight == {}
+
+
+def test_failed_graph_flight_releases_waiters_and_allows_retry(graph_server, monkeypatch):
+    server, _ = graph_server
+    original = render._render_graph_documents
+    entered, release = threading.Event(), threading.Event()
+    def failed(bundle):
+        entered.set()
+        assert release.wait(10)
+        raise ValueError('render failed')
+    monkeypatch.setattr(render, '_render_graph_documents', failed)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        owner = pool.submit(render._graph_documents, server.bundle, cached=True)
+        try:
+            assert entered.wait(10)
+            with server.bundle._derived_lock:
+                flight = next(iter(server.bundle._graph_documents_inflight.values()))
+            waiter = pool.submit(flight.result)
+        finally:
+            release.set()
+        for request in (owner, waiter):
+            with pytest.raises(ValueError, match='render failed'):
+                request.result(timeout=3)
+    assert server.bundle._graph_documents_inflight == {}
+    monkeypatch.setattr(render, '_render_graph_documents', original)
+    assert 'Old content' in render._graph_documents(server.bundle, cached=True)[0]['a']
 
 
 def test_graph_single_flight_across_requests_and_html(graph_server, monkeypatch):
@@ -88,6 +207,19 @@ def test_graph_single_flight_across_requests_and_html(graph_server, monkeypatch)
     assert len(calls) == 2
 
 
+@pytest.mark.parametrize('path', ['/__data/graph.json', '/__data/graph.json?view=structure'])
+def test_graph_if_none_match_all_fields_and_quoted_commas(graph_server, path):
+    _, base = graph_server
+    _, headers, _ = _get(base, path)
+    tag = headers['ETag']
+    for method in ('GET', 'HEAD'):
+        for fields in (('"other"', tag), ('"other,*,tag", W/' + tag,), ('*',), ('W/' + tag,)):
+            status, fresh, body = _get(base, path, validators=fields, method=method)
+            assert status == 304 and body == b'' and fresh['ETag'] == tag
+            assert fresh['Cache-Control'] == headers['Cache-Control'] == 'private, no-cache'
+        assert _get(base, path, validators=('"other,*,tag"',), method=method)[0] == 200
+
+
 def test_graph_etag_tracks_clock_not_only_content_revision(graph_server, monkeypatch):
     from okf_loom.viewer import metadata
     server, base = graph_server
@@ -101,7 +233,7 @@ def test_graph_etag_tracks_clock_not_only_content_revision(graph_server, monkeyp
 
     monkeypatch.setattr(metadata, 'datetime', Clock)
     status, headers, before = _get(base)
-    assert status == 200 and headers['Cache-Control'] == 'no-cache'
+    assert status == 200 and headers['Cache-Control'] == 'private, no-cache'
     assert b'Not stale' in before
     cached = server.bundle._graph_documents_cache
     current = headers['ETag']

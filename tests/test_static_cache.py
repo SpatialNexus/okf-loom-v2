@@ -57,13 +57,13 @@ def _assert_revalidation(server, path):
     assert status == 200 and body
     tag = headers['ETag']
     assert tag == '"' + hashlib.sha256(body).hexdigest() + '"'
-    assert headers['Cache-Control'] == 'no-cache'
+    assert headers['Cache-Control'] == 'private, no-cache'
     for method in ('GET', 'HEAD'):
         for values in ((tag,), ('W/' + tag,), ('"other", W/' + tag,), ('*',),
                        ('"other"', tag), ('  "other" , ' + tag + '  ',)):
             code, fresh, empty = _request(server, path, method=method, validators=values)
             assert code == 304 and empty == b''
-            assert fresh['ETag'] == tag and fresh['Cache-Control'] == 'no-cache'
+            assert fresh['ETag'] == tag and fresh['Cache-Control'] == 'private, no-cache'
             assert 'Content-Length' not in fresh
             for key in SECURITY_HEADERS:
                 assert fresh[key] == headers[key]
@@ -75,6 +75,19 @@ def _assert_revalidation(server, path):
         assert _request(server, path, validators=(value,))[0] == 200
     assert _request(server, path, validators=('"other,tag", ' + tag,))[0] == 304
     return headers, body
+
+
+@pytest.mark.parametrize('fields, expected', [
+    (['"other"', '"current"'], True),
+    (['"other,*,tag"'], False),
+    (['"other,tag", "current"'], True),
+    (['*'], True),
+    (['W/"current"'], True),
+    ([], False),
+])
+def test_shared_if_none_match_parser(fields, expected):
+    from okf_loom.server import _if_none_match_matches
+    assert _if_none_match_matches(fields, '"current"') is expected
 
 
 def test_static_conditional_get_head_and_final_text_bytes(static_server):

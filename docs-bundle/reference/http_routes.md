@@ -265,6 +265,21 @@ Graph JSON: nodes (one per concept) + edges (one per internal link,
 including wikilinks with `form="wikilink"`). Same shape as
 [`graph --format json`](cli.md#graph).
 
+With no `view` parameter, returns the full projection including rendered concept
+`bodies` and reserved `documents`. Exactly one `view=structure` returns the same
+projection without those two fields (and does not render their HTML). Any other
+`view` value, including an empty value, or repeated `view` parameters returns
+`400 {"ok": false, "error": "invalid_request"}`. Unknown query parameters are
+ignored, including cache-busters alongside `view=structure`.
+
+Both views send `Cache-Control: private, no-cache` and a strong `ETag` computed
+from the final response bytes, not merely the bundle revision: comment counts
+and clock-sensitive metadata can change independently. Browsers may store the
+response but must revalidate; shared caches must not store it. A matching
+`If-None-Match` on GET/HEAD (including weak `W/` comparison, comma-separated
+validators, multiple header fields or `*`) returns `304` with no body and the
+same ETag, cache policy and security headers.
+
 ## `/__data/content.json`
 
 Full content index JSON: every concept's id, type, title,
@@ -449,6 +464,13 @@ active-code gate is open (bundle declares
 `viewer.allow_active_code: true` AND operator consent via
 `--allow-active-code` / `OKF_LOOM_ALLOW_ACTIVE_CODE`). Path traversal is
 rejected (`..` and separators after normalisation; NUL bytes).
+
+Successful static responses send `Cache-Control: private, no-cache` and a strong
+`ETag` computed from the final served bytes, including generated CSS and admitted
+overrides. GET/HEAD `If-None-Match` uses the same weak comparison and validator
+list rules as graph JSON above; a match returns body-free `304` with the ETag,
+cache policy and security headers retained. Asset allowlists, containment,
+active-code admission and vendor integrity checks still run before revalidation.
 
 ## `/<path>.<media ext>`
 

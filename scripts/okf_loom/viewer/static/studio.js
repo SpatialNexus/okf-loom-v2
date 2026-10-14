@@ -809,7 +809,11 @@
   }
   function mountPageFeedback() {
     const host = pageFeedbackHost();
-    if (!host || pageFeedback) return;
+    if (!host || pageFeedback) {
+      document.querySelectorAll("[data-okf-page-feedback-placeholder]").forEach((node) => node.remove());
+      if (!host) document.querySelector(".okf-hero--feedback")?.classList.remove("okf-hero--feedback");
+      return;
+    }
     const inGraph = host.id === "okf-detail-actions-slot";
     const noun = inGraph ? "concept" : "page";
     const placeholder = document.querySelector("[data-okf-page-feedback-placeholder]");
@@ -11634,6 +11638,9 @@
         });
         window.addEventListener("pageshow", function (event) {
           if (!event.persisted) return;
+          // pagehide fences pending structure completions. Restore only the
+          // same lazy consumers as live updates; graph.js owns full pages.
+          refreshGraph();
           // R6-3: BFCache restore — re-apply marks and rebuild markers from
           // the still-current state.doc. The live.js pageshow handler
           // triggers a canonical resync; we just reconcile presentation.

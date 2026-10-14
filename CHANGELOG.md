@@ -10,14 +10,20 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Graph JSON tolerates unknown query parameters (including cache-busters);
+  only `view` is interpreted: absent means full, one `structure` means body-free,
+  and other or repeated values return `400 invalid_request`. The route reference
+  now records both views and graph/static final-byte ETag revalidation.
 - Graph first frames avoid redundant default-URL restyling and a discarded grid
   layout; initial lens/theme updates are batched without changing settled positions.
 - Graph canvas labels remeasure and redraw once when Ledger fonts load late,
   without delaying the first frame or rerunning the layout.
-- Live pages reserve inert Studio launcher, document viewbar and index page
-  feedback geometry before first paint. Studio fills those slots in place, and its truthful
-  loading/failure notice no longer shifts the authored page when boot settles.
-  Portable and no-JS pages do not reserve inactive Studio chrome.
+- Live pages reserve inert Studio launcher and document viewbar geometry only
+  when Studio is attached, and index feedback only for an actual index document.
+  Studio fills those slots in place (removing feedback it cannot fill); its
+  truthful loading/failure notice stays anchored below the bar while booting.
+  Inactive sessions, documentless indexes, portable and no-JS pages reserve no
+  inactive Studio chrome.
 - Split view now clears the "Loading source…" notice whenever the source pane
   is populated, including by a concurrent document or live-update load. A
   redundant request no longer leaves a loading or failure notice above source
@@ -63,7 +69,7 @@ follow [Semantic Versioning](https://semver.org/). The product version
 ### Changed
 
 - Live static assets now use final-byte strong ETags and body-free conditional
-  GET/HEAD responses. `Cache-Control: no-cache` still requires revalidation on
+  GET/HEAD responses. `Cache-Control: private, no-cache` requires revalidation on
   every reuse, so toolkit edits, overrides and generated font CSS stay fresh.
 - Graph pages defer the ordered, integrity-pinned vendor chain in CDN and
   offline modes, letting the appearance runtime and page styles load without
@@ -73,7 +79,8 @@ follow [Semantic Versioning](https://semver.org/). The product version
 - Live graph reads reuse single-flight, generation-owned rendered bodies while
   recomputing clock-sensitive metadata; index/graph HTML skip unused bodies.
   Graph JSON now has final-byte strong
-  ETags and revalidates with `no-cache`; Studio shares the graph page's initial
+  ETags and revalidates with `private, no-cache` (no shared-cache storage);
+  Studio shares the graph page's initial
   request and uses body-free structure only for visible badges/recency or an
   opened command palette on other pages.
 - **Ledger appearance:** Bone (default, light), Slate, Clay, Plum (dark), plus

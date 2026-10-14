@@ -80,6 +80,16 @@ def test_portable_shell_reserves_but_does_not_advertise_studio(
             assert "data-okf-viewbar-placeholder" not in page.read_text(encoding="utf-8")
 
 
+def test_inactive_live_shell_does_not_emit_launcher():
+    from okf_loom.render import _application_shell_html
+    html = _application_shell_html(
+        name="Proof", bundle_href="/", search_href="/__search", index_href="/",
+        graph_href="/__graph", current="index", mode="serve", studio_available=False,
+    )
+    assert 'data-okf-studio-capability="unavailable"' in html
+    assert 'okf-studio-launcher' not in html
+
+
 def test_live_shell_emits_only_inert_launcher_placeholder():
     from okf_loom.render import _application_shell_html
 

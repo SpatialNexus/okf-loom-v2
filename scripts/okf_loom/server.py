@@ -127,6 +127,14 @@ def _prefers_html_error(accept: str) -> bool:
     return preference("text/html") > max(preference("text/plain"), preference("application/json"))
 
 
+def _if_none_match_matches(fields: list[str], etag: str) -> bool:
+    """GET/HEAD weak comparison across all If-None-Match header fields."""
+    # Commas inside an opaque quoted tag are not list separators.
+    validators = (value.strip() for field in fields
+                  for value in re.findall(r'(?:[^",]|"[^"]*")+', field))
+    return any(value == "*" or value.removeprefix("W/") == etag for value in validators)
+
+
 def _canonical_annotation_source(bundle: Bundle, cid: ConceptId) -> str:
     """Read canonical bytes by trusted root + concept identity, never stale paths."""
     return _canonical_document_source(bundle, "/".join(cid) + ".md")
@@ -1576,6 +1584,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         self._send_text(200, render_feedback_import_page(
             name=self.display_name, config=self._config(),
             availability=self._feedback_import_availability(),
+            studio_available=self.studio is not None,
             max_note_bytes=MAX_NOTE_BYTES,
             preview_ttl_seconds=PREVIEW_TOKEN_TTL_SECONDS,
         ))
@@ -2810,7 +2819,8 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         from .render import render_reserved_document
         self._send_text(200, render_reserved_document(
             document, payload['raw'], mode='serve', config=self._config(),
-            bundle=self.bundle, name=self.display_name))
+            bundle=self.bundle, name=self.display_name,
+            studio_available=self.studio is not None))
 
     def _handle_root(self) -> None:
         self._page_document = 'index.md' if self.bundle.root_index() else None
@@ -2825,6 +2835,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
                 pass
         html = _render_index_page(
             self.bundle, mode="serve", name=self.display_name,
+            studio_available=self.studio is not None,
             palette=self.palette, config=self._config(), sub="",
             index_file=self.bundle.root_index(),
             comment_summary=comment_summary,
@@ -2864,6 +2875,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
                 )
         html = _render_index_page(
             self.bundle, mode="serve", name=self.display_name,
+            studio_available=self.studio is not None,
             palette=self.palette, config=self._config(), sub=sub,
             index_file=index_file,
             comment_summary=None,
@@ -2879,6 +2891,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         if _prefers_html_error(",".join(self.headers.get_all("Accept", []))):
             return self._send_text(404, _render_not_found_page(
                 name=self.display_name, path=cid_str, config=self._config(),
+                studio_available=self.studio is not None,
             ), extra_headers=headers)
         self._send_text(404, plain_message, content_type="text/plain", extra_headers=headers)
 
@@ -2928,6 +2941,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
                 pass
         html = _render_concept_page(
             concept, bundle, graph, mode="serve",
+            studio_available=self.studio is not None,
             name=self.display_name, palette=self.palette,
             config=self._config(),
             body_plugin=plugin.on_concept_render,
@@ -2938,6 +2952,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
     def _handle_graph(self) -> None:
         html = _render_graph_page(
             self.bundle, mode="serve", name=self.display_name,
+            studio_available=self.studio is not None,
             config=self._config(),
         )
         self._send_text(200, html)
@@ -2985,6 +3000,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
                         )
                         html = _render_search_page(
                             bundle, mode="serve", name=display_name, config=config,
+                            studio_available=self.studio is not None,
                             query=request.query, results=rows, request=request,
                             sections=sections,
                         )
@@ -3202,6 +3218,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
             **{key: params.get(key) for key in ("tag", "entity", "relation", "source", "target")})
         body = _render_search_page(
             bundle, mode="serve", name=display_name or self.display_name, config=config,
+            studio_available=self.studio is not None,
             query=params.get("q", ""), results=[], error=exc, request=request,
         )
         self._send_text(exc.status, body, content_type="text/html; charset=utf-8")
@@ -3273,7 +3290,8 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
 
     def _handle_graph_json(self, query: dict[str, list[str]] | None = None) -> None:
         query = query or {}
-        if query and query != {"view": ["structure"]}:
+        structure = query.get("view") == ["structure"]
+        if "view" in query and not structure:
             return self._send_json(400, {"ok": False, "error": "invalid_request"})
         bundle, _palette, _plugin, config = self._state_snapshot()
         display_name = getattr(self.server, "name", None) or config.get("name") or bundle.name
@@ -3296,9 +3314,9 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
             name=display_name,
             comment_summary=comment_summary,
             cache_bodies=True,
-            include_bodies=not query,
+            include_bodies=not structure,
         )
-        if query:
+        if structure:
             del data["bodies"]
             del data["documents"]
         from .retrieval import MAX_RESPONSE_BYTES, canonical_json_bytes
@@ -3312,9 +3330,8 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         # this read-only projection. Hash final bytes, not just the revision:
         # comment counts and stale_after metadata can change independently.
         etag = '"' + hashlib.sha256(body).hexdigest() + '"'
-        headers = {"Cache-Control": "no-cache", "ETag": etag}
-        validators = [value.strip() for value in self.headers.get("If-None-Match", "").split(",")]
-        not_modified = any(value == "*" or value.removeprefix("W/") == etag for value in validators)
+        headers = {"Cache-Control": "private, no-cache", "ETag": etag}
+        not_modified = _if_none_match_matches(self.headers.get_all("If-None-Match", []), etag)
         self._send_bytes(304 if not_modified else 200, b"" if not_modified else body,
                          content_type="application/json; charset=utf-8", extra_headers=headers)
 
@@ -3767,13 +3784,10 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         # every request so even edits preserving mtime/size cannot hide changes
         # or bypass vendor integrity checks. No viewer-specific data is added.
         etag = '"' + hashlib.sha256(body).hexdigest() + '"'
-        # Commas inside an opaque quoted tag are not list separators.
-        validators = [value.strip() for field in self.headers.get_all("If-None-Match", [])
-                      for value in re.findall(r'(?:[^",]|"[^"]*")+', field)]
-        not_modified = any(value == "*" or value.removeprefix("W/") == etag for value in validators)
+        not_modified = _if_none_match_matches(self.headers.get_all("If-None-Match", []), etag)
         self._send_bytes(304 if not_modified else 200, b"" if not_modified else body,
                          content_type=content_type,
-                         extra_headers={"Cache-Control": "no-cache", "ETag": etag})
+                         extra_headers={"Cache-Control": "private, no-cache", "ETag": etag})
 
     def _handle_bundle_asset(self, rel: str) -> None:
         """Serve a bundle-local media file (screenshots, diagrams, video, PDF).

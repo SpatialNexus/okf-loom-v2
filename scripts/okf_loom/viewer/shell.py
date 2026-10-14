@@ -70,9 +70,9 @@ def render_application_shell(model: ApplicationShell, appearance_html: str) -> s
         )
 
     capability = "available" if model.studio_available else "unavailable"
-    # Inert first-paint geometry, revealed only where the head runtime has
-    # marked JavaScript available. Studio replaces it in place at boot;
-    # portable and no-JS targets neither advertise nor reserve a launcher.
+    # The live server supplies its actual Studio attachment state. Inert
+    # first-paint geometry is revealed only with JavaScript; Studio replaces
+    # it at boot. Inactive sessions, portable and no-JS targets reserve none.
     studio_placeholder = (
         '<button type="button" class="okf-studiobtn okf-studio-launcher" '
         'disabled tabindex="-1" aria-hidden="true">'

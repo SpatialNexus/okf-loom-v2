@@ -442,6 +442,55 @@ def test_nojs_does_not_reserve_studio_controls(server_url, route):
             browser.close()
 
 
+@pytest.mark.parametrize("studio_mode", ["enabled", "cli-disabled", "config-disabled"])
+@pytest.mark.parametrize("width", [1280, 390])
+def test_inactive_studio_and_documentless_indexes_leave_no_reserved_bands(tmp_path, page, studio_mode, width):
+    (tmp_path / "services").mkdir()
+    (tmp_path / "services" / "a.md").write_text('---\ntype: note\n---\n# Service\n\nBody\n')
+    flags = ()
+    if studio_mode == "cli-disabled":
+        flags = ("--no-edit", "--no-watch-ui")
+    elif studio_mode == "config-disabled":
+        (tmp_path / "okf-loom.config.yaml").write_text('studio:\n  live: false\n  edit: false\n')
+    page.set_viewport_size({"width": width, "height": 900})
+    with live_server(tmp_path, *flags) as base:
+        routes = ["/", "/services/"]
+        if studio_mode != "enabled":
+            routes += ["/services/a", "/__graph", "/__search?q=Service"]
+        for route in routes:
+            page.goto(base + route, wait_until="load")
+            if studio_mode == "enabled":
+                page.wait_for_function("() => window.okfStudioReadiness?.ready")
+                expect(page.locator('.okf-studio-launcher')).to_be_visible()
+            else:
+                assert page.locator('#okf-studio-bootstrap').count() == 0
+                assert page.locator('.okf-studio-launcher').count() == 0
+            page.evaluate("() => document.fonts.ready")
+            page.wait_for_timeout(600)
+            reserved = page.evaluate("""() => [...document.querySelectorAll(
+              '[data-okf-viewbar-placeholder], [data-okf-outline-jump-placeholder], '
+              + '[data-okf-page-feedback-placeholder], .okf-shell__studio-slot[hidden]')]
+              .filter(n => n.getBoundingClientRect().height > 0).map(n => n.outerHTML)""")
+            assert reserved == [], (studio_mode, route, reserved)
+            assert page.locator('.okf-hero--feedback').count() == 0
+
+
+def test_studio_removes_feedback_placeholder_when_no_document_target(tmp_path, page):
+    (tmp_path / 'services').mkdir()
+    (tmp_path / 'services' / 'a.md').write_text('---\ntype: note\n---\nBody\n')
+    def add_unfillable_slot(route):
+        response = route.fetch()
+        body = response.text().replace('class="okf-hero ', 'class="okf-hero okf-hero--feedback ', 1)
+        body = body.replace('</main>', '<div class="okf-page-feedback" '
+                            'data-okf-page-feedback-placeholder aria-hidden="true">Unused</div></main>', 1)
+        route.fulfill(response=response, body=body)
+    page.route('**/services/', add_unfillable_slot)
+    with live_server(tmp_path) as base:
+        page.goto(base + '/services/')
+        page.wait_for_function("() => window.okfStudioReadiness?.ready")
+        assert page.locator('[data-okf-page-feedback-placeholder], .okf-hero--feedback').count() == 0
+
+
 def test_studio_mounts_one_compact_launcher_in_the_shell(page, server_url: str) -> None:
     page.goto(server_url + "/")
     page.wait_for_function("() => window.okfStudioReadiness && window.okfStudioReadiness.ready")
