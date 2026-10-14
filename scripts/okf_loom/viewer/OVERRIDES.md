@@ -42,6 +42,15 @@ Two built-in elements carry behaviour that an override should keep:
 - In `single_file.html`, `#okf-single-index` and `#detail-content` are the
   destinations of the concept-list links (`?selected=<id>#detail-content`).
 
+Live shell markup includes inert launcher, document viewbar/Sections and index
+feedback placeholders. Their final responsive size is reserved before first
+paint only when the parser-blocking theme runtime has marked JavaScript
+available; portable and no-JS targets reserve no Studio space. Studio fills
+those slots in place, while `document-outline.js` owns the Sections control.
+The live loading/failure notice remains visible until a successful boot but
+sits outside document flow, so settling boot does not displace authored content.
+Custom templates without the placeholders keep the legacy client mount path.
+
 ## 2. Static asset overrides
 
 Drop a file at `.okf-loom/viewer/static/<file>` to replace the built-in asset.
@@ -329,6 +338,14 @@ All three mechanisms compose: a bundle can ship a custom `wiki.css`, a
 `ViewerPlugin`, and a `register("panel", …)` extension at the same time.
 
 ## 7. Live graph acquisition seam
+
+Live, static and SPA graph pages load their external classic vendor scripts
+with `defer`, in dependency order: Cytoscape → layout-base → cose-base →
+cytoscape-fcose → dagre → cytoscape-dagre → graph.js. This applies to CDN and
+verified offline assets alike; CDN integrity and crossorigin pins are unchanged.
+Overrides must not rely on these globals during parsing. `theme.js` remains
+parser-blocking for first-paint appearance. Single-file output retains its
+parser-blocking vendor chain ahead of its inline graph runtime.
 
 On live graph pages, `window.okfGraphData` is a promise for the full
 `/__data/graph.json` projection. Whichever of graph.js or studio.js needs it

@@ -812,7 +812,8 @@
     panel.hidden = true;
     wrap.appendChild(toggle);
     wrap.appendChild(panel);
-    bar.appendChild(wrap);
+    var placeholder = bar.querySelector("[data-okf-outline-jump-placeholder]");
+    if (placeholder) placeholder.replaceWith(wrap); else bar.appendChild(wrap);
     jump = { wrap: wrap, toggle: toggle, current: current, panel: panel };
 
     toggle.addEventListener("click", function () {

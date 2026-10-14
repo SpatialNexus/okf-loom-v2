@@ -14,6 +14,10 @@ follow [Semantic Versioning](https://semver.org/). The product version
   layout; initial lens/theme updates are batched without changing settled positions.
 - Graph canvas labels remeasure and redraw once when Ledger fonts load late,
   without delaying the first frame or rerunning the layout.
+- Live pages reserve inert Studio launcher, document viewbar and index page
+  feedback geometry before first paint. Studio fills those slots in place, and its truthful
+  loading/failure notice no longer shifts the authored page when boot settles.
+  Portable and no-JS pages do not reserve inactive Studio chrome.
 - Split view now clears the "Loading source…" notice whenever the source pane
   is populated, including by a concurrent document or live-update load. A
   redundant request no longer leaves a loading or failure notice above source
@@ -34,6 +38,9 @@ follow [Semantic Versioning](https://semver.org/). The product version
 - Live static assets now use final-byte strong ETags and body-free conditional
   GET/HEAD responses. `Cache-Control: no-cache` still requires revalidation on
   every reuse, so toolkit edits, overrides and generated font CSS stay fresh.
+- Graph pages defer the ordered, integrity-pinned vendor chain in CDN and
+  offline modes, letting the appearance runtime and page styles load without
+  waiting for graph dependencies. Single-file vendor ordering is unchanged.
 - Live document pages, document data and search reuse bounded, content-keyed
   heading render work without changing canonical-source or section-link checks.
 - Live graph reads reuse single-flight, generation-owned rendered bodies while

@@ -189,6 +189,87 @@ def test_recent_pages_popover_is_anchored_below_the_search_field(page, server_ur
     assert popup['width'] < 400
 
 
+_FIRST_PAINT_CLS = """(() => {
+  const shifts = window.__okfPaintShifts = [];
+  const record = entries => entries.forEach(entry => {
+    if (!entry.hadRecentInput) shifts.push({value: entry.value,
+      sources: (entry.sources || []).map(source => ({
+        node: source.node && (source.node.id || source.node.className),
+        before: source.previousRect.toJSON(), after: source.currentRect.toJSON()
+      }))});
+  });
+  const observer = new PerformanceObserver(list => record(list.getEntries()));
+  observer.observe({type: 'layout-shift', buffered: true});
+  window.__okfPaintCLS = () => {
+    record(observer.takeRecords());
+    return {cls: shifts.reduce((sum, shift) => sum + shift.value, 0), shifts};
+  };
+})();"""
+
+
+@pytest.mark.parametrize("route", ["/", "/tables/orders"])
+@pytest.mark.parametrize("width,coarse", [(1280, False), (390, False), (320, False),
+                                         (390, True), (320, True)])
+def test_live_first_paint_stays_stable_after_studio_boot(server_url, route, width, coarse):
+    """Hold the real module until after first paint, so a fast local server
+    cannot conceal a post-paint insertion. Measure after async boot settles."""
+    with sync_playwright() as playwright:
+        browser = launch_chromium(playwright)
+        context = browser.new_context(viewport={"width": width, "height": 900},
+                                      is_mobile=coarse, has_touch=coarse)
+        try:
+            context.add_init_script(_FIRST_PAINT_CLS)
+            page = context.new_page()
+            held = []
+            page.route("**/__static/studio.js", lambda request: held.append(request))
+            page.goto(server_url + route, wait_until="commit")
+            page.wait_for_function("""() => document.querySelector('.okf-shell__studio-slot button') &&
+              performance.getEntriesByType('paint').some(entry => entry.name === 'first-contentful-paint')""")
+            assert held
+            expect(page.locator('.okf-studio-launcher')).to_be_hidden()
+            before = page.locator('.okf-shell').bounding_box()
+            if route != "/":
+                assert page.locator('[data-okf-viewbar-placeholder]').bounding_box()["height"] >= 42
+                expect(page.locator('[data-okf-viewbar-placeholder]')).to_be_hidden()
+            held[0].continue_()
+            page.wait_for_function("""() => window.okfStudioReadiness?.ready &&
+              window.okfLoomStudio.state.commentsReady && window.okfLoomStudio.state.graphReady""")
+            page.evaluate("() => document.fonts.ready")
+            page.wait_for_timeout(600)  # includes Studio's 400ms layout-settle pass
+            after = page.locator('.okf-shell').bounding_box()
+            assert after["height"] == before["height"], (before, after)
+            result = page.evaluate("window.__okfPaintCLS()")
+            assert result["cls"] < 0.02, result
+            assert page.locator('[data-okf-viewbar-placeholder], [data-okf-page-feedback-placeholder], '
+                                '[data-okf-outline-jump-placeholder]').count() == 0
+            if route != "/":
+                assert page.locator('.okf-concept-viewbar [data-okf-outline-jump]').count() == 1
+            expect(page.locator('.okf-studio-launcher')).to_be_visible()
+            assert page.evaluate("matchMedia('(pointer: coarse)').matches") is coarse
+            assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
+        finally:
+            context.close()
+            browser.close()
+
+
+@pytest.mark.parametrize("route", ["/", "/tables/orders"])
+def test_nojs_does_not_reserve_studio_controls(server_url, route):
+    with sync_playwright() as playwright:
+        browser = launch_chromium(playwright)
+        context = browser.new_context(java_script_enabled=False, viewport={"width": 320, "height": 900})
+        try:
+            page = context.new_page()
+            page.goto(server_url + route)
+            expect(page.locator('[data-okf-shell-item="studio"]')).to_be_hidden()
+            expect(page.locator('.okf-studio-launcher')).to_be_hidden()
+            assert page.locator('.okf-concept-viewbar:visible').count() == 0
+            expect(page.locator('.okf-nojs-live-banner')).to_be_visible()
+            assert page.locator('[data-okf-shell-item="studio"]').bounding_box() is None
+        finally:
+            context.close()
+            browser.close()
+
+
 def test_studio_mounts_one_compact_launcher_in_the_shell(page, server_url: str) -> None:
     page.goto(server_url + "/")
     page.wait_for_function("() => window.okfStudioReadiness && window.okfStudioReadiness.ready")
@@ -842,7 +923,7 @@ _LAUNCHER_TEXT_RECORDER = """(() => {
   const log = [];
   window.__okfLauncherLog = log;
   const attach = () => {
-    const summary = document.querySelector('.okf-studio-launcher__summary');
+    const summary = document.querySelector('.okf-shell__studio-slot:not([hidden]) .okf-studio-launcher__summary');
     if (!summary) return false;
     const record = () => log.push({t: performance.now(), text: summary.textContent});
     record();

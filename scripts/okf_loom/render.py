@@ -4481,6 +4481,32 @@ def _render_concept_page(
         mode=mode,
         appearance_choice=configured_theme,
     )
+    if mode == "serve":
+        # The local viewbar has the same responsive geometry before Studio
+        # fills it. No-JS and portable readers must not inherit empty chrome.
+        first_heading = _ONTHISPAGE_HEADING_RE.search(body_html)
+        section_label = (
+            re.sub(r"\s+", " ", _html.unescape(re.sub(r"<[^>]+>", "", first_heading.group(3)))).strip()
+            if first_heading else ""
+        )
+        sections_placeholder = (
+            '<div class="okf-outline-jump" data-okf-outline-jump-placeholder aria-hidden="true">'
+            '<button type="button" class="okf-studiobtn okf-outline-jump__toggle" disabled tabindex="-1">'
+            '<span class="okf-outline-jump__label">Sections</span>'
+            f'<span class="okf-outline-jump__current">{_esc(section_label)}</span></button></div>'
+            if section_label else ""
+        )
+        shell_html += (
+            '<div class="okf-concept-viewbar" data-okf-viewbar-placeholder aria-hidden="true">'
+            '<div class="okf-viewswitch" role="group" aria-label="View mode">'
+            + "".join(
+                f'<button type="button" class="okf-viewswitch__btn'
+                f'{(" okf-focus-toggle" if label == "Focus view" else "")}" disabled tabindex="-1" '
+                f'aria-pressed="{str(label == "Rendered").lower()}">{label}</button>'
+                for label in ("Rendered", "Source", "Split", "Focus view")
+            )
+            + '</div>' + sections_placeholder + '</div>'
+        )
 
     theme_attr = (f' data-theme="{initial_theme}"')
     revision = bundle_revision(bundle)
@@ -6175,7 +6201,12 @@ def _render_index_page(
         .replace("__APPLICATION_SHELL__", shell_html)
         .replace("__INDEX_TITLE__", _esc(title))
         .replace('__INDEX_TITLE_ANCHOR__', title_anchor)
-          .replace("__HERO_MODIFIER__", hero_modifier)
+          .replace("__HERO_MODIFIER__", hero_modifier + (" okf-hero--feedback" if mode == "serve" else ""))
+          .replace("__PAGE_FEEDBACK_PLACEHOLDER__", (
+              '<div class="okf-page-feedback" data-okf-page-feedback-placeholder aria-hidden="true">'
+              '<button type="button" class="okf-btn okf-page-feedback__comment" disabled tabindex="-1">'
+              'Comment on this page</button></div>' if mode == "serve" else ""
+          ))
           .replace("__HERO_V2__", hero_v2)
           .replace("__INDEX_INTRO__", intro)
           .replace("__INDEX_INTRO_REMAINDER__", intro_remainder)
@@ -6787,6 +6818,10 @@ def _render_graph_page(
     if offline_assets is not None:
         # X1: the same pinned chain, from verified local copies, in order.
         cdn_scripts = offline_assets.graph_scripts(static_prefix)
+    # External classic scripts defer in document order, including their UMD
+    # dependencies, before deferred graph.js. Keep the single-file chain
+    # parser-blocking: its inline graph bootstrap cannot participate in defer.
+    cdn_scripts = cdn_scripts.replace("<script ", "<script defer ")
 
     # P1-3: emit data-okf-mode on the graph page body so graph.js can
     # detect static mode and append .html to the Open-page href (the
