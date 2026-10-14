@@ -27,9 +27,10 @@ PALETTES = ("bone", "slate", "clay", "plum")
 # paint exactly these resolved token values; there is no per-theme JS table.
 # "edge" is --graph-edge lifted toward --text-3 until it clears 3:1 on the
 # canvas (WCAG 1.4.11): the raw edge tokens sit near 2.5:1.
+# Bone uses the contrast-repaired --text-3 (#675f55) for that lift.
 LEDGER_GRAPH = {
     "bone": {"node": "rgb(210,202,189)", "stroke": "rgb(176,166,150)", "label": "rgb(29,26,22)",
-             "edge": "rgb(146,137,124)", "halo": "rgb(246,243,237)", "accent": "rgb(163,87,58)",
+             "edge": "rgb(145,136,123)", "halo": "rgb(246,243,237)", "accent": "rgb(163,87,58)",
              "raised": "rgb(227,221,210)", "ink": "rgb(29,26,22)"},
     "slate": {"node": "rgb(44,50,59)", "stroke": "rgb(59,66,76)", "label": "rgb(227,231,235)",
               "edge": "rgb(91,99,108)", "halo": "rgb(16,18,21)", "accent": "rgb(95,135,180)",
