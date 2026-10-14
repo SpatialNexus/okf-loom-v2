@@ -6153,8 +6153,11 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
       // The default Map projection above already represents an empty URL.
       // Restore only admitted URL state, not a second Map restyle/clear pass.
       // Popstate always uses the full restore owner, including an empty URL.
+      // Skipping the restyle must not skip its final status commit: the
+      // visible counts/text are published now, not by the 200ms debounce.
       var initialInteraction = decodeInteractionUrl();
       if (initialInteraction.lens !== "map" || initialInteraction.selected || initialInteraction.focus || initialInteraction.path || Object.keys(initialInteraction.hidden).length || Object.keys(initialInteraction.hiddenRelations).length) graphInteractionController.restore();
+      else reconcileVisibleRelationshipProjection();
       // Stable, read-only capture adapter. The mutable Cytoscape core remains
       // diagnostic-only and is intentionally absent from this public shape.
       window.okfGraphCaptureState = function () {
