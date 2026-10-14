@@ -282,6 +282,17 @@ html:not([data-okf-js="1"]) #okf-theme { display: none !important; }
   .okf-shell__nav .okf-btn,
   .okf-shell__search-form :is(input, button) { min-height: 44px; }
 }
+/* Compact coarse rows: the 44px destinations leave the shrinkable search
+ * field the remainder, which at 390px cut its placeholder to "Searc". A
+ * 10rem non-shrinking basis (a ~5.5rem field plus the joined button) is
+ * what the row must hold for the field to keep its whole label; where Index,
+ * Graph and Studio no longer fit beside it the last destinations wrap to the
+ * next row instead, and the field then grows into the freed space. Basis,
+ * not min-width, because the graph route's narrow reflow forces
+ * min-width:0 on every nav item. */
+@media (pointer: coarse) and (max-width: 640px) {
+  body.okf-viewer .okf-shell [data-okf-shell-item="search"] { flex: 1 0 10rem; max-width: 100%; }
+}
 
 /* Mid-size documents keep the full destination set without allowing the nav
  * intrinsic width to widen the page. This is also the Studio modal handoff

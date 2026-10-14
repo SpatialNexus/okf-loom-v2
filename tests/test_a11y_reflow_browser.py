@@ -166,8 +166,36 @@ def test_core_coarse_pointer_targets_are_44px_at_390(chromium, coarse_server_url
             expect(page.locator('.okf-toast__action')).to_have_count(0)
         overflow = page.evaluate(_OVERFLOW)
         assert overflow['scrollWidth'] <= overflow['innerWidth'] + 1, overflow
+        _assert_shell_search_shows_placeholder(page, route)
+        page.set_viewport_size({'width': 320, 'height': 844})
+        page.wait_for_function('w => innerWidth === w', arg=320)
+        _assert_shell_search_shows_placeholder(page, route)
     finally:
         context.close()
+
+
+_SEARCH_PLACEHOLDER_FIT = """async () => {
+  await document.fonts.ready;
+  const input = document.querySelector('.okf-shell__search-form input[type="search"]');
+  const style = getComputedStyle(input);
+  const ctx = document.createElement('canvas').getContext('2d');
+  ctx.font = style.font;
+  const r = input.getBoundingClientRect();
+  return {placeholder: input.placeholder, width: r.width,
+          needed: ctx.measureText(input.placeholder).width,
+          available: input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)};
+}"""
+
+
+def _assert_shell_search_shows_placeholder(page, label):
+    """The top-bar search field keeps its whole placeholder ("Search…", not
+    the former "Searc" at 390) beside the 44px coarse destinations."""
+    fit = page.evaluate(_SEARCH_PLACEHOLDER_FIT)
+    width = page.viewport_size['width']
+    assert fit['placeholder'] == 'Search…', fit
+    assert fit['needed'] <= fit['available'], (label, width, fit)
+    overflow = page.evaluate(_OVERFLOW)
+    assert overflow['scrollWidth'] <= overflow['innerWidth'] + 1, (label, width, overflow)
 
 
 def _coarse_targets(page, selector):
@@ -211,6 +239,19 @@ def test_coarse_pointer_shell_targets_are_44px_on_graph_and_single_file(chromium
         assert page.evaluate("matchMedia('(pointer: coarse)').matches")
         measured = {GRAPH: {s: _coarse_targets(page, s) for s in _SHELL_TARGETS}}
         assert len(measured[GRAPH]['.okf-skip-link']) >= 2, measured
+        _assert_shell_search_shows_placeholder(page, GRAPH)
+        # A fresh load at 320: the graph route sizes its narrow chrome from
+        # the visual viewport, which an in-place emulated resize leaves at 390.
+        narrow = chromium.new_context(viewport={'width': 320, 'height': 844}, is_mobile=True,
+                                      has_touch=True, reduced_motion='reduce')
+        try:
+            graph_320 = narrow.new_page()
+            graph_320.route('https://cdn.jsdelivr.net/**', lambda route: route.abort())
+            graph_320.goto(coarse_server_url + GRAPH)
+            graph_320.wait_for_function(STUDIO_READY)
+            _assert_shell_search_shows_placeholder(graph_320, GRAPH)
+        finally:
+            narrow.close()
         page.goto(single.as_uri())
         page.wait_for_function("() => document.body.dataset.okfSearchCaptureReady === 'ready'"
                                " && !document.getElementById('okf-single-search-toggle').disabled")
