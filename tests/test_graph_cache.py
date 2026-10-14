@@ -121,6 +121,7 @@ def test_graph_if_none_match_all_fields_and_quoted_commas(graph_server, path):
         for fields in (('"other"', tag), ('"other,*,tag", W/' + tag,), ('*',), ('W/' + tag,)):
             status, fresh, body = _get(base, path, validators=fields, method=method)
             assert status == 304 and body == b'' and fresh['ETag'] == tag
+            assert fresh['Cache-Control'] == headers['Cache-Control'] == 'private, no-cache'
         assert _get(base, path, validators=('"other,*,tag"',), method=method)[0] == 200
 
 
@@ -137,7 +138,7 @@ def test_graph_etag_tracks_clock_not_only_content_revision(graph_server, monkeyp
 
     monkeypatch.setattr(metadata, 'datetime', Clock)
     status, headers, before = _get(base)
-    assert status == 200 and headers['Cache-Control'] == 'no-cache'
+    assert status == 200 and headers['Cache-Control'] == 'private, no-cache'
     assert b'Not stale' in before
     cached = server.bundle._graph_documents_cache
     current = headers['ETag']

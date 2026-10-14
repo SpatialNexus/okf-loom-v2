@@ -3330,7 +3330,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         # this read-only projection. Hash final bytes, not just the revision:
         # comment counts and stale_after metadata can change independently.
         etag = '"' + hashlib.sha256(body).hexdigest() + '"'
-        headers = {"Cache-Control": "no-cache", "ETag": etag}
+        headers = {"Cache-Control": "private, no-cache", "ETag": etag}
         not_modified = _if_none_match_matches(self.headers.get_all("If-None-Match", []), etag)
         self._send_bytes(304 if not_modified else 200, b"" if not_modified else body,
                          content_type="application/json; charset=utf-8", extra_headers=headers)
@@ -3787,7 +3787,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         not_modified = _if_none_match_matches(self.headers.get_all("If-None-Match", []), etag)
         self._send_bytes(304 if not_modified else 200, b"" if not_modified else body,
                          content_type=content_type,
-                         extra_headers={"Cache-Control": "no-cache", "ETag": etag})
+                         extra_headers={"Cache-Control": "private, no-cache", "ETag": etag})
 
     def _handle_bundle_asset(self, rel: str) -> None:
         """Serve a bundle-local media file (screenshots, diagrams, video, PDF).

@@ -69,7 +69,7 @@ follow [Semantic Versioning](https://semver.org/). The product version
 ### Changed
 
 - Live static assets now use final-byte strong ETags and body-free conditional
-  GET/HEAD responses. `Cache-Control: no-cache` still requires revalidation on
+  GET/HEAD responses. `Cache-Control: private, no-cache` requires revalidation on
   every reuse, so toolkit edits, overrides and generated font CSS stay fresh.
 - Graph pages defer the ordered, integrity-pinned vendor chain in CDN and
   offline modes, letting the appearance runtime and page styles load without
@@ -79,7 +79,8 @@ follow [Semantic Versioning](https://semver.org/). The product version
 - Live graph reads reuse single-flight, generation-owned rendered bodies while
   recomputing clock-sensitive metadata; index/graph HTML skip unused bodies.
   Graph JSON now has final-byte strong
-  ETags and revalidates with `no-cache`; Studio shares the graph page's initial
+  ETags and revalidates with `private, no-cache` (no shared-cache storage);
+  Studio shares the graph page's initial
   request and uses body-free structure only for visible badges/recency or an
   opened command palette on other pages.
 - **Ledger appearance:** Bone (default, light), Slate, Clay, Plum (dark), plus

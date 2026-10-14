@@ -57,13 +57,13 @@ def _assert_revalidation(server, path):
     assert status == 200 and body
     tag = headers['ETag']
     assert tag == '"' + hashlib.sha256(body).hexdigest() + '"'
-    assert headers['Cache-Control'] == 'no-cache'
+    assert headers['Cache-Control'] == 'private, no-cache'
     for method in ('GET', 'HEAD'):
         for values in ((tag,), ('W/' + tag,), ('"other", W/' + tag,), ('*',),
                        ('"other"', tag), ('  "other" , ' + tag + '  ',)):
             code, fresh, empty = _request(server, path, method=method, validators=values)
             assert code == 304 and empty == b''
-            assert fresh['ETag'] == tag and fresh['Cache-Control'] == 'no-cache'
+            assert fresh['ETag'] == tag and fresh['Cache-Control'] == 'private, no-cache'
             assert 'Content-Length' not in fresh
             for key in SECURITY_HEADERS:
                 assert fresh[key] == headers[key]
