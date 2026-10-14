@@ -256,8 +256,8 @@ def test_coarse_pointer_shell_targets_are_44px_on_graph_and_single_file(chromium
         measured = {GRAPH: {s: _coarse_targets(page, s) for s in _SHELL_TARGETS}}
         assert len(measured[GRAPH]['.okf-skip-link']) >= 2, measured
         _assert_shell_search_shows_placeholder(page, GRAPH)
-        # A fresh load at 320: the graph route sizes its narrow chrome from
-        # the visual viewport, which an in-place emulated resize leaves at 390.
+        # A fresh load at 320 (the in-place 390 -> 320 resize is covered by
+        # test_graph_route_resizes_in_place_without_a_stale_width).
         narrow = chromium.new_context(viewport={'width': 320, 'height': 844}, is_mobile=True,
                                       has_touch=True, reduced_motion='reduce')
         try:
@@ -280,6 +280,100 @@ def test_coarse_pointer_shell_targets_are_44px_on_graph_and_single_file(chromium
             for selector, targets in by_selector.items():
                 assert targets, f'{surface}: no visible target for {selector}'
                 assert all(t['width'] >= 43.5 and t['height'] >= 43.5 for t in targets), (surface, selector, targets)
+        overflow = page.evaluate(_OVERFLOW)
+        assert overflow['scrollWidth'] <= overflow['innerWidth'] + 1, overflow
+    finally:
+        context.close()
+
+
+_GRAPH_VIEWPORT_FIT = """() => {
+  const bar = document.querySelector('.okf-topbar');
+  return {innerWidth, clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+    scale: visualViewport ? visualViewport.scale : 1,
+    visualWidth: visualViewport ? visualViewport.width : innerWidth,
+    topbar: bar ? bar.getBoundingClientRect().width : null,
+    effective: document.body.style.getPropertyValue('--okf-effective-vw')};
+}"""
+
+
+@pytest.mark.parametrize('steps', [
+    [(320, 844)],
+    [(844, 390), (390, 844)],
+    [(568, 320), (320, 568)],
+], ids=['390-to-320', 'rotate-390x844-844x390-back', 'rotate-narrow-568x320-320x568'])
+def test_graph_route_resizes_in_place_without_a_stale_width(chromium, server_url, steps):
+    """A mobile viewport that shrinks or rotates in place keeps the graph
+    route at the new width. The narrow chrome follows the visual viewport, so
+    a stale px width used to overflow the new layout viewport, the browser
+    zoomed out to fit it (scale 0.82 at 390 -> 320), and the zoomed-out
+    visual viewport reported the stale width back."""
+    context = chromium.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True,
+                                   has_touch=True, device_scale_factor=3)
+    try:
+        page = context.new_page()
+        page.goto(server_url + GRAPH)
+        page.wait_for_function(STUDIO_READY)
+        page.wait_for_function(GRAPH_SETTLED)
+        page.wait_for_function("() => document.body.hasAttribute('data-okf-narrow-reflow')")
+        for width, height in steps:
+            page.set_viewport_size({'width': width, 'height': height})
+            page.wait_for_function('w => document.documentElement.clientWidth === w', arg=width)
+            try:
+                page.wait_for_function("""w => innerWidth === w && visualViewport.scale === 1
+                  && document.documentElement.scrollWidth <= innerWidth
+                  && Math.abs(document.querySelector('.okf-topbar').getBoundingClientRect().width - w) <= 1""",
+                                       arg=width, timeout=5000)
+            except Exception:
+                pass  # the explicit assertions below report the measured state
+            fit = page.evaluate(_GRAPH_VIEWPORT_FIT)
+            assert fit['innerWidth'] == width, (width, height, fit)
+            assert fit['scrollWidth'] <= fit['innerWidth'], (width, height, fit)
+            assert fit['scale'] == 1, (width, height, fit)
+            assert abs(fit['topbar'] - width) <= 1, (width, height, fit)
+    finally:
+        context.close()
+
+
+def test_single_file_index_offers_graph_pane_tabs_only_with_the_graph(chromium, tmp_path):
+    """Narrow single-file output docks the Graph/Concepts/Details pane tabs
+    in the top bar. They switch panes of the graph workspace, so the Index
+    destination (like the static and live index, which have no pane tabs)
+    hides them; with the graph shown they return and the pressed tab is the
+    visible pane."""
+    from okf_loom import Bundle
+    from okf_loom.render import render_single_file
+
+    single = tmp_path / 'single.html'
+    render_single_file(Bundle.load(copy_bundle(DEMO_BUNDLE, tmp_path / 'bundle')), single)
+    context = chromium.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True, has_touch=True)
+    try:
+        page = context.new_page()
+        page.goto(single.as_uri())
+        page.wait_for_function("() => document.body.dataset.okfSingleDestination === 'index'"
+                               " && document.body.hasAttribute('data-okf-narrow-reflow')"
+                               " && window.__okfLoomGraph && window.__okfLoomGraph.interaction")
+        panes = page.get_by_role('navigation', name='Graph panes')
+        expect(page.locator('#okf-single-index')).to_be_visible()
+        expect(panes).to_be_hidden()
+        assert page.evaluate("() => getComputedStyle(document.querySelector('.okf-graph-mobile-nav')).display") == 'none'
+
+        primary = page.get_by_role('navigation', name='Primary navigation')
+        primary.get_by_role('link', name='Graph', exact=True).click()
+        page.wait_for_function("() => document.body.dataset.okfSingleDestination === 'graph'")
+        expect(panes).to_be_visible()
+        for name, pane in (('Concepts', 'concepts'), ('Details', 'details'), ('Graph', 'graph')):
+            if name != 'Concepts':
+                panes.get_by_role('button', name=name, exact=True).click()
+            expect(page.locator('.okf-layout')).to_have_attribute('data-mobile-pane', pane)
+            pressed = panes.locator('button[aria-pressed="true"]')
+            expect(pressed).to_have_count(1)
+            expect(pressed).to_have_text(name)
+
+        primary.get_by_role('link', name='Index', exact=True).click()
+        page.wait_for_function("() => document.body.dataset.okfSingleDestination === 'index'")
+        expect(page.locator('#okf-single-index')).to_be_visible()
+        expect(panes).to_be_hidden()
         overflow = page.evaluate(_OVERFLOW)
         assert overflow['scrollWidth'] <= overflow['innerWidth'] + 1, overflow
     finally:

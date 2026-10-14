@@ -2575,11 +2575,15 @@ def _render_not_found_page(*, name: str, path: str, config: dict[str, Any]) -> s
         graph_href="/__graph", current=None, mode="serve",
         appearance_choice=configured_theme,
     )
+    # The shared inline product icon from the BUILT-IN index template, so the
+    # recovery page does not request a missing /favicon.ico either.
+    icon = re.search(r'<link rel="icon"[^>]*>', load_template("index_page.html"))
     return (
         '<!doctype html><html lang="en"'
         f' data-theme="{_esc_attr_qs(initial_theme)}"><head>'
         '<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
         f'<title>Page not found — {_esc(name)}</title>'
+        + (icon.group(0) if icon else '')
         + _ledger_fonts_head("/__static", mode="serve")
         + '<link rel="stylesheet" href="/__static/wiki.css">'
         '<link rel="stylesheet" href="/__static/shell.css">'
@@ -6203,9 +6207,17 @@ def _render_index_page(
         .replace('__INDEX_TITLE_ANCHOR__', title_anchor)
           .replace("__HERO_MODIFIER__", hero_modifier + (" okf-hero--feedback" if mode == "serve" else ""))
           .replace("__PAGE_FEEDBACK_PLACEHOLDER__", (
+              # Both final layouts are reserved; theme.js marks whether this
+              # session may comment before first paint and shell.css keeps
+              # the matching one (read-only: View comments plus its note).
               '<div class="okf-page-feedback" data-okf-page-feedback-placeholder aria-hidden="true">'
-              '<button type="button" class="okf-btn okf-page-feedback__comment" disabled tabindex="-1">'
-              'Comment on this page</button></div>' if mode == "serve" else ""
+              '<button type="button" class="okf-btn okf-page-feedback__comment" '
+              'data-okf-feedback-variant="comment" disabled tabindex="-1">Comment on this page</button>'
+              '<button type="button" class="okf-btn okf-btn--quiet okf-page-feedback__count" '
+              'data-okf-feedback-variant="read-only" disabled tabindex="-1">View comments</button>'
+              '<p class="okf-page-feedback__note" data-okf-feedback-variant="read-only">'
+              'This session is read-only: comments can be read here but not added.</p></div>'
+              if mode == "serve" else ""
           ))
           .replace("__HERO_V2__", hero_v2)
           .replace("__INDEX_INTRO__", intro)

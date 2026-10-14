@@ -80,6 +80,20 @@ def test_bone_default_ignores_os_and_paint_hint(dark):
     assert not any(k.startswith("data-okf-") and k != "data-okf-js" for k in state["attrs"])
 
 
+@pytest.mark.parametrize("bootstrap,expected", [
+    ({"edit": True, "comment": True}, "1"),
+    ({"edit": False, "comment": True}, "1"),
+    ({"edit": True, "comment": False}, "0"),
+    ({"edit": False}, "0"),
+    ({"theme": "clay"}, "1"),
+])
+def test_studio_bootstrap_marks_comment_capability_before_first_paint(bootstrap, expected):
+    """The reserved index feedback slot follows studio.js CAN_COMMENT: an
+    explicit comment flag wins; older bootstraps follow edit."""
+    assert run(bootstrap=bootstrap)[0]["attrs"]["data-okf-studio-comment"] == expected
+    assert "data-okf-studio-comment" not in run(config={"theme": "plum"})[0]["attrs"]
+
+
 @pytest.mark.parametrize("choice", ["bone", "slate", "clay", "plum", "system"])
 def test_precedence(choice):
     configured = run(config={"theme": choice}, dark=True)[0]

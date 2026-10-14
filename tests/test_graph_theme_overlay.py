@@ -487,6 +487,149 @@ def test_graph_chrome_is_square_and_starting_points_are_hairline_rows(
     assert abs(proof["headCentre"] - proof["fieldCentre"]) <= 2, proof
 
 
+_SELECT_FIELD_JS = """selector => {
+  const select = document.querySelector(selector);
+  const root = getComputedStyle(document.documentElement);
+  const resolve = value => {
+    const probe = document.createElement('span');
+    probe.style.color = value;
+    document.body.appendChild(probe);
+    const result = getComputedStyle(probe).color;
+    probe.remove();
+    return result;
+  };
+  const cs = getComputedStyle(select);
+  return {
+    disabled: select.disabled, focusVisible: select.matches(':focus-visible'),
+    height: select.getBoundingClientRect().height, font: cs.fontFamily, size: cs.fontSize,
+    radius: cs.borderTopLeftRadius, border: [cs.borderTopWidth, cs.borderTopStyle, cs.borderTopColor],
+    background: cs.backgroundColor, color: cs.color, outline: [cs.outlineStyle, cs.outlineWidth, cs.outlineColor],
+    shadow: cs.boxShadow,
+    inputBorder: resolve(root.getPropertyValue('--input-border').trim()),
+    inputBg: resolve(root.getPropertyValue('--input-bg').trim()),
+    inputText: resolve(root.getPropertyValue('--input-text').trim()),
+    rings: [resolve(root.getPropertyValue('--okf-accent').trim()), resolve(root.getPropertyValue('--focus').trim())],
+  };
+}"""
+
+# Graph settings Depth and Group by, and the canvas focus bar's depth.
+GRAPH_SELECTS = (
+    '.okf-signal select[aria-label="Depth"]',
+    '.okf-signal select[aria-label="Group by"]',
+    '.okf-graph-focusbar select',
+)
+
+
+def _reveal_depth_select(page):
+    select = page.locator('.okf-signal select[aria-label="Depth"]')
+    select.wait_for(state="attached")
+    details = page.get_by_role("navigation", name="Graph panes").get_by_role("button", name="Details", exact=True)
+    if details.is_visible() and details.get_attribute("aria-pressed") != "true":
+        details.click()
+    page.evaluate("() => document.querySelectorAll('.okf-detail details').forEach(d => { d.open = true; })")
+    select.scroll_into_view_if_needed()
+    return select
+
+
+def _explore_neighbourhood(page) -> None:
+    page.evaluate("""() => {
+      const G = window.__okfLoomGraph;
+      G.interaction.dispatch({type: 'SELECT', id: G.cy.nodes().filter(n => n.degree() > 0).first().id(),
+                              source: 'test', quietUrl: true});
+    }""")
+    _apply_lens(page, "focus")
+    page.wait_for_function("() => !document.querySelector('.okf-signal select[aria-label=\"Depth\"]').disabled")
+
+
+def test_graph_selects_are_ledger_fields(server_url: str, page) -> None:
+    """Every graph select (Graph settings Depth and Group by, and the focus
+    bar's neighbourhood depth) is a Ledger field in every palette: body type,
+    --input tokens, a square 1px outline, no shadow, a 2px focus ring, a 44px
+    coarse target and a system outline under forced colours."""
+    _open_graph(page, server_url)
+    _reveal_depth_select(page)
+    _explore_neighbourhood(page)
+    expect(page.locator(".okf-graph-focusbar select")).to_be_visible()
+    for palette in PALETTES:
+        _set_palette(page, palette)
+        for selector in GRAPH_SELECTS:
+            seen = page.evaluate(_SELECT_FIELD_JS, selector)
+            where = (palette, selector, seen)
+            assert seen["disabled"] is False, where
+            assert "Public Sans" in seen["font"] and seen["size"] == "13px", where
+            assert seen["radius"] == "0px" and seen["shadow"] == "none", where
+            assert seen["border"][:2] == ["1px", "solid"] and seen["border"][2] == seen["inputBorder"], where
+            assert seen["background"] == seen["inputBg"] and seen["color"] == seen["inputText"], where
+            assert 32 <= seen["height"] < 44, where
+    for selector in GRAPH_SELECTS:
+        page.locator(selector).scroll_into_view_if_needed()
+        page.keyboard.press("Tab")
+        page.locator(selector).focus()
+        focused = page.evaluate(_SELECT_FIELD_JS, selector)
+        assert focused["focusVisible"], (selector, focused)
+        assert focused["outline"][:2] == ["solid", "2px"] and focused["outline"][2] in focused["rings"], (selector, focused)
+
+    page.emulate_media(forced_colors="active")
+    page.wait_for_function("() => matchMedia('(forced-colors: active)').matches")
+    for selector in GRAPH_SELECTS:
+        forced = page.evaluate(_SELECT_FIELD_JS, selector)
+        assert forced["border"][:2] == ["1px", "solid"], (selector, forced)
+        assert forced["border"][2] != forced["background"], (selector, forced)
+
+    coarse = page.context.browser.new_context(viewport={"width": 390, "height": 844},
+                                              is_mobile=True, has_touch=True)
+    try:
+        phone = coarse.new_page()
+        _open_graph(phone, server_url)
+        assert phone.evaluate("matchMedia('(pointer: coarse)').matches")
+        _reveal_depth_select(phone)
+        for selector in GRAPH_SELECTS[:2]:
+            assert phone.evaluate(_SELECT_FIELD_JS, selector)["height"] >= 44, selector
+    finally:
+        coarse.close()
+
+
+_PANE_TABS_JS = """() => {
+  const accent = (() => { const p = document.createElement('span');
+    p.style.color = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+    document.body.appendChild(p); const c = getComputedStyle(p).color; p.remove(); return c; })();
+  return {accent, tabs: [...document.querySelectorAll('.okf-graph-mobile-nav button')]
+    .filter(b => b.getClientRects().length).map(b => { const cs = getComputedStyle(b);
+      return {name: b.textContent.trim(), pressed: b.getAttribute('aria-pressed'), font: cs.fontFamily,
+        weight: cs.fontWeight, background: cs.backgroundColor, radius: cs.borderTopLeftRadius,
+        bottom: [cs.borderBottomWidth, cs.borderBottomColor], height: b.getBoundingClientRect().height}; })};
+}"""
+
+
+@pytest.mark.parametrize("width,height", [(768, 1024), (844, 390), (390, 844)])
+def test_graph_pane_tabs_are_ledger_tabs_wherever_they_show(server_url: str, page, width, height) -> None:
+    """graph.js shows the Graph/Concepts/Details pane tabs up to 900px, so
+    tablet portrait and phone landscape get the same Ledger tabs as phones:
+    no browser-default fill, Public Sans, and exactly one pressed tab marked by
+    bold ink over a 2px accent underline, following the visible pane."""
+    page.set_viewport_size({"width": width, "height": height})
+    page.add_init_script("try { localStorage.setItem('okfGraphTourDone', '1'); } catch (e) {}")
+    page.goto(f"{server_url}/__graph", wait_until="domcontentloaded")
+    page.wait_for_function("() => window.__okfLoomGraph?.layoutStats?.lastAppliedSeq >= 1")
+    panes = page.get_by_role("navigation", name="Graph panes")
+    expect(panes).to_be_visible()
+    for name, pane in (("Details", "details"), ("Graph", "graph"), ("Concepts", "concepts")):
+        panes.get_by_role("button", name=name, exact=True).click()
+        expect(page.locator(".okf-layout")).to_have_attribute("data-mobile-pane", pane)
+        seen = page.evaluate(_PANE_TABS_JS)
+        tabs = seen["tabs"]
+        assert [t["name"] for t in tabs] == ["Graph", "Concepts", "Details"], seen
+        assert [t["name"] for t in tabs if t["pressed"] == "true"] == [name], seen
+        for tab in tabs:
+            assert "Public Sans" in tab["font"] and tab["radius"] == "0px", seen
+            assert tab["background"] in ("rgba(0, 0, 0, 0)", "transparent"), seen
+            assert tab["height"] >= 44, seen
+            if tab["pressed"] == "true":
+                assert tab["bottom"] == ["2px", seen["accent"]] and tab["weight"] == "700", seen
+            else:
+                assert tab["bottom"][0] == "1px" and tab["bottom"][1] != seen["accent"], seen
+
+
 _SELECTED_LENS_PREVIEW_JS = """() => {
   const cv = document.createElement('canvas'); cv.width = cv.height = 1;
   const cx = cv.getContext('2d', {willReadFrequently: true});

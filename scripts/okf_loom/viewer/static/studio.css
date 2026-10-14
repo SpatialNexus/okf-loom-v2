@@ -2123,8 +2123,9 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
   .okf-presence { max-width: 100%; }
   /* Split is not a simultaneous surface below 900px. Before JS normalizes a
    * split deep-link to Rendered, CSS fails safe to one pane (never a stacked
-   * two-pane document). Existing Rendered/Source controls remain the switch. */
-  .okf-viewswitch__btn[data-mode="split"] { display: inline-flex; }
+   * two-pane document). Existing Rendered/Source controls remain the switch.
+   * The Split tab keeps its siblings' box: a flex display here would pin its
+   * label to the top of the 44px coarse target, above the other tabs. */
   .okf-view[data-okf-view="split"] { display: block; }
   .okf-view[data-okf-view="split"] > .okf-source { display: none; }
   .okf-view[data-okf-view="split"] > .okf-page__body,

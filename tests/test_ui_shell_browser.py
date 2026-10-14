@@ -244,9 +244,181 @@ def test_live_first_paint_stays_stable_after_studio_boot(server_url, route, widt
                                 '[data-okf-outline-jump-placeholder]').count() == 0
             if route != "/":
                 assert page.locator('.okf-concept-viewbar [data-okf-outline-jump]').count() == 1
+                # View tabs on one row share one label line: no tab (Split was
+                # inline-flex below 900px) pins its label to the top of the
+                # 44px coarse target while its neighbours centre theirs.
+                tabs = page.evaluate("""() => [...document.querySelectorAll('.okf-concept-viewbar .okf-viewswitch__btn')]
+                  .filter(b => b.getClientRects().length).map(b => {
+                    const box = b.getBoundingClientRect(), text = document.createRange();
+                    text.selectNodeContents(b);
+                    return {label: b.textContent.trim(), top: box.top, height: box.height,
+                            textTop: text.getBoundingClientRect().top};
+                  })""")
+                assert {"Rendered", "Source", "Split"} <= {tab["label"] for tab in tabs}, tabs
+                rows: dict[int, list] = {}
+                for tab in tabs:
+                    rows.setdefault(round(tab["top"]), []).append(tab)
+                for row in rows.values():
+                    offsets = [tab["textTop"] - tab["top"] for tab in row]
+                    assert max(offsets) - min(offsets) <= 0.5, tabs
+                    assert len({round(tab["height"], 1) for tab in row}) == 1, tabs
+                if coarse:
+                    assert all(tab["height"] >= 43.5 for tab in tabs), tabs
             expect(page.locator('.okf-studio-launcher')).to_be_visible()
             assert page.evaluate("matchMedia('(pointer: coarse)').matches") is coarse
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
+        finally:
+            context.close()
+            browser.close()
+
+
+_BOOT_NOTICE_STATE = """() => {
+  const bar = document.querySelector('.okf-topbar.okf-shell');
+  const notice = [...document.querySelectorAll('.okf-live-studio-fallback')]
+    .find(n => n.getClientRects().length && getComputedStyle(n).display !== 'none');
+  const box = notice ? notice.getBoundingClientRect() : null;
+  const controls = [...bar.querySelectorAll('a, button, input, select, summary')].filter(e => {
+    const r = e.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== 'hidden';
+  });
+  // Every visible top-bar control is the topmost element at its own centre.
+  const covered = controls.filter(e => {
+    const r = e.getBoundingClientRect();
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return !hit || !(hit === e || e.contains(hit));
+  }).map(e => e.getAttribute('aria-label') || e.textContent.trim());
+  const hit = box && document.elementFromPoint(box.left + Math.min(40, box.width / 2), box.top + box.height / 2);
+  return {
+    barBottom: bar.getBoundingClientRect().bottom,
+    notice: box && {top: box.top, height: box.height, position: getComputedStyle(notice).position,
+                    topmost: !!(hit && notice.contains(hit)), text: notice.textContent.trim()},
+    controls: controls.length, covered,
+    reserved: [...document.querySelectorAll('[data-okf-viewbar-placeholder], [data-okf-page-feedback-placeholder], '
+      + '.okf-shell__studio-slot[hidden]')].filter(e => e.getClientRects().length).map(e => e.className),
+    status: document.documentElement.dataset.okfStudioStatus || null,
+    code: document.documentElement.dataset.okfStudioCode || null,
+    overflow: document.documentElement.scrollWidth > innerWidth + 1,
+  };
+}"""
+
+
+@pytest.mark.parametrize("route", ["/", "/tables/orders", "/__graph"])
+@pytest.mark.parametrize("width,coarse", [(1280, False), (390, True), (320, True)])
+def test_live_boot_notice_sits_below_the_top_bar_while_studio_loads(server_url, route, width, coarse):
+    """While Studio loads, the truthful notice is visible directly under the
+    top bar, out of flow: it covers no bar control (it once sat at y=0 over
+    the brand, search and destinations, and under the narrow graph bar), and
+    boot removes it without shifting the page."""
+    with sync_playwright() as playwright:
+        browser = launch_chromium(playwright)
+        context = browser.new_context(viewport={"width": width, "height": 900},
+                                      is_mobile=coarse, has_touch=coarse)
+        try:
+            context.add_init_script(_FIRST_PAINT_CLS)
+            context.add_init_script("try { localStorage.setItem('okfGraphTourDone', '1'); } catch (e) {}")
+            page = context.new_page()
+            held = []
+            page.route("**/__static/studio.js", lambda request: held.append(request))
+            page.goto(server_url + route, wait_until="commit")
+            page.wait_for_function("""() => performance.getEntriesByType('paint').some(e => e.name === 'first-contentful-paint')
+              && [...document.querySelectorAll('.okf-live-studio-fallback')].some(n => n.getClientRects().length)""")
+            page.wait_for_timeout(300)
+            loading = page.evaluate(_BOOT_NOTICE_STATE)
+            assert loading["status"] is None and loading["notice"], loading
+            assert loading["notice"]["position"] == "absolute" and loading["notice"]["topmost"], loading
+            assert abs(loading["notice"]["top"] - loading["barBottom"]) <= 1, loading
+            assert loading["controls"] and loading["covered"] == [], loading
+            assert held
+            held[0].continue_()
+            page.wait_for_function("() => window.okfStudioReadiness?.ready && window.okfLoomStudio.state.commentsReady")
+            page.evaluate("() => document.fonts.ready")
+            page.wait_for_timeout(600)
+            ready = page.evaluate(_BOOT_NOTICE_STATE)
+            assert ready["notice"] is None and ready["covered"] == [] and not ready["overflow"], ready
+            if not (route == "/__graph" and width <= 640):
+                # The narrow graph route's own chrome still moves after first
+                # paint (pre-existing, owned by graph.js); the notice adds none.
+                result = page.evaluate("window.__okfPaintCLS()")
+                assert result["cls"] < 0.02, result
+        finally:
+            context.close()
+            browser.close()
+
+
+@pytest.mark.parametrize("route", ["/", "/tables/orders", "/__graph"])
+@pytest.mark.parametrize("width,coarse", [(1280, False), (390, True), (320, True)])
+def test_blocked_studio_shows_the_failure_below_the_bar_and_collapses_reserved_slots(
+    server_url, route, width, coarse,
+):
+    """A Studio module that never runs is a terminal failure: theme.js marks it
+    (blocked-script), the notice joins the flow directly below the bar, so it
+    covers neither bar controls nor content, and the launcher, viewbar and
+    feedback slots it will never fill collapse instead of staying blank."""
+    with sync_playwright() as playwright:
+        browser = launch_chromium(playwright)
+        context = browser.new_context(viewport={"width": width, "height": 900},
+                                      is_mobile=coarse, has_touch=coarse)
+        try:
+            context.add_init_script("try { localStorage.setItem('okfGraphTourDone', '1'); } catch (e) {}")
+            page = context.new_page()
+            page.route("**/__static/studio.js", lambda request: request.abort())
+            page.goto(server_url + route, wait_until="load")
+            page.wait_for_function("() => document.documentElement.dataset.okfStudioStatus === 'failed'")
+            page.wait_for_timeout(300)
+            failed = page.evaluate(_BOOT_NOTICE_STATE)
+            assert failed["code"] == "blocked-script", failed
+            assert failed["notice"] and failed["notice"]["text"].startswith("Live Studio is unavailable."), failed
+            assert failed["notice"]["position"] == "static" and failed["notice"]["topmost"], failed
+            assert abs(failed["notice"]["top"] - failed["barBottom"]) <= 1, failed
+            assert failed["controls"] and failed["covered"] == [], failed
+            assert failed["reserved"] == [] and not failed["overflow"], failed
+            readiness = page.evaluate("() => window.okfStudioReadiness")
+            assert readiness["status"] == "failed" and readiness["ready"] is False, readiness
+        finally:
+            context.close()
+            browser.close()
+
+
+@pytest.fixture(scope="module")
+def read_only_server_url(tmp_path_factory) -> str:
+    bundle = copy_bundle(DEMO_BUNDLE, tmp_path_factory.mktemp("shell-read-only") / "bundle")
+    with live_server(bundle, "--no-edit") as base:
+        yield base
+
+
+@pytest.mark.parametrize("width,coarse", [(1280, False), (390, False), (320, False), (390, True), (320, True)])
+def test_read_only_index_feedback_slot_reserves_the_read_only_layout(read_only_server_url, width, coarse):
+    """A session that cannot comment mounts View comments plus a read-only
+    note, not the Comment button. The reserved slot takes that layout before
+    first paint, so boot does not shift the index (it was 32px -> 78px)."""
+    with sync_playwright() as playwright:
+        browser = launch_chromium(playwright)
+        context = browser.new_context(viewport={"width": width, "height": 900},
+                                      is_mobile=coarse, has_touch=coarse)
+        try:
+            context.add_init_script(_FIRST_PAINT_CLS)
+            page = context.new_page()
+            held = []
+            page.route("**/__static/studio.js", lambda request: held.append(request))
+            page.goto(read_only_server_url + "/", wait_until="commit")
+            page.wait_for_function("""() => document.querySelector('[data-okf-page-feedback-placeholder]') &&
+              performance.getEntriesByType('paint').some(entry => entry.name === 'first-contentful-paint')""")
+            assert page.evaluate("document.documentElement.dataset.okfStudioComment") == "0"
+            reserved = page.locator("[data-okf-page-feedback-placeholder]").bounding_box()
+            held[0].continue_()
+            page.wait_for_function("""() => window.okfStudioReadiness?.ready &&
+              window.okfLoomStudio.state.commentsReady && !document.querySelector('[data-okf-page-feedback-placeholder]')""")
+            page.evaluate("() => document.fonts.ready")
+            page.wait_for_timeout(600)
+            group = page.get_by_role("group", name="Page feedback")
+            expect(group.get_by_role("button", name="View comments")).to_be_visible()
+            expect(group.get_by_role("button", name="Comment on this page")).to_have_count(0)
+            expect(group.locator(".okf-page-feedback__note")).to_have_text(
+                "This session is read-only: comments can be read here but not added.")
+            mounted = group.bounding_box()
+            assert abs(mounted["height"] - reserved["height"]) <= 1 and abs(mounted["y"] - reserved["y"]) <= 1, (reserved, mounted)
+            result = page.evaluate("window.__okfPaintCLS()")
+            assert result["cls"] < 0.02, result
         finally:
             context.close()
             browser.close()

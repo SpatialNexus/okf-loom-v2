@@ -273,7 +273,15 @@
      pane tabs, then secondary utilities. Search/filter/reset remain available
      behind More graph tools instead of consuming the graph's initial viewport. */place(topbar,paneNav,mobileSecondary);placeAfter(graphToolsHome,graphTools);mobileSecondary.hidden=true;place(mobileSecondaryRow,mobileSecondaryToggle,null);place(topbar.querySelector('.okf-topbar__brand'),mobileModeIndicator,null);}else{placeAfter(paneNavHome,paneNav);placeAfter(graphToolsHome,graphTools);if(mobileModeIndicator&&mobileModeHome)placeAfter(mobileModeHome,mobileModeIndicator);}/* Reparenting an active control can make browsers drop focus. Restore the
      same connected control without scrolling; idempotent syncs do no focus work. */if(moved&&focused&&focused!==document.body&&focused.isConnected&&document.activeElement!==focused&&typeof focused.focus==="function"){try{focused.focus({preventScroll:true});}catch(e){focused.focus();}}}
-    function syncEffectiveViewport(){var viewport=window.visualViewport,width=viewport?viewport.width:window.innerWidth,narrow=width<=640;document.body.style.setProperty("--okf-effective-vw",Math.max(1,width)+"px");document.body.style.setProperty("--okf-effective-left",Math.max(0,viewport?viewport.offsetLeft:0)+"px");document.body.toggleAttribute("data-okf-narrow-reflow",narrow);syncCriticalMobileChrome(narrow);if(!narrow&&paneNav&&paneNavHome&&paneNavHome.parentNode)paneNavHome.parentNode.insertBefore(paneNav,paneNavHome.nextSibling);}
+    /* The narrow chrome follows the visual viewport (pinch zoom keeps it on
+     screen) but never exceeds the initial containing block. When a mobile
+     viewport shrinks in place (390 -> 320, or a rotation), the previous px
+     width briefly overflows; mobile browsers then zoom out to fit it, and
+     visualViewport.width reports the stale wider value back. Clamping to
+     documentElement.clientWidth, which content overflow cannot widen, breaks
+     that loop so the page returns to scale 1 at the new width. */
+    function readLiveViewportWidth(){var viewport=window.visualViewport,root=document.documentElement,width=viewport?viewport.width:window.innerWidth,layout=root?root.clientWidth:0;return layout>0?Math.min(width,layout):width;}
+    function syncEffectiveViewport(){var viewport=window.visualViewport,width=readLiveViewportWidth(),narrow=width<=640;document.body.style.setProperty("--okf-effective-vw",Math.max(1,width)+"px");document.body.style.setProperty("--okf-effective-left",Math.max(0,viewport?viewport.offsetLeft:0)+"px");document.body.toggleAttribute("data-okf-narrow-reflow",narrow);syncCriticalMobileChrome(narrow);if(!narrow&&paneNav&&paneNavHome&&paneNavHome.parentNode)paneNavHome.parentNode.insertBefore(paneNav,paneNavHome.nextSibling);}
   syncEffectiveViewport();window.addEventListener("resize",syncEffectiveViewport);window.addEventListener("load",syncEffectiveViewport);window.addEventListener("pageshow",function(event){if(event.persisted)syncEffectiveViewport();});setTimeout(syncEffectiveViewport,0);setTimeout(syncEffectiveViewport,120);setTimeout(syncEffectiveViewport,500);if(window.visualViewport){window.visualViewport.addEventListener("resize",syncEffectiveViewport);window.visualViewport.addEventListener("scroll",syncEffectiveViewport);}
   var DATA_URL = (graphEl && graphEl.getAttribute("data-graph-url")) || window.OKF_LOOM_GRAPH_DATA_URL || null;
   var CONCEPT_PREFIX = (graphEl && graphEl.getAttribute("data-concept-prefix")) || window.OKF_CONCEPT_PAGE_PREFIX || "/";
@@ -288,7 +296,7 @@
   var mobileModeIndicator=null,mobileModeHome=null;
   if(mobileSecondaryRow){var brand=document.querySelector(".okf-topbar__brand"),studioSummarizesLive=MODE==="serve"&&document.querySelector('[data-okf-studio-capability="available"]');mobileModeIndicator=MODE==="serve"?liveStatus:null;if(!mobileModeIndicator&&!studioSummarizesLive){mobileModeIndicator=document.createElement("span");mobileModeIndicator.setAttribute("role","status");}if(mobileModeIndicator){mobileModeIndicator.tabIndex=0;mobileModeIndicator.textContent=IS_SINGLE?"Local":(MODE==="static"?"Static":"Live");mobileModeIndicator.classList.add("okf-mobile-mode");if(brand){brand.appendChild(mobileModeIndicator);mobileModeHome=document.createComment("okf mode home");brand.insertBefore(mobileModeHome,mobileModeIndicator);}}syncEffectiveViewport();}
     var graphLayout = document.querySelector(".okf-layout");
-    function isCompactGraphViewport(){var viewport=window.visualViewport;return (viewport?viewport.width:window.innerWidth)<=900;}
+    function isCompactGraphViewport(){return readLiveViewportWidth()<=900;}
   function setMobilePane(name, focusPane) {
     if (!graphLayout || ["graph", "concepts", "details"].indexOf(name) < 0) return;
     // Pane-local scrollports own traversal; retired list scroll must not move
@@ -3114,7 +3122,7 @@
       });
     }
 
-    function readMobileGraphViewport(){var viewport=window.visualViewport;return (viewport?viewport.width:window.innerWidth)<=900;}
+    function readMobileGraphViewport(){return readLiveViewportWidth()<=900;}
     function isMobileGraphViewport(){return initialMobileViewport!==null?initialMobileViewport:readMobileGraphViewport();}
     var mobileLabelWidth=90;
     function compactMobileSmallGraph(){
