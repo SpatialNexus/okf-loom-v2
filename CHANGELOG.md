@@ -37,9 +37,22 @@ follow [Semantic Versioning](https://semver.org/). The product version
   page stayed zoomed out until reload.
 - The Split view tab now lines up with Rendered and Source on touch screens.
   It sat about 4px higher.
-- The Graph settings Depth and Group by selects now use the Ledger field
-  style (square 1px outline, palette colours, focus ring, 44px touch target,
-  forced-colours outline) instead of the browser default.
+- The graph's selects (Graph settings Depth and Group by, and the focus bar's
+  neighbourhood depth) now use the Ledger field style: square 1px outline,
+  palette colours, Public Sans, focus ring, 44px touch target and a
+  forced-colours outline. Before, they used the browser default.
+- The "Live Studio is unavailable" boot notice now sits just below the top
+  bar while Studio loads. Before, it covered the brand, search and
+  destinations (or, on narrow graph pages, was hidden under the bar).
+- If Studio cannot load at all (for example, a blocked script), the page now
+  reports the failure. The notice then sits in the page below the bar, and the
+  empty Studio launcher, view bar and feedback slots are removed.
+- Read-only and public read-only sessions reserve the read-only page-feedback
+  layout (View comments plus its note), so the index no longer shifts when
+  Studio loads.
+- On tablets and in phone landscape (641–900px wide), the graph pane tabs
+  are now Ledger tabs with a visible current pane. Before, they were
+  unstyled browser buttons.
 - On narrow screens, the single-file Index no longer shows the
   Graph/Concepts/Details pane tabs, which controlled the hidden graph. They
   appear with the graph, and the pressed tab matches the visible pane.

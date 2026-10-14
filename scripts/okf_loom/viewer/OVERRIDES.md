@@ -47,8 +47,13 @@ feedback placeholders. Their final responsive size is reserved before first
 paint only when the parser-blocking theme runtime has marked JavaScript
 available; portable and no-JS targets reserve no Studio space. Studio fills
 those slots in place, while `document-outline.js` owns the Sections control.
-The live loading/failure notice remains visible until a successful boot but
-sits outside document flow, so settling boot does not displace authored content.
+The index feedback placeholder carries both the comment and the read-only
+layout; the theme runtime marks the session's comment capability from the
+Studio bootstrap so the matching one is reserved. The live loading notice stays
+visible until a successful boot, outside document flow and anchored below the
+top bar, so settling boot does not displace authored content. If Studio cannot
+boot, including when its module never runs, the notice joins the flow below the
+bar and the unfilled placeholders collapse.
 Custom templates without the placeholders keep the legacy client mount path.
 
 ## 2. Static asset overrides
