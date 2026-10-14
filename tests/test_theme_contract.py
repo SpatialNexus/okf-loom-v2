@@ -62,7 +62,11 @@ def test_first_paint_and_non_executable_config():
     for name in ("concept_page", "index_page", "search_page", "graph_page", "single_file"):
         text = (templates / f"{name}.html").read_text()
         assert text.rindex("__THEME_CONFIG__") < text.rindex("__THEME_HEAD_JS__") < text.index("</head>")
-        assert 'font-src' in text and 'data:' in text.split('font-src', 1)[1].split(';', 1)[0]
+        font_src = text.split('font-src', 1)[1].split(';', 1)[0].split()
+        expected = ["'self'", "https://cdn.jsdelivr.net"]
+        if name == "single_file":
+            expected.insert(1, "data:")
+        assert font_src == expected
 
 
 def test_one_native_radio_group_five_options():

@@ -569,6 +569,29 @@ def test_ledger_fonts_without_network(tmp_path, target, assets):
             session.guard.assert_offline()
 
 
+@pytest.mark.parametrize("assets", ["cdn", "offline"])
+def test_file_static_ledger_fonts_without_console_errors(tmp_path, assets):
+    # Plain content isolates Ledger delivery from CDN-only rich renderers and
+    # the graph page's documented file:// fetch limitation.
+    root = write_offline_fixture(tmp_path / "bundle", rich=False)
+    (root / "nested").mkdir()
+    (root / "nested" / "note.md").write_text(
+        "---\ntype: Note\ntitle: Nested note\n---\n\n# Nested note\n\nLedger font proof.\n",
+        encoding="utf-8")
+    out = tmp_path / "static"
+    build_site(Bundle.load(root), out, target="static", assets=assets)
+    with ExitStack() as stack:
+        session = _session(stack, None)
+        console_errors = []
+        session.page.on("console", lambda message: console_errors.append(message.text)
+                        if message.type == "error" else None)
+        for path in ("index.html", "nested/note.html"):
+            session.goto((out / path).as_uri())
+            _assert_ledger_fonts(session.page)
+            _assert_clean(session)
+            assert console_errors == [], (path, console_errors)
+
+
 def test_served_ledger_fonts_without_network(tmp_path):
     bundle = write_offline_fixture(tmp_path / "bundle")
     port = free_port()
@@ -579,6 +602,12 @@ def test_served_ledger_fonts_without_network(tmp_path):
             base, tmp_path / "serve.log"))
         session = _session(stack, base)
         session.goto(base + "/other")
+        expect(session.page.locator('link[rel="preload"][as="font"][type="font/woff2"][crossorigin]')).to_have_count(2)
+        assert session.page.evaluate("""() => {
+            const preload = document.querySelector('link[rel="preload"][as="font"]');
+            const stylesheet = document.querySelector('link[rel="stylesheet"]');
+            return !!(preload.compareDocumentPosition(stylesheet) & Node.DOCUMENT_POSITION_FOLLOWING);
+        }""")
         for _family, _style, path in vendor.LEDGER_FACES:
             response = session.page.request.get(base + "/__static/" + path)
             assert response.status == 200

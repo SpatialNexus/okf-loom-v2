@@ -2310,10 +2310,14 @@ def test_320_selecting_no_horizontal_overflow(server_url, page):
     assert geom["contextRight"] <= 320, f"context bar overflow at 320: {geom}"
 
 
-def test_stale_recovery_action_is_prominent(server_url, page):
-    """P1-4: the collapsed stale anchor's Re-anchor action carries primary
-    weight (the key recovery path), while a resolved anchor's Jump stays
-    quiet."""
+@pytest.mark.parametrize("has_touch", [False, True])
+def test_broken_anchor_recovery_is_outlined_with_one_drawer_primary(server_url, page, has_touch):
+    """Ledger C3: multiple broken anchors leave the one filled action to Send.
+    Recovery keeps its accessible name, keyboard activation and touch target.
+    """
+    context = page.context.browser.new_context(
+        viewport={"width": 1280, "height": 900}, has_touch=has_touch)
+    page = context.new_page()
     _boot(page, server_url)
     page.evaluate("window.okfLoomLive && window.okfLoomLive._disconnectForTest()")
     page.evaluate("""() => {
@@ -2325,12 +2329,44 @@ def test_stale_recovery_action_is_prominent(server_url, page):
          anchor:{schema:2,kind:'text-quote',exact:'target text',prefix:'',suffix:'',heading:{path:[]},block:{id:'paragraph:1',hash:'sha256:'+'a'.repeat(64),start:0,end:11},position:{start:0,end:11}},
          anchor_resolution:{status:'resolved',reason:'original_position',concept_content_rev:'a'.repeat(64),resolver_version:2,position:{start:0,end:11},block:{id:'paragraph:1',hash:'sha256:'+'a'.repeat(64),start:0,end:11},changes:[]}}
       ];
+      const stale = window.okfLoomStudio.state.comments[0];
+      window.okfLoomStudio.state.comments.splice(1, 0, {
+        ...stale, id: '01JAMBIG001', body: 'ambiguous one', row_token: 'r2:a',
+        anchor_resolution: {...stale.anchor_resolution, status: 'ambiguous', reason: 'multiple_matches'}
+      });
       window.okfLoomStudio.openPanel('comments');
     }""")
-    stale_cls = page.locator("#comment-01JSTALE001 .okf-anchor-row__action").get_attribute("class")
-    resolved_cls = page.locator("#comment-01JRESOLVED1 .okf-anchor-row__action").get_attribute("class")
-    assert stale_cls and "okf-anchor-row__action--primary" in stale_cls, f"stale Re-anchor not prominent: {stale_cls}"
-    assert resolved_cls and "okf-anchor-row__action--primary" not in resolved_cls, f"resolved Jump should stay quiet: {resolved_cls}"
+    drawer = page.locator(".okf-panel")
+    recovery = drawer.locator('.okf-anchor-row[data-anchor-status="stale"] button, '
+                              '.okf-anchor-row[data-anchor-status="ambiguous"] button')
+    expect(recovery).to_have_count(2)
+    assert recovery.evaluate_all("""buttons => buttons.every(button => {
+        const style = getComputedStyle(button);
+        return button.classList.contains('okf-btn') && !button.classList.contains('okf-btn--primary')
+            && style.borderStyle === 'solid' && parseFloat(style.borderWidth) >= 1
+            && style.backgroundColor === 'rgba(0, 0, 0, 0)';
+    })""")
+    drawer.locator(".okf-composer__textarea").fill("A pending page comment")
+    send = drawer.get_by_role("button", name="Send", exact=True)
+    expect(send).to_be_visible()
+    expect(send).to_be_enabled()
+    send_background = send.evaluate("button => getComputedStyle(button).backgroundColor")
+    assert send_background != "rgba(0, 0, 0, 0)", "Send must own a filled primary"
+    filled = drawer.locator("button:visible").evaluate_all("""(buttons, primary) =>
+        buttons.filter(button => getComputedStyle(button).backgroundColor === primary).length
+    """, send_background)
+    assert filled == 1, f"drawer has {filled} filled primary actions for two broken anchors"
+    if has_touch:
+        assert page.evaluate("matchMedia('(pointer: coarse)').matches")
+        assert recovery.evaluate_all("buttons => buttons.every(button => button.getBoundingClientRect().height >= 44)")
+    jump = page.locator("#comment-01JRESOLVED1 .okf-anchor-row__action")
+    assert "okf-btn" not in jump.get_attribute("class"), "resolved Jump should stay quiet"
+    reanchor = drawer.get_by_role("button", name="Re-anchor", exact=True)
+    expect(reanchor).to_be_visible()
+    reanchor.focus()
+    reanchor.press("Enter")
+    expect(page.locator("#comment-01JSTALE001 .okf-reanchor__instruction")).to_be_focused()
+    context.close()
 
 
 def test_anchor_health_row_distinct_from_thread_lifecycle(server_url, page):

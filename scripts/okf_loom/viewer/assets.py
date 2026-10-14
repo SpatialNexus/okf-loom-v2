@@ -356,8 +356,7 @@ def type_icon_svg(type_name: str | None, *, size: int = 16,
 # by test_curated_colours_are_well_separated) so adjacent legend swatches
 # read as distinct colours at ~55% saturation; the icon disambiguates any
 # remaining closeness. Saturation/lightness are tuned per hue for visual
-# weight balance and so :func:`render._chip_fg` (luminance-aware black/white)
-# always yields AA contrast on a chip background.
+# weight balance.
 #
 # Exactly 8 curated categories (a curated 8-colour palette + icon set).
 # Types whose icon key is NOT in this map fall through

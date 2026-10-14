@@ -1120,20 +1120,6 @@ body.okf-focus-view .okf-concept-viewbar {
 }
 .okf-reanchor__context-label { flex: 0 0 auto; font-family: var(--font-label); font-size: var(--label-size, 9.5px); text-transform: uppercase; letter-spacing: var(--label-track, 0.16em); font-weight: var(--label-weight, 500); }
 .okf-reanchor__context-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--okf-fg); font-weight: 600; }
-/* P1-4: the collapsed stale/ambiguous recovery action ("Re-anchor" /
- * "Choose text") is the key path off a broken anchor, so it carries primary
- * weight rather than reading as a quiet tertiary chip. */
-.okf-anchor-row__action--primary {
-  background: var(--primary-bg);
-  color: var(--primary-text);
-  border-color: var(--primary-border);
-  font-weight: 600;
-}
-.okf-anchor-row__action--primary:hover {
-  background: var(--primary-hover-bg);
-  border-color: var(--primary-hover-bg);
-  color: var(--primary-text);
-}
 /* P1-3: narrow "Back to document" path. When the drawer covers the page
  * (mobile/full-width overlay) and the user is selecting a new anchor, a
  * "Select in document" action collapses the drawer into a slim floating
@@ -2210,7 +2196,7 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
     color: LinkText; border-color: LinkText;
   }
   /* P1-6 (forced-colors rereview): primary ACTIONS (Retry save / Refresh and
-   * reselect / Save anchor / prominent Re-anchor) must NOT be Highlight-filled.
+   * reselect / Save anchor) must NOT be Highlight-filled.
    * A Highlight fill (a) collides with the single Highlight focus outline — the
    * ring is the SAME color as the button background so the focused button looks
    * like an unlabelled block and (b) makes the action read as permanently
@@ -2219,8 +2205,7 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
    * then the sole, clearly-visible focus indicator against the non-Highlight
    * button, and the ButtonText label is unambiguously readable on ButtonFace.
    * Verified by assert: outlineColor != backgroundColor, color != background. */
-  .okf-studiobtn--primary,
-  .okf-anchor-row__action--primary {
+  .okf-studiobtn--primary {
     background: ButtonFace !important; color: ButtonText !important;
     border: 2px solid ButtonText !important;
   }

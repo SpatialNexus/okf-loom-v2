@@ -436,6 +436,8 @@ def test_server_response_security_headers(tmp_path: Path) -> None:
         httpd.server_close()
 
     assert "Content-Security-Policy" in headers
+    font_src = headers["Content-Security-Policy"].split("font-src ", 1)[1].split(";", 1)[0]
+    assert font_src == "'self' https://cdn.jsdelivr.net"
     assert "nosniff" in headers.get("X-Content-Type-Options", "").lower()
     assert "deny" in headers.get("X-Frame-Options", "").lower()
     assert "no-referrer" in headers.get("Referrer-Policy", "").lower()

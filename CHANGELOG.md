@@ -10,8 +10,6 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
-- Reduce Ledger first-paint CSS cost with preloaded self-hosted font files on serve/static/SPA; retain embedded single-file fonts, offline integrity and benchmark inputs.
-
 - Split view now clears the "Loading source…" notice whenever the source pane
   is populated, including by a concurrent document or live-update load. A
   redundant request no longer leaves a loading or failure notice above source
@@ -35,8 +33,13 @@ follow [Semantic Versioning](https://semver.org/). The product version
   system. The page maximum is 1280px, reading column 760px, prose 55ch even in
   full-width Focus. Contrast, border and density modifiers are removed.
 - Public Sans and Azeret Mono normal/italic faces are self-hosted on every
-  output, with verified hashes and full SIL OFL notices. No font network access
-  is needed, even for default CDN builds and single-file output.
+  output, with verified hashes and full SIL OFL notices. Live/static/SPA pages
+  use relative WOFF2 files; static/SPA builds (including CDN mode) emit
+  `__static/ledger-public-sans/` and `__static/ledger-azeret-mono/` with the faces
+  and OFL `LICENSE` files. Publish both directories with the site. Single-file
+  output alone embeds the faces as base64 data URLs. All use `font-display: swap`
+  (text may paint in a fallback face first); only serve/SPA preload the upright
+  faces. No external font network access is needed on any target.
 
 ### Appearance migration
 
