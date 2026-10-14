@@ -848,6 +848,9 @@
     }
 
     function init(bundle) {
+      // Viewport reads can flush layout after chrome writes. The viewport
+      // cannot resize during this synchronous init task; later fits read live.
+      var initialMobileViewport = readMobileGraphViewport();
       if (graphMountGeneration++) teardownGraphLifecycle("graph-remount", { invalidateProvider: true });
       graphBundleRevision = String(bundle.bundle_revision || bundle.revision || "");
       singleSourceRevisions =
@@ -1994,12 +1997,36 @@
         // above (path, search, bridge, orphan, presence).
         { selector: "node:selected", style: { "border-width": 4, "border-style": "solid", "border-color": INITIAL_GRAPH_PALETTE.select } },
       ],
-      // Seed with a cheap grid; the real tuned layout runs once via
-      // runLayoutNow() AFTER the panel exists, so its overlay-aware fit can
-      // measure the panel footprint and its layoutstop re-fits a settled graph
-      // (fixes the init over-zoom + off-centre cluster).
-      layout: layoutOpts("grid", { animate: false, fit: false }),
+      // The deterministic circle/sparse/mobile seed below replaces ALL node
+      // positions before runLayoutNow(). Do not compute a discarded grid (and
+      // its label-aware bounding boxes) during element creation. The tuned
+      // layout still runs once after the chrome exists, through its sole owner.
+      layout: { name: "preset", animate: false, fit: false },
     });
+    // Canvas metrics/label textures are keyed by the font-family string, not
+    // by FontFace load state. A style().update() with the same string therefore
+    // keeps fallback measurements AND textures. Re-key through the supported
+    // stylesheet API once after late Ledger faces settle: a repeated generic
+    // fallback is typographically identical, but invalidates both cache layers.
+    // Never await fonts on the first-frame/layout path or rerun the layout.
+    if (document.fonts) {
+      var lateSans = INITIAL_GRAPH_PALETTE.font.indexOf("Public Sans") >= 0 && !document.fonts.check('600 13px "Public Sans"');
+      var lateMono = INITIAL_GRAPH_PALETTE.mono.indexOf("Azeret Mono") >= 0 && !document.fonts.check('500 10px "Azeret Mono"');
+      var fontMountGeneration = graphMountGeneration;
+      if (lateSans || lateMono) document.fonts.ready.then(function () {
+        if (fontMountGeneration !== graphMountGeneration || cy.destroyed()) return;
+        var sansLoaded = lateSans && document.fonts.check('600 13px "Public Sans"');
+        var monoLoaded = lateMono && document.fonts.check('500 10px "Azeret Mono"');
+        if (!sansLoaded && !monoLoaded) return;
+        var pal = graphPalette(), style = cy.style();
+        if (sansLoaded) style.selector("node, edge").style("font-family", pal.font + ", sans-serif");
+        // This later selector preserves the distinct bundled-edge mono face
+        // even when the new base edge rule was appended after its original rule.
+        style.selector("edge.okf-multi-edge").style("font-family", pal.mono + (monoLoaded ? ", monospace" : ""));
+        style.update();
+        cy.forceRender();
+      });
+    }
     // Review feedback: clamp zoom. cy.fit on a small/collapsed cluster used to
     // over-zoom (font-size scales with zoom → giant labels). maxZoom caps both
     // user and programmatic zoom; overlayAwareFit() also respects it.
@@ -2064,6 +2091,8 @@
     }
     function syncLabelColour() {
       var pal = graphPalette();
+      // Commit the complete label palette once, not a whole-graph style pass
+      // for each selector. Stateful cues still follow these base rules.
       cy.style().selector("node").style({
         "color": pal.nodeText,
         "border-color": pal.nodeBorder,
@@ -2076,29 +2105,25 @@
         "text-outline-width": 2,
         "text-background-color": pal.edgeLabelBg,
         "text-background-opacity": pal.dark ? 0.85 : 0
-      }).update();
-      cy.style().selector("node:selected, node.okf-hover, node.okf-tour-target").style({
+      }).selector("node:selected, node.okf-hover, node.okf-tour-target").style({
         "color": pal.nodeText,
         "text-background-color": pal.edgeLabelBg,
         "text-background-opacity": 1
-      }).update();
-      cy.style().selector("node.okf-hover-dim, node.dim").style({
+      }).selector("node.okf-hover-dim, node.dim").style({
         "color": pal.nodeText,
         "text-background-color": pal.edgeLabelBg
-      }).update();
-      cy.style().selector("node.okf-tour-target").style({
+      }).selector("node.okf-tour-target").style({
         "border-color": pal.cue, "border-width": 5,
         "underlay-color": pal.raised, "underlay-opacity": 1, "underlay-padding": 10
-      }).update();
-      cy.style().selector("edge").style({
+      }).selector("edge").style({
         "line-color": pal.edge,
         "target-arrow-color": pal.edge,
         "text-background-color": pal.edgeLabelBg,
         "color": pal.edgeLabel
-      }).update();
+      })
       // Typed edges carry their (lens) colour in data(relColor); restore the
       // mapping a forced-colours pass replaced with a system colour.
-      cy.style().selector("edge.okf-rel-edge").style({ "line-color": "data(relColor)", "target-arrow-color": "data(relColor)" }).update();
+      .selector("edge.okf-rel-edge").style({ "line-color": "data(relColor)", "target-arrow-color": "data(relColor)" }).update();
       syncStatefulGraphColours(pal);
     }
       if(reducedMotionQuery){var syncGraphMotion=function(){try{cy.style().selector("node.okf-hover").style("transition-duration",REDUCED_MOTION?"0ms":"120ms").update();}catch(e){}};if(reducedMotionQuery.addEventListener)reducedMotionQuery.addEventListener("change",syncGraphMotion);else if(reducedMotionQuery.addListener)reducedMotionQuery.addListener(syncGraphMotion);}
@@ -2180,9 +2205,11 @@
       // A palette event invalidates the resolved token set; a forced-colours
       // media change keeps it (custom properties are not forced).
       if(event&&event.type==="okf-loom:themeChanged")invalidateGraphPalette();
-      syncBadgeDataUris();
-      repaintLensColours();
-      if(FORCED_COLORS)syncForcedColorGraph();else syncLabelColour();
+      cy.batch(function () {
+        syncBadgeDataUris();
+        repaintLensColours();
+        if(FORCED_COLORS)syncForcedColorGraph();else syncLabelColour();
+      });
       syncMinimap();
       }
       window.addEventListener("okf-loom:themeChanged",syncGraphTheme);
@@ -3087,7 +3114,8 @@
       });
     }
 
-    function isMobileGraphViewport(){var viewport=window.visualViewport;return (viewport?viewport.width:window.innerWidth)<=900;}
+    function readMobileGraphViewport(){var viewport=window.visualViewport;return (viewport?viewport.width:window.innerWidth)<=900;}
+    function isMobileGraphViewport(){return initialMobileViewport!==null?initialMobileViewport:readMobileGraphViewport();}
     var mobileLabelWidth=90;
     function compactMobileSmallGraph(){
       var nodes=cy.nodes().filter(function(n){return !n.hasClass("dim");});
@@ -4616,7 +4644,9 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
         // real layout so the layout only considers backbone edges (cleaner
         // initial positions — the hairball-free default).
         applyEdgeElision();
-        applyLens(controlState.lens);
+        // Lens data, filter/interaction classes and labels form one initial
+        // projection. Flush styles before any layout/bounding-box reads.
+        cy.batch(function () { applyLens(controlState.lens); });
       }
     var fitDebounced = debounce(function () { overlayAwareFit(); }, 160);
     if (window.addEventListener) window.addEventListener("resize", fitDebounced);
@@ -6112,7 +6142,11 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
         refreshGraph: typeof window.__okfRefreshGraph === "function" ? window.__okfRefreshGraph : null
       };
       window.okfGraphInteraction = graphInteractionController;
-      graphInteractionController.restore();
+      // The default Map projection above already represents an empty URL.
+      // Restore only admitted URL state, not a second Map restyle/clear pass.
+      // Popstate always uses the full restore owner, including an empty URL.
+      var initialInteraction = decodeInteractionUrl();
+      if (initialInteraction.lens !== "map" || initialInteraction.selected || initialInteraction.focus || initialInteraction.path || Object.keys(initialInteraction.hidden).length || Object.keys(initialInteraction.hiddenRelations).length) graphInteractionController.restore();
       // Stable, read-only capture adapter. The mutable Cytoscape core remains
       // diagnostic-only and is intentionally absent from this public shape.
       window.okfGraphCaptureState = function () {
@@ -6147,6 +6181,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
       }
         publishGraphCaptureReady(layoutSettled ? "ready" : "loading", true);
     } catch (e) {}
+    initialMobileViewport = null;
   }
 
   // ---- helpers ----------------------------------------------------------
