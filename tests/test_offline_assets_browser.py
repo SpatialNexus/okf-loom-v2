@@ -552,7 +552,7 @@ def _assert_ledger_fonts(page):
 
 @pytest.mark.parametrize("target,assets", [("static", "offline"), ("spa", "offline"),
                                            ("single-file", "offline"), ("static", "cdn"),
-                                           ("single-file", "cdn")])
+                                           ("spa", "cdn"), ("single-file", "cdn")])
 def test_ledger_fonts_without_network(tmp_path, target, assets):
     out = _build(tmp_path, target, assets)
     with ExitStack() as stack:
@@ -579,6 +579,15 @@ def test_served_ledger_fonts_without_network(tmp_path):
             base, tmp_path / "serve.log"))
         session = _session(stack, base)
         session.goto(base + "/other")
+        for _family, _style, path in vendor.LEDGER_FACES:
+            response = session.page.request.get(base + "/__static/" + path)
+            assert response.status == 200
+            assert response.headers["content-type"] == "font/woff2"
+            assert response.body() == vendor.read_vendor_bytes(path)
+        for path in (*vendor.LEDGER_LICENSES, vendor.LOCK_NAME,
+                     "ledger-public-sans/unknown.woff2",
+                     "ledger-public-sans/%2e%2e/vendor.lock.json"):
+            assert session.page.request.get(base + "/__static/" + path).status == 404
         _assert_ledger_fonts(session.page)
         session.assert_no_csp_violation()
         session.guard.assert_offline()

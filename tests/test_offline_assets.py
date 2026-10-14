@@ -571,14 +571,32 @@ def test_ledger_fonts_and_full_ofl_ship_on_every_target(tmp_path, target, assets
     build_site(bundle, out, target=target, assets=assets)
     text = ((out / "index.html") if target == "single-file" else
             (out / "__static" / "ledger-fonts.css")).read_text()
-    assert text.count('src:url(data:font/woff2;base64,') >= 4
+    if target == "single-file":
+        assert text.count('src:url(data:font/woff2;base64,') >= 4
+        assert not list(out.rglob("*.woff2"))
+        assert 'as="font"' not in text
+    else:
+        assert "data:font" not in text
+        assert len(text.encode()) < 10_000
+        for _family, _style, path in vendor.LEDGER_FACES:
+            assert f'src:url({path}) format("woff2")' in text
+            assert (out / "__static" / path).read_bytes() == vendor.read_vendor_bytes(path)
+        for path in vendor.LEDGER_LICENSES:
+            assert (out / "__static" / path).read_bytes() == vendor.read_vendor_bytes(path)
+        for page in out.rglob("*.html"):
+            html = page.read_text()
+            assert html.count('as="font" type="font/woff2" crossorigin') == 2, page
+            assert html.index('rel="preload"') < html.index('rel="stylesheet"')
     for family, style, _path in vendor.LEDGER_FACES:
         assert f'font-family:"{family}";font-style:{style};' in text
+    assert text.count('font-display:swap;') >= 4
     for path in vendor.LEDGER_LICENSES:
         assert (vendor.VENDOR_ROOT / path).read_text() in text
     lock = vendor.load_lock()
-    css = vendor.load_ledger_css().encode()
-    assert lock["derived"][vendor.LEDGER_DERIVED]["sha256"] == vendor.sha256_hex(css)
+    css = vendor.load_ledger_css(inline=True).encode()
+    pin = lock["derived"][vendor.LEDGER_DERIVED]
+    assert pin["sha256"] == vendor.sha256_hex(css)
+    assert pin["external"]["sha256"] == vendor.sha256_hex(vendor.load_ledger_css().encode())
 
 
 @pytest.mark.parametrize("path", [face[2] for face in vendor.LEDGER_FACES] + list(vendor.LEDGER_LICENSES))
@@ -589,10 +607,14 @@ def test_ledger_corruption_fails_closed_even_in_cdn_mode(vendor_copy, path):
         vendor.load_ledger_css(vendor_copy)
 
 
-def test_ledger_derived_hash_and_symlinks_are_verified(vendor_copy):
+@pytest.mark.parametrize("variant", ["inline", "external"])
+def test_ledger_derived_hash_and_symlinks_are_verified(vendor_copy, variant):
     lock_path = vendor_copy / vendor.LOCK_NAME
     lock = json.loads(lock_path.read_text())
-    lock["derived"][vendor.LEDGER_DERIVED]["sha256"] = "0" * 64
+    pin = lock["derived"][vendor.LEDGER_DERIVED]
+    if variant == "external":
+        pin = pin["external"]
+    pin["sha256"] = "0" * 64
     lock_path.write_text(json.dumps(lock))
     with pytest.raises(vendor.VendorIntegrityError, match="derived Ledger"):
         vendor.load_ledger_css(vendor_copy)

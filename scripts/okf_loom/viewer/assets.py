@@ -51,7 +51,7 @@ LEDGER_FONTS_ASSET = "ledger-fonts.css"
 
 
 def ledger_fonts_css() -> str:
-    """Verified self-contained faces and full licence texts for every target."""
+    """Verified relative font URLs and full licence texts for multi-file output."""
     from .vendor import load_ledger_css
     return load_ledger_css()
 

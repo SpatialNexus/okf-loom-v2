@@ -25,6 +25,11 @@
    "size": 367928
   },
   "ledger-fonts.css": {
+   "external": {
+    "sha256": "411281d2ece20eba8497c87fb740232145b66c358aebaf2822f121f74f92c886",
+    "size": 9481,
+    "transform": "okf_loom.viewer.vendor.derive_ledger_css(inline=False); relative WOFF2 URLs and complete OFL notices"
+   },
    "inputs": [
     "ledger-public-sans/LICENSE",
     "ledger-azeret-mono/LICENSE",
