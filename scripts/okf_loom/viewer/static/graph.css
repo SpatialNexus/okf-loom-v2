@@ -1726,7 +1726,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom { z-index: 40 !im
   .okf-graph-zoom button[data-tooltip]::after { display: none; }
 }
 @media (forced-colors: active) {
-  .okf-graph-zoom button[data-tooltip]::after { background: Canvas; color: CanvasText; }
+  .okf-graph-zoom button[data-tooltip]::after { border: 1px solid CanvasText; background: Canvas; color: CanvasText; }
 }
 @media (prefers-reduced-motion: reduce) {
   .okf-graph-zoom button[data-tooltip]::after { transition: none !important; }
