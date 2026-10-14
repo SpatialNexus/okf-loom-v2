@@ -146,6 +146,16 @@ html[data-okf-js="1"] body[data-okf-mode="serve"] > .okf-live-studio-fallback {
 @supports not (anchor-name: --okf-shell) {
   html[data-okf-js="1"] body[data-okf-mode="serve"] > .okf-live-studio-fallback { position: static; }
 }
+/* A failed boot is final: the notice joins the flow below the bar, so it
+ * covers no content, and the reserved Studio slots it will never fill
+ * collapse instead of leaving blank bands (one geometry change, at failure). */
+html[data-okf-js="1"][data-okf-studio-status="failed"] body[data-okf-mode="serve"] > .okf-live-studio-fallback {
+  position: static;
+}
+html[data-okf-js="1"][data-okf-studio-status="failed"] :is([data-okf-viewbar-placeholder], [data-okf-page-feedback-placeholder]),
+html[data-okf-js="1"][data-okf-studio-status="failed"] .okf-shell__studio-slot[data-okf-studio-capability="available"][hidden] {
+  display: none;
+}
 .okf-shell :is(a, button):focus-visible,
 [data-okf-route-heading]:focus-visible {
   outline: 2px solid var(--focus);

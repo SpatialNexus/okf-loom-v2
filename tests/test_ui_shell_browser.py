@@ -345,6 +345,40 @@ def test_live_boot_notice_sits_below_the_top_bar_while_studio_loads(server_url, 
             browser.close()
 
 
+@pytest.mark.parametrize("route", ["/", "/tables/orders", "/__graph"])
+@pytest.mark.parametrize("width,coarse", [(1280, False), (390, True), (320, True)])
+def test_blocked_studio_shows_the_failure_below_the_bar_and_collapses_reserved_slots(
+    server_url, route, width, coarse,
+):
+    """A Studio module that never runs is a terminal failure: theme.js marks it
+    (blocked-script), the notice joins the flow directly below the bar, so it
+    covers neither bar controls nor content, and the launcher, viewbar and
+    feedback slots it will never fill collapse instead of staying blank."""
+    with sync_playwright() as playwright:
+        browser = launch_chromium(playwright)
+        context = browser.new_context(viewport={"width": width, "height": 900},
+                                      is_mobile=coarse, has_touch=coarse)
+        try:
+            context.add_init_script("try { localStorage.setItem('okfGraphTourDone', '1'); } catch (e) {}")
+            page = context.new_page()
+            page.route("**/__static/studio.js", lambda request: request.abort())
+            page.goto(server_url + route, wait_until="load")
+            page.wait_for_function("() => document.documentElement.dataset.okfStudioStatus === 'failed'")
+            page.wait_for_timeout(300)
+            failed = page.evaluate(_BOOT_NOTICE_STATE)
+            assert failed["code"] == "blocked-script", failed
+            assert failed["notice"] and failed["notice"]["text"].startswith("Live Studio is unavailable."), failed
+            assert failed["notice"]["position"] == "static" and failed["notice"]["topmost"], failed
+            assert abs(failed["notice"]["top"] - failed["barBottom"]) <= 1, failed
+            assert failed["controls"] and failed["covered"] == [], failed
+            assert failed["reserved"] == [] and not failed["overflow"], failed
+            readiness = page.evaluate("() => window.okfStudioReadiness")
+            assert readiness["status"] == "failed" and readiness["ready"] is False, readiness
+        finally:
+            context.close()
+            browser.close()
+
+
 @pytest.mark.parametrize("route", ["/", "/tables/orders"])
 def test_nojs_does_not_reserve_studio_controls(server_url, route):
     with sync_playwright() as playwright:

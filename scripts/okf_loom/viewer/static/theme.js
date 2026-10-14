@@ -131,7 +131,34 @@
     }
     applyConfig(readConfig("okf-theme-config"));
     applyConfig(readConfig("okf-studio-bootstrap"));
+    liveStudioAvailability();
   })();
+
+  // ---- Live Studio availability (layout facts, not theme state) ---------
+  // A served bootstrap block promises the deferred Studio module, which may
+  // never run (blocked, failed fetch, early error) and then publishes no
+  // status. Deferred modules run before DOMContentLoaded, so a bootstrap with
+  // no status by then is a terminal load failure. Publish it in the studio.js
+  // status shape (code as capture-readiness reports it), so the notice and
+  // reserved slots take their failure layout.
+  function liveStudioAvailability() {
+    if (!document.getElementById("okf-studio-bootstrap")) return;
+    function publishLoadFailure() {
+      if (window.okfStudioReadiness || root.hasAttribute("data-okf-studio-status")) return;
+      var detail = Object.freeze({ status: "failed", ready: false, code: "blocked-script",
+        message: "The Studio script did not run.", generation: 1 });
+      window.okfStudioReadiness = detail;
+      window.okfStudioStatus = detail;
+      [root, document.body].forEach(function (node) {
+        if (!node || !node.dataset) return;
+        node.dataset.okfStudioStatus = "failed";
+        node.dataset.okfStudioGeneration = "1";
+        node.dataset.okfStudioCode = "blocked-script";
+      });
+      try { window.dispatchEvent(new CustomEvent("okf-loom:studioStatus", { detail: detail })); } catch (e) {}
+    }
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", publishLoadFailure);
+  }
 
   // ---- User choice (one key; retired keys migrated once) ----------------
   // An unrecognised stored value is ignored (falls back to configured/
