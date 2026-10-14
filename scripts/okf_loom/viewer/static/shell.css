@@ -20,6 +20,7 @@
   border-bottom: 1px solid var(--nav-border);
   background: var(--nav-bg);
   color: var(--nav-text);
+  anchor-name: --okf-shell;
 }
 .okf-shell .okf-brand-link:hover { color: var(--nav-text); text-decoration: none; }
 /* WCAG 2.5.8: the brand is the bar's only text-link target; a 24px line box
@@ -126,13 +127,24 @@ html[data-okf-js="1"] :is([data-okf-viewbar-placeholder], [data-okf-page-feedbac
   display: flex;
   visibility: hidden;
 }
-/* The truthful loading/failure notice must not displace the authored page
- * and then pull it back at boot. Keep it visible at its normal static
- * position, but outside flow. No-JS notes retain their ordinary flow. */
+/* The truthful loading notice must not displace the authored page and then
+ * pull it back at boot, so while Studio loads it sits outside flow, anchored
+ * to the top bar's bottom edge. (Its static position is no anchor: body is a
+ * flex column, so an absolutely positioned child with top:auto lands at
+ * y=0, over the bar.) It stacks under the sticky bar (z-index 10), so it
+ * never covers a bar control, even after a scroll. No-JS notes keep their
+ * ordinary flow. */
 html[data-okf-js="1"] body[data-okf-mode="serve"] > .okf-live-studio-fallback {
   position: absolute;
+  position-anchor: --okf-shell;
+  top: anchor(bottom);
   inset-inline: 0;
-  z-index: 11;
+  z-index: 9;
+}
+/* Without anchor positioning, the notice keeps its ordinary flow below the
+ * bar (a boot-time shift, but never an overlap). */
+@supports not (anchor-name: --okf-shell) {
+  html[data-okf-js="1"] body[data-okf-mode="serve"] > .okf-live-studio-fallback { position: static; }
 }
 .okf-shell :is(a, button):focus-visible,
 [data-okf-route-heading]:focus-visible {

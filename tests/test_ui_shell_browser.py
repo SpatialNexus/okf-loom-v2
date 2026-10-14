@@ -272,6 +272,79 @@ def test_live_first_paint_stays_stable_after_studio_boot(server_url, route, widt
             browser.close()
 
 
+_BOOT_NOTICE_STATE = """() => {
+  const bar = document.querySelector('.okf-topbar.okf-shell');
+  const notice = [...document.querySelectorAll('.okf-live-studio-fallback')]
+    .find(n => n.getClientRects().length && getComputedStyle(n).display !== 'none');
+  const box = notice ? notice.getBoundingClientRect() : null;
+  const controls = [...bar.querySelectorAll('a, button, input, select, summary')].filter(e => {
+    const r = e.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== 'hidden';
+  });
+  // Every visible top-bar control is the topmost element at its own centre.
+  const covered = controls.filter(e => {
+    const r = e.getBoundingClientRect();
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return !hit || !(hit === e || e.contains(hit));
+  }).map(e => e.getAttribute('aria-label') || e.textContent.trim());
+  const hit = box && document.elementFromPoint(box.left + Math.min(40, box.width / 2), box.top + box.height / 2);
+  return {
+    barBottom: bar.getBoundingClientRect().bottom,
+    notice: box && {top: box.top, height: box.height, position: getComputedStyle(notice).position,
+                    topmost: !!(hit && notice.contains(hit)), text: notice.textContent.trim()},
+    controls: controls.length, covered,
+    reserved: [...document.querySelectorAll('[data-okf-viewbar-placeholder], [data-okf-page-feedback-placeholder], '
+      + '.okf-shell__studio-slot[hidden]')].filter(e => e.getClientRects().length).map(e => e.className),
+    status: document.documentElement.dataset.okfStudioStatus || null,
+    code: document.documentElement.dataset.okfStudioCode || null,
+    overflow: document.documentElement.scrollWidth > innerWidth + 1,
+  };
+}"""
+
+
+@pytest.mark.parametrize("route", ["/", "/tables/orders", "/__graph"])
+@pytest.mark.parametrize("width,coarse", [(1280, False), (390, True), (320, True)])
+def test_live_boot_notice_sits_below_the_top_bar_while_studio_loads(server_url, route, width, coarse):
+    """While Studio loads, the truthful notice is visible directly under the
+    top bar, out of flow: it covers no bar control (it once sat at y=0 over
+    the brand, search and destinations, and under the narrow graph bar), and
+    boot removes it without shifting the page."""
+    with sync_playwright() as playwright:
+        browser = launch_chromium(playwright)
+        context = browser.new_context(viewport={"width": width, "height": 900},
+                                      is_mobile=coarse, has_touch=coarse)
+        try:
+            context.add_init_script(_FIRST_PAINT_CLS)
+            context.add_init_script("try { localStorage.setItem('okfGraphTourDone', '1'); } catch (e) {}")
+            page = context.new_page()
+            held = []
+            page.route("**/__static/studio.js", lambda request: held.append(request))
+            page.goto(server_url + route, wait_until="commit")
+            page.wait_for_function("""() => performance.getEntriesByType('paint').some(e => e.name === 'first-contentful-paint')
+              && [...document.querySelectorAll('.okf-live-studio-fallback')].some(n => n.getClientRects().length)""")
+            page.wait_for_timeout(300)
+            loading = page.evaluate(_BOOT_NOTICE_STATE)
+            assert loading["status"] is None and loading["notice"], loading
+            assert loading["notice"]["position"] == "absolute" and loading["notice"]["topmost"], loading
+            assert abs(loading["notice"]["top"] - loading["barBottom"]) <= 1, loading
+            assert loading["controls"] and loading["covered"] == [], loading
+            assert held
+            held[0].continue_()
+            page.wait_for_function("() => window.okfStudioReadiness?.ready && window.okfLoomStudio.state.commentsReady")
+            page.evaluate("() => document.fonts.ready")
+            page.wait_for_timeout(600)
+            ready = page.evaluate(_BOOT_NOTICE_STATE)
+            assert ready["notice"] is None and ready["covered"] == [] and not ready["overflow"], ready
+            if not (route == "/__graph" and width <= 640):
+                # The narrow graph route's own chrome still moves after first
+                # paint (pre-existing, owned by graph.js); the notice adds none.
+                result = page.evaluate("window.__okfPaintCLS()")
+                assert result["cls"] < 0.02, result
+        finally:
+            context.close()
+            browser.close()
+
+
 @pytest.mark.parametrize("route", ["/", "/tables/orders"])
 def test_nojs_does_not_reserve_studio_controls(server_url, route):
     with sync_playwright() as playwright:
