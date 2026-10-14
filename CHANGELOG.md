@@ -32,6 +32,20 @@ follow [Semantic Versioning](https://semver.org/). The product version
   Presence records a role, so it silently failed for any name other than
   `agent`/`user`; the name stays on the comment as `claimed_by`. `presence
   --actor <name>` likewise shows a v1-style custom name as the agent.
+- On phones, the graph route now follows an in-place resize or rotation
+  (390 → 320 wide, for example). Before, the top bar kept the old width and the
+  page stayed zoomed out until reload.
+- The Split view tab now lines up with Rendered and Source on touch screens.
+  It sat about 4px higher.
+- The Graph settings Depth and Group by selects now use the Ledger field
+  style (square 1px outline, palette colours, focus ring, 44px touch target,
+  forced-colours outline) instead of the browser default.
+- On narrow screens, the single-file Index no longer shows the
+  Graph/Concepts/Details pane tabs, which controlled the hidden graph. They
+  appear with the graph, and the pressed tab matches the visible pane.
+- The favicon is now a square Ledger mark (ink tile, bone bars, warm 1px frame)
+  instead of the old rounded teal tile. It is the same inline icon in every
+  output, and the live 404 page now has it too.
 
 ### Changed
 
