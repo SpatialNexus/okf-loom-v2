@@ -575,6 +575,47 @@ def test_graph_settings_depth_select_is_a_ledger_field(server_url: str, page) ->
         coarse.close()
 
 
+_PANE_TABS_JS = """() => {
+  const accent = (() => { const p = document.createElement('span');
+    p.style.color = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+    document.body.appendChild(p); const c = getComputedStyle(p).color; p.remove(); return c; })();
+  return {accent, tabs: [...document.querySelectorAll('.okf-graph-mobile-nav button')]
+    .filter(b => b.getClientRects().length).map(b => { const cs = getComputedStyle(b);
+      return {name: b.textContent.trim(), pressed: b.getAttribute('aria-pressed'), font: cs.fontFamily,
+        weight: cs.fontWeight, background: cs.backgroundColor, radius: cs.borderTopLeftRadius,
+        bottom: [cs.borderBottomWidth, cs.borderBottomColor], height: b.getBoundingClientRect().height}; })};
+}"""
+
+
+@pytest.mark.parametrize("width,height", [(768, 1024), (844, 390), (390, 844)])
+def test_graph_pane_tabs_are_ledger_tabs_wherever_they_show(server_url: str, page, width, height) -> None:
+    """graph.js shows the Graph/Concepts/Details pane tabs up to 900px, so
+    tablet portrait and phone landscape get the same Ledger tabs as phones:
+    no browser-default fill, Public Sans, and exactly one pressed tab marked by
+    bold ink over a 2px accent underline, following the visible pane."""
+    page.set_viewport_size({"width": width, "height": height})
+    page.add_init_script("try { localStorage.setItem('okfGraphTourDone', '1'); } catch (e) {}")
+    page.goto(f"{server_url}/__graph", wait_until="domcontentloaded")
+    page.wait_for_function("() => window.__okfLoomGraph?.layoutStats?.lastAppliedSeq >= 1")
+    panes = page.get_by_role("navigation", name="Graph panes")
+    expect(panes).to_be_visible()
+    for name, pane in (("Details", "details"), ("Graph", "graph"), ("Concepts", "concepts")):
+        panes.get_by_role("button", name=name, exact=True).click()
+        expect(page.locator(".okf-layout")).to_have_attribute("data-mobile-pane", pane)
+        seen = page.evaluate(_PANE_TABS_JS)
+        tabs = seen["tabs"]
+        assert [t["name"] for t in tabs] == ["Graph", "Concepts", "Details"], seen
+        assert [t["name"] for t in tabs if t["pressed"] == "true"] == [name], seen
+        for tab in tabs:
+            assert "Public Sans" in tab["font"] and tab["radius"] == "0px", seen
+            assert tab["background"] in ("rgba(0, 0, 0, 0)", "transparent"), seen
+            assert tab["height"] >= 44, seen
+            if tab["pressed"] == "true":
+                assert tab["bottom"] == ["2px", seen["accent"]] and tab["weight"] == "700", seen
+            else:
+                assert tab["bottom"][0] == "1px" and tab["bottom"][1] != seen["accent"], seen
+
+
 _SELECTED_LENS_PREVIEW_JS = """() => {
   const cv = document.createElement('canvas'); cv.width = cv.height = 1;
   const cx = cv.getContext('2d', {willReadFrequently: true});

@@ -1254,6 +1254,27 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
 @media (max-width: 900px) {
   .okf-viewer--graph .okf-topbar { height: auto; min-height: var(--okf-topbar-h); padding: var(--okf-space-2) var(--okf-space-3); flex-wrap: wrap; align-items: center; }
   .okf-viewer--graph .okf-topbar__controls { flex: 1 1 100%; width: 100%; }
+  /* Pane tabs: graph.js shows them up to 900px (isCompactGraphViewport), so
+   * their Ledger look and pressed state cover that whole range, not only
+   * phones: outlined text tabs; the current pane is bold ink over a 2px accent
+   * underline, never a fill. */
+  .okf-graph-mobile-nav button {
+    height:44px;
+    min-height: 44px;
+    border: 1px solid var(--okf-border-strong);
+    border-radius: 0;
+    background: transparent;
+    color: var(--okf-fg);
+    font: inherit;
+    font-weight: 600;
+  }
+  .okf-graph-mobile-nav button[aria-pressed="true"] {
+    border-color: var(--okf-border-strong);
+    border-bottom: 2px solid var(--accent);
+    background: transparent;
+    color: var(--okf-fg);
+    font-weight: 700;
+  }
   /* Graph pages allocate the bundle identity its own complete row.  Shared
    * wiki.css truncates brands for compact concept-page chrome; the graph has
    * a taller, wrapping control header and can preserve the full title. */
@@ -1420,24 +1441,6 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
     padding: var(--okf-space-2);
     border-bottom: 1px solid var(--okf-border);
     background: var(--okf-bg-elev);
-  }
-  .okf-graph-mobile-nav button {
-    height:44px;
-    min-height: 44px;
-    border: 1px solid var(--okf-border-strong);
-    border-radius: 0;
-    background: transparent;
-    color: var(--okf-fg);
-    font: inherit;
-    font-weight: 600;
-  }
-  /* The current pane is a tab: bold ink over a 2px accent underline. */
-  .okf-graph-mobile-nav button[aria-pressed="true"] {
-    border-color: var(--okf-border-strong);
-    border-bottom: 2px solid var(--accent);
-    background: transparent;
-    color: var(--okf-fg);
-    font-weight: 700;
   }
   .okf-layout[data-mobile-pane="graph"] > .okf-detail,
   .okf-layout[data-mobile-pane="concepts"] > .okf-detail,
