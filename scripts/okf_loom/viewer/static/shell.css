@@ -39,7 +39,7 @@
 .okf-shell__nav .okf-btn:hover { border-color: transparent; background: var(--surface-2); color: var(--nav-text); }
 /* Search: one joined control — the field on the band surface, its button
  * on the raised surface, sharing a border. */
-.okf-shell__search-form { gap: 0; align-items: stretch; }
+.okf-shell__search-form { position: relative; gap: 0; align-items: stretch; }
 .okf-shell__search-form input {
   min-height: var(--ctl-h);
   padding: 0 10px;
@@ -209,7 +209,7 @@ html:not([data-okf-js="1"]) #okf-theme { display: none !important; }
   .okf-shell .okf-appearance-trigger { min-height: 44px; }
   /* Row 2: the one real search control grows; Index and Graph stay labelled
    * text controls at full touch height. */
-  body.okf-viewer .okf-shell [data-okf-shell-item="search"] { flex: 1 1 9rem; min-width: 0; }
+  body.okf-viewer .okf-shell [data-okf-shell-item="search"] { flex: 1 1 8rem; min-width: 0; }
   body.okf-viewer .okf-shell__search-form { flex: 1 1 auto; min-width: 0; }
   .okf-shell__search-form input { flex: 1 1 auto; width: auto; min-width: 0; min-height: 44px; }
   .okf-shell__search-form button { flex: 0 0 auto; min-width: 44px; min-height: 44px; }
@@ -227,10 +227,27 @@ html:not([data-okf-js="1"]) #okf-theme { display: none !important; }
    * <=640px on the graph route the launcher would otherwise compute 40px
    * instead of the shell's promised 44px floor. */
   body.okf-viewer .okf-shell__nav .okf-studio-launcher { min-height: 44px; }
-  /* Inline launcher status is consolidated to the action label at this
-   * width; genuine failure/pending states still print through the
-   * data-attention "· Error" / "· Needs attention" projections. */
-  .okf-shell .okf-studio-launcher__summary { display: none; }
+  /* Reserve one compact attention slot so even Needs attention cannot push
+   * Studio onto a third row. Full status remains in the accessible name. */
+  body.okf-viewer .okf-shell .okf-studio-launcher { position: relative; box-sizing: border-box; min-width: 5.5rem; }
+  .okf-shell .okf-studio-launcher__summary {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  body.okf-viewer .okf-shell .okf-studio-launcher[data-attention="pending"]::after {
+    content: "\25A0" / " · Needs attention";
+    font-size: 0.7em;
+    color: var(--status-warn);
+  }
+  body.okf-viewer .okf-shell .okf-studio-launcher[data-attention="failure"]::after {
+    content: "!" / " · Error";
+    color: var(--status-error);
+  }
 }
 /* At the narrowest supported widths the two-row arrangement runs out of
  * linear budget (brand + Appearance exceed ~296px of inner width), so the
@@ -257,7 +274,10 @@ html:not([data-okf-js="1"]) #okf-theme { display: none !important; }
     border-bottom: 3px solid Highlight;
   }
 }
-/* Coarse pointers keep 44px targets whatever the chrome density. */
+@media (max-width: 640px) and (forced-colors: active) {
+  body.okf-viewer .okf-shell .okf-studio-launcher:is([data-attention="pending"], [data-attention="failure"])::after { color: CanvasText; }
+}
+/* Coarse pointers keep 44px targets. */
 @media (pointer: coarse) {
   .okf-shell__nav .okf-btn,
   .okf-shell__search-form :is(input, button) { min-height: 44px; }

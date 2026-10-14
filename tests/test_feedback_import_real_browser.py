@@ -85,6 +85,13 @@ def test_operator_previews_imports_and_the_card_keeps_its_provenance(linked_bund
         expect(result.locator("[data-fbi-disclosure='confirm']")).to_have_text(_confirm_copy("sub/one.md"))
         expect(result.locator(".okf-fbi__facts")).to_contain_text("sub/one.md")
         expect(result.locator(".okf-fbi__facts")).to_contain_text("Ana unverified")
+        assert result.locator('.okf-fbi__facts').evaluate("""facts => {
+          const cells = [...facts.children];
+          return cells.filter(n => n.tagName === 'DT').every(n => {
+            const next = n.nextElementSibling, a = n.getBoundingClientRect(), b = next.getBoundingClientRect();
+            return Math.abs(a.right - b.left) < 1 && Math.abs(a.bottom - b.bottom) < 1;
+          });
+        }"""), 'fact rows must have continuous hairlines between label and value'
         expect(result.locator(".okf-fbi__body")).to_have_text("The log link is missing.\nPlease add it.")
         expect(result.locator("blockquote")).to_have_text("dir-log-link")
         # R3: the quote is the note's own unverified claim, not "from the page".

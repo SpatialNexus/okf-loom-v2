@@ -150,6 +150,7 @@ body.okf-focus-view .okf-onthispage,
 body.okf-focus-view .okf-page__infobox,
 body.okf-focus-view .okf-page__connections,
 body.okf-focus-view .okf-connections-disclosure,
+body.okf-focus-view .okf-document-tools,
 body.okf-focus-view .okf-page-utilities,
 body.okf-focus-view .okf-document-end,
 body.okf-focus-view .okf-prevnext { display: none !important; }
@@ -406,7 +407,7 @@ body.okf-focus-view .okf-concept-viewbar {
 
 /* iter2 G11 (§3): the "Agent watching" switch. A toggle button (aria-pressed)
  * styled as a studiobtn; the pressed (on) state is the 2px accent bar plus
- * accent-text, like every other pressed Ledger control. The eye glyph +
+ * accent-text, like every other pressed Ledger control. The square glyph +
  * visible label carry the meaning (not colour alone, WCAG 1.4.1). */
 .okf-watch-toggle { gap: 6px; }
 .okf-watch-toggle__icon { font-size: var(--okf-text-sm); line-height: 1; }
@@ -830,6 +831,23 @@ body.okf-focus-view .okf-concept-viewbar {
   gap: 6px;
   flex-wrap: wrap;
 }
+/* Main and inline reply outcomes share the Ledger status treatment. */
+.okf-composer__status[data-tone] {
+  --composer-tone: var(--status-info);
+  margin: 0;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: inset 2px 0 0 0 var(--composer-tone);
+  color: var(--text);
+  font-size: var(--okf-text-xs);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.okf-composer__status[data-tone="error"] { --composer-tone: var(--status-error); }
+.okf-composer__status[data-tone="warn"] { --composer-tone: var(--status-warn); }
+.okf-composer__status[data-tone="success"] { --composer-tone: var(--status-ok); }
 /* R3 precision line: exact annotation, page comment, or a page-level
    fallback whose Source/graph selection is quoted in the comment. */
 .okf-composer__anchor-note {
@@ -984,7 +1002,7 @@ body.okf-focus-view .okf-concept-viewbar {
   background: transparent;
   color: var(--text-2);
 }
-.okf-comment[data-state="open"] .okf-comment__state     { color: var(--accent-text); }
+.okf-comment[data-state="open"] .okf-comment__state     { color: var(--text-2); }
 .okf-comment[data-state="claimed"] .okf-comment__state  { color: var(--okf-warn); }
 .okf-comment[data-state="resolved"] .okf-comment__state { color: var(--okf-ok); }
 .okf-anchor-row {
@@ -1509,10 +1527,7 @@ body.okf-focus-view .okf-concept-viewbar {
   outline-offset: 1px;
   border-color: var(--border-strong);
 }
-.okf-comment-toolbar__toggle {
-  font-size: 12px;
-  padding: 4px 10px;
-}
+.okf-comment-toolbar__toggle { white-space: normal; }
 .okf-comment-toolbar__count {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
@@ -1724,9 +1739,9 @@ body.okf-focus-view .okf-concept-viewbar {
 .okf-panel-state--error p { margin-top: 0; }
 .okf-studio-quick-action {
   display: grid;
-  grid-template-columns: minmax(10rem, 0.8fr) minmax(0, 1.2fr);
+  grid-template-columns: 1fr;
   align-items: start;
-  gap: var(--okf-space-3);
+  gap: var(--okf-space-1);
   padding-block: var(--okf-space-2);
   border-bottom: 1px solid var(--okf-border);
 }
@@ -1741,9 +1756,6 @@ body.okf-focus-view .okf-concept-viewbar {
 }
 .okf-proposal-unavailable p { margin-top: 0; }
 .okf-proposal-unavailable__title { font-weight: 700; }
-@media (max-width: 520px) {
-  .okf-studio-quick-action { grid-template-columns: 1fr; gap: var(--okf-space-1); }
-}
 
 /* ---- 7. Command palette (§13.4) ------------------------------------- */
 .okf-palette-overlay {
@@ -2175,6 +2187,7 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
   }
 
 @media (forced-colors: active) {
+  .okf-toast { border: 1px solid CanvasText; border-left-width: 2px; box-shadow: none; }
   .okf-anchor-row__status, .okf-comment-mark { forced-color-adjust: auto; }
   .okf-comment-mark { outline: 1px solid Highlight; }
   /* The command-palette's selected (keyboard cursor) item maps to the system
@@ -2248,6 +2261,7 @@ html[data-okf-studio-status="failed"] .okf-reanchor-peek { display: none !import
   :is(.okf-studiobtn, .okf-iconbtn, .okf-panel__back, .okf-panel__close, .okf-change__undo,
     .okf-comment-toolbar__select, .okf-filters select, .okf-filters input) { min-height: 44px; }
   .okf-comment__action { min-height: 44px; }
+  .okf-toast__action, .okf-toast__close { min-height: 44px; min-inline-size: 44px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
