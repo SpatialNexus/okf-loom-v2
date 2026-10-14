@@ -42,11 +42,14 @@ Two built-in elements carry behaviour that an override should keep:
 - In `single_file.html`, `#okf-single-index` and `#detail-content` are the
   destinations of the concept-list links (`?selected=<id>#detail-content`).
 
-Live shell markup includes inert launcher, document viewbar/Sections and index
-feedback placeholders. Their final responsive size is reserved before first
-paint only when the parser-blocking theme runtime has marked JavaScript
-available; portable and no-JS targets reserve no Studio space. Studio fills
-those slots in place, while `document-outline.js` owns the Sections control.
+Live shell markup includes inert launcher and document viewbar/Sections
+placeholders only when the server has attached Studio; index feedback also
+requires an actual `index.md` document. Their final responsive size is reserved
+before first paint only when the parser-blocking theme runtime has marked
+JavaScript available. Inactive Studio sessions, documentless indexes, portable
+and no-JS targets reserve no inactive Studio space. Studio fills those slots in
+place (removing any feedback placeholder it cannot fill), while
+`document-outline.js` owns the Sections control.
 The index feedback placeholder carries both the comment and the read-only
 layout; the theme runtime marks the session's comment capability from the
 Studio bootstrap so the matching one is reserved. The live loading notice stays

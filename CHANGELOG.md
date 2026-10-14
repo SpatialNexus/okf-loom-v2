@@ -14,10 +14,12 @@ follow [Semantic Versioning](https://semver.org/). The product version
   layout; initial lens/theme updates are batched without changing settled positions.
 - Graph canvas labels remeasure and redraw once when Ledger fonts load late,
   without delaying the first frame or rerunning the layout.
-- Live pages reserve inert Studio launcher, document viewbar and index page
-  feedback geometry before first paint. Studio fills those slots in place, and its truthful
-  loading/failure notice no longer shifts the authored page when boot settles.
-  Portable and no-JS pages do not reserve inactive Studio chrome.
+- Live pages reserve inert Studio launcher and document viewbar geometry only
+  when Studio is attached, and index feedback only for an actual index document.
+  Studio fills those slots in place (removing feedback it cannot fill); its
+  truthful loading/failure notice stays anchored below the bar while booting.
+  Inactive sessions, documentless indexes, portable and no-JS pages reserve no
+  inactive Studio chrome.
 - Split view now clears the "Loading source…" notice whenever the source pane
   is populated, including by a concurrent document or live-update load. A
   redundant request no longer leaves a loading or failure notice above source

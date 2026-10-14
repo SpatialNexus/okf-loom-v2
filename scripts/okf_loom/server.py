@@ -1576,6 +1576,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         self._send_text(200, render_feedback_import_page(
             name=self.display_name, config=self._config(),
             availability=self._feedback_import_availability(),
+            studio_available=self.studio is not None,
             max_note_bytes=MAX_NOTE_BYTES,
             preview_ttl_seconds=PREVIEW_TOKEN_TTL_SECONDS,
         ))
@@ -2810,7 +2811,8 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         from .render import render_reserved_document
         self._send_text(200, render_reserved_document(
             document, payload['raw'], mode='serve', config=self._config(),
-            bundle=self.bundle, name=self.display_name))
+            bundle=self.bundle, name=self.display_name,
+            studio_available=self.studio is not None))
 
     def _handle_root(self) -> None:
         self._page_document = 'index.md' if self.bundle.root_index() else None
@@ -2825,6 +2827,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
                 pass
         html = _render_index_page(
             self.bundle, mode="serve", name=self.display_name,
+            studio_available=self.studio is not None,
             palette=self.palette, config=self._config(), sub="",
             index_file=self.bundle.root_index(),
             comment_summary=comment_summary,
@@ -2864,6 +2867,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
                 )
         html = _render_index_page(
             self.bundle, mode="serve", name=self.display_name,
+            studio_available=self.studio is not None,
             palette=self.palette, config=self._config(), sub=sub,
             index_file=index_file,
             comment_summary=None,
@@ -2879,6 +2883,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         if _prefers_html_error(",".join(self.headers.get_all("Accept", []))):
             return self._send_text(404, _render_not_found_page(
                 name=self.display_name, path=cid_str, config=self._config(),
+                studio_available=self.studio is not None,
             ), extra_headers=headers)
         self._send_text(404, plain_message, content_type="text/plain", extra_headers=headers)
 
@@ -2928,6 +2933,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
                 pass
         html = _render_concept_page(
             concept, bundle, graph, mode="serve",
+            studio_available=self.studio is not None,
             name=self.display_name, palette=self.palette,
             config=self._config(),
             body_plugin=plugin.on_concept_render,
@@ -2938,6 +2944,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
     def _handle_graph(self) -> None:
         html = _render_graph_page(
             self.bundle, mode="serve", name=self.display_name,
+            studio_available=self.studio is not None,
             config=self._config(),
         )
         self._send_text(200, html)
@@ -2985,6 +2992,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
                         )
                         html = _render_search_page(
                             bundle, mode="serve", name=display_name, config=config,
+                            studio_available=self.studio is not None,
                             query=request.query, results=rows, request=request,
                             sections=sections,
                         )
@@ -3202,6 +3210,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
             **{key: params.get(key) for key in ("tag", "entity", "relation", "source", "target")})
         body = _render_search_page(
             bundle, mode="serve", name=display_name or self.display_name, config=config,
+            studio_available=self.studio is not None,
             query=params.get("q", ""), results=[], error=exc, request=request,
         )
         self._send_text(exc.status, body, content_type="text/html; charset=utf-8")

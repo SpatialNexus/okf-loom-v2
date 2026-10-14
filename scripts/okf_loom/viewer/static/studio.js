@@ -809,7 +809,11 @@
   }
   function mountPageFeedback() {
     const host = pageFeedbackHost();
-    if (!host || pageFeedback) return;
+    if (!host || pageFeedback) {
+      document.querySelectorAll("[data-okf-page-feedback-placeholder]").forEach((node) => node.remove());
+      if (!host) document.querySelector(".okf-hero--feedback")?.classList.remove("okf-hero--feedback");
+      return;
+    }
     const inGraph = host.id === "okf-detail-actions-slot";
     const noun = inGraph ? "concept" : "page";
     const placeholder = document.querySelector("[data-okf-page-feedback-placeholder]");
