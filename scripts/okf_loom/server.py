@@ -127,6 +127,14 @@ def _prefers_html_error(accept: str) -> bool:
     return preference("text/html") > max(preference("text/plain"), preference("application/json"))
 
 
+def _if_none_match_matches(fields: list[str], etag: str) -> bool:
+    """GET/HEAD weak comparison across all If-None-Match header fields."""
+    # Commas inside an opaque quoted tag are not list separators.
+    validators = (value.strip() for field in fields
+                  for value in re.findall(r'(?:[^",]|"[^"]*")+', field))
+    return any(value == "*" or value.removeprefix("W/") == etag for value in validators)
+
+
 def _canonical_annotation_source(bundle: Bundle, cid: ConceptId) -> str:
     """Read canonical bytes by trusted root + concept identity, never stale paths."""
     return _canonical_document_source(bundle, "/".join(cid) + ".md")
@@ -3323,8 +3331,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         # comment counts and stale_after metadata can change independently.
         etag = '"' + hashlib.sha256(body).hexdigest() + '"'
         headers = {"Cache-Control": "no-cache", "ETag": etag}
-        validators = [value.strip() for value in self.headers.get("If-None-Match", "").split(",")]
-        not_modified = any(value == "*" or value.removeprefix("W/") == etag for value in validators)
+        not_modified = _if_none_match_matches(self.headers.get_all("If-None-Match", []), etag)
         self._send_bytes(304 if not_modified else 200, b"" if not_modified else body,
                          content_type="application/json; charset=utf-8", extra_headers=headers)
 
@@ -3777,10 +3784,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         # every request so even edits preserving mtime/size cannot hide changes
         # or bypass vendor integrity checks. No viewer-specific data is added.
         etag = '"' + hashlib.sha256(body).hexdigest() + '"'
-        # Commas inside an opaque quoted tag are not list separators.
-        validators = [value.strip() for field in self.headers.get_all("If-None-Match", [])
-                      for value in re.findall(r'(?:[^",]|"[^"]*")+', field)]
-        not_modified = any(value == "*" or value.removeprefix("W/") == etag for value in validators)
+        not_modified = _if_none_match_matches(self.headers.get_all("If-None-Match", []), etag)
         self._send_bytes(304 if not_modified else 200, b"" if not_modified else body,
                          content_type=content_type,
                          extra_headers={"Cache-Control": "no-cache", "ETag": etag})

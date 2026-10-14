@@ -77,6 +77,19 @@ def _assert_revalidation(server, path):
     return headers, body
 
 
+@pytest.mark.parametrize('fields, expected', [
+    (['"other"', '"current"'], True),
+    (['"other,*,tag"'], False),
+    (['"other,tag", "current"'], True),
+    (['*'], True),
+    (['W/"current"'], True),
+    ([], False),
+])
+def test_shared_if_none_match_parser(fields, expected):
+    from okf_loom.server import _if_none_match_matches
+    assert _if_none_match_matches(fields, '"current"') is expected
+
+
 def test_static_conditional_get_head_and_final_text_bytes(static_server):
     server, _ = static_server
     _, body = _assert_revalidation(server, 'test.js')

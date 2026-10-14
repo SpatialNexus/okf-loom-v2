@@ -18,11 +18,14 @@ from okf_loom.retrieval import canonical_json_bytes
 from test_server_smoke import _start_server
 
 
-def _get(base, path='/__data/graph.json', etag=None):
+def _get(base, path='/__data/graph.json', etag=None, *, validators=(), method='GET'):
     from urllib.parse import urlparse
     url = urlparse(base)
     conn = http.client.HTTPConnection(url.hostname, url.port, timeout=20)
-    conn.request('GET', path, headers={'If-None-Match': etag} if etag else {})
+    conn.putrequest(method, path)
+    for value in ((etag,) if etag else validators):
+        conn.putheader('If-None-Match', value)
+    conn.endheaders()
     response = conn.getresponse()
     result = response.status, dict(response.getheaders()), response.read()
     conn.close()
@@ -107,6 +110,18 @@ def test_graph_single_flight_across_requests_and_html(graph_server, monkeypatch)
     assert status == 200 and b'New content' in body
     assert headers['ETag'] != results[0][1]['ETag']
     assert len(calls) == 2
+
+
+@pytest.mark.parametrize('path', ['/__data/graph.json', '/__data/graph.json?view=structure'])
+def test_graph_if_none_match_all_fields_and_quoted_commas(graph_server, path):
+    _, base = graph_server
+    _, headers, _ = _get(base, path)
+    tag = headers['ETag']
+    for method in ('GET', 'HEAD'):
+        for fields in (('"other"', tag), ('"other,*,tag", W/' + tag,), ('*',), ('W/' + tag,)):
+            status, fresh, body = _get(base, path, validators=fields, method=method)
+            assert status == 304 and body == b'' and fresh['ETag'] == tag
+        assert _get(base, path, validators=('"other,*,tag"',), method=method)[0] == 200
 
 
 def test_graph_etag_tracks_clock_not_only_content_revision(graph_server, monkeypatch):
