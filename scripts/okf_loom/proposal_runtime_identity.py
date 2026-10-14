@@ -74,7 +74,7 @@ VALIDATOR_RULE_CODES = (
 )
 
 # Updated only by an explicit reviewed release identity bump.
-VALIDATOR_ID = "okf-validator@1.0+sha256:cc3e36838bfad5f92006d7512910b75ccf4b982c3d577c361674c11da9f75c51"
+VALIDATOR_ID = "okf-validator@1.0+sha256:64d26d6947daa07bea5d3ac17a7a7747c6d169bd79ffb6027d4cae513f42a5df"
 SERIALIZER_ID = "okf-roundtrip@1.0+sha256:9f4d826f237f8ba408d1e440655c5bfbd93f2275b479d733fe194c88f5bdeb82"
 OPERATION_RUNTIME_ID = "proposal-ops@1.0+sha256:67f64217e518f0a37019810734bc36ffc7fd6b255dd8484e39452feafbd8c1e1"
 
