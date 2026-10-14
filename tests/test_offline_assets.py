@@ -12,6 +12,7 @@ import re
 import shutil
 import subprocess
 import sys
+from html.parser import HTMLParser
 from pathlib import Path
 
 import pytest
@@ -110,7 +111,48 @@ def test_default_and_explicit_cdn_output_are_identical_and_vendor_free(tmp_path,
                             else "'self' https://cdn.jsdelivr.net"), page
     if target != "single-file":
         graph = (tmp_path / "default" / "__graph.html").read_text(encoding="utf-8")
-        assert render._CDN_SCRIPTS in graph
+        assert render._CDN_SCRIPTS.replace("<script ", "<script defer ") in graph
+
+
+class _ScriptTags(HTMLParser):
+    def __init__(self, html):
+        super().__init__()
+        self.scripts = []
+        self.feed(html)
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "script":
+            self.scripts.append(dict(attrs))
+
+
+@pytest.mark.parametrize("mode", ["serve", "static", "spa"])
+@pytest.mark.parametrize("assets", ["cdn", "offline"])
+def test_graph_vendor_chain_defers_in_order_without_changing_integrity(tmp_path, mode, assets):
+    bundle = Bundle.load(write_offline_fixture(tmp_path / "bundle"))
+    offline = vendor.load_offline_assets() if assets == "offline" else None
+    html = render._render_graph_page(bundle, mode=mode, name="Proof", config={},
+                                     offline_assets=offline)
+    scripts = _ScriptTags(html).scripts
+    graph_index = next(i for i, tag in enumerate(scripts) if tag.get("src", "").endswith("/graph.js"))
+    chain = [tag for tag in scripts[:graph_index] if "cdn.jsdelivr.net" in tag.get("src", "")
+             or "/vendor/" in tag.get("src", "")]
+    original = _ScriptTags(render._CDN_SCRIPTS).scripts
+    locked = {entry["cdn"]: entry for entry in vendor.lock_files(vendor.load_lock()) if entry.get("cdn")}
+    assert len(chain) == 6
+    prefix = "/__static" if mode in ("serve", "spa") else "__static"
+    for tag, pin in zip(chain, original):
+        assert "defer" in tag and "async" not in tag
+        if assets == "cdn":
+            assert {key: value for key, value in tag.items() if key != "defer"} == pin
+            assert tag["integrity"] == locked[tag["src"]]["sha384"]
+            assert tag["crossorigin"] == "anonymous"
+        else:
+            assert tag["src"] == f'{prefix}/vendor/{locked[pin["src"]]["dest"]}'
+            assert "integrity" not in tag and "crossorigin" not in tag
+    assert "defer" in scripts[graph_index]
+    if mode != "serve":
+        theme = next(tag for tag in scripts if tag.get("src", "").endswith("/theme.js"))
+        assert "defer" not in theme and "async" not in theme
 
 
 def test_render_single_file_default_equals_cdn(tmp_path):
@@ -340,7 +382,7 @@ def test_offline_site_is_closed_and_licensed(tmp_path, target):
             assert (base / ref.lstrip("/")).is_file(), (page, ref)
     graph = (out / "__graph.html").read_text(encoding="utf-8")
     prefix = "/__static" if target == "spa" else "__static"
-    chain = re.findall(r'<script src="([^"]+/vendor/[^"]+)"></script>', graph)
+    chain = re.findall(r'<script defer src="([^"]+/vendor/[^"]+)"></script>', graph)
     assert chain == [f"{prefix}/vendor/{rel}" for rel in (
         "cytoscape-3.34.3/cytoscape.min.js", "layout-base-2.0.1/layout-base.js",
         "cose-base-2.2.0/cose-base.js", "cytoscape-fcose-2.2.0/cytoscape-fcose.js",

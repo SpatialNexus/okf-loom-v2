@@ -330,6 +330,14 @@ All three mechanisms compose: a bundle can ship a custom `wiki.css`, a
 
 ## 7. Live graph acquisition seam
 
+Live, static and SPA graph pages load their external classic vendor scripts
+with `defer`, in dependency order: Cytoscape → layout-base → cose-base →
+cytoscape-fcose → dagre → cytoscape-dagre → graph.js. This applies to CDN and
+verified offline assets alike; CDN integrity and crossorigin pins are unchanged.
+Overrides must not rely on these globals during parsing. `theme.js` remains
+parser-blocking for first-paint appearance. Single-file output retains its
+parser-blocking vendor chain ahead of its inline graph runtime.
+
 On live graph pages, `window.okfGraphData` is a promise for the full
 `/__data/graph.json` projection. Whichever of graph.js or studio.js needs it
 first creates it; the other reuses it. Failed initial acquisition clears the

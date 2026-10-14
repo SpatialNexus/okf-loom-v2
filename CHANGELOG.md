@@ -27,6 +27,9 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Changed
 
+- Graph pages defer the ordered, integrity-pinned vendor chain in CDN and
+  offline modes, letting the appearance runtime and page styles load without
+  waiting for graph dependencies. Single-file vendor ordering is unchanged.
 - Live document pages, document data and search reuse bounded, content-keyed
   heading render work without changing canonical-source or section-link checks.
 - Live graph reads reuse single-flight, generation-owned rendered bodies while

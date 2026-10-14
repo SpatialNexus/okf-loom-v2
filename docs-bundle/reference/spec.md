@@ -789,7 +789,11 @@ built before offline assets existed. In `cdn` mode pages load Mermaid,
 highlight.js, KaTeX, and the Cytoscape graph chain (Cytoscape.js, layout-base,
 cose-base, cytoscape-fcose, dagre, cytoscape-dagre) from pinned
 `cdn.jsdelivr.net` URLs, with SRI where the code pins it. `serve` always uses
-the CDN mode.
+the CDN mode. On live, static and SPA graph pages the external classic graph
+vendor chain is deferred in the dependency order above, before deferred
+`graph.js`; inline extensions cannot assume its globals during parsing.
+`theme.js` remains parser-blocking for first-paint appearance. Single-file
+output retains the parser-blocking vendor chain before its inline graph runtime.
 
 `--assets offline` is an explicit opt-in that ships byte-verified copies of the
 same pinned versions instead. The copies live in the checkout at

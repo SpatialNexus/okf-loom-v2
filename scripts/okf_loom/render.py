@@ -6787,6 +6787,10 @@ def _render_graph_page(
     if offline_assets is not None:
         # X1: the same pinned chain, from verified local copies, in order.
         cdn_scripts = offline_assets.graph_scripts(static_prefix)
+    # External classic scripts defer in document order, including their UMD
+    # dependencies, before deferred graph.js. Keep the single-file chain
+    # parser-blocking: its inline graph bootstrap cannot participate in defer.
+    cdn_scripts = cdn_scripts.replace("<script ", "<script defer ")
 
     # P1-3: emit data-okf-mode on the graph page body so graph.js can
     # detect static mode and append .html to the Open-page href (the
