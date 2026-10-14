@@ -2534,7 +2534,7 @@ def _render_not_found_page(*, name: str, path: str, config: dict[str, Any]) -> s
         f' data-theme="{_esc_attr_qs(initial_theme)}"><head>'
         '<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
         f'<title>Page not found — {_esc(name)}</title>'
-        + _ledger_fonts_head("/__static")
+        + _ledger_fonts_head("/__static", mode="serve")
         + '<link rel="stylesheet" href="/__static/wiki.css">'
         '<link rel="stylesheet" href="/__static/shell.css">'
         + _theme_config_html(configured_theme)
@@ -2628,7 +2628,7 @@ def render_feedback_import_page(*, name: str, config: dict[str, Any], availabili
         f'<meta http-equiv="Content-Security-Policy" content="{_RESERVED_CSP}">\n'
         f'<title>Import a feedback note — {_esc(name)}</title>\n'
         + (icon.group(0) + '\n' if icon else '')
-        + _ledger_fonts_head("/__static") +
+        + _ledger_fonts_head("/__static", mode="serve") +
         '<link rel="stylesheet" href="/__static/wiki.css">\n'
         '<link rel="stylesheet" href="/__static/shell.css">\n'
         '<link rel="stylesheet" href="/__static/feedback-import.css">\n'
@@ -4007,15 +4007,15 @@ def _type_icons_block() -> str:
     return _TYPE_ICONS_BLOCK_CACHE
 
 
-def _ledger_fonts_head(static_prefix: str) -> str:
-    """Start upright prose/UI fonts early; italics remain demand-loaded."""
+def _ledger_fonts_head(static_prefix: str, *, mode: str) -> str:
+    """Preload upright fonts on HTTP-only targets, never file-capable static pages."""
     from .viewer.vendor import LEDGER_FACES
     prefix = _esc_attr_qs(static_prefix)
     preloads = "".join(
         f'<link rel="preload" href="{prefix}/{path}" as="font" '
         'type="font/woff2" crossorigin>\n'
         for _family, style, path in LEDGER_FACES if style == "normal"
-    )
+    ) if mode in ("serve", "spa") else ""
     return preloads + f'<link rel="stylesheet" href="{prefix}/ledger-fonts.css">\n'
 
 
@@ -4450,7 +4450,7 @@ def _render_concept_page(
         f'data-okf-capture-revision="{_esc_attr_qs(revision)}"'
     )
 
-    css_link = (_ledger_fonts_head(static_prefix) +
+    css_link = (_ledger_fonts_head(static_prefix, mode=mode) +
                 f'<link rel="stylesheet" href="{static_prefix}/wiki.css">')
     shell_css_link = f'<link rel="stylesheet" href="{static_prefix}/shell.css">'
     # theme.js is parser-blocking (no defer) in <head> so it resolves
@@ -5549,7 +5549,7 @@ def _v2_spotlight_html(bundle: Bundle, mode: str, graph_href: str) -> str:
 _RESERVED_CSP = (
     "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; "
     "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data:; "
-    "connect-src 'self' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; "
+    "connect-src 'self' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; "
     "object-src 'none'; base-uri 'self'; form-action 'self'"
 )
 
@@ -5664,7 +5664,7 @@ def render_reserved_document(document: str, body: str, *, mode: str,
         f'<meta http-equiv="Content-Security-Policy" content="{_RESERVED_CSP}">\n'
         f'<title>{_esc(document)} — {_esc(display)}</title>\n'
         + icon_html +
-        _ledger_fonts_head(prefix) +
+        _ledger_fonts_head(prefix, mode=mode) +
         f'<link rel="stylesheet" href="{prefix}/wiki.css">\n'
         f'<link rel="stylesheet" href="{prefix}/shell.css">\n'
         + _theme_config_html(configured_theme) + '\n'
@@ -6059,7 +6059,7 @@ def _render_index_page(
                   f'data-okf-revision="{_esc_attr_qs(revision)}" data-okf-capture-revision="{_esc_attr_qs(revision)}" '
                   f'data-okf-concept-routes="{_esc_attr_qs(routes_json)}"')
 
-    css_link = (_ledger_fonts_head(static_prefix) +
+    css_link = (_ledger_fonts_head(static_prefix, mode=mode) +
                 f'<link rel="stylesheet" href="{static_prefix}/wiki.css">')
     shell_css_link = f'<link rel="stylesheet" href="{static_prefix}/shell.css">'
     # theme.js in <head> before first paint (no FOUC); see concept page.
@@ -6558,7 +6558,7 @@ def _render_search_page(
         f'data-okf-capture-query="{_esc_attr_qs(query)}" data-okf-revision="{_esc_attr_qs(bundle_revision(bundle))}"'
     )
 
-    css_link = (_ledger_fonts_head(static_prefix) +
+    css_link = (_ledger_fonts_head(static_prefix, mode=mode) +
                 f'<link rel="stylesheet" href="{static_prefix}/wiki.css">')
     shell_css_link = f'<link rel="stylesheet" href="{static_prefix}/shell.css">'
     # theme.js in <head> before first paint (no FOUC); see concept page.
@@ -6752,7 +6752,7 @@ def _render_graph_page(
                   f'data-okf-studio="{("1" if mode == "serve" else "0")}" '
                   f'data-okf-revision="{_esc_attr_qs(revision)}" data-okf-capture-revision="{_esc_attr_qs(revision)}" data-okf-capture-ready="loading"')
 
-    css_link = (_ledger_fonts_head(static_prefix) +
+    css_link = (_ledger_fonts_head(static_prefix, mode=mode) +
                 f'<link rel="stylesheet" href="{static_prefix}/wiki.css">')
     shell_css_link = f'<link rel="stylesheet" href="{static_prefix}/shell.css">'
     graph_css_link = f'<link rel="stylesheet" href="{static_prefix}/graph.css">'

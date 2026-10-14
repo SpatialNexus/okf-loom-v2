@@ -329,6 +329,15 @@ All three mechanisms compose: a bundle can ship a custom `wiki.css`, a
 `ViewerPlugin`, and a `register("panel", …)` extension at the same time.
 
 Ledger fonts (Public Sans and Azeret Mono, normal/italic) are verified vendored
-assets, not network dependencies. `ledger-fonts.css` embeds all four faces and
-the full SIL OFL notices for live, static, SPA and single-file output. Keep
-`font-src data:` when supplying a compatible CSP; do not widen script policy.
+assets, not external network dependencies. For live, static and SPA pages,
+`ledger-fonts.css` references relative WOFF2 files under
+`__static/ledger-public-sans/` and `__static/ledger-azeret-mono/`; static/SPA
+builds copy the faces and SIL OFL `LICENSE` files into those directories even
+in CDN mode. Publish both directories with the site and permit `font-src 'self'`
+in a compatible CSP. The stylesheet also carries the full OFL notices.
+
+Only single-file output embeds all four faces as base64 data URLs and needs
+`font-src data:` for Ledger. All targets use `font-display: swap`, so text can
+paint in a fallback face before the fonts arrive. Only serve and SPA preload
+the two upright faces; static pages omit font preloads to avoid CORS errors
+when opened via `file://`. Do not widen script policy.

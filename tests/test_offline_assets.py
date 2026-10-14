@@ -105,6 +105,9 @@ def test_default_and_explicit_cdn_output_are_identical_and_vendor_free(tmp_path,
         assert 'id="okf-vendor-' not in html
         expected = vendor.CDN_SINGLE_FILE_CSP if target == "single-file" else vendor.CDN_PAGE_CSP
         assert _csp(html) == [expected], page
+        font_src = _csp(html)[0].split("font-src ", 1)[1].split(";", 1)[0]
+        assert font_src == ("'self' data: https://cdn.jsdelivr.net" if target == "single-file"
+                            else "'self' https://cdn.jsdelivr.net"), page
     if target != "single-file":
         graph = (tmp_path / "default" / "__graph.html").read_text(encoding="utf-8")
         assert render._CDN_SCRIPTS in graph
@@ -585,8 +588,11 @@ def test_ledger_fonts_and_full_ofl_ship_on_every_target(tmp_path, target, assets
             assert (out / "__static" / path).read_bytes() == vendor.read_vendor_bytes(path)
         for page in out.rglob("*.html"):
             html = page.read_text()
-            assert html.count('as="font" type="font/woff2" crossorigin') == 2, page
-            assert html.index('rel="preload"') < html.index('rel="stylesheet"')
+            if target == "spa":
+                assert html.count('as="font" type="font/woff2" crossorigin') == 2, page
+                assert html.index('rel="preload"') < html.index('rel="stylesheet"')
+            else:
+                assert 'as="font"' not in html, page
     for family, style, _path in vendor.LEDGER_FACES:
         assert f'font-family:"{family}";font-style:{style};' in text
     assert text.count('font-display:swap;') >= 4

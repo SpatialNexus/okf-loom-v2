@@ -1069,7 +1069,12 @@ Storage denial retains in-memory switching; cross-tab and live OS changes work.
 Deduplicated `okf-loom:themeChanged` events on window carry the current and
 previous palette and scheme, including dark-to-dark palette changes.
 Public Sans and Azeret Mono normal/italic faces and full OFL notices are
-self-hosted on every output, including single-file with embedded data fonts.
+self-hosted on every output. Live/static/SPA pages use relative WOFF2 files;
+static/SPA builds (including CDN mode) emit `__static/ledger-public-sans/`
+and `__static/ledger-azeret-mono/` with the faces and OFL `LICENSE` files.
+Publish both directories with the site. Single-file output alone embeds the
+faces as base64 data URLs. All targets use `font-display: swap`; only serve
+and SPA preload the upright faces, not file-capable static pages.
 The graph key and its counted type/relationship filter controls are owned by
 Graph settings (not a separate canvas legend). Directed edges
 retain a static dash and arrow cue and may animate dash offset while hovered,

@@ -3964,8 +3964,9 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         # ``data:`` (inline SVG icons) plus the CDN for any image asset
         # a bundle might embed from jsdelivr. ``font-src`` allows the CDN
         # because KaTeX's stylesheet references its webfonts relative to
-        # the CDN. Keep this list in sync with the per-page
-        # <meta> CSPs in viewer/templates/ — browsers enforce the
+        # the CDN. Ledger fonts are same-origin WOFF2 files, so no ``data:``
+        # font source is needed on served pages. Keep this list in sync with
+        # the per-page <meta> CSPs in viewer/templates/ — browsers enforce the
         # INTERSECTION of header + meta, so a directive missing here or
         # there silently wins.
         self.send_header(
@@ -3976,7 +3977,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
                 "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
                 "img-src 'self' data: https://cdn.jsdelivr.net; "
                 "connect-src 'self' https://cdn.jsdelivr.net; "
-                "font-src 'self' data: https://cdn.jsdelivr.net; "
+                "font-src 'self' https://cdn.jsdelivr.net; "
                 "object-src 'none'; "
                 "base-uri 'self'; "
                 "form-action 'self'"
