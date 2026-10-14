@@ -2105,7 +2105,12 @@ body.okf-viewer--graph[data-okf-single-destination="index"] {
   min-height: 100dvh;
   overflow-y: visible;
 }
-
+/* The Graph/Concepts/Details tabs switch panes of the graph workspace, which
+ * the Index destination hides. Like the static/serve index (which has no pane
+ * tabs), the Index offers none; the shell's Graph link is the way in, and the
+ * tabs return, reflecting the visible pane, once the graph is shown. Stronger
+ * than the narrow-reflow display rule that docks them in the top bar. */
+body.okf-viewer--graph.okf-viewer--singlefile[data-okf-single-destination="index"] .okf-graph-mobile-nav { display: none !important; }
 
 /* Coarse pointers: every graph and single-file control is a 44px target.
  * Last in the file so it follows the base rules it enlarges. */

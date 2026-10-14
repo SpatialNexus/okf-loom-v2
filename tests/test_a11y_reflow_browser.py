@@ -335,6 +335,51 @@ def test_graph_route_resizes_in_place_without_a_stale_width(chromium, server_url
         context.close()
 
 
+def test_single_file_index_offers_graph_pane_tabs_only_with_the_graph(chromium, tmp_path):
+    """Narrow single-file output docks the Graph/Concepts/Details pane tabs
+    in the top bar. They switch panes of the graph workspace, so the Index
+    destination (like the static and live index, which have no pane tabs)
+    hides them; with the graph shown they return and the pressed tab is the
+    visible pane."""
+    from okf_loom import Bundle
+    from okf_loom.render import render_single_file
+
+    single = tmp_path / 'single.html'
+    render_single_file(Bundle.load(copy_bundle(DEMO_BUNDLE, tmp_path / 'bundle')), single)
+    context = chromium.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True, has_touch=True)
+    try:
+        page = context.new_page()
+        page.goto(single.as_uri())
+        page.wait_for_function("() => document.body.dataset.okfSingleDestination === 'index'"
+                               " && document.body.hasAttribute('data-okf-narrow-reflow')"
+                               " && window.__okfLoomGraph && window.__okfLoomGraph.interaction")
+        panes = page.get_by_role('navigation', name='Graph panes')
+        expect(page.locator('#okf-single-index')).to_be_visible()
+        expect(panes).to_be_hidden()
+        assert page.evaluate("() => getComputedStyle(document.querySelector('.okf-graph-mobile-nav')).display") == 'none'
+
+        primary = page.get_by_role('navigation', name='Primary navigation')
+        primary.get_by_role('link', name='Graph', exact=True).click()
+        page.wait_for_function("() => document.body.dataset.okfSingleDestination === 'graph'")
+        expect(panes).to_be_visible()
+        for name, pane in (('Concepts', 'concepts'), ('Details', 'details'), ('Graph', 'graph')):
+            if name != 'Concepts':
+                panes.get_by_role('button', name=name, exact=True).click()
+            expect(page.locator('.okf-layout')).to_have_attribute('data-mobile-pane', pane)
+            pressed = panes.locator('button[aria-pressed="true"]')
+            expect(pressed).to_have_count(1)
+            expect(pressed).to_have_text(name)
+
+        primary.get_by_role('link', name='Index', exact=True).click()
+        page.wait_for_function("() => document.body.dataset.okfSingleDestination === 'index'")
+        expect(page.locator('#okf-single-index')).to_be_visible()
+        expect(panes).to_be_hidden()
+        overflow = page.evaluate(_OVERFLOW)
+        assert overflow['scrollWidth'] <= overflow['innerWidth'] + 1, overflow
+    finally:
+        context.close()
+
+
 @pytest.mark.parametrize('theme', ['bone', 'slate', 'clay', 'plum'])
 def test_ledger_hover_press_and_breadcrumb_cues_remain_visible(open_page, theme):
     page = open_page(CONCEPT, DESKTOP)
