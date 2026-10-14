@@ -487,8 +487,8 @@ def test_graph_chrome_is_square_and_starting_points_are_hairline_rows(
     assert abs(proof["headCentre"] - proof["fieldCentre"]) <= 2, proof
 
 
-_DEPTH_SELECT_JS = """() => {
-  const select = document.querySelector('.okf-signal select[aria-label="Depth"]');
+_SELECT_FIELD_JS = """selector => {
+  const select = document.querySelector(selector);
   const root = getComputedStyle(document.documentElement);
   const resolve = value => {
     const probe = document.createElement('span');
@@ -508,9 +508,16 @@ _DEPTH_SELECT_JS = """() => {
     inputBorder: resolve(root.getPropertyValue('--input-border').trim()),
     inputBg: resolve(root.getPropertyValue('--input-bg').trim()),
     inputText: resolve(root.getPropertyValue('--input-text').trim()),
-    ring: resolve(root.getPropertyValue('--okf-accent').trim()),
+    rings: [resolve(root.getPropertyValue('--okf-accent').trim()), resolve(root.getPropertyValue('--focus').trim())],
   };
 }"""
+
+# Graph settings Depth and Group by, and the canvas focus bar's depth.
+GRAPH_SELECTS = (
+    '.okf-signal select[aria-label="Depth"]',
+    '.okf-signal select[aria-label="Group by"]',
+    '.okf-graph-focusbar select',
+)
 
 
 def _reveal_depth_select(page):
@@ -534,34 +541,40 @@ def _explore_neighbourhood(page) -> None:
     page.wait_for_function("() => !document.querySelector('.okf-signal select[aria-label=\"Depth\"]').disabled")
 
 
-def test_graph_settings_depth_select_is_a_ledger_field(server_url: str, page) -> None:
-    """Graph settings' Depth select is a Ledger field in every palette: body
-    type, --input tokens, a square 1px outline, no shadow, the accent focus
-    ring, a 44px coarse target and a system outline under forced colours."""
+def test_graph_selects_are_ledger_fields(server_url: str, page) -> None:
+    """Every graph select (Graph settings Depth and Group by, and the focus
+    bar's neighbourhood depth) is a Ledger field in every palette: body type,
+    --input tokens, a square 1px outline, no shadow, a 2px focus ring, a 44px
+    coarse target and a system outline under forced colours."""
     _open_graph(page, server_url)
-    select = _reveal_depth_select(page)
+    _reveal_depth_select(page)
     _explore_neighbourhood(page)
+    expect(page.locator(".okf-graph-focusbar select")).to_be_visible()
     for palette in PALETTES:
         _set_palette(page, palette)
-        seen = page.evaluate(_DEPTH_SELECT_JS)
-        assert seen["disabled"] is False, (palette, seen)
-        assert "Public Sans" in seen["font"] and seen["size"] == "13px", (palette, seen)
-        assert seen["radius"] == "0px" and seen["shadow"] == "none", (palette, seen)
-        assert seen["border"][:2] == ["1px", "solid"] and seen["border"][2] == seen["inputBorder"], (palette, seen)
-        assert seen["background"] == seen["inputBg"] and seen["color"] == seen["inputText"], (palette, seen)
-        assert 32 <= seen["height"] < 44, (palette, seen)
-    page.keyboard.press("Tab")
-    select.focus()
-    focused = page.evaluate(_DEPTH_SELECT_JS)
-    assert focused["focusVisible"], focused
-    assert focused["outline"] == ["solid", "2px", focused["ring"]], focused
+        for selector in GRAPH_SELECTS:
+            seen = page.evaluate(_SELECT_FIELD_JS, selector)
+            where = (palette, selector, seen)
+            assert seen["disabled"] is False, where
+            assert "Public Sans" in seen["font"] and seen["size"] == "13px", where
+            assert seen["radius"] == "0px" and seen["shadow"] == "none", where
+            assert seen["border"][:2] == ["1px", "solid"] and seen["border"][2] == seen["inputBorder"], where
+            assert seen["background"] == seen["inputBg"] and seen["color"] == seen["inputText"], where
+            assert 32 <= seen["height"] < 44, where
+    for selector in GRAPH_SELECTS:
+        page.locator(selector).scroll_into_view_if_needed()
+        page.keyboard.press("Tab")
+        page.locator(selector).focus()
+        focused = page.evaluate(_SELECT_FIELD_JS, selector)
+        assert focused["focusVisible"], (selector, focused)
+        assert focused["outline"][:2] == ["solid", "2px"] and focused["outline"][2] in focused["rings"], (selector, focused)
 
     page.emulate_media(forced_colors="active")
     page.wait_for_function("() => matchMedia('(forced-colors: active)').matches")
-    forced = page.evaluate(_DEPTH_SELECT_JS)
-    assert forced["border"][:2] == ["1px", "solid"], forced
-    assert forced["border"][2] != forced["background"], forced
-    assert forced["outline"][0] == "solid" and forced["outline"][1] == "2px", forced
+    for selector in GRAPH_SELECTS:
+        forced = page.evaluate(_SELECT_FIELD_JS, selector)
+        assert forced["border"][:2] == ["1px", "solid"], (selector, forced)
+        assert forced["border"][2] != forced["background"], (selector, forced)
 
     coarse = page.context.browser.new_context(viewport={"width": 390, "height": 844},
                                               is_mobile=True, has_touch=True)
@@ -570,7 +583,8 @@ def test_graph_settings_depth_select_is_a_ledger_field(server_url: str, page) ->
         _open_graph(phone, server_url)
         assert phone.evaluate("matchMedia('(pointer: coarse)').matches")
         _reveal_depth_select(phone)
-        assert phone.evaluate(_DEPTH_SELECT_JS)["height"] >= 44
+        for selector in GRAPH_SELECTS[:2]:
+            assert phone.evaluate(_SELECT_FIELD_JS, selector)["height"] >= 44, selector
     finally:
         coarse.close()
 

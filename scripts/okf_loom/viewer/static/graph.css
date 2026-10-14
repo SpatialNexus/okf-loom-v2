@@ -533,11 +533,13 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-topbar__controls>*,body.okf-
 .okf-signal__row-hint { margin: 2px 0 0; }
 .okf-signal__row select,
 .okf-signal__row input[type="range"] { width: 100%; }
-/* Graph settings selects (Depth, Group by) are Ledger fields, matching the
- * graph tool row and index sort/filter selects: --input tokens, a square 1px
- * outline, body type, and the shared field height (44px on coarse pointers).
- * Focus uses the .okf-signal ring; :disabled keeps its muted rule. */
-.okf-signal__row select {
+/* Graph selects (Graph settings Depth and Group by, and the canvas focus
+ * bar's neighbourhood depth) are Ledger fields, matching the graph tool row
+ * and index sort/filter selects: --input tokens, a square 1px outline, body
+ * type, and the shared field height (44px on coarse pointers). Focus uses
+ * the .okf-signal / global ring; :disabled keeps its muted rule. */
+.okf-signal__row select,
+.okf-graph-focusbar select {
   box-sizing: border-box;
   min-height: var(--okf-graph-field-h);
   padding: 0 8px;
@@ -914,7 +916,7 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
   .okf-detail__header > .okf-graph-actions button:first-child { display: none; }
 }
 .okf-graph-focusbar{position:absolute;top:56px;left:50%;z-index:31;display:flex;align-items:center;gap:var(--okf-space-2);max-width:calc(100% - 32px);padding:6px 8px;background:var(--okf-bg-elev);border:0;border-radius:0;box-shadow:var(--shadow-pop);font-size:var(--okf-text-sm);transform:translateX(-50%)}
-.okf-graph-focusbar[hidden]{display:none}.okf-graph-focusbar label{display:flex;align-items:center;gap:4px;white-space:nowrap}.okf-graph-focusbar select,.okf-graph-focusbar button{min-height:32px;color:var(--okf-fg);background:var(--okf-bg-elev);border:1px solid var(--okf-border-strong);border-radius:0}
+.okf-graph-focusbar[hidden]{display:none}.okf-graph-focusbar label{display:flex;align-items:center;gap:4px;white-space:nowrap}.okf-graph-focusbar button{min-height:32px;color:var(--okf-fg);background:var(--okf-bg-elev);border:1px solid var(--okf-border-strong);border-radius:0}
 .okf-detail-path{margin:0 0 var(--okf-space-4);padding:var(--okf-space-3) 0;border-block:1px solid var(--okf-border)}.okf-detail-path h3,.okf-detail-path p{margin-block:0 var(--okf-space-2)}
 .okf-detail-path__chain{display:flex;align-items:center;gap:var(--okf-space-2);padding:0;margin:0 0 var(--okf-space-3);list-style:none;overflow-x:auto}.okf-detail-path__chain li{display:flex;align-items:center;gap:var(--okf-space-2)}
 .okf-detail-path__node{color:var(--okf-accent);background:transparent;border:0;padding:4px;font-weight:700;cursor:pointer}.okf-detail-path__relation{display:inline-flex;padding:2px 6px;background:var(--okf-bg-inset);border-radius:0;color:var(--okf-fg-muted);font-size:var(--okf-text-xs);white-space:nowrap}.okf-detail-path__relation--reverse{border:1px dashed var(--okf-border-strong);color:var(--okf-fg)}
@@ -1963,8 +1965,8 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
 
 @media (forced-colors: active) {
   /* Settings selects keep a system field outline and a Highlight focus ring. */
-  .okf-signal__row select { border: 1px solid ButtonText; background-color: Field; color: FieldText; }
-  .okf-signal__row select:focus-visible { outline: 2px solid Highlight; outline-offset: 2px; }
+  .okf-signal__row select, .okf-graph-focusbar select { border: 1px solid ButtonText; background-color: Field; color: FieldText; }
+  .okf-signal__row select:focus-visible, .okf-graph-focusbar select:focus-visible { outline: 2px solid Highlight; outline-offset: 2px; }
   /* The selected lens must remain identifiable when accent/background colours
    * collapse to system colours.  The textual cue is intentionally present in
    * addition to the border, not a colour-only treatment. */
