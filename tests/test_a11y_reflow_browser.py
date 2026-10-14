@@ -113,13 +113,18 @@ def coarse_server_url(tmp_path_factory):
         yield base
 
 
+# The shell's brand link and the (focused) skip link are coarse targets on
+# every route, not only the route-specific controls.
+_SHELL_TARGETS = ['.okf-brand-link', '.okf-skip-link']
+
+
 @pytest.mark.parametrize('route,selectors', [
     (CONCEPT, ['.okf-sidebar-panel__toggle', '.okf-heading-anchor', '.okf-breadcrumb a',
                '.okf-conn__title', '.okf-viewswitch__btn', '.okf-onthispage__filter',
-               '.okf-toast__action', '.okf-toast__close']),
-    (INDEX, ['.okf-card__link', '.okf-card__comments', '.okf-v2-spotlight__tertiary']),
+               '.okf-toast__action', '.okf-toast__close', *_SHELL_TARGETS]),
+    (INDEX, ['.okf-card__link', '.okf-card__comments', '.okf-v2-spotlight__tertiary', *_SHELL_TARGETS]),
     (SEARCH, ['.okf-search-mode', '.okf-search-disclosure > summary',
-              '.okf-search-query input', '.okf-search-submit']),
+              '.okf-search-query input', '.okf-search-submit', *_SHELL_TARGETS]),
 ])
 def test_core_coarse_pointer_targets_are_44px_at_390(chromium, coarse_server_url, route, selectors):
     server_url = coarse_server_url
@@ -151,9 +156,7 @@ def test_core_coarse_pointer_targets_are_44px_at_390(chromium, coarse_server_url
               window.okfLoomStudio._toast(action, {sticky: true});
             }""")
         for selector in selectors:
-            targets = page.locator(selector).evaluate_all("""nodes => nodes.filter(n => n.checkVisibility()).map(n => {
-              const r = n.getBoundingClientRect(); return {text: n.textContent, width: r.width, height: r.height};
-            })""")
+            targets = _coarse_targets(page, selector)
             assert targets, f'{route}: no visible target for {selector}'
             assert all(t['width'] >= 43.5 and t['height'] >= 43.5 for t in targets), (route, selector, targets)
         if route == CONCEPT:
@@ -161,6 +164,65 @@ def test_core_coarse_pointer_targets_are_44px_at_390(chromium, coarse_server_url
             assert page.evaluate('window.__coarseAction')
             page.locator('.okf-toast__close').click()
             expect(page.locator('.okf-toast__action')).to_have_count(0)
+        overflow = page.evaluate(_OVERFLOW)
+        assert overflow['scrollWidth'] <= overflow['innerWidth'] + 1, overflow
+    finally:
+        context.close()
+
+
+def _coarse_targets(page, selector):
+    """Measure every visible match; skip links are measured while focused,
+    the only state in which they are on screen."""
+    measure = """n => { const r = n.getBoundingClientRect();
+      return {text: n.textContent, width: r.width, height: r.height}; }"""
+    if selector == '.okf-skip-link':
+        links = page.locator(selector)
+        targets = []
+        for i in range(links.count()):
+            link = links.nth(i)
+            if not link.evaluate('n => n.checkVisibility()'):
+                continue
+            link.focus()
+            expect(link).to_be_focused()
+            # Focused skip links slide in from top:-100px; measure on screen.
+            page.wait_for_function('n => n.getBoundingClientRect().top >= 0', arg=link.element_handle())
+            targets.append(link.evaluate(measure))
+        return targets
+    return page.locator(selector).evaluate_all(
+        f"nodes => nodes.filter(n => n.checkVisibility()).map({measure})")
+
+
+def test_coarse_pointer_shell_targets_are_44px_on_graph_and_single_file(chromium, coarse_server_url, tmp_path):
+    """The graph route and the single-file target restyle the shell brand and
+    carry their own skip links; the single-file search drawer reuses the
+    search-mode labels. Each stays a 44px target on a coarse pointer."""
+    from okf_loom import Bundle
+    from okf_loom.render import render_single_file
+
+    single = tmp_path / 'single.html'
+    render_single_file(Bundle.load(copy_bundle(DEMO_BUNDLE, tmp_path / 'bundle')), single)
+    context = chromium.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True,
+                                   has_touch=True, reduced_motion='reduce')
+    try:
+        page = context.new_page()
+        page.route('https://cdn.jsdelivr.net/**', lambda route: route.abort())
+        page.goto(coarse_server_url + GRAPH)
+        page.wait_for_function(STUDIO_READY)
+        assert page.evaluate("matchMedia('(pointer: coarse)').matches")
+        measured = {GRAPH: {s: _coarse_targets(page, s) for s in _SHELL_TARGETS}}
+        assert len(measured[GRAPH]['.okf-skip-link']) >= 2, measured
+        page.goto(single.as_uri())
+        page.wait_for_function("() => document.body.dataset.okfSearchCaptureReady === 'ready'"
+                               " && !document.getElementById('okf-single-search-toggle').disabled")
+        page.get_by_role('navigation', name='Primary navigation').get_by_role(
+            'button', name='Search', exact=True).click()
+        expect(page.locator('#okf-single-search .okf-search-mode').first).to_be_visible()
+        measured['single-file'] = {s: _coarse_targets(page, s)
+                                   for s in ['#okf-single-search .okf-search-mode', *_SHELL_TARGETS]}
+        for surface, by_selector in measured.items():
+            for selector, targets in by_selector.items():
+                assert targets, f'{surface}: no visible target for {selector}'
+                assert all(t['width'] >= 43.5 and t['height'] >= 43.5 for t in targets), (surface, selector, targets)
         overflow = page.evaluate(_OVERFLOW)
         assert overflow['scrollWidth'] <= overflow['innerWidth'] + 1, overflow
     finally:
