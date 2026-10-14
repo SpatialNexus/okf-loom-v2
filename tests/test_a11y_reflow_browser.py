@@ -198,6 +198,22 @@ def _assert_shell_search_shows_placeholder(page, label):
     assert overflow['scrollWidth'] <= overflow['innerWidth'] + 1, (label, width, overflow)
 
 
+@pytest.mark.parametrize('attention', [None, 'pending', 'failure'])
+@pytest.mark.parametrize('route', [CONCEPT, INDEX, GRAPH])
+@pytest.mark.parametrize('viewport', [(390, 844, 1), (320, 844, 1)], ids=_viewport_id)
+def test_fine_pointer_narrow_shell_search_shows_placeholder(open_page, route, viewport, attention):
+    """A narrow fine-pointer window keeps its compact rows and the search
+    field keeps its whole placeholder, in every Studio attention state."""
+    page = open_page(route, viewport)
+    assert not page.evaluate("matchMedia('(pointer: coarse)').matches")
+    page.evaluate("""async (attention) => {
+      const launcher = document.querySelector('.okf-studio-launcher');
+      if (attention) launcher.dataset.attention = attention; else delete launcher.dataset.attention;
+      await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)));
+    }""", attention)
+    _assert_shell_search_shows_placeholder(page, route)
+
+
 def _coarse_targets(page, selector):
     """Measure every visible match; skip links are measured while focused,
     the only state in which they are on screen."""

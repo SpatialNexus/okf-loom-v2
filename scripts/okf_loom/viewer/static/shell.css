@@ -228,8 +228,11 @@ html:not([data-okf-js="1"]) #okf-theme { display: none !important; }
    * instead of the shell's promised 44px floor. */
   body.okf-viewer .okf-shell__nav .okf-studio-launcher { min-height: 44px; }
   /* Reserve one compact attention slot so even Needs attention cannot push
-   * Studio onto a third row. Full status remains in the accessible name. */
-  body.okf-viewer .okf-shell .okf-studio-launcher { position: relative; box-sizing: border-box; min-width: 5.5rem; }
+   * Studio onto a third row. Full status remains in the accessible name.
+   * 4.75rem holds the widest state ("Studio ■", 75px) and no more: every
+   * extra pixel comes out of the search field, whose "Search…" placeholder
+   * must still fit beside it at 390px. */
+  body.okf-viewer .okf-shell .okf-studio-launcher { position: relative; box-sizing: border-box; min-width: 4.75rem; }
   .okf-shell .okf-studio-launcher__summary {
     position: absolute;
     width: 1px;
