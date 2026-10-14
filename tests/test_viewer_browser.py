@@ -269,7 +269,7 @@ def test_delayed_initial_graph_fetch_is_fenced_by_pagehide_and_bfcache_restarts(
       window.fetch=(input,init) => {
         const url=typeof input==='string'?input:(input&&input.url)||'';
         const stack=new Error('graph request probe').stack||'';
-        if (!new URL(url,location.href).pathname.endsWith('/__data/graph.json') || !stack.includes('/graph.js:')) return real(input,init);
+        if (!new URL(url,location.href).pathname.endsWith('/__data/graph.json') || (!stack.includes('/graph.js:') && !stack.includes('/studio.js:'))) return real(input,init);
         const requestId=++window.__initialGraphGate.requestCount;
         window.__initialGraphGate.stacks.push(stack);
         return real(input,init).then(response => response.json()).then(payload => {
@@ -6129,7 +6129,7 @@ def test_graph_phase3_comment_badge_semantics_index_detail_and_canvas(
     assert rows[1]["hasCanvas"] == 1 and rows[1]["canvas"] == "none"
     assert all(row["hasCanvas"] == 1 and row["canvas"].startswith("data:image/svg+xml") for row in rows[2:])
     assert result["detail"] == "1234"
-    assert result["cache"] == "no-store"
+    assert result["cache"] == "no-cache"
     assert result["nodeCount"] == result["payloadCount"] == 5, "accepted capture payload must exclude exit visuals"
     assert result["transitionPending"] is True and result["pendingRaw"] >= result["payloadCount"]
     assert result["settledRaw"] == result["payloadCount"], "raw Cytoscape count must converge after transition settlement"
@@ -6159,7 +6159,7 @@ def test_graph_phase3_comment_refresh_rejects_malformed_and_preserves_last_good(
           await refresh(); const network=read(),networkReady=ready();
           window.fetch=(req,opt)=>String(req)===url?(options.push(opt),Promise.resolve(new Response(JSON.stringify(payload(11)),{status:200,headers:{'Content-Type':'application/json'}}))):native(req,opt);
           await refresh(); const recovered=read(),recoveredReady=ready();
-          return {good,malformed,unavailable,network,recovered,goodReady,malformedReady,unavailableReady,networkReady,recoveredReady,noStore:options.every(o=>o.cache==='no-store')};
+          return {good,malformed,unavailable,network,recovered,goodReady,malformedReady,unavailableReady,networkReady,recoveredReady,revalidates:options.every(o=>o.cache==='no-cache')};
         }"""
     )
     assert "7 active comments" in result["good"]
@@ -6172,7 +6172,7 @@ def test_graph_phase3_comment_refresh_rejects_malformed_and_preserves_last_good(
         assert result[key]["error"]
     assert "11 active comments" in result["recovered"]
     assert result["recoveredReady"] == {"graph": "ready", "page": "ready", "error": None}
-    assert result["noStore"] is True
+    assert result["revalidates"] is True
 
 
 def test_multi_edge_keyboard_pointer_panel_and_secondary_semantics(server_url: str, page) -> None:
