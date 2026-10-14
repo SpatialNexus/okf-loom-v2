@@ -149,8 +149,12 @@
   // The lens ramp: a MUTED colour set derived from the active palette, so a
   // lens keeps its meaning without breaking the one-accent rule.
   //   categorical  8 low-chroma hues stepped by the golden angle from the
-  //                accent hue, at about the neutral node's lightness
-  //                (themes/communities, groups).
+  //                accent hue, near the neutral node's lightness
+  //                (themes/communities, groups). Dark palettes lift the
+  //                node lightness; a light palette (Bone) steps just below
+  //                its node at a lower chroma, because the same chroma at
+  //                paper lightness reads as pastel candy rather than as
+  //                the muted tints the dark palettes get.
   //   sequence(t)  neutral node (t=0) -> a muted accent (t=1), in OKLab
   //                (freshness, bridging, importance).
   //   relation     the categorical hues at the edge's lightness (typed
@@ -169,7 +173,7 @@
       }
       return rgb;
     }
-    var catL = node[0] + (dark ? 0.12 : -0.04), catC = dark ? 0.05 : 0.055;
+    var catL = node[0] + (dark ? 0.12 : -0.07), catC = dark ? 0.05 : 0.034;
     var categorical = [], relation = [];
     for (var k = 0; k < 8; k++) {
       categorical.push(colourHex(legible(catL, catC, accH + k * GOLDEN_ANGLE)));
@@ -4518,6 +4522,15 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
       var minimapButton=zbtn("minimap","Show minimap","Overview",function(){minimapWrap.hidden=!minimapWrap.hidden;var minimapAction=minimapWrap.hidden?"Show minimap":"Hide minimap";minimapButton.setAttribute("aria-pressed",String(!minimapWrap.hidden));minimapButton.setAttribute("aria-label",minimapAction);minimapButton.title=minimapAction;minimapButton.dataset.tooltip=minimapAction;syncMinimap();});minimapButton.setAttribute("aria-pressed","false");
       viewportRerunButton=zbtn("layout", "Re-run layout", "Layout", function () { viewportRerunButton.disabled=true;viewportRerunButton.dataset.layoutState="running";viewportRerunButton.classList.add("is-running");viewportRerunButton.title="Layout running";viewportRerunButton.dataset.tooltip="Layout running";runLayoutNow(true,false,true); });viewportRerunButton.dataset.layoutState="ready";
       container.appendChild(wrap);
+      // The zoom column (bottom-right) and the All concepts summary
+      // (top-right) share the right edge. When the canvas is too short for
+      // both (the single-file Search & context drawer open, a short window)
+      // mark it so CSS lays the cluster out as a bottom-left row instead of
+      // stacking it over the summary. Docked mobile toolbars are not direct
+      // children and never take the mark.
+      function syncCanvasClearance(){var zoom=wrap.parentNode===container?wrap:null,index=container.querySelector(":scope > .okf-node-index"),summary=index&&index.querySelector("summary");var short=false;if(zoom&&summary&&summary.offsetParent!==null){var buttons=Array.prototype.filter.call(zoom.children,function(child){return child.offsetParent!==null;}),column=0;buttons.forEach(function(child){column+=child.offsetHeight;});column+=Math.max(0,buttons.length-1)*4;short=container.clientHeight<index.offsetTop+summary.offsetHeight+8+column+14;}if(short!==container.hasAttribute("data-okf-graph-short"))container.toggleAttribute("data-okf-graph-short",short);}
+      if(typeof ResizeObserver!=="undefined"){var canvasClearanceObserver=new ResizeObserver(syncCanvasClearance);canvasClearanceObserver.observe(container);window.addEventListener("pagehide",function(){canvasClearanceObserver.disconnect();});window.addEventListener("pageshow",function(event){if(event.persisted)canvasClearanceObserver.observe(container);});}
+      syncCanvasClearance();
       if(isMobileGraphViewport()){var viewportToolbar=document.createElement("div");viewportToolbar.className="okf-graph-viewport-toolbar";container.appendChild(viewportToolbar);viewportToolbar.appendChild(wrap);}
       ["pointerdown","mousedown","touchstart","click","dblclick","wheel"].forEach(function(name){wrap.addEventListener(name,function(e){e.stopPropagation();});});
       minimapWrap=document.createElement("div");minimapWrap.className="okf-graph-minimap";minimapWrap.hidden=true;minimapWrap.setAttribute("aria-hidden","true");var minimapLabel=document.createElement("span");minimapLabel.textContent="Overview";minimapWrap.appendChild(minimapLabel);minimapCanvas=document.createElement("canvas");minimapCanvas.width=160;minimapCanvas.height=100;minimapWrap.appendChild(minimapCanvas);container.appendChild(minimapWrap);
@@ -6024,7 +6037,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
         if (modal || replayStart) try { next.focus({ preventScroll: true }); } catch (e) { try { next.focus(); } catch (e2) {} }
        }
       var replay = document.createElement("button");
-      replay.type = "button"; replay.className = "okf-graph-tour-replay";
+      replay.type = "button"; replay.className = "okf-btn okf-graph-tour-replay";
       replay.textContent = "Take a 45-second graph tour";
       replay.setAttribute("aria-label", "Take a 45-second graph tour");
       var helpGroup=document.createElement("div");helpGroup.className="okf-graph-help";helpGroup.setAttribute("role","group");helpGroup.setAttribute("aria-label","Graph help");var helpLabel=document.createElement("span");helpLabel.className="okf-graph-help__label";helpLabel.textContent="Help";helpGroup.appendChild(helpLabel);helpGroup.appendChild(replay);

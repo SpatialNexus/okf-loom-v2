@@ -18,7 +18,7 @@
 
 /* Field height for the graph tool rows: 34px, 44px on coarse pointers. */
 :root { --okf-graph-field-h: 34px; }
-@media (pointer: coarse) { :root { --okf-graph-field-h: 44px; } }
+/* Coarse pointers raise it to 44px (the coarse block at the end of this file). */
 
 #okf-graph {
   background: var(--graph-bg);
@@ -436,33 +436,16 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-topbar__controls>*,body.okf-
 }
 .okf-signal__lenses .okf-signal__seg { flex: 1 1 auto; }
 .okf-signal__advanced { margin-top: var(--okf-space-2); }
+/* Graph settings opens like its sibling disclosures (Explore with lenses,
+ * Themes in this graph): the native marker on the left, body type, ink. */
 .okf-signal__advanced > summary {
-  cursor: pointer;
-  font-family: var(--font-label);
-  font-size: var(--label-size);
-  font-weight: var(--label-weight);
-  letter-spacing: var(--label-track);
-  text-transform: uppercase;
-  color: var(--label-color);
-  list-style: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--okf-space-1);
-  width: 100%;
   min-height: 44px;
-  padding: 8px 2px;
-  white-space: normal;
+  padding-block: .65rem;
+  cursor: pointer;
+  color: var(--okf-fg);
+  font-weight: 650;
   overflow-wrap: anywhere;
 }
-.okf-signal__advanced > summary::-webkit-details-marker { display: none; }
-.okf-signal__advanced > summary::after {
-  content: "▸";
-  color: var(--okf-fg-muted);
-  transition: transform 0.15s ease;
-}
-.okf-signal__advanced[open] > summary::after { transform: rotate(90deg); }
-.okf-signal__advanced > summary:hover { color: var(--okf-accent); }
 .okf-signal__advanced > summary:focus-visible { outline: 2px solid var(--okf-accent); outline-offset: 2px; }
 .okf-signal__body {
   max-height: min(52vh, 440px);
@@ -957,6 +940,13 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
   box-shadow: none;
 }
 .okf-graph-zoom button:focus-visible { outline: 2px solid var(--okf-focus-ring); outline-offset: 2px; }
+/* A short canvas (the single-file Search & context drawer open, a short
+ * window) cannot fit the column beside All concepts: graph.js marks it and
+ * the cluster becomes a row along the bottom-left edge, with its tooltips
+ * above the buttons. */
+#okf-graph[data-okf-graph-short] > .okf-graph-zoom { flex-direction: row; left: 14px; right: auto; }
+#okf-graph[data-okf-graph-short] > .okf-graph-zoom button[data-tooltip]::after { top: auto; right: auto; bottom: calc(100% + 8px); left: 0; transform: none; }
+#okf-graph[data-okf-graph-short] > .okf-graph-minimap { right: auto; left: 14px; bottom: 66px; }
 .okf-viewport-icon{width:20px;height:20px;display:block}.okf-graph-zoom button.is-running .okf-viewport-icon{animation:okf-viewport-spin .8s linear infinite}.okf-graph-zoom button.is-failed{border-width:2px;border-color:var(--okf-error);color:var(--okf-error)}@keyframes okf-viewport-spin{to{transform:rotate(360deg)}}
 .okf-viewport-label{display:none}
 .okf-graph-minimap{position:absolute;right:58px;bottom:14px;z-index:24;width:160px;height:116px;background:var(--okf-bg-elev);border:0;border-radius:0;box-shadow:var(--shadow-pop);overflow:hidden;pointer-events:none}.okf-graph-minimap[hidden]{display:none}.okf-graph-minimap>span{display:block;height:16px;padding-inline:5px;font-family:var(--font-label);font-size:var(--label-size);font-weight:var(--label-weight);letter-spacing:var(--label-track);text-transform:uppercase;line-height:16px;color:var(--label-color);background:var(--okf-bg-inset);border-bottom:1px solid var(--okf-border)}.okf-graph-minimap canvas{display:block;width:160px;height:100px}
@@ -1178,6 +1168,12 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
 .okf-graph-context-actions { margin-top: var(--okf-space-2); }
 .okf-graph-copy-fallback { position: fixed; right: var(--okf-space-4); bottom: var(--okf-space-4); z-index: 70; width: min(34rem, calc(100vw - 2 * var(--okf-space-4))); padding: var(--okf-space-3); background: var(--okf-bg-elev); border: 0; border-radius: 0; box-shadow: var(--shadow-pop); }
 
+/* Single-file banners sit on the same column as the index and the Search &
+ * context drawer (the page column itself, not the document gutter). */
+.okf-viewer--singlefile .okf-studio-fallback-banner {
+  padding-inline: max(var(--okf-space-4), calc((100vw - var(--okf-maxw)) / 2));
+}
+
 /* Single-file Index: the Ledger inventory ruler on the portable list —
  * row number / record (title over mono type and id) / summary, hairline
  * rows, ink titles. Row numbers are CSS counters, so they follow the list. */
@@ -1349,7 +1345,9 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
   .okf-mobile-secondary__summary [aria-label*="command palette" i]{white-space:nowrap!important}
   .okf-mobile-secondary__summary [aria-label*="command palette" i] kbd{display:none}
   .okf-mobile-secondary__summary [aria-label^="Live updates connection"]{width:auto!important;min-width:64px;overflow:visible;white-space:nowrap!important;font-size:var(--okf-text-sm);color:var(--okf-fg)}
-  .okf-mobile-mode{display:inline-flex;align-items:center;padding:3px 7px;border:1px solid var(--okf-border-strong);border-radius:0;font-weight:750;white-space:normal;text-align:end}
+  /* The mode indicator (Local / Static / Live) is a plain status word, as
+   * on wide screens, not a boxed control. */
+  .okf-mobile-mode{display:inline-flex;align-items:center;padding:3px 7px;border:0;border-radius:0;font-weight:750;white-space:normal;text-align:end}
   .okf-live-label{margin-inline-start:5px;font-weight:700;color:currentColor}
   .okf-mobile-secondary__toggle{width:auto;min-width:44px;padding:6px 8px;color:var(--okf-fg);background:var(--okf-bg-inset);border:1px solid var(--okf-border-strong);border-radius:0;font:inherit;font-weight:600;white-space:nowrap!important;overflow-wrap:normal!important}
   .okf-mobile-secondary__toggle:focus-visible{outline:2px solid var(--okf-accent);outline-offset:2px}
@@ -1570,14 +1568,10 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
     font-size: 14px !important;
     line-height: 1.2;
   }
-  .okf-mobile-mode {
-    border-color: var(--okf-border-strong);
-    background: transparent;
-  }
+  .okf-mobile-mode { background: transparent; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .okf-signal__advanced > summary::after { transition: none !important; }
   /* Phase 3: the orphan shelf, hub halo, and broken-link badge are static
    * (no transitions introduced). This guard exists so any future motion
    * enhancement is gated from the start. */
@@ -1774,7 +1768,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
   line-height: 1.2;
 }
 @media (max-width: 640px) {
-  .okf-viewer--graph .okf-graph-route-title { padding: 4px var(--okf-space-2); font-size: var(--okf-text-base); }
+  .okf-viewer--graph .okf-graph-route-title { padding: 4px var(--okf-space-3); font-size: var(--okf-text-base); }
 }
 @media (min-width: 900px) {
   /* Unlike document pages, the desktop graph is an application workspace:
@@ -1942,7 +1936,8 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
 
 @media (max-width: 640px) {
   .okf-viewer--graph .okf-global-nav > * { min-height: 44px !important; }
-  .okf-viewer--graph .okf-graph-tools { padding-inline: var(--okf-space-2); }
+  /* Same 12px gutter as the pane tabs and the Concepts pane. */
+  .okf-viewer--graph .okf-graph-tools { padding-inline: var(--okf-space-3); }
   .okf-viewer--graph .okf-layout { overflow-y: auto; overscroll-behavior-y: contain; }
   .okf-viewer--graph .okf-layout[data-mobile-pane="details"] > .okf-detail { min-height: calc(100dvh - 11rem); }
   .okf-viewer--graph .okf-layout[data-mobile-pane="graph"] > .okf-graph { height: 50dvh; min-height: 360px; }
@@ -2091,4 +2086,17 @@ body.okf-viewer--graph[data-okf-single-destination="index"] {
   min-height: 100vh;
   min-height: 100dvh;
   overflow-y: visible;
+}
+
+/* Coarse pointers: every graph and single-file control is a 44px target.
+ * Last in the file so it follows the base rules it enlarges. */
+@media (pointer: coarse) {
+  :root { --okf-graph-field-h: 44px; }
+  .okf-node-index > summary { padding-block: 12px; }
+  .okf-node-index__item,
+  .okf-lens-summary__row,
+  .okf-signal__row--check,
+  .okf-signal select,
+  .okf-signal input[type="range"] { min-height: 44px; }
+  .okf-edge-bundle-index summary { padding-block: 12px; }
 }

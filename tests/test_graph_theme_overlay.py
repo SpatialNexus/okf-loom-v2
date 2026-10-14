@@ -408,7 +408,9 @@ def test_lenses_use_a_muted_palette_ramp_reapplied_on_every_change(
     assert themes["painted"] and set(themes["painted"]) <= set(themes["fills"]), themes
     assert set(themes["fills"]) <= set(themes["swatches"]), themes
     assert themes["minIconContrast"] >= 4.5, themes
-    assert themes["maxChroma"] <= 0.1, themes
+    # Muted: the categorical hues stay low-chroma. On Bone's paper lightness
+    # the dark palettes' chroma would read as pastel, so it steps lower.
+    assert themes["maxChroma"] <= (0.04 if palette == "bone" else 0.055), themes
     bars = [bar for bar in themes["digestBars"] if bar]
     assert bars and set(bars) <= set(themes["swatches"]), themes
 
