@@ -1206,6 +1206,7 @@ Key routes:
 | `GET /__search` | Read-only six-mode HTML search or compatibility JSON array over one bundle snapshot. |
 | `GET /__search-form` | Native-form normalization and 303 redirect to strict search; no retrieval or mutation. |
 | `GET /__context` | Read-only deterministic schema-v1 context pack as JSON or Markdown over one bundle snapshot. |
+| `GET /__data/graph.json[?view=structure]` | Read-only graph projection; `view=structure` omits `bodies` and `documents` only. Strong final-byte ETag, `Cache-Control: no-cache`, and `If-None-Match`/304 revalidation; metadata freshness and comment counts participate in the validator independently of bundle revision. The projection is identical across local and public read-only ingress; no authority is encoded. |
 | `GET /__data/doc?id=<concept_id>` | One concept's `{rev, html, raw, frontmatter, backlinks, outgoing, headings}` for in-place patching. |
 | `GET /__data/page?document=<path.md>` | Schema-1 canonical Markdown page read: document, nullable concept, document_content_rev, raw, html, page anchor; no guessed projection. |
 | `GET /__data/events?since=&limit=&actor=&concept=&order=` | Filtered change-list read over `events.jsonl`. |
