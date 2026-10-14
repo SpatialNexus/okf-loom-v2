@@ -57,6 +57,18 @@ def test_cached_graph_is_byte_identical_to_uncached(root):
     assert canonical_json_bytes(render.build_graph_data(bundle, cache_bodies=True)) == expected
 
 
+def test_cached_graph_documents_are_isolated_from_caller_mutation(graph_server):
+    server, _ = graph_server
+    first = render.build_graph_data(server.bundle, cache_bodies=True)
+    expected = canonical_json_bytes(first)
+    first['bodies']['a'] = '<script>tampered</script>'
+    first['documents']['index.md']['html'] = 'tampered'
+    first['documents']['index.md']['document'] = 'other.md'
+    first['documents']['injected.md'] = {'html': 'tampered'}
+    first['bodies'].clear()
+    assert canonical_json_bytes(render.build_graph_data(server.bundle, cache_bodies=True)) == expected
+
+
 @pytest.mark.parametrize('query, expected, structure', [
     ('?cache_buster=1', 200, False),
     ('?view=structure&cache_buster=1', 200, True),

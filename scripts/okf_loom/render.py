@@ -1969,7 +1969,9 @@ def _graph_documents(bundle: Bundle, *, cached: bool) -> tuple[dict[str, str], d
         if entry is None or entry[0] != key:
             entry = (key, _render_graph_documents(bundle))
             bundle._graph_documents_cache = entry
-        return entry[1]
+        bodies, documents = entry[1]
+        # Callers own their projection; never expose mutable cache containers.
+        return dict(bodies), {path: dict(document) for path, document in documents.items()}
 
 
 def build_graph_data(
