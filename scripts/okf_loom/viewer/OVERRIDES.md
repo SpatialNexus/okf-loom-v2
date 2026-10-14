@@ -371,6 +371,9 @@ reconciles that event instead of issuing another full request. Non-graph live
 pages use `?view=structure` (no bodies or reserved-document HTML) when visible
 connection/comment chips or index recency need it, or lazily when the command
 palette opens. Accepted structural live updates refresh those consumers.
+Pagehide fences pending Studio acquisitions; persisted pageshow reacquires
+structure for those consumers under the same lazy refresh rules, while graph.js
+retains ownership of full graph-page acquisition.
 
 Portable viewers retain their existing transport: single-file uses embedded
 `window.BUNDLE`; static/SPA graph pages read their emitted graph JSON. This

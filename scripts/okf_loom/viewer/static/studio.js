@@ -11638,6 +11638,9 @@
         });
         window.addEventListener("pageshow", function (event) {
           if (!event.persisted) return;
+          // pagehide fences pending structure completions. Restore only the
+          // same lazy consumers as live updates; graph.js owns full pages.
+          refreshGraph();
           // R6-3: BFCache restore — re-apply marks and rebuild markers from
           // the still-current state.doc. The live.js pageshow handler
           // triggers a canonical resync; we just reconcile presentation.
