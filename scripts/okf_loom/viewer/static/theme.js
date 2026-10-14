@@ -131,18 +131,26 @@
     }
     applyConfig(readConfig("okf-theme-config"));
     applyConfig(readConfig("okf-studio-bootstrap"));
-    liveStudioAvailability();
+    liveStudioAvailability(readConfig("okf-studio-bootstrap"));
   })();
 
   // ---- Live Studio availability (layout facts, not theme state) ---------
-  // A served bootstrap block promises the deferred Studio module, which may
-  // never run (blocked, failed fetch, early error) and then publishes no
-  // status. Deferred modules run before DOMContentLoaded, so a bootstrap with
-  // no status by then is a terminal load failure. Publish it in the studio.js
-  // status shape (code as capture-readiness reports it), so the notice and
-  // reserved slots take their failure layout.
-  function liveStudioAvailability() {
+  // A served bootstrap block promises the deferred Studio module. Two facts
+  // must not wait for that module, because it may never run:
+  //  * whether this session may comment (the same rule as studio.js
+  //    CAN_COMMENT), so the reserved index feedback slot takes the read-only
+  //    geometry before first paint (shell.css);
+  //  * a module that never executes (blocked, failed fetch, early error)
+  //    publishes no status. Deferred modules run before DOMContentLoaded, so a
+  //    bootstrap with no status by then is a terminal load failure. Publish it
+  //    in the studio.js status shape (code as capture-readiness reports it), so
+  //    the notice and reserved slots take their failure layout.
+  function liveStudioAvailability(boot) {
     if (!document.getElementById("okf-studio-bootstrap")) return;
+    if (boot) {
+      var canComment = boot.comment === true || (boot.comment === undefined && boot.edit !== false);
+      try { root.setAttribute("data-okf-studio-comment", canComment ? "1" : "0"); } catch (e) {}
+    }
     function publishLoadFailure() {
       if (window.okfStudioReadiness || root.hasAttribute("data-okf-studio-status")) return;
       var detail = Object.freeze({ status: "failed", ready: false, code: "blocked-script",

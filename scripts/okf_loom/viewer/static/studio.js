@@ -904,7 +904,7 @@
       else if (resolved && !dismissed && open + resolved + dismissed === rows.length) label = countLabel(resolved, "resolved comment");
       else if (dismissed && !resolved && open + resolved + dismissed === rows.length) label = countLabel(dismissed, "dismissed comment");
       else label = "View " + rows.length + " comment" + (rows.length === 1 ? "" : "s") + " on this " + noun;
-    } else if (!CAN_COMMENT && status === "ready") label = "View comments";
+    } else if (!CAN_COMMENT && status !== "error") label = "View comments";  // reserved before load; the panel shows loading
     pageFeedback.count.textContent = label;
     pageFeedback.count.hidden = !label;
     let note = "";

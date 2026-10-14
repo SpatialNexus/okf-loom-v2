@@ -379,6 +379,51 @@ def test_blocked_studio_shows_the_failure_below_the_bar_and_collapses_reserved_s
             browser.close()
 
 
+@pytest.fixture(scope="module")
+def read_only_server_url(tmp_path_factory) -> str:
+    bundle = copy_bundle(DEMO_BUNDLE, tmp_path_factory.mktemp("shell-read-only") / "bundle")
+    with live_server(bundle, "--no-edit") as base:
+        yield base
+
+
+@pytest.mark.parametrize("width,coarse", [(1280, False), (390, False), (320, False), (390, True), (320, True)])
+def test_read_only_index_feedback_slot_reserves_the_read_only_layout(read_only_server_url, width, coarse):
+    """A session that cannot comment mounts View comments plus a read-only
+    note, not the Comment button. The reserved slot takes that layout before
+    first paint, so boot does not shift the index (it was 32px -> 78px)."""
+    with sync_playwright() as playwright:
+        browser = launch_chromium(playwright)
+        context = browser.new_context(viewport={"width": width, "height": 900},
+                                      is_mobile=coarse, has_touch=coarse)
+        try:
+            context.add_init_script(_FIRST_PAINT_CLS)
+            page = context.new_page()
+            held = []
+            page.route("**/__static/studio.js", lambda request: held.append(request))
+            page.goto(read_only_server_url + "/", wait_until="commit")
+            page.wait_for_function("""() => document.querySelector('[data-okf-page-feedback-placeholder]') &&
+              performance.getEntriesByType('paint').some(entry => entry.name === 'first-contentful-paint')""")
+            assert page.evaluate("document.documentElement.dataset.okfStudioComment") == "0"
+            reserved = page.locator("[data-okf-page-feedback-placeholder]").bounding_box()
+            held[0].continue_()
+            page.wait_for_function("""() => window.okfStudioReadiness?.ready &&
+              window.okfLoomStudio.state.commentsReady && !document.querySelector('[data-okf-page-feedback-placeholder]')""")
+            page.evaluate("() => document.fonts.ready")
+            page.wait_for_timeout(600)
+            group = page.get_by_role("group", name="Page feedback")
+            expect(group.get_by_role("button", name="View comments")).to_be_visible()
+            expect(group.get_by_role("button", name="Comment on this page")).to_have_count(0)
+            expect(group.locator(".okf-page-feedback__note")).to_have_text(
+                "This session is read-only: comments can be read here but not added.")
+            mounted = group.bounding_box()
+            assert abs(mounted["height"] - reserved["height"]) <= 1 and abs(mounted["y"] - reserved["y"]) <= 1, (reserved, mounted)
+            result = page.evaluate("window.__okfPaintCLS()")
+            assert result["cls"] < 0.02, result
+        finally:
+            context.close()
+            browser.close()
+
+
 @pytest.mark.parametrize("route", ["/", "/tables/orders"])
 def test_nojs_does_not_reserve_studio_controls(server_url, route):
     with sync_playwright() as playwright:

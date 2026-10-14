@@ -6207,9 +6207,17 @@ def _render_index_page(
         .replace('__INDEX_TITLE_ANCHOR__', title_anchor)
           .replace("__HERO_MODIFIER__", hero_modifier + (" okf-hero--feedback" if mode == "serve" else ""))
           .replace("__PAGE_FEEDBACK_PLACEHOLDER__", (
+              # Both final layouts are reserved; theme.js marks whether this
+              # session may comment before first paint and shell.css keeps
+              # the matching one (read-only: View comments plus its note).
               '<div class="okf-page-feedback" data-okf-page-feedback-placeholder aria-hidden="true">'
-              '<button type="button" class="okf-btn okf-page-feedback__comment" disabled tabindex="-1">'
-              'Comment on this page</button></div>' if mode == "serve" else ""
+              '<button type="button" class="okf-btn okf-page-feedback__comment" '
+              'data-okf-feedback-variant="comment" disabled tabindex="-1">Comment on this page</button>'
+              '<button type="button" class="okf-btn okf-btn--quiet okf-page-feedback__count" '
+              'data-okf-feedback-variant="read-only" disabled tabindex="-1">View comments</button>'
+              '<p class="okf-page-feedback__note" data-okf-feedback-variant="read-only">'
+              'This session is read-only: comments can be read here but not added.</p></div>'
+              if mode == "serve" else ""
           ))
           .replace("__HERO_V2__", hero_v2)
           .replace("__INDEX_INTRO__", intro)

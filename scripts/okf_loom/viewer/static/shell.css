@@ -127,6 +127,13 @@ html[data-okf-js="1"] :is([data-okf-viewbar-placeholder], [data-okf-page-feedbac
   display: flex;
   visibility: hidden;
 }
+/* The feedback slot reserves the layout this session will mount: a session
+ * that cannot comment shows View comments plus its read-only note, not the
+ * Comment button (theme.js sets the marker from the Studio bootstrap). */
+html:not([data-okf-studio-comment="0"]) [data-okf-page-feedback-placeholder] > [data-okf-feedback-variant="read-only"],
+html[data-okf-studio-comment="0"] [data-okf-page-feedback-placeholder] > [data-okf-feedback-variant="comment"] {
+  display: none;
+}
 /* The truthful loading notice must not displace the authored page and then
  * pull it back at boot, so while Studio loads it sits outside flow, anchored
  * to the top bar's bottom edge. (Its static position is no anchor: body is a
