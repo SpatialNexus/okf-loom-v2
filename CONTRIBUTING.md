@@ -109,9 +109,12 @@ some need CDN access, or headed Chrome for real browser zoom.
   with `OKF_REQUIRE_BROWSER=1`.
 - Chrome's Unix socket path is limited to 107 bytes. Before collection, conftest
   relocates an overlong, shared or setgid effective `TMPDIR` to a short private
-  directory under the resolved `.shared-cache`, the virtualenv's parent, or
-  writable `/tmp`.
-  If none fits, it fails early with a request for a short writable `TMPDIR`.
+  directory under writable `/tmp` first, then the resolved `.shared-cache` or
+  the virtualenv's parent. Effective temp directories and fallback candidates
+  inside this checkout's work tree are rejected (including an in-repo `.venv`
+  parent); an external cache symlink remains a valid fallback. A short private
+  external `TMPDIR` is kept as-is, including on hosts that deny `/tmp`.
+  If none fits, it fails early with a request for a short writable external `TMPDIR`.
   The directory is removed after the test session; do not use a symlink to a
   long path as a workaround (Chrome resolves it).
 - The shared server fixture prints startup logs on failure and cleans up with

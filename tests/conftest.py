@@ -158,18 +158,24 @@ def private_session_root(bundle: Path) -> Path:
 def _short_chrome_tmpdir(effective: Path, candidates: tuple[Path, ...]) -> Path | None:
     """Keep Chrome's SingletonSocket within Linux's 107-byte pathname limit.
 
+    Keep all test output outside this work tree, even with an in-repo venv.
     Return a newly owned short directory when relocation is needed. Shared or
     setgid temporary ancestors also need a private namespace: child directories
     otherwise inherit setgid even with mkdir(mode=0700). Do not shorten paths
     with symlinks: Chrome resolves them before binding its socket.
     """
     suffix = "/.com.google.Chrome.XXXXXX/SingletonSocket"
+    root = TOOLKIT_ROOT.resolve()
+    effective = effective.resolve()
     private = not effective.exists() or stat.S_IMODE(effective.stat().st_mode) == 0o700
-    if len(os.fsencode(str(effective.resolve()))) + len(suffix) <= 107 and private:
+    if len(os.fsencode(str(effective))) + len(suffix) <= 107 and private and not effective.is_relative_to(root):
         return None
     errors = []
     for candidate in candidates:
         candidate = candidate.resolve()
+        # In-repo venvs and non-linked caches must never become test output.
+        if candidate.is_relative_to(root):
+            continue
         if len(os.fsencode(str(candidate))) + len("/b-XXXXXXXX") + len(suffix) > 107:
             continue
         try:
@@ -179,8 +185,8 @@ def _short_chrome_tmpdir(effective: Path, candidates: tuple[Path, ...]) -> Path 
         except OSError as exc:
             errors.append(f"{candidate}: {exc}")
     raise pytest.UsageError(
-        f"TMPDIR {effective} is too long or not private for Chrome's 107-byte Unix socket path; "
-        "set TMPDIR to a short writable private directory (see CONTRIBUTING.md). "
+        f"TMPDIR {effective} is too long, not private, or inside the work tree for Chrome's 107-byte Unix socket path; "
+        "set TMPDIR to a short writable private directory outside the work tree (see CONTRIBUTING.md). "
         + "; ".join(errors)
     )
 
@@ -208,8 +214,8 @@ def pytest_configure(config: pytest.Config) -> None:
     # starts its driver, give Chrome one short private temporary namespace.
     effective = Path(tempfile.gettempdir())
     short = _short_chrome_tmpdir(
-        effective, ((TOOLKIT_ROOT / ".shared-cache").resolve(),
-                    Path(sys.prefix).parent, Path("/tmp")))
+        effective, (Path("/tmp"), (TOOLKIT_ROOT / ".shared-cache").resolve(),
+                    Path(sys.prefix).parent))
     if short is not None:
         previous = {key: os.environ.get(key) for key in ("TMPDIR", "TMP", "TEMP")}
         cached = tempfile.tempdir
