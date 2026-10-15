@@ -2286,7 +2286,7 @@ def test_graph_comment_badges_appear_only_for_positive_counts(server_url: str, p
         route.fulfill(response=response, body=_json.dumps(body),
                       content_type="application/json")
 
-    page.route("**/graph.json", handle)
+    page.route(lambda url: urllib.parse.urlsplit(url).path == "/__data/graph.json", handle)
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto(server_url + "/__graph", wait_until="domcontentloaded")
     page.wait_for_function(
