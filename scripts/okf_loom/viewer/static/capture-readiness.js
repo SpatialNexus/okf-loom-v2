@@ -158,6 +158,12 @@
         message: renderer.message || "The document renderer could not settle.",
       };
       if (renderer.status !== "ready") return { pending: true, phase: "deferred-renderers" };
+      // A ready cycle for an older palette (its Mermaid SVGs still carry the
+      // old colours) is not ready for the palette now on the root.
+      if (typeof renderer.themeName === "string" && root.hasAttribute("data-theme") &&
+          renderer.themeName !== root.getAttribute("data-theme")) {
+        return { pending: true, phase: "deferred-renderers" };
+      }
     }
 
     // A served page with a bootstrap block is expected to expose the usable

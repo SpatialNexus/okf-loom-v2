@@ -621,8 +621,44 @@
   // --- Mermaid ---------------------------------------------------------
   // Mermaid's render() API returns SVG text. Rendering off-DOM and committing
   // only after the token check is what makes a late theme/body completion
-  // unable to overwrite a newer diagram. The authored source is preserved in
-  // data-source and is restored only for a current, resolved mode change.
+  // unable to overwrite a newer diagram (latest wins). The authored source is
+  // preserved in data-source and is never put back into a rendered diagram:
+  // a palette re-render keeps the old SVG visible (aria-busy) and replaces it
+  // in one write once the new SVG exists, so the container never shows raw
+  // source and never changes size mid-swap. data-okf-mermaid-theme records
+  // the palette the visible SVG was drawn with; a mismatch with the current
+  // palette is what marks a diagram stale for any later cycle (theme or body),
+  // including after a failed re-render, which keeps the old diagram.
+  var MERMAID_THEME_ATTR = "data-okf-mermaid-theme";
+
+  // Mermaid measures text in a temporary element. Give it a hidden, size-
+  // neutral host instead of the body end: visibility keeps layout metrics
+  // (getBBox) real, height:0 + overflow:hidden keep it out of the page's
+  // scrollable overflow, and the body's width keeps label wrapping identical
+  // to Mermaid's default body-appended measurement.
+  function mermaidRenderHost() {
+    var body = document.body;
+    if (!body || typeof document.createElement !== "function") return null;
+    var host = document.createElement("div");
+    host.setAttribute("aria-hidden", "true");
+    host.setAttribute("data-okf-mermaid-render-host", "");
+    var width = body.clientWidth;
+    host.style.cssText = "position:absolute;top:0;left:0;height:0;overflow:hidden;" +
+      "visibility:hidden;pointer-events:none;contain:layout paint;" +
+      (width > 0 ? "width:" + width + "px;" : "width:100%;");
+    body.appendChild(host);
+    return host;
+  }
+
+  function mermaidNeedsRender(el, token) {
+    if (!el.querySelector("svg")) return "first";
+    // An SVG this renderer did not draw (no authored source kept) is left as is.
+    if (!el.hasAttribute("data-source")) return null;
+    var painted = el.getAttribute(MERMAID_THEME_ATTR);
+    if (painted !== null) return painted !== token.themeName ? "rerender" : null;
+    return token.forceMermaid ? "rerender" : null;
+  }
+
   function getMermaidModule() {
     if (!mermaidModulePromise) {
       mermaidModulePromise = OFFLINE
@@ -635,20 +671,33 @@
   function initMermaid(token) {
     var allDivs = Array.prototype.slice.call(document.querySelectorAll("div.mermaid"));
     if (!allDivs.length) return Promise.resolve();
-    var mermaidDivs = allDivs.filter(function (el) {
-      if (token.forceMermaid && currentToken(token) && el.hasAttribute("data-source")) {
-        // Restore the exact authored source as text. This is a synchronous
-        // mutation owned by the current theme generation.
-        el.textContent = el.getAttribute("data-source");
-        el.classList.remove("mermaid--fallback");
-      }
-      return !el.querySelector("svg");
+    var jobs = [];
+    allDivs.forEach(function (el) {
+      var kind = mermaidNeedsRender(el, token);
+      if (kind) jobs.push({ el: el, rerender: kind === "rerender" });
+      // Bone -> Slate -> Bone before Slate finished: the painted SVG already
+      // matches again, the Slate render is fenced out, nothing is redrawing.
+      else if (el.getAttribute(MERMAID_THEME_ATTR) === token.themeName) el.removeAttribute("aria-busy");
     });
-    if (!mermaidDivs.length) return Promise.resolve();
-    mermaidDivs.forEach(function (el) {
+    if (!jobs.length) return Promise.resolve();
+    jobs.forEach(function (job) {
+      var el = job.el;
       if (!el.hasAttribute("data-source")) el.setAttribute("data-source", el.textContent || "");
       if (!el.id) el.id = "okf-mermaid-" + (++mermaidId);
+      if (job.rerender) {
+        // The old diagram stays painted; assistive tech is told it is being
+        // redrawn. An unstamped SVG becomes explicitly stale ("") so a later
+        // non-forced cycle still re-renders it if this one is superseded.
+        if (el.getAttribute(MERMAID_THEME_ATTR) === null) el.setAttribute(MERMAID_THEME_ATTR, "");
+        el.setAttribute("aria-busy", "true");
+      }
     });
+    function releaseBusy() {
+      if (!currentToken(token)) return;
+      jobs.forEach(function (job) {
+        if (job.rerender) job.el.removeAttribute("aria-busy");
+      });
+    }
     return getMermaidModule().then(function (mod) {
       if (!currentToken(token)) return;
       var mermaid = (mod && (mod.default || mod.mermaid)) || window.mermaid;
@@ -659,19 +708,27 @@
       var options = { startOnLoad: false, securityLevel: "strict", theme: themed.theme };
       if (themed.themeVariables) options.themeVariables = themed.themeVariables;
       mermaid.initialize(options);
-      return Promise.all(mermaidDivs.map(function (el) {
+      return Promise.all(jobs.map(function (job) {
+        var el = job.el;
         if (!currentToken(token)) return Promise.resolve();
         var source = el.getAttribute("data-source") || "";
         // Mermaid owns/removes a temporary DOM element with the render id.
         // Never give it the authored host id (that deletes our projection node).
         var renderId = "okf-mermaid-svg-" + (++mermaidId);
-        return Promise.resolve(mermaid.render(renderId, source)).then(function (rendered) {
+        var host = mermaidRenderHost();
+        return Promise.resolve().then(function () {
+          return host ? mermaid.render(renderId, source, host) : mermaid.render(renderId, source);
+        }).then(function (rendered) {
+          removeNode(host);
           if (!currentToken(token) || !el.isConnected) return;
           var svg = rendered && rendered.svg != null ? rendered.svg : rendered;
           if (typeof svg !== "string" || !svg) {
             throw rendererError("renderer-failure", "Mermaid returned no SVG output.");
           }
+          // The single atomic swap: old SVG out, new SVG in, same task.
           el.innerHTML = svg;
+          el.setAttribute(MERMAID_THEME_ATTR, token.themeName);
+          el.removeAttribute("aria-busy");
           el.classList.remove("mermaid--fallback");
           if (rendered && typeof rendered.bindFunctions === "function") {
             rendered.bindFunctions(el);
@@ -681,12 +738,19 @@
           document.querySelectorAll("body > div.mermaidTooltip").forEach(function (tooltip) {
             tooltip.style.removeProperty("border-radius");
           });
+        }, function (error) {
+          removeNode(host);
+          throw error;
         });
       }));
     }).catch(function (error) {
       if (!currentToken(token)) return;
-      mermaidDivs.forEach(function (el) {
-        if (currentToken(token)) el.classList.add("mermaid--fallback");
+      // A first render falls back to its truthful source text; a failed
+      // re-render keeps the previous diagram (still stamped with its old
+      // palette, so the next cycle retries) and the cycle reports failure.
+      releaseBusy();
+      jobs.forEach(function (job) {
+        if (!job.rerender) job.el.classList.add("mermaid--fallback");
       });
       throw asRendererError(error, "blocked-script", "Mermaid could not be loaded.");
     });
@@ -1442,8 +1506,10 @@
     currentResolvedMode = resolvedMode(nextName);
     // A real theme event revokes every older renderer token. Mermaid SVGs
     // embed palette colours, so ANY palette change (Slate -> Clay keeps the
-    // dark scheme but not the colours) restores the authored source and
-    // re-renders with the new palette's variables. A repeated event for the
+    // dark scheme but not the colours) re-renders from the authored source
+    // with the new palette's variables, swapping the old SVG out only when
+    // the new one is ready. Readiness is "loading" until then, so a capture
+    // never takes the old-palette diagram as ready. A repeated event for the
     // palette already painted starts a fenced cycle without re-rendering.
     if (nextName === previousName && !detail) return;
     themeGeneration += 1;
