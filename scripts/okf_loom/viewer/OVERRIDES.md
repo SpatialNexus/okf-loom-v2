@@ -375,6 +375,17 @@ Pagehide fences pending Studio acquisitions; persisted pageshow reacquires
 structure for those consumers under the same lazy refresh rules, while graph.js
 retains ownership of full graph-page acquisition.
 
+Live index inventory/statistics and document Connections reconcile separately
+from graph acquisition. Content notifications (`changed`, `created`, `removed`,
+`graph`), resync and reconnect coalesce for 250 ms, then re-read the current
+page's existing HTML GET. Only those derived regions are patched; authored
+bodies, Studio/bootstrap authority, menus and composers are not replaced.
+Keyed cards/links, reader ordering/filtering, disclosure state, focus, selection
+and scroll survive reconciliation. Reads use the same ingress as the page,
+including public read-only and `--no-edit`; no additional data route or authority
+is introduced. New notifications invalidate pending reads immediately; navigation
+and pagehide abort/fence them, and persisted pageshow resyncs the regions.
+
 Portable viewers retain their existing transport: single-file uses embedded
 `window.BUNDLE`; static/SPA graph pages read their emitted graph JSON. This
 seam adds no assets, origins, CSP permissions or portable requests.

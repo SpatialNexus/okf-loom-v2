@@ -17,10 +17,10 @@
  *     its panels.
  *   - resync → re-fetch open doc + tell studio to reload change list/comments.
  *
- * Security: untrusted strings never go through innerHTML here. The only
- * innerHTML assignment is the server-rendered concept body (.html field of
- * /__data/doc), which is produced by the SAME escaped markdown renderer the
- * concept page itself uses on initial load - identical trust level (§7.3).
+ * Security: untrusted strings never go through innerHTML here. Concept bodies
+ * (/__data/doc) and derived index/Connections fragments (the page's own GET)
+ * come from the SAME escaped renderer used on initial load - identical trust
+ * level (§7.3). Page scripts and bootstrap are never transplanted.
  * All mutating requests in studio.js carry X-OKF-Token; live.js only reads.
  *
  * No framework, no bundler. Vanilla ES module. Degrades gracefully: if the
@@ -744,6 +744,170 @@
     }
   }
 
+  // ---- derived reading regions ----------------------------------------
+  // Like patchOpenConcept below, notifications only invalidate: read canonical
+  // server rendering, then patch the smallest owned regions. Reusing the page's
+  // GET keeps index grouping/recency and typed Connections identical to SSR,
+  // including on public ingress and --no-edit. Never transplant head/bootstrap,
+  // authored body, chrome, menus or the comment composer from that response.
+  let derivedTimer = null;
+  let derivedAbort = null;
+  let derivedGeneration = 0;
+  let derivedSuspended = false;
+  const connectionSelector = ".okf-connections-disclosure, .okf-page__connections";
+  function cancelDerivedRefresh() {
+    ++derivedGeneration;
+    clearTimeout(derivedTimer);
+    derivedTimer = null;
+    if (derivedAbort) derivedAbort.abort();
+    derivedAbort = null;
+  }
+  function scheduleDerivedRefresh() {
+    cancelDerivedRefresh(); // invalidate immediately, not when the timer fires
+    if (derivedSuspended || !document.querySelector(".okf-viewer--index, article.okf-page__main")) return;
+    derivedTimer = setTimeout(refreshDerivedRegions, 250);
+  }
+  // Retain keyed rows and descendants, even when a card changes type group.
+  // Reader-owned disclosure/filter state is not server state.
+  function derivedKey(node) {
+    if (node.nodeType !== Node.ELEMENT_NODE) return String(node.nodeType);
+    if (node.matches(".okf-card__comments")) return node.tagName + "|comment-count";
+    const classes = (node.getAttribute("class") || "").split(/\s+/).filter((name) => name !== "okf-presence-focus").join(" ");
+    return [node.tagName, classes, node.id,
+      node.getAttribute("data-concept-id") || "", node.getAttribute("data-index-type") || "",
+      node.getAttribute("value") || ""].join("|");
+  }
+  function patchDerivedNode(node, fresh, rows) {
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      if (node.nodeValue !== fresh.nodeValue) node.nodeValue = fresh.nodeValue;
+      return;
+    }
+    const readerAttribute = (name) => name === "open" ||
+      (name === "hidden" && node.matches(".okf-card, [data-index-section]"));
+    Array.from(node.attributes).forEach((attr) => {
+      if (!readerAttribute(attr.name) && !fresh.hasAttribute(attr.name)) node.removeAttribute(attr.name);
+    });
+    Array.from(fresh.attributes).forEach((attr) => {
+      if (!readerAttribute(attr.name) && node.getAttribute(attr.name) !== attr.value) node.setAttribute(attr.name, attr.value);
+    });
+    const available = Array.from(node.childNodes);
+    let cursor = node.firstChild;
+    Array.from(fresh.childNodes).forEach((child) => {
+      const key = derivedKey(child);
+      let retained = child.nodeType === Node.ELEMENT_NODE && child.matches(".okf-card, .okf-conn")
+        ? rows.get(child.getAttribute("data-concept-id")) : null;
+      if (!retained) retained = available.find((candidate) => derivedKey(candidate) === key);
+      const index = available.indexOf(retained);
+      if (index >= 0) available.splice(index, 1);
+      if (!retained) retained = child.cloneNode(false);
+      patchDerivedNode(retained, child, rows);
+      if (retained !== cursor) node.insertBefore(retained, cursor);
+      cursor = retained.nextSibling;
+    });
+    available.forEach((child) => { if (child.parentNode === node) child.remove(); });
+  }
+  function patchDerivedRegions(fresh) {
+    const indexPage = document.body.classList.contains("okf-viewer--index");
+    if (indexPage !== fresh.body.classList.contains("okf-viewer--index")) return;
+    const x = window.scrollX, y = window.scrollY, active = document.activeElement;
+    const derivedFocus = active && active.closest && active.closest(".okf-card, .okf-type-nav, " + connectionSelector);
+    const selection = window.getSelection();
+    const savedSelection = selection && selection.rangeCount ? {
+      anchor: selection.anchorNode, start: selection.anchorOffset,
+      focus: selection.focusNode, end: selection.focusOffset,
+    } : null;
+    const rows = new Map();
+    if (indexPage) {
+      document.querySelectorAll(".okf-card[data-concept-id]").forEach((row) => rows.set(row.dataset.conceptId, row));
+      // Keep selects themselves (and any native popup) alive.
+      [".okf-hero__stats", "select[data-index-type]", "[data-index-empty]"].forEach((selector) => {
+        const node = document.querySelector(selector), next = fresh.querySelector(selector);
+        if (!node || !next) return;
+        const value = node.value;
+        patchDerivedNode(node, next, rows);
+        if (node.tagName === "SELECT") node.value = Array.from(node.options).some((option) => option.value === value) ? value : "";
+      });
+      const host = document.querySelector("main.okf-index");
+      if (!host) return;
+      const selector = ".okf-type-nav, [data-index-section]";
+      const old = Array.from(host.querySelectorAll(selector));
+      const next = Array.from(fresh.querySelectorAll("main.okf-index > :is(.okf-type-nav, [data-index-section])"));
+      const retained = new Set();
+      // Keep new/empty inventories in the same place, without a blank frame.
+      const marker = document.createComment("index inventory");
+      if (old.length) old[old.length - 1].after(marker);
+      else host.insertBefore(marker, host.querySelector(".okf-index__overview"));
+      next.forEach((section) => {
+        const node = old.find((candidate) => derivedKey(candidate) === derivedKey(section)) || section.cloneNode(false);
+        patchDerivedNode(node, section, rows);
+        retained.add(node);
+        if (node.nextSibling !== marker) host.insertBefore(node, marker);
+      });
+      old.forEach((node) => { if (!retained.has(node)) node.remove(); });
+      marker.remove();
+      document.body.dataset.okfConceptRoutes = fresh.body.dataset.okfConceptRoutes || "{}";
+    } else {
+      const host = document.querySelector("article.okf-page__main");
+      if (!host || !fresh.querySelector("article.okf-page__main")) return;
+      const old = host.querySelector(connectionSelector), next = fresh.querySelector(connectionSelector);
+      const after = old ? old.nextSibling : host.querySelector(".okf-prevnext, .okf-document-end");
+      // Outgoing and incoming rows can name the same concept: their identities
+      // stay scoped to each list, not one global row pool.
+      if (next) {
+        let node = old && old.tagName === next.tagName ? old : next.cloneNode(false);
+        if (old && old.tagName !== next.tagName) {
+          // Crossing the disclosure threshold must not discard focused links
+          // or a selection in the common Connections navigation.
+          const nav = old.matches(".okf-page__connections") ? old : old.querySelector(".okf-page__connections");
+          if (next.matches(".okf-page__connections")) node = nav;
+          else {
+            if (nav.contains(active) || (savedSelection && nav.contains(savedSelection.anchor))) node.open = true;
+            node.appendChild(nav);
+          }
+        }
+        patchDerivedNode(node, next, rows);
+        if (node !== old) {
+          host.insertBefore(node, after);
+          if (old && old.parentNode === host) old.remove();
+        }
+      } else if (old) old.remove();
+    }
+    window.dispatchEvent(new CustomEvent("okf-loom:derivedPatched"));
+    if (active && active.isConnected && document.activeElement !== active && typeof active.focus === "function") active.focus({ preventScroll: true });
+    else if (derivedFocus && !active.isConnected) {
+      const fallback = document.querySelector("main.okf-index, article.okf-page__main");
+      fallback.setAttribute("tabindex", "-1");
+      fallback.focus({ preventScroll: true });
+    }
+    if (savedSelection && savedSelection.anchor.isConnected && savedSelection.focus.isConnected &&
+        (selection.anchorNode !== savedSelection.anchor || selection.anchorOffset !== savedSelection.start ||
+         selection.focusNode !== savedSelection.focus || selection.focusOffset !== savedSelection.end)) {
+      try { selection.setBaseAndExtent(savedSelection.anchor, savedSelection.start, savedSelection.focus, savedSelection.end); } catch (e) { /* selected content was removed */ }
+    }
+    window.scrollTo(x, y);
+  }
+  async function refreshDerivedRegions() {
+    derivedTimer = null;
+    const own = derivedGeneration, nav = _navEpoch, path = location.pathname;
+    const controller = new AbortController();
+    derivedAbort = controller;
+    const deadline = setTimeout(() => controller.abort(), 10000);
+    controller.signal.addEventListener("abort", () => clearTimeout(deadline), { once: true });
+    try {
+      const response = await fetch(path, { cache: "no-store", headers: { Accept: "text/html" }, signal: controller.signal });
+      if (!response.ok) return;
+      const html = await response.text();
+      if (controller.signal.aborted || derivedSuspended || own !== derivedGeneration || nav !== _navEpoch || path !== location.pathname) return;
+      patchDerivedRegions(new DOMParser().parseFromString(html, "text/html"));
+    } catch (e) { /* Keep visible content on read failure; next notification retries. */ }
+    finally {
+      clearTimeout(deadline);
+      if (derivedAbort === controller) derivedAbort = null;
+    }
+  }
+  ["changed", "created", "removed", "graph", "resync"].forEach((type) => on(type, scheduleDerivedRefresh));
+  on("conn", (data) => { if (data.state === "online") scheduleDerivedRefresh(); });
+
   // ---- the in-place patch (sacred state-preservation contract) ---------
   // Per-concept fetch sequence: two rapid `changed` events fire two
   // concurrent /__data/doc fetches, and without a fence the OLDER response
@@ -763,6 +927,7 @@
     // commit fence alone. Both advance together on popstate/pagehide.
     let _routeAbort = new AbortController();
     function _advanceRouteOwner() {
+      cancelDerivedRefresh();
       _navEpoch++;
       try { _routeAbort.abort("navigation"); } catch (e) {}
       _routeAbort = new AbortController();
@@ -1232,6 +1397,7 @@
   // owners so in-flight fetches are aborted and late responses are fenced.
   // R8-MINOR2: the backoff-clear timer is also cancelled here.
   function _suspend() {
+    derivedSuspended = true;
     _advanceRouteOwner();
     // R9-RESYNC-FENCE: advance the suspend epoch so an in-flight doResync's
     // post-await commit/drain is fenced. The in-flight operation clears
@@ -1272,6 +1438,7 @@
     // and trigger a canonical resync so the restored page catches up.
     window.addEventListener("pageshow", function (event) {
       if (!event.persisted) return;
+      derivedSuspended = false;
       // BFCache restore: SSE source was killed by _suspend on freeze.
       // Reset ALL transport state.
       lastCursor = 0;
