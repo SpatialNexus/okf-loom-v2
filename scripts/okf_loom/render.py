@@ -3305,12 +3305,14 @@ def render_single_file(
     # second concept-only approximation.
     data["retrieval_corpus"] = _browser_passage_corpus(bundle, data.get("edges", []))
     # The canonical chunk already contains the complete passage payload. Ship
-    # it once; the single-file bootstrap restores the legacy payload property
-    # lazily before any BUNDLE consumer runs. Keep the shared corpus/export
-    # path (including its integrity hashes and exact canonical bytes) unchanged.
-    for chunk in data["retrieval_corpus"]["chunks"]:
-        del chunk["payload"]
+    # it once when using the built-in bootstrap, which restores the legacy
+    # payload property lazily before any BUNDLE consumer runs. Custom templates
+    # may predate that accessor: retain their original wire shape. Keep the
+    # shared corpus/export path and exact canonical bytes/hashes unchanged.
     template = load_template("single_file.html", bundle)
+    if template == load_template("single_file.html"):
+        for chunk in data["retrieval_corpus"]["chunks"]:
+            del chunk["payload"]
     if offline is not None:
         template = offline.single_file_template(template)
     template = inject_review_metadata(template, config.get('review_base_url'))

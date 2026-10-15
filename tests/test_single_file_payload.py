@@ -63,6 +63,22 @@ def test_single_file_size_growth_tracks_unique_bodies(tmp_path: Path) -> None:
     assert growth < rendered_growth + 2.5 * source_growth
 
 
+def test_legacy_single_file_template_retains_serialized_payload(tmp_path: Path, monkeypatch) -> None:
+    from okf_loom import render
+
+    root = tmp_path / "bundle"
+    root.mkdir()
+    (root / "concept.md").write_text("---\ntype: concept\n---\n\nLegacy reader evidence.\n", encoding="utf-8")
+    bundle = Bundle.load(root)
+    original = render.load_template
+    legacy = '<!doctype html><html><head></head><body><script>window.BUNDLE = __BUNDLE_DATA__;</script></body></html>'
+    monkeypatch.setattr(render, "load_template", lambda name, owner=None: legacy if owner else original(name))
+    out = tmp_path / "index.html"
+    render_single_file(bundle, out)
+    data = embedded(out.read_text(encoding="utf-8"))
+    assert data["retrieval_corpus"] == _browser_passage_corpus(bundle, data["edges"])
+
+
 def test_single_file_bootstrap_preserves_legacy_payload_access(tmp_path: Path) -> None:
     node = shutil.which("node")
     assert node, "Node is required to prove the single-file bootstrap contract"
@@ -92,6 +108,11 @@ console.log(JSON.stringify(window.BUNDLE));
 assert.deepEqual(Object.keys(chunks[0]), ['canonical_chunk', 'payload']);
 chunks[0].payload = {replacement: true};
 assert.equal(chunks[0].payload.replacement, true);
+""" + bootstrap + """
+const fresh = window.BUNDLE.retrieval_corpus.chunks[0];
+assert.equal(typeof Object.getOwnPropertyDescriptor(fresh, 'payload').get, 'function');
+fresh.payload = {assignedBeforeFirstRead: true};
+assert.deepEqual(fresh.payload, {assignedBeforeFirstRead: true});
 """
     result = subprocess.run([node], input=program, text=True, capture_output=True, check=True)
     assert json.loads(result.stdout) == expected
