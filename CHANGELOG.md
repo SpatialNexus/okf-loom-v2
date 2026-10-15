@@ -10,6 +10,10 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Switching palettes no longer flashes a Mermaid diagram's source text. The old
+  diagram stays in place (marked busy) until the new palette's diagram is ready,
+  then swaps in without moving the layout; the latest switch wins and a failed
+  redraw keeps the old diagram. Renderer and capture readiness wait for the swap.
 - Live graph JSON reuses final serialized bytes and strong ETags, with independent
   per-view coalescing and exact metadata-expiry invalidation. Certainly oversized
   projections are refused before rendering/encoding, and repeated size refusals
