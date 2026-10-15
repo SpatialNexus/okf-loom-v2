@@ -1647,6 +1647,132 @@
     });
   }
 
+  // ---- Scroll-away chrome on phones ------------------------------------
+  // At <=640px (sticky viewports) the top bar and the live document view bar
+  // under it cost a third to a half of the screen. While the reader scrolls
+  // down past them they slide away and only the view bar's Sections row stays
+  // pinned (nothing stays on pages without Sections); scrolling up, reaching
+  // the top, keyboard focus in the chrome, an open overlay, or a capture
+  // bring the whole chrome back. State lives on <html data-okf-chrome>;
+  // shell.css owns the presentation (transforms only, so nothing shifts).
+  // Wider viewports never get the attribute, and the graph route keeps its
+  // own full-screen layout.
+  (function scrollAwayChrome() {
+    var shell = document.querySelector(".okf-topbar.okf-shell");
+    if (!shell || !window.matchMedia || document.body.classList.contains("okf-viewer--graph")) return;
+    var root = document.documentElement;
+    var query = window.matchMedia("(max-width: 640px) and (min-height: 481px)");
+    var GUTTER = 4;   // view-bar surface kept above the pinned Sections row
+    var TRAVEL = 10;  // one-direction scroll distance before the state flips
+    var state = "", lastY = 0, travel = 0, frame = 0, compactHeight = 0;
+
+    function scrollTop() { return Math.max(0, window.scrollY || window.pageYOffset || 0); }
+    function boxHeight(node) {
+      return node && node.getClientRects().length ? node.getBoundingClientRect().height : 0;
+    }
+    // Publishes the shifts that move the top bar wholly above the viewport
+    // and the view bar up to its Sections row; returns the full stack height.
+    function measure() {
+      var bar = document.querySelector(".okf-concept-viewbar");
+      var topHeight = boxHeight(shell), barHeight = boxHeight(bar), offset = barHeight;
+      var kept = bar && bar.querySelector(".okf-outline-jump");
+      if (kept && kept.getClientRects().length) {
+        offset = Math.max(0, kept.getBoundingClientRect().top - bar.getBoundingClientRect().top - GUTTER);
+      }
+      root.style.setProperty("--okf-chrome-shift-top", -topHeight + "px");
+      root.style.setProperty("--okf-chrome-shift-bar", -(topHeight + offset) + "px");
+      compactHeight = barHeight - offset;
+      return topHeight + barHeight;
+    }
+    // The full chrome must stay: during a capture, under any registered
+    // overlay (menus, palette, Studio dialog), and while the live Studio
+    // loading notice is anchored below the bar.
+    function held() {
+      if (root.hasAttribute("data-okf-capture")) return true;
+      if (window.OKFOverlayStack && window.OKFOverlayStack.depth() > 0) return true;
+      var notice = document.querySelector("body > .okf-live-studio-fallback");
+      return !!(notice && notice.getClientRects().length && getComputedStyle(notice).position === "absolute");
+    }
+    function apply(next, animate) {
+      if (!state || next === state) return;
+      if (animate) root.setAttribute("data-okf-chrome-motion", "");
+      else root.removeAttribute("data-okf-chrome-motion");
+      state = next;
+      root.setAttribute("data-okf-chrome", next);
+      if (window.okfDocumentOutline && typeof window.okfDocumentOutline.updateOcclusion === "function") {
+        window.okfDocumentOutline.updateOcclusion();
+      }
+    }
+    function onScroll() {
+      frame = 0;
+      if (!state) return;
+      var y = scrollTop(), delta = y - lastY;
+      lastY = y;
+      if (y <= 1 || held()) { travel = 0; apply("revealed", y <= 1); return; }
+      if (!delta) return;
+      travel = (delta > 0) === (travel > 0) ? travel + delta : delta;
+      if (travel >= TRAVEL && state === "revealed" && y > measure()) apply("compact", true);
+      else if (travel <= -TRAVEL && state === "compact") apply("revealed", true);
+    }
+    function sync() {
+      if (query.matches && !state) {
+        state = "revealed";
+        root.setAttribute("data-okf-chrome", state);
+      } else if (!query.matches && state) {
+        state = "";
+        root.removeAttribute("data-okf-chrome");
+        root.removeAttribute("data-okf-chrome-motion");
+        if (window.okfDocumentOutline && typeof window.okfDocumentOutline.updateOcclusion === "function") {
+          window.okfDocumentOutline.updateOcclusion();
+        }
+      }
+      lastY = scrollTop();
+      travel = 0;
+    }
+
+    window.addEventListener("scroll", function () {
+      if (state && !frame) frame = requestAnimationFrame(onScroll);
+    }, { passive: true });
+    if (query.addEventListener) query.addEventListener("change", sync);
+    else if (query.addListener) query.addListener(sync);
+    // Keyboard (or programmatic) focus entering hidden chrome brings it all
+    // back; the pinned Sections row is already on screen and never moves
+    // under the reader's finger. shell.css reveals synchronously too, so the
+    // control is visible before the browser scrolls to it.
+    document.addEventListener("focusin", function (event) {
+      var bar = document.querySelector(".okf-concept-viewbar");
+      var target = event.target;
+      if (state === "compact" && target && target.closest &&
+          (shell.contains(target) || (bar && bar.contains(target) && !target.closest(".okf-outline-jump")))) {
+        apply("revealed", false);
+      }
+    });
+    window.addEventListener("okf-loom:overlaychange", function () {
+      if (state === "compact" && held()) apply("revealed", false);
+    });
+    // Geometry is re-measured whenever compact is entered or a jump is
+    // prepared; the published shifts also follow viewport resizes.
+    window.addEventListener("resize", function () { if (state === "compact") measure(); });
+    sync();
+
+    window.okfShellChrome = Object.freeze({
+      get state() { return state || "static"; },
+      // The height of chrome occluding the document top, given the full
+      // sticky stack height.
+      occlusion: function (full) { return state === "compact" ? compactHeight : full; },
+      // Heading jumps: past the full chrome the jump lands under the pinned
+      // row alone, so settle compact first (no slide); near the top keep the
+      // full chrome. document-outline.js then scrolls and calls settle().
+      prepareJump: function (target) {
+        if (!state || !target || held()) return;
+        var full = measure();
+        var top = target.getBoundingClientRect().top + scrollTop();
+        apply(top - compactHeight - 16 > full ? "compact" : "revealed", false);
+      },
+      settle: function () { lastY = scrollTop(); travel = 0; },
+    });
+  })();
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function () {
       bindLinkHovers();

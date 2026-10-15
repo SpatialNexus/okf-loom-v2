@@ -48,7 +48,11 @@
     var style = document.documentElement.style;
     style.setProperty("--okf-viewbar-top", shellHeight + "px");
     style.setProperty("--okf-viewbar-h", barHeight + "px");
-    style.setProperty("--okf-document-occlusion", (shellHeight + barHeight + 16) + "px");
+    // On phones the chrome scrolls away (wiki.js okfShellChrome): while it is
+    // compact only the pinned Sections row occludes the document.
+    var chrome = window.okfShellChrome;
+    var occluding = chrome ? chrome.occlusion(shellHeight + barHeight) : shellHeight + barHeight;
+    style.setProperty("--okf-document-occlusion", (occluding + 16) + "px");
     var target = activationOwner && document.getElementById(activationOwner);
     if (lastShellHeight !== null && shellHeight !== lastShellHeight && target === document.activeElement &&
         target.getBoundingClientRect().top >= 0 && target.getBoundingClientRect().top < shellHeight + barHeight + 16) {
@@ -58,6 +62,19 @@
   }
   updateOcclusion();
   window.addEventListener("resize", updateOcclusion);
+
+  // Every heading jump lands below the chrome that will actually be on
+  // screen: on phones the scroll-away chrome first settles the state the
+  // jump implies (compact when the heading is past the full chrome), and
+  // afterwards records the new position so the jump is not read as reader
+  // scrolling.
+  function scrollToHeading(target) {
+    var chrome = window.okfShellChrome;
+    if (chrome) chrome.prepareJump(target);
+    updateOcclusion();
+    target.scrollIntoView({ behavior: "auto", block: "start" });
+    if (chrome) chrome.settle();
+  }
 
   // ---- R1/R2 destination admission ---------------------------------------
   // A hash or section intent is only ever re-admitted against the actually
@@ -226,12 +243,11 @@
     // inside this document, never rewrite the URL, never a section action.
     target = document.getElementById(id);
     if (!target || !body.contains(target)) return;
-    updateOcclusion();
     activationOwner = id;
     if (root) setCurrent(id, false);
     target.tabIndex = -1;
     target.focus({ preventScroll: true });
-    target.scrollIntoView({ behavior: "auto", block: "start" });
+    scrollToHeading(target);
   }
 
   function singleIntentParam(params, name) {
@@ -296,12 +312,11 @@
   }
 
   function admitTarget(target, id) {
-    updateOcclusion();
     activationOwner = id;
     if (root) setCurrent(id, false);
     target.tabIndex = -1;
     target.focus({ preventScroll: true });
-    target.scrollIntoView({ behavior: "auto", block: "start" });
+    scrollToHeading(target);
   }
 
   window.addEventListener("hashchange", restoreFromLocation);
@@ -578,10 +593,9 @@
     setCurrent(id, true);
     if (compactQuery && compactQuery.matches) root.open = false;
     if (jump) closeJump(false);
-    updateOcclusion();
     target.tabIndex = -1;
     target.focus({ preventScroll: true });
-    target.scrollIntoView({ behavior: "auto", block: "start" });
+    scrollToHeading(target);
     if (window.history && window.history.pushState && location.hash !== "#" + encodeURIComponent(id)) {
       window.history.pushState(history.state, "", "#" + encodeURIComponent(id));
     }

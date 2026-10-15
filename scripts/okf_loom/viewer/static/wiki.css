@@ -3301,10 +3301,26 @@ body:has(.okf-graph-loading--error) .okf-cytoscape-fallback-actions { display: f
   .okf-metadata,
   .okf-document-tools,
   .okf-page__infobox { padding-inline: 14px; }
-  /* The bar wraps to two rows here (view tabs / Sections): a 4px row gap
-   * keeps the sticky strip compact (~81px at 390px) without shrinking the
-   * targets themselves. */
+  /* Two rows here: the view tabs with their modifier toggles on one row,
+   * Sections on its own row below. A 4px row gap keeps the strip compact
+   * without shrinking the targets; the Sections row is the one the
+   * scroll-away chrome (shell.css) keeps pinned while reading. Tighter tab
+   * spacing keeps Rendered / Source / Split and Focus view on one row down
+   * to 320px. */
   body.okf-viewer .okf-concept-viewbar { gap: 4px 12px; padding-inline: 12px; }
+  body.okf-viewer .okf-concept-viewbar > .okf-outline-jump { flex: 1 0 100%; }
+  body.okf-viewer .okf-viewswitch { gap: 12px; }
+  body.okf-viewer .okf-viewswitch__btn:is(.okf-source-wrap, .okf-focus-toggle) { padding-left: 12px; }
+  /* "Wrap lines" shows as "Wrap"; the full name stays in the button. */
+  .okf-viewswitch__more {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
   .okf-stat strong { font-size: 22px; }
   .okf-page-utilities__live { display: none; }
   .okf-reserved { padding: 16px 12px 48px; }

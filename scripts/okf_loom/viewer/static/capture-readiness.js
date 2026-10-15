@@ -307,6 +307,10 @@
   }
   function start(options) {
     options = options || {};
+    // A capture shows the full page chrome: on phones the top bar scrolls
+    // away while reading (shell.css); this marker keeps it revealed, without
+    // a slide, for the rest of the page's life.
+    try { document.documentElement.setAttribute("data-okf-capture", "active"); } catch (error) { /* no root */ }
     var own = ++generation, started = Date.now(), targetName = options.target || "document";
     if (active) finish(active, failure("superseded", "Capture readiness was superseded by a newer generation.", active.generation, active.started, "superseded"));
     var resolvePromise, rejectPromise;

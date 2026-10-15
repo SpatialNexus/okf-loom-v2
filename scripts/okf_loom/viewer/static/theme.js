@@ -69,11 +69,18 @@
   // command palette / editors) — see _onKeyDown below.
   if (!window.OKFOverlayStack) {
     var _stack = [];
+    // Every change is announced on window ("okf-loom:overlaychange"), so page
+    // chrome that scrolls away on phones (wiki.js) can come back while any
+    // overlay is open.
+    var _changed = function () {
+      try { window.dispatchEvent(new CustomEvent("okf-loom:overlaychange", { detail: { depth: _stack.length } })); } catch (e) {}
+    };
     window.OKFOverlayStack = {
-      push: function (e) { if (_stack.indexOf(e) < 0) _stack.push(e); },
+      push: function (e) { if (_stack.indexOf(e) < 0) { _stack.push(e); _changed(); } },
       remove: function (e) {
-        var i;
-        while ((i = _stack.indexOf(e)) >= 0) _stack.splice(i, 1);
+        var i, removed = false;
+        while ((i = _stack.indexOf(e)) >= 0) { _stack.splice(i, 1); removed = true; }
+        if (removed) _changed();
       },
       depth: function () { return _stack.length; },
       top: function () { return _stack.length ? _stack[_stack.length - 1] : null; },
