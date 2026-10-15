@@ -390,6 +390,15 @@ Portable viewers retain their existing transport: single-file uses embedded
 `window.BUNDLE`; static/SPA graph pages read their emitted graph JSON. This
 seam adds no assets, origins, CSP permissions or portable requests.
 
+The live graph HTTP transport caches final bytes and their strong ETag separately
+for full and structure views, including over-size refusals. Source generation,
+name, palette, comment-summary revision and exact metadata-expiry transitions
+invalidate those bytes. This does not change `window.okfGraphData`, its full-view
+shape, refresh ownership, capture readiness, or the portable data transport.
+The live index thumbnail now receives only identities/topology and relationship
+counts rather than constructing rendered node metadata or document bodies; its
+visible miniature and count semantics are unchanged.
+
 Single-file serialization stores each retrieval chunk's `canonical_chunk` once,
 without a second serialized `payload`. Before viewer scripts run, the bootstrap
 provides the existing enumerable `window.BUNDLE.retrieval_corpus.chunks[i].payload`

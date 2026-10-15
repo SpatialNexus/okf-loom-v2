@@ -10,6 +10,14 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Live graph JSON reuses final serialized bytes and strong ETags, with independent
+  per-view coalescing and exact metadata-expiry invalidation. Certainly oversized
+  projections are refused before rendering/encoding, and repeated size refusals
+  no longer rebuild the graph. The 4 MiB cap and full/structure schemas are unchanged.
+- Live index thumbnails derive only identities, topology and relationship counts
+  instead of building unused graph metadata HTML. The root inventory has a separate
+  8 MiB HTML cap so 5,000 ordinary cards fit; other response caps and portable
+  build bytes are unchanged.
 - Single-file exports store portable search passages once instead of embedding
   both canonical JSON and its parsed copy. Existing `window.BUNDLE` consumers
   retain lazy, mutable `payload` access; static/SPA and live output are unchanged.

@@ -2021,6 +2021,7 @@ def build_graph_data(
     comment_summary: CommentSummaryV1 | None = None,
     cache_bodies: bool = False,
     include_bodies: bool = True,
+    metadata_now: Any = None,
 ) -> dict[str, Any]:
     """Serialise a Bundle into the JSON shape consumed by the viewer.
 
@@ -2210,7 +2211,7 @@ def build_graph_data(
                 "relations": governed["relations"],
                 "metadata": grouping_meta,
                 "okf_metadata": c.metadata,
-                "metadata_html": render_metadata(c, bundle, mode="graph"),
+                "metadata_html": render_metadata(c, bundle, mode="graph", now=metadata_now),
                 "generated_at": c.generated_at,
                 "graph_cluster": grouping_meta.get("graph_cluster", ""),
                 "source_system": grouping_meta.get("source_system", ""),
@@ -3205,6 +3206,28 @@ def _index_graph_preview_svg(graph_data: dict[str, Any]) -> str:
         f'<g class="okf-graph-thumb__edges">{edge_svg}</g>'
         f'<g class="okf-graph-thumb__nodes">{"".join(node_svg)}</g></svg>'
     )
+
+
+def _graph_thumbnail_data(bundle: Bundle) -> dict[str, Any]:
+    """Live thumbnail input: identity/topology only, never graph payload HTML.
+
+    The miniature selects its small visible subset itself. Retain all identities
+    here for its exact degree ordering and caption count, not full node records.
+    """
+    ids = set(bundle.concepts)
+    pairs = set()
+    relationships = 0
+    for link in bundle.graph().edges:
+        if link.source in ids and link.target in ids:
+            pairs.add((link.source, link.target))
+            relationships += 1
+    return {
+        "nodes": [{"data": {"id": concept_id_to_str(cid)}} for cid in sorted(ids)],
+        "edges": [{"data": {"source": concept_id_to_str(source),
+                            "target": concept_id_to_str(target)}}
+                  for source, target in sorted(pairs)],
+        "raw_relationship_count": relationships,
+    }
 
 
 def _graph_thumbnail_html(graph_data: dict[str, Any], href: str) -> str:
@@ -5921,7 +5944,8 @@ def _render_index_page(
     graph_thumbnail = ""
     if not sub:
         graph_thumbnail = ('<details class="okf-home-graph"><summary>Preview graph</summary>'
-                           + _graph_thumbnail_html(build_graph_data(bundle, name=name, include_bodies=mode != 'serve'), graph_href_root)
+                           + _graph_thumbnail_html(_graph_thumbnail_data(bundle) if mode == 'serve'
+                                                   else build_graph_data(bundle, name=name), graph_href_root)
                            + '</details>')
     hero_v2 = _v2_spotlight_html(bundle, mode, graph_href_root) if not sub else ""
     hero_modifier = " okf-hero--split" if hero_v2 else ""
