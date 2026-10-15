@@ -7120,7 +7120,7 @@
     }
     return (rawActor + " " + (verb || rawAction)).trim();
   }
-  function buildIndexEngagement() {
+  function buildIndexEngagement(options) {
     // Connection chips are surface-independent and reconcile as soon as an
     // accepted graph/comments generation exists. Recent activity remains
     // index-only below.
@@ -7191,6 +7191,7 @@
       const label = count + " active comment" + (count === 1 ? "" : "s");
       chip.textContent = label; chip.setAttribute("aria-label", label + " on " + (titleOf[id] || id));
     });
+    if (options && options.inventoryOnly) return;
     const hero = $(".okf-hero"); if (!hero) return;
     const focusedRecent = document.activeElement && document.activeElement.closest
       ? document.activeElement.closest("#okf-recent-rail li[data-concept-id]") : null;
@@ -7251,6 +7252,12 @@
       if (target) { if (!target.matches("a,button,[tabindex]")) target.setAttribute("tabindex", "-1"); target.focus(); }
     }
   }
+
+  window.addEventListener("okf-loom:derivedPatched", () => {
+    highlightFocusedConcept(state._lastFocus);
+    // Reconcile chips without rebuilding the independent recent-activity rail.
+    buildIndexEngagement({ inventoryOnly: true });
+  });
 
   function hrefToConceptId(href) {
     if (!href || typeof href !== "string") return null;
