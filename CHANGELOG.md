@@ -10,6 +10,13 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Under forced colours (Windows High Contrast) the graph canvas paints only
+  system colours: Canvas nodes with CanvasText strokes, glyphs, labels and
+  edges; Highlight selection, path, search and focus cues that each carry
+  their own stroke width or style; dotted GrayText for dimmed context. Lenses
+  trade hue for node shape or stroke weight (with a matching key), badges,
+  count chips and the overview map stay readable, and leaving forced colours
+  restores the Ledger palette exactly.
 - On touch screens the code-block Copy button no longer covers the first
   line of code, and stays in view while a long line is scrolled sideways.
 - Graph JSON tolerates unknown query parameters (including cache-busters);
