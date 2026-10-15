@@ -790,21 +790,31 @@
     Array.from(fresh.attributes).forEach((attr) => {
       if (!readerAttribute(attr.name) && node.getAttribute(attr.name) !== attr.value) node.setAttribute(attr.name, attr.value);
     });
-    const available = Array.from(node.childNodes);
+    const unused = new Set(node.childNodes), available = new Map();
+    unused.forEach((child) => {
+      const key = derivedKey(child);
+      if (!available.has(key)) available.set(key, {nodes: [], next: 0});
+      available.get(key).nodes.push(child);
+    });
     let cursor = node.firstChild;
     Array.from(fresh.childNodes).forEach((child) => {
       const key = derivedKey(child);
       let retained = child.nodeType === Node.ELEMENT_NODE && child.matches(".okf-card, .okf-conn")
         ? rows.get(child.getAttribute("data-concept-id")) : null;
-      if (!retained) retained = available.find((candidate) => derivedKey(candidate) === key);
-      const index = available.indexOf(retained);
-      if (index >= 0) available.splice(index, 1);
+      if (!retained) {
+        const bucket = available.get(key);
+        // Repeated text/element keys keep their original order. Skip entries
+        // already claimed by a keyed row without rescanning the sibling list.
+        while (bucket && bucket.next < bucket.nodes.length && !unused.has(bucket.nodes[bucket.next])) bucket.next++;
+        if (bucket && bucket.next < bucket.nodes.length) retained = bucket.nodes[bucket.next++];
+      }
+      unused.delete(retained);
       if (!retained) retained = child.cloneNode(false);
       patchDerivedNode(retained, child, rows);
       if (retained !== cursor) node.insertBefore(retained, cursor);
       cursor = retained.nextSibling;
     });
-    available.forEach((child) => { if (child.parentNode === node) child.remove(); });
+    unused.forEach((child) => { if (child.parentNode === node) child.remove(); });
   }
   function patchDerivedRegions(fresh) {
     const indexPage = document.body.classList.contains("okf-viewer--index");
