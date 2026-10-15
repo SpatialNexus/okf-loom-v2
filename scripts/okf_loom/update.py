@@ -780,15 +780,15 @@ def apply_plan(
                         if path not in history_before:
                             path.unlink(missing_ok=True)
                     for path, raw in history_before.items():
-                        atomic_write_bytes(path, raw)
+                        atomic_write_bytes(path, raw, mode=0o600)
                     if events_before is None:
                         studio.events_path.unlink(missing_ok=True)
                     else:
-                        atomic_write_bytes(studio.events_path, events_before)
+                        atomic_write_bytes(studio.events_path, events_before, mode=0o600)
                     if logged_before is None:
                         studio.last_logged_path.unlink(missing_ok=True)
                     else:
-                        atomic_write_bytes(studio.last_logged_path, logged_before)
+                        atomic_write_bytes(studio.last_logged_path, logged_before, mode=0o600)
                     studio._last_logged_rev = logged_map_before
                     raise
                 from .studio import _event_dedup_key

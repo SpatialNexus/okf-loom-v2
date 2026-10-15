@@ -329,11 +329,12 @@ def test_snapshot_write_is_atomic(studio: Studio, bundle: Path, monkeypatch) -> 
     call_count = {"n": 0}
     real_atomic_write_bytes = studio_mod.atomic_write_bytes
 
-    def flaky(path, data):
+    def flaky(path, data, *, mode=None):
+        assert mode == 0o600
         call_count["n"] += 1
         if call_count["n"] == 1:
             raise OSError("simulated mid-write crash")
-        return real_atomic_write_bytes(path, data)
+        return real_atomic_write_bytes(path, data, mode=mode)
 
     monkeypatch.setattr(studio_mod, "atomic_write_bytes", flaky)
     with pytest.raises(OSError):
