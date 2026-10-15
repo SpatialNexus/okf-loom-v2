@@ -2,6 +2,7 @@
 from pathlib import Path
 import errno
 import multiprocessing
+import os
 import stat
 
 import pytest
@@ -47,6 +48,68 @@ def test_short_chrome_tmpdir_measures_resolved_bytes(tmp_path, monkeypatch):
     monkeypatch.setattr(conftest.tempfile, "mkdtemp", lambda **_kwargs: pytest.fail("tried long parent"))
     with pytest.raises(pytest.UsageError, match="too long"):
         conftest._short_chrome_tmpdir(link, (link,))
+
+
+@pytest.mark.parametrize("tmp_denied", (False, True))
+def test_pytest_temp_prefers_tmp_then_external_cache_with_in_repo_venv(tmp_path, monkeypatch, tmp_denied):
+    from types import SimpleNamespace
+
+    root = tmp_path / "checkout"
+    root.mkdir()
+    cache = Path("/external-cache")
+    (root / ".shared-cache").symlink_to(cache, target_is_directory=True)
+    monkeypatch.setattr(conftest, "TOOLKIT_ROOT", root)
+    monkeypatch.setattr(conftest.sys, "prefix", str(root / ".venv"))
+    monkeypatch.setattr(conftest.tempfile, "gettempdir", lambda: "/" + "long" * 30)
+    owned = tmp_path / "owned"
+    calls, cleanups = [], []
+
+    def allocate(*, prefix, dir):
+        calls.append(dir)
+        if tmp_denied and dir == Path("/tmp"):
+            raise PermissionError(errno.EACCES, "restricted host denies /tmp")
+        owned.mkdir()
+        return str(owned)
+
+    monkeypatch.setattr(conftest.tempfile, "mkdtemp", allocate)
+    conftest.pytest_configure(SimpleNamespace(
+        add_cleanup=cleanups.append, addinivalue_line=lambda *_: None))
+    try:
+        assert calls == ([Path("/tmp"), cache] if tmp_denied else [Path("/tmp")])
+        assert conftest.tempfile.tempdir == str(owned)
+        assert all(os.environ[key] == str(owned) for key in ("TMPDIR", "TMP", "TEMP"))
+        assert stat.S_IMODE(owned.stat().st_mode) == 0o700
+    finally:
+        for cleanup in reversed(cleanups):
+            cleanup()
+    assert not owned.exists()
+
+
+def test_short_chrome_tmpdir_rejects_in_tree_effective_and_fallback_paths(monkeypatch, tmp_path):
+    # Short synthetic paths prove rejection is about the work tree, not length.
+    root = Path("/checkout")
+    monkeypatch.setattr(conftest, "TOOLKIT_ROOT", root)
+    owned = tmp_path / "external"
+    calls = []
+
+    def allocate(*, prefix, dir):
+        calls.append(dir)
+        owned.mkdir()
+        return str(owned)
+
+    monkeypatch.setattr(conftest.tempfile, "mkdtemp", allocate)
+    result = conftest._short_chrome_tmpdir(root / "private", (
+        root, root / ".venv", root / ".shared-cache", Path("/outside")))
+    assert result == owned
+    assert calls == [Path("/outside")]
+
+
+def test_private_external_tmpdir_survives_denied_system_tmp(monkeypatch):
+    def denied(**_kwargs):
+        pytest.fail("must keep the documented private external TMPDIR")
+
+    monkeypatch.setattr(conftest.tempfile, "mkdtemp", denied)
+    assert conftest._short_chrome_tmpdir(Path("/short-private"), (Path("/tmp"),)) is None
 
 
 def test_private_session_fixture_repairs_only_its_new_owned_directory(tmp_path, monkeypatch):

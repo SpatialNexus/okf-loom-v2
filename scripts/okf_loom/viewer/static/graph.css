@@ -2152,6 +2152,8 @@ body.okf-viewer--graph.okf-viewer--singlefile[data-okf-single-destination="index
   .okf-lens-summary__row,
   .okf-signal__row--check,
   .okf-signal select,
-  .okf-signal input[type="range"] { min-height: 44px; }
+  .okf-signal input[type="range"],
+  .okf-detail-body-retry { min-height: 44px; }
+  .okf-detail-body-retry { min-width: 44px; }
   .okf-edge-bundle-index summary { padding-block: 12px; }
 }

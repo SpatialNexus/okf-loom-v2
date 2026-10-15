@@ -78,7 +78,7 @@ def test_replace_preserves_permissions_and_owner(mode_dir, writer, mode):
     getattr(io_utils, writer)(target, payload)
     after = target.stat()
     assert target.read_text() == "after"
-    assert stat.S_IMODE(after.st_mode) == mode
+    assert stat.S_IMODE(after.st_mode) == mode & ~stat.S_ISUID
     assert (after.st_uid, after.st_gid) == (before.st_uid, before.st_gid)
     assert after.st_ino != before.st_ino
 
@@ -109,6 +109,44 @@ def test_umask_read_never_changes_parent_mask(mode_dir, mask, procfs):
         mask, procfs, mode_dir / "new",
     )
     assert stat.S_IMODE((mode_dir / "new").stat().st_mode) == 0o666 & ~mask
+
+
+def test_concurrent_new_files_read_fallback_umask_only_once(mode_dir, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    import time
+
+    monkeypatch.setattr(io_utils, "_CACHED_UMASK", None)
+    real_read, real_child = Path.read_text, subprocess.check_output
+    proc_reads, child_calls = [], []
+
+    def no_proc(path, *args, **kwargs):
+        if path == Path("/proc/self/status"):
+            proc_reads.append(path)
+            raise PermissionError("procfs hidden")
+        return real_read(path, *args, **kwargs)
+
+    def child(*args, **kwargs):
+        child_calls.append(args)
+        time.sleep(.02)  # Let other writers contend on first use.
+        return real_child(*args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", no_proc)
+    monkeypatch.setattr(subprocess, "check_output", child)
+    monkeypatch.setattr(os, "umask", lambda *_: pytest.fail("changed parent umask"))
+
+    def write(i):
+        writer = WRITERS[i % len(WRITERS)]
+        getattr(io_utils, writer)(mode_dir / str(i), b"new" if writer == "atomic_write_bytes" else "new")
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(write, range(24)))
+    assert len(child_calls) == len(proc_reads) == 1
+    mask = io_utils._CACHED_UMASK
+    assert mask is not None
+    for i in range(24):
+        path = mode_dir / str(i)
+        assert path.read_bytes() == b"new"
+        assert stat.S_IMODE(path.stat().st_mode) == 0o666 & ~mask
 
 
 @pytest.mark.parametrize("writer", WRITERS)
@@ -175,7 +213,59 @@ def test_replacement_retains_different_owner_before_mode(mode_dir, monkeypatch):
     monkeypatch.setattr(os, "fchown", lambda fd, uid, gid: events.append(("owner", uid, gid)))
     monkeypatch.setattr(os, "fchmod", lambda fd, mode: events.append(("mode", mode)))
     io_utils.atomic_write_text(target, "after")
-    assert events == [("owner", previous.st_uid + 1, previous.st_gid + 1), ("mode", 0o6440)]
+    assert events == [("owner", previous.st_uid + 1, previous.st_gid + 1), ("mode", 0o2440)]
+
+
+@pytest.mark.parametrize("writer", WRITERS)
+@pytest.mark.parametrize("keep_group", (True, False))
+@pytest.mark.parametrize("explicit_mode", (None, 0o600))
+def test_shared_owner_eperm_still_publishes_content(mode_dir, monkeypatch, writer, keep_group, explicit_mode):
+    """Exercise the kernel's real fchown EPERM, not a fabricated exception."""
+    import errno
+    from types import SimpleNamespace
+
+    target = mode_dir / "shared-content"
+    target.write_bytes(b"before")
+    # Root/CAP_CHOWN hosts cannot prove the unprivileged denial. Probe the
+    # exact syscall, on a disposable inode, rather than guessing from platform.
+    other_uid = os.geteuid() + 1
+    with (mode_dir / "chown-probe").open("wb") as probe:
+        try:
+            os.fchown(probe.fileno(), other_uid, -1)
+        except PermissionError as exc:
+            assert exc.errno == errno.EPERM
+        else:
+            pytest.skip(f"os.fchown(fd, {other_uid}, -1) permitted (euid={os.geteuid()}); requires unprivileged EPERM")
+    real_stat, real_chown = Path.stat, os.fchown
+    groups = {os.getegid(), *os.getgroups()}
+    group = os.getegid() if keep_group else max(groups) + 1
+    calls, denials = [], []
+
+    def previous_owner(path, *args, **kwargs):
+        if path == target:
+            return SimpleNamespace(st_uid=other_uid, st_gid=group, st_mode=0o107764)
+        return real_stat(path, *args, **kwargs)
+
+    def observed_chown(fd, uid, gid):
+        calls.append((uid, gid))
+        try:
+            return real_chown(fd, uid, gid)
+        except PermissionError as exc:
+            denials.append(exc.errno)
+            raise
+
+    monkeypatch.setattr(Path, "stat", previous_owner)
+    monkeypatch.setattr(os, "fchown", observed_chown)
+    payload = b"after" if writer == "atomic_write_bytes" else "after"
+    getattr(io_utils, writer)(target, payload, mode=explicit_mode)
+    after = real_stat(target)
+    assert target.read_bytes() == b"after"
+    assert stat.S_IMODE(after.st_mode) == (0o1764 if explicit_mode is None else 0o600)
+    assert after.st_uid == os.geteuid()
+    assert after.st_gid == os.getegid()
+    assert calls == [(other_uid, group), (-1, group)]
+    assert denials == [errno.EPERM] * (1 if keep_group else 2)
+    assert not list(mode_dir.glob(".okf-*.tmp"))
 
 
 def test_studio_private_atomic_writers_restrict_replacements(mode_dir):

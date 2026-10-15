@@ -9,7 +9,7 @@ through these helpers. The pattern is:
        it is private even on shared hosts.
     2. Write and flush the content via ``os.fdopen``. Preserve an existing
        target's owner and permission bits, or apply 0666 masked by the current
-       umask for new content. An explicit ``mode`` overrides preservation (use
+       umask (snapshotted at first use) for new content. An explicit ``mode`` overrides preservation (use
        ``mode=0o600`` for private state, even if a prior file was wider).
     3. ``os.replace(tmp, path)`` to swap into place atomically.
     4. On ANY exception during write or replace, ``os.unlink`` the tmp
@@ -428,14 +428,26 @@ def ensure_self_ignored(dirpath: str | Path) -> None:
         pass  # best-effort: a read-only checkout must not break serving
 
 
-def _process_umask() -> int:
-    """Read the live umask without ever changing the parent process's mask.
+_UMASK_LOCK = threading.Lock()
+_CACHED_UMASK: int | None = None
 
-    Linux exposes it read-only in procfs. Elsewhere (or with procfs hidden),
-    a short-lived isolated Python child reads its inherited mask. A lock around
-    os.umask in this process would not protect unrelated server threads, and
-    an import-time snapshot would miss later operator changes.
+
+def _process_umask() -> int:
+    """Snapshot the umask at first use, without changing the parent's mask.
+
+    Serialize first use so even concurrent new-file writes launch at most one
+    isolated child on hosts without procfs. Never call os.umask in the parent:
+    a lock here would not protect unrelated server threads.
     """
+    global _CACHED_UMASK
+    with _UMASK_LOCK:
+        if _CACHED_UMASK is None:
+            _CACHED_UMASK = _read_process_umask()
+        return _CACHED_UMASK
+
+
+def _read_process_umask() -> int:
+    """Read Linux procfs, or the inherited mask in an isolated Python child."""
     try:
         for line in Path("/proc/self/status").read_text(encoding="ascii").splitlines():
             if line.startswith("Umask:"):
@@ -455,28 +467,38 @@ def _process_umask() -> int:
 def _set_atomic_metadata(fd: int, path: Path, mode: int | None) -> None:
     """Apply final metadata only after flushing, while the temp fd is open.
 
-    Ownership preservation fails closed if the writer cannot retain it. Chown
-    precedes chmod because chown (and writing) can clear setuid/setgid bits.
+    Preserve ownership when permitted, otherwise try retaining the group alone.
+    Chown precedes chmod because it can clear privilege bits. Rewritten content
+    never retains setuid, nor setgid if the original ownership could not be kept.
     Explicit modes always win: private rewrites never preserve a wider mode.
     """
     try:
         previous = path.stat()
     except FileNotFoundError:
         previous = None
+    ownership_preserved = True
     if previous is not None:
         current = os.fstat(fd)
         if (current.st_uid, current.st_gid) != (previous.st_uid, previous.st_gid):
-            os.fchown(fd, previous.st_uid, previous.st_gid)
+            try:
+                os.fchown(fd, previous.st_uid, previous.st_gid)
+            except PermissionError:
+                ownership_preserved = False
+                try:
+                    os.fchown(fd, -1, previous.st_gid)
+                except PermissionError:
+                    pass  # Shared content remains writable as the writing user.
     if mode is None:
-        mode = previous.st_mode & 0o7777 if previous is not None else 0o666 & ~_process_umask()
+        mode = (previous.st_mode & (0o3777 if ownership_preserved else 0o1777)
+                if previous is not None else 0o666 & ~_process_umask())
     os.fchmod(fd, mode)
 
 
 def atomic_write_text(path: str | Path, text: str, *, encoding: str = "utf-8",
                       mode: int | None = None) -> None:
-    """Atomically write text, preserving ownership and existing permission bits.
+    """Atomically write text, retaining permissions and ownership when possible.
 
-    New content uses 0666 & ~umask, like open(path, 'w'). Explicit ``mode``
+    New content uses 0666 & ~umask, snapshotted at first use. Explicit ``mode``
     overrides both defaults, even on replacement: private callers must pass
     ``mode=0o600``. The same-directory temp stays 0600 until fully written.
     Parents are created if missing; errors unlink the temp without publishing.
