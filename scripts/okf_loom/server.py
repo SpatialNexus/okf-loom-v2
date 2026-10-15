@@ -59,7 +59,6 @@ from .studio import Studio, rev_of, CommentMutationError, CommentSummaryUnavaila
 from .presence import PresenceUnavailable, PresenceCapacity, valid_focus, valid_label
 from .annotations import AnchorError, capture_anchor, concept_content_rev, parse_v2_anchor, resolve_anchor
 from .render import (
-    build_graph_data,
     _render_concept_page,
     _render_index_page,
     _render_search_page,
@@ -90,6 +89,9 @@ _STDLIB_THREADING_HTTP_SERVER = ThreadingHTTPServer
 # (16 MiB) — it is a backstop, not the primary control.
 # ---------------------------------------------------------------------------
 MAX_RAW_RESPONSE_BYTES: int = 16 * 1024 * 1024  # 16 MiB cap on /__raw bodies.
+# The root inventory lists every concept. Keep its HTML allowance independent
+# of retrieval JSON; no other HTML route inherits this larger bound.
+MAX_INDEX_RESPONSE_BYTES: int = 8 * 1024 * 1024
 
 
 def _prefers_html_error(accept: str) -> bool:
@@ -2842,7 +2844,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
             engagement_events=engagement_events,
         )
         html = self._plugin().on_index_render(html)
-        self._send_text(200, html)
+        self._send_text(200, html, html_limit=MAX_INDEX_RESPONSE_BYTES)
 
     def _handle_dir_index(self, sub: str) -> None:
         sub = sub.lstrip("/")
@@ -3309,27 +3311,28 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
                     {"ok": False, "error": "comment_summary_unavailable"},
                     extra_headers={"Cache-Control": "no-store"},
                 )
-        data = build_graph_data(
-            bundle,
-            name=display_name,
-            comment_summary=comment_summary,
-            cache_bodies=True,
-            include_bodies=not structure,
-        )
-        if structure:
-            del data["bodies"]
-            del data["documents"]
-        from .retrieval import MAX_RESPONSE_BYTES, canonical_json_bytes
+        from .graph_response import graph_response
+        from .retrieval import MAX_RESPONSE_BYTES, RetrievalContractError
         try:
-            body = canonical_json_bytes(data)
-        except Exception:
-            return self._send_json(200, data, extra_headers={"Cache-Control": "no-store"})
-        if len(body) > MAX_RESPONSE_BYTES:
-            return self._send_json(200, data, extra_headers={"Cache-Control": "no-store"})
+            response = graph_response(
+                bundle, name=display_name, comment_summary=comment_summary,
+                structure=structure, limit=MAX_RESPONSE_BYTES,
+            )
+        except RetrievalContractError:
+            return self._send_json(500, {"ok": False, "error": {
+                "code": "invalid_json_value", "message": "Response contains a non-canonical JSON value",
+                "fields": {},
+            }}, extra_headers={"Cache-Control": "no-store"})
+        if response is None:
+            return self._send_json(413, {"ok": False, "error": {
+                "code": "response_too_large",
+                "message": "Graph exceeds the 4 MiB response limit. Open a smaller bundle or use a portable build.",
+                "fields": {},
+            }}, extra_headers={"Cache-Control": "no-store"})
         # No authority/viewer-specific fields: local and public ingress share
         # this read-only projection. Hash final bytes, not just the revision:
         # comment counts and stale_after metadata can change independently.
-        etag = '"' + hashlib.sha256(body).hexdigest() + '"'
+        body, etag = response
         headers = {"Cache-Control": "private, no-cache", "ETag": etag}
         not_modified = _if_none_match_matches(self.headers.get_all("If-None-Match", []), etag)
         self._send_bytes(304 if not_modified else 200, b"" if not_modified else body,
@@ -3958,7 +3961,8 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         return "\n".join(bits)
 
     def _send_text(self, code: int, body: str, *, content_type: str = "text/html; charset=utf-8",
-                   close: bool = False, extra_headers: dict[str, str] | None = None) -> None:
+                   close: bool = False, extra_headers: dict[str, str] | None = None,
+                   html_limit: int | None = None) -> None:
         # Inject theme.js (+ studio bootstrap when attached) into <head> of
         # every served HTML page so data-theme resolves before first paint.
         if content_type.startswith("text/html") and "</head>" in body:
@@ -3966,7 +3970,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         body_bytes = body.encode("utf-8")
         if content_type.startswith("text/html"):
             from .retrieval import MAX_RESPONSE_BYTES
-            if len(body_bytes) > MAX_RESPONSE_BYTES:
+            if len(body_bytes) > (MAX_RESPONSE_BYTES if html_limit is None else html_limit):
                 code = 413
                 body_bytes = (
                     b"<!doctype html><html><head><title>Response too large</title></head>"

@@ -134,6 +134,14 @@ Root index page. Renders the bundle-root `index.md` (hand-authored
 or generated) plus the type-grouped concept listing. The studio
 bootstrap (token + asset links) is injected into the `</head>`.
 
+The root inventory has its own 8 MiB HTML response cap (oversize returns `413`),
+independent of the 4 MiB retrieval/graph JSON cap. It lists every concept, so
+5,000 ordinary cards can exceed 4 MiB even with a tiny graph thumbnail. The
+thumbnail uses only identities/topology/counts and renders its existing small
+subset; it does not construct rendered graph metadata or document bodies.
+This larger allowance does not apply to other HTML routes and is not a bound
+on concurrent rendering work or temporary allocations.
+
 ## `/<concept_id>`
 
 Concept page. `concept_id` is the dotted path without `.md`
@@ -279,6 +287,31 @@ response but must revalidate; shared caches must not store it. A matching
 `If-None-Match` on GET/HEAD (including weak `W/` comparison, comma-separated
 validators, multiple header fields or `*`) returns `304` with no body and the
 same ETag, cache policy and security headers.
+
+The live server retains one final serialized response per view for the current
+bundle generation, display name, palette, comment-summary revision and metadata
+expiry interval. Repeated reads reuse those exact bytes and ETag, without graph
+rebuilding or JSON encoding. Expiry intervals change at the authored instant,
+not at a rounded clock bucket. Concurrent identical reads coalesce independently
+per view, so a slow full-body render does not hold up structure reads.
+
+Both views currently retain the 4 MiB response cap. A conservative lower bound
+from mandatory graph records refuses certainly oversized graphs before rendering
+or encoding; other responses are checked before encoding when their projected
+size already proves refusal, then against their exact UTF-8 bytes. Refusals are
+cached too, but sent with `Cache-Control: no-store` and status `413`:
+
+```json
+{"ok":false,"error":{"code":"response_too_large","message":"Graph exceeds the 4 MiB response limit. Open a smaller bundle or use a portable build.","fields":{}}}
+```
+
+There is no viewer-dependent cache key or visibility change. At most two accepted
+wire responses (8 MiB total) are retained per loaded Bundle, in addition to the
+existing rendered-document cache. This bounds retained response bytes, not all
+cold rendering allocations or the HTTP server's thread count. The current graph
+client still requests the full view and displays only the HTTP status on refusal;
+on-demand body acquisition and richer error presentation remain separate work.
+Portable builds do not use this live transport cache or cap.
 
 ## `/__data/content.json`
 
