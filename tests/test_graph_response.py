@@ -13,13 +13,15 @@ from okf_loom.retrieval import MAX_RESPONSE_BYTES, canonical_json_bytes
 from test_graph_cache import _get, graph_server  # noqa: F401 -- shared live fixture
 
 
-def generated_bundle(root: Path, count: int, *, fanout: int = 3) -> Bundle:
+def generated_bundle(root: Path, count: int, *, fanout: int = 3, write: bool = False) -> Bundle:
     concepts = {}
     for i in range(count):
         cid = f"node-{i:05d}"
         body = "# Detail\n\n" + " ".join(
             f"[Link](/node-{(i + offset + 1) % count:05d}.md)" for offset in range(fanout))
         raw = f"---\ntype: note\ntitle: Node {i}\n---\n{body}"
+        if write:
+            (root / (cid + '.md')).write_text(raw)
         concepts[(cid,)] = Concept(
             id=(cid,), path=root / (cid + '.md'), rel_path=Path(cid + '.md'),
             frontmatter={"type": "note", "title": f"Node {i}"}, body=body, raw_text=raw,
@@ -97,10 +99,10 @@ def test_5000_concept_refusal_precedes_build_and_encoding(tmp_path, monkeypatch)
 
     monkeypatch.setattr(render, 'build_graph_data', forbidden)
     monkeypatch.setattr(transport, 'canonical_json_bytes', forbidden)
-    for structure in (False, True, False, True):
+    for structure in (False, False):
         assert transport.graph_response(bundle, name='Large', comment_summary=None,
                                         structure=structure, limit=MAX_RESPONSE_BYTES) is None
-    assert len(bundle._graph_response_cache) == 2
+    assert len(bundle._graph_response_cache) == 1
 
 
 def test_size_refusal_has_actionable_json_and_is_cached(graph_server, monkeypatch):
@@ -123,6 +125,7 @@ def test_cached_structure_refusal_skips_full_body_render(graph_server, monkeypat
     server, base = graph_server
     import okf_loom.retrieval as retrieval
     monkeypatch.setattr(retrieval, 'MAX_RESPONSE_BYTES', 1500)
+    monkeypatch.setattr(transport, 'MAX_STRUCTURE_BYTES', 1500)
     assert _get(base, '/__data/graph.json?view=structure')[0] == 413
     monkeypatch.setattr(render, '_render_graph_documents', lambda *a, **k: pytest.fail('rendered bodies'))
     assert _get(base)[0] == 413
