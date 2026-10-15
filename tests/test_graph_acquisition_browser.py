@@ -1,8 +1,11 @@
 """Graph/Studio acquisition cost without changing their readiness contracts."""
 from __future__ import annotations
 
+import json
 import re
+import time
 from urllib.parse import urlparse
+from urllib.request import urlopen
 
 import pytest
 
@@ -172,3 +175,41 @@ def test_graph_refresh_publishes_latest_data_to_studio_without_second_fetch(acqu
         assert page.evaluate('''() => window.__okfLoomGraph.cy.getElementById('tables/orders').data('label') === 'Shared refresh title' ''')
     finally:
         source.write_text(original)
+
+
+def test_graph_body_recovers_stale_revision_without_live_push(tmp_path, page, monkeypatch):
+    """Editing still advances the server revision when UI push is disabled."""
+    monkeypatch.setattr('browser_support.free_port', lambda: 9070)
+    source = tmp_path / 'alpha.md'
+    source.write_text('---\ntype: note\ntitle: Alpha\n---\nOriginal body.\n')
+    (tmp_path / 'beta.md').write_text('---\ntype: note\n---\n[Alpha](alpha.md)\n')
+    with live_server(tmp_path, '--no-watch-ui') as base:
+        body_statuses, structures = [], []
+        page.on('response', lambda response: body_statuses.append(response.status)
+                if urlparse(response.url).path == '/__data/graph-body' else None)
+        page.on('request', lambda request: structures.append(request.url)
+                if urlparse(request.url).path == '/__data/graph.json' else None)
+        page.goto(base + '/__graph', wait_until='load')
+        page.wait_for_function('() => window.okfGraphCaptureState?.().layoutSettled')
+        assert not page.evaluate('() => !!window.okfLoomLive')
+        revision = page.evaluate('async () => (await window.okfGraphData).bundle_revision')
+        source.write_text(source.read_text().replace('Original body.', 'New body after disk edit.'))
+        deadline = time.monotonic() + 10
+        while True:
+            with urlopen(base + '/__data/graph.json?view=structure', timeout=2) as response:
+                fresh = json.load(response)
+            if fresh['bundle_revision'] != revision:
+                break
+            assert time.monotonic() < deadline, 'Watcher did not advance the server revision'
+            time.sleep(.05)
+        structures.clear()
+        page.evaluate("window.okfGraphInteraction.dispatch({type:'SELECT', id:'alpha', source:'test'})")
+        page.wait_for_function("() => document.getElementById('detail-body').textContent.includes('New body after disk edit.')")
+        assert 'HTTP 409' not in page.locator('#detail-body').inner_text()
+        assert body_statuses == [409, 200]
+        assert [urlparse(url).query for url in structures] == ['view=structure']
+        assert page.evaluate('''async () => (await window.okfGraphData).bundle_revision === document.body.dataset.okfRevision
+            && window.okfLoomStudio.state.graph.bundle_revision === document.body.dataset.okfRevision''')
+        result = page.evaluate('''async () => await window.okfCaptureReadiness.start({target:'graph'}).promise''')
+        assert result['screenshotAllowed'], result
+        assert not page.evaluate('() => window.okfGraphCaptureState().terminalCode')

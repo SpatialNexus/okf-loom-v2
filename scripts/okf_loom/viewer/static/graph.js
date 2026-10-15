@@ -966,7 +966,7 @@
         var timer = setTimeout(function () { controller.abort(); }, 10000);
         fetch("/__data/graph-body?id=" + encodeURIComponent(job.id) + "&revision=" + encodeURIComponent(job.revision),
           { signal: controller.signal, cache: "no-cache", headers: { Accept: "application/json" } })
-          .then(function (response) { if (!response.ok) throw new Error("Concept body unavailable (HTTP " + response.status + ")."); return response.json(); })
+          .then(function (response) { if (!response.ok) { var error = new Error("Concept body unavailable (HTTP " + response.status + ")."); error.status = response.status; throw error; } return response.json(); })
           .then(function (doc) {
             if (controller.signal.aborted || job.epoch !== bodyEpoch) throw new DOMException("Superseded", "AbortError");
             if (!doc || doc.id !== job.id || doc.bundle_revision !== job.revision || typeof doc.html !== "string" || typeof doc.metadata_html !== "string") throw new Error("Concept body revision is invalid.");
@@ -5022,10 +5022,16 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
         // Existing progressive renderers also see lazily loaded bodies.
         try { window.dispatchEvent(new Event("okf-loom:bodyPatched")); } catch (e) {}
       }
-      function showSelectedBody(conceptId, bodyEl, metadataSlot) {
+      function showSelectedBody(conceptId, bodyEl, metadataSlot, retriedRevision) {
         if (!bodyEl || !metadataSlot) return;
         if (LIVE_GRAPH && !bundle.bodies) {
           var owner = selectionGeneration, epoch = bodyEpoch;
+          function stillSelected() { return graphPageActive && epoch === bodyEpoch && owner === selectionGeneration && selectedConceptId === conceptId; }
+          function showBodyError(error) {
+            if (!stillSelected()) return;
+            detailBodyPending = false; detailBodyError = String(error.message || error);
+            bodyEl.removeAttribute("aria-busy"); bodyEl.textContent = detailBodyError;
+          }
           detailBodyPending = true; detailBodyError = null;
           bodyEl.textContent = "Loading concept…"; bodyEl.setAttribute("aria-busy", "true");
           readGraphBody(conceptId).then(function (doc) {
@@ -5033,9 +5039,17 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
             paintDetailMetadata(metadataSlot, doc.metadata_html);
             paintDetailBody(bodyEl, doc.html); detailBodyPending = false;
           }).catch(function (error) {
-            if (!graphPageActive || epoch !== bodyEpoch || owner !== selectionGeneration || selectedConceptId !== conceptId) return;
-            detailBodyPending = false; detailBodyError = String(error.message || error);
-            bodyEl.removeAttribute("aria-busy"); bodyEl.textContent = detailBodyError;
+            if (!stillSelected()) return;
+            if (error.status === 409 && !retriedRevision) {
+              // Reuse the same latest-wins structure owner even without SSE.
+              // Acceptance cancels this epoch and retries the current selection
+              // once; a failed refresh leaves this owner to report the error.
+              refreshGraphFromServer({ retryBodyRevision: true }).then(function (accepted) {
+                if (!accepted) showBodyError(error);
+              });
+              return;
+            }
+            showBodyError(error);
           });
         } else paintDetailBody(bodyEl, bodies[conceptId] || "");
       }
@@ -5785,6 +5799,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
         if (focus === presenceFocus) return;
         applyPresenceFocus(focus);
       });
+    }
 
       // ---- Phase 5: the canvas consumes live graph events ---
       // Phase 4 compatibility boundary: existing Phase 5 graph/comment SSE
@@ -5868,8 +5883,9 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
       }
       function hideGraphChip() { if (_graphChipEl) _graphChipEl.hidden = true; }
 
-          function refreshGraphFromServer() {
-          if (!DATA_URL) return;
+          function refreshGraphFromServer(options) {
+          options = options || {};
+          if (!DATA_URL || !graphPageActive) return Promise.resolve(false);
           var refreshFocus=document.activeElement,refreshFocusSolo=!!(refreshFocus&&refreshFocus.classList&&refreshFocus.classList.contains("okf-filter-solo")),refreshFocusOwner=refreshFocus&&refreshFocus.closest&&refreshFocus.closest('[aria-label="Relationship filters"]'),refreshFocusValue=refreshFocusOwner?(refreshFocusSolo?refreshFocus.dataset.filterSoloValue:refreshFocus.dataset.filterValue):document.body.dataset.okfRelationshipFilterFocus;if(!refreshFocusOwner)refreshFocusSolo=document.body.dataset.okfRelationshipFilterFocusSolo==="1";
           if (graphRefreshController) graphRefreshController.abort();
           var controller = new AbortController();
@@ -5983,7 +5999,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
               buildNodeIndex(fresh);
               if (selectedConceptId && freshIds[selectedConceptId]) {
                 renderSignalExplain(selectedConceptId);
-                if (LIVE_GRAPH) showSelectedBody(selectedConceptId, document.getElementById("detail-body"), document.getElementById("detail-okf-metadata"));
+                if (LIVE_GRAPH) showSelectedBody(selectedConceptId, document.getElementById("detail-body"), document.getElementById("detail-okf-metadata"), options.retryBodyRevision);
               }
               if (selectedConceptId && !freshIds[selectedConceptId]) {
                 // Phase 4 compatibility boundary for the existing Phase 5
@@ -6066,6 +6082,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
                   publishGraphCaptureReady(acceptedState, acceptedState === "ready");
                 }
               });
+              return true;
             })
               .catch(function (error) {
                 // Only the still-current owner may restore the coherent
@@ -6091,6 +6108,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
           if (graphRefreshDebounceTimer) clearTimeout(graphRefreshDebounceTimer);
           graphRefreshDebounceTimer = setTimeout(function () { graphRefreshDebounceTimer = null; if (graphPageActive) refreshGraphFromServer(); }, 700);
         }
+    if (window.okfLoomLive && typeof window.okfLoomLive.on === "function") {
         window.okfLoomLive.on("graph", scheduleGraphRefresh);
         // Comment lifecycle events change only graph-derived count metadata,
         // but share the exact same debounced request owner and stale fence.
