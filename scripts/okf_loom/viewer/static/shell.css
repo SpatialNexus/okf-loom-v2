@@ -212,7 +212,10 @@ html[data-okf-js="1"][data-okf-studio-status="failed"] .okf-shell__studio-slot[d
     transform: none;
     padding-block: var(--okf-space-2);
     padding-inline: var(--okf-space-3);
-    gap: var(--okf-space-2);
+    /* 6px between controls on a row (8px between rows): with the 8px
+     * destination padding below, this is what lets Studio share row 2 with
+     * a search field that still shows its whole placeholder at 390px. */
+    gap: var(--okf-space-2) 6px;
   }
   body.okf-viewer .okf-shell__nav { display: contents; }
   body.okf-viewer .okf-shell__brand {
@@ -262,16 +265,17 @@ html[data-okf-js="1"][data-okf-studio-status="failed"] .okf-shell__studio-slot[d
   body.okf-viewer .okf-shell [data-okf-shell-item="search"] { flex: 1 1 8rem; min-width: 0; }
   body.okf-viewer .okf-shell__search-form { flex: 1 1 auto; min-width: 0; }
   .okf-shell__search-form input { flex: 1 1 auto; width: auto; min-width: 0; min-height: 44px; }
-  .okf-shell__search-form button { flex: 0 0 auto; min-width: 44px; min-height: 44px; }
+  .okf-shell__search-form button { flex: 0 0 auto; min-width: 44px; min-height: 44px; padding-inline: 10px; }
   .okf-shell :is(a, button, input) { max-width: 100%; }
   /* Links are inline by default; make the nav controls real flex boxes so
    * the 44px touch height actually applies. */
   .okf-shell__nav .okf-btn { display: inline-flex; align-items: center; min-height: 44px; }
-  /* Phone rows run on a tight linear budget (search basis + Index + Graph +
-   * Studio must share ~366px at 390px): destinations take 10px inline
-   * padding here instead of the desktop 13px, so Studio stays on row 2. */
+  /* Phone rows run on a tight linear budget (the 10rem coarse search basis +
+   * Index + Graph + Studio must share ~366px at 390px): destinations take
+   * 8px inline padding here instead of the desktop 13px, so Studio stays on
+   * row 2 for touch and mouse alike. */
   .okf-shell__nav .okf-btn,
-  body.okf-viewer .okf-shell .okf-studio-launcher { padding-inline: 10px; }
+  body.okf-viewer .okf-shell .okf-studio-launcher { padding-inline: 8px; }
   .okf-shell__nav .okf-studiobtn { min-height: 44px; }
   /* Same studio.css graph-chrome defeat as the 641–900px band below: at
    * <=640px on the graph route the launcher would otherwise compute 40px
@@ -279,10 +283,10 @@ html[data-okf-js="1"][data-okf-studio-status="failed"] .okf-shell__studio-slot[d
   body.okf-viewer .okf-shell__nav .okf-studio-launcher { min-height: 44px; }
   /* Reserve one compact attention slot so even Needs attention cannot push
    * Studio onto a third row. Full status remains in the accessible name.
-   * 4.75rem holds the widest state ("Studio ■", 75px) and no more: every
-   * extra pixel comes out of the search field, whose "Search…" placeholder
-   * must still fit beside it at 390px. */
-  body.okf-viewer .okf-shell .okf-studio-launcher { position: relative; box-sizing: border-box; min-width: 4.75rem; }
+   * 4.5rem holds the widest state ("Studio ■", 71px with 8px padding) and
+   * no more: every extra pixel comes out of the search field, whose
+   * "Search…" placeholder must still fit beside it at 390px. */
+  body.okf-viewer .okf-shell .okf-studio-launcher { position: relative; box-sizing: border-box; min-width: 4.5rem; }
   .okf-shell .okf-studio-launcher__summary {
     position: absolute;
     width: 1px;
@@ -319,6 +323,33 @@ html[data-okf-js="1"][data-okf-studio-status="failed"] .okf-shell__studio-slot[d
  * query and wiki.css drops the measured scroll offset to match. */
 @media (max-width: 640px) and (max-height: 480px) {
   .okf-topbar.okf-shell { position: static; }
+}
+/* ---- Scroll-away chrome (<=640px, sticky viewports) ------------------
+ * On a phone the sticky top bar plus the document view bar cost a third to
+ * a half of the screen. wiki.js owns the state on <html>:
+ *   data-okf-chrome="revealed" | "compact"  (never set above 640px)
+ *   data-okf-chrome-motion                   (the change was scroll-driven)
+ * and publishes the measured shifts --okf-chrome-shift-top / -bar. Compact
+ * moves the top bar wholly above the viewport and the view bar up to its
+ * Sections row, which stays pinned (pages without Sections keep nothing).
+ * Only transforms move: sticky offsets and document layout never change,
+ * so nothing shifts. Keyboard focus in the hidden chrome, an expanded
+ * top-bar control (Appearance menu, search suggestions) and an active
+ * capture override compact synchronously and without a slide, so a focused
+ * control is on screen before the browser scrolls to it. The graph route
+ * keeps its own full-screen layout. */
+@media (max-width: 640px) and (min-height: 481px) {
+  html[data-okf-chrome="compact"]:not([data-okf-capture]):not(:has(.okf-shell :focus-visible, .okf-shell [aria-expanded="true"], .okf-concept-viewbar .okf-viewswitch :focus-visible)) body.okf-viewer:not(.okf-viewer--graph) .okf-topbar.okf-shell {
+    transform: translateY(var(--okf-chrome-shift-top, -100%));
+  }
+  html[data-okf-chrome="compact"]:not([data-okf-capture]):not(:has(.okf-shell :focus-visible, .okf-shell [aria-expanded="true"], .okf-concept-viewbar .okf-viewswitch :focus-visible)) body.okf-viewer--page .okf-concept-viewbar {
+    transform: translateY(var(--okf-chrome-shift-bar, 0px));
+  }
+}
+@media (max-width: 640px) and (min-height: 481px) and (prefers-reduced-motion: no-preference) {
+  html[data-okf-chrome-motion]:not([data-okf-capture]):not(:has(.okf-shell :focus-visible, .okf-shell [aria-expanded="true"], .okf-concept-viewbar .okf-viewswitch :focus-visible)) body.okf-viewer:not(.okf-viewer--graph) :is(.okf-topbar.okf-shell, .okf-concept-viewbar) {
+    transition: transform 180ms ease-out;
+  }
 }
 @media (forced-colors: active) {
   /* Box shadows drop out in forced colours: the bar becomes a real border. */

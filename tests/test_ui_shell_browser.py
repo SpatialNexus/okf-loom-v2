@@ -1,10 +1,12 @@
 """Browser proof for the shared shell and consolidated Studio surface."""
 from __future__ import annotations
 
+import contextlib
 import os
 import re
 import socket
 import subprocess
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -12,7 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from browser_support import expect, sync_playwright, launch_chromium, copy_bundle, live_server, reveal_control
+from browser_support import (expect, sync_playwright, launch_chromium, copy_bundle, live_server, reveal_control,
+                             managed_server, free_port)
 
 from conftest import okf_module_argv, okf_subprocess_env
 
@@ -1939,3 +1942,323 @@ def test_studio_direct_escape_matrix_for_modal_and_nonmodal_editables(page, serv
         expect(page.locator('.okf-studio-launcher')).to_be_focused()
     else:
         assert page.evaluate("document.activeElement && document.activeElement.id === 'escape-matrix-target'")
+
+
+# ---- Scroll-away chrome on phones ------------------------------------------
+# At <=640px the reading view keeps at most one compact sticky row (the view
+# bar's Sections row) while the reader scrolls down; the full chrome returns
+# on scroll-up, at the top, for keyboard focus, open overlays and captures.
+
+_CHROME_GEOMETRY = """() => {
+  const box = sel => { const n = document.querySelector(sel);
+    if (!n || !n.getClientRects().length) return null;
+    const r = n.getBoundingClientRect(); return {top: r.top, bottom: r.bottom, height: r.height}; };
+  const top = box('.okf-topbar'), bar = box('.okf-concept-viewbar');
+  const jump = box('.okf-concept-viewbar .okf-outline-jump');
+  const sticky = Math.max(0, ...[top, bar].filter(Boolean).map(b => Math.min(innerHeight, b.bottom)));
+  return {state: document.documentElement.getAttribute('data-okf-chrome'), top, bar, jump, sticky,
+    y: scrollY, overflow: document.documentElement.scrollWidth > innerWidth + 1,
+    topTransition: getComputedStyle(document.querySelector('.okf-topbar')).transitionDuration};
+}"""
+
+_HITS = """selectors => selectors.map(sel => {
+  const n = document.querySelector(sel);
+  if (!n) return [sel, 'missing'];
+  const r = n.getBoundingClientRect();
+  const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+  return [sel, !!hit && (hit === n || n.contains(hit))];
+}).filter(([, ok]) => ok !== true)"""
+
+_SHELL_CONTROLS = ['.okf-shell__search-form input', '[data-okf-shell-item="index"] a',
+                   '[data-okf-shell-item="graph"] a', '.okf-appearance-trigger']
+
+
+def _frames(page) -> None:
+    page.evaluate("() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))")
+
+
+def _scroll(page, dy: int) -> None:
+    page.evaluate("dy => window.scrollBy(0, dy)", dy)
+    _frames(page)
+
+
+def _settle(page) -> None:
+    page.wait_for_function("""() => !document.getAnimations().some(a =>
+      a.transitionProperty === 'transform' && a.playState === 'running')""")
+    _frames(page)
+
+
+def _phone_page(playwright, width: int, height: int, coarse: bool, **options):
+    browser = launch_chromium(playwright)
+    context = browser.new_context(viewport={"width": width, "height": height},
+                                  is_mobile=coarse, has_touch=coarse, **options)
+    return browser, context
+
+
+def _wait_live_document(page) -> None:
+    page.wait_for_function("""() => window.okfStudioReadiness && window.okfStudioReadiness.ready &&
+      document.querySelector('.okf-concept-viewbar [data-okf-outline-jump]')""")
+    page.evaluate("() => document.fonts.ready")
+    _frames(page)
+
+
+@pytest.mark.parametrize("width,height,coarse", [(390, 844, True), (390, 844, False),
+                                                 (320, 700, True), (320, 700, False)])
+def test_phone_chrome_scrolls_away_to_one_row_and_returns_on_scroll_up(
+    server_url: str, width: int, height: int, coarse: bool,
+) -> None:
+    with sync_playwright() as playwright:
+        browser, context = _phone_page(playwright, width, height, coarse)
+        try:
+            context.add_init_script(_FIRST_PAINT_CLS)
+            page = context.new_page()
+            page.goto(server_url + "/tables/orders")
+            _wait_live_document(page)
+            at_top = page.evaluate(_CHROME_GEOMETRY)
+            assert at_top["state"] == "revealed" and at_top["top"]["top"] == 0, at_top
+            # Compact rows: the top bar takes two rows at 390px (Studio shares
+            # the search row), three at 320px; the view tabs keep one row with
+            # Sections on its own row below; the search placeholder is whole.
+            layout = page.evaluate("""() => {
+              const rows = sel => { const tops = [...document.querySelectorAll(sel)]
+                .filter(n => n.getClientRects().length).map(n => n.getBoundingClientRect().top).sort((a, b) => a - b);
+                return tops.filter((t, i) => !i || t - tops[i - 1] > 8).length; };
+              const input = document.querySelector('.okf-shell__search-form input'), style = getComputedStyle(input);
+              const ctx = document.createElement('canvas').getContext('2d'); ctx.font = style.font;
+              const tabs = [...document.querySelectorAll('.okf-concept-viewbar .okf-viewswitch__btn')]
+                .filter(n => n.getClientRects().length);
+              return {shellRows: rows('.okf-shell [data-okf-shell-item]'),
+                tabRows: rows('.okf-concept-viewbar .okf-viewswitch__btn'), tabs: tabs.map(n => n.textContent.trim()),
+                jumpBelowTabs: document.querySelector('.okf-outline-jump').getBoundingClientRect().top >=
+                  Math.max(...tabs.map(n => n.getBoundingClientRect().bottom)),
+                placeholderFits: ctx.measureText(input.placeholder).width + parseFloat(style.paddingLeft) +
+                  parseFloat(style.paddingRight) <= input.clientWidth};
+            }""")
+            assert layout["shellRows"] <= (2 if width >= 390 else 3), layout
+            assert layout["tabRows"] == 1 and "Focus view" in layout["tabs"], layout
+            assert layout["jumpBelowTabs"] and layout["placeholderFits"], layout
+
+            _scroll(page, 300)
+            _scroll(page, 300)
+            _settle(page)
+            down = page.evaluate(_CHROME_GEOMETRY)
+            assert down["state"] == "compact", down
+            assert down["sticky"] <= 56, down
+            assert down["top"]["bottom"] <= 0, down
+            assert 0 <= down["jump"]["top"] <= 8, down
+            assert page.evaluate(_HITS, ['.okf-outline-jump__toggle']) == []
+
+            _scroll(page, -50)
+            _settle(page)
+            up = page.evaluate(_CHROME_GEOMETRY)
+            assert up["state"] == "revealed" and abs(up["top"]["top"]) < 0.5, up
+            assert abs(up["bar"]["top"] - up["top"]["bottom"]) < 1, up
+            assert page.evaluate(_HITS, _SHELL_CONTROLS + ['.okf-studio-launcher']) == []
+            assert up["overflow"] is False, up
+
+            # Back to the top keeps the full chrome; nothing shifted throughout.
+            _scroll(page, -5000)
+            _settle(page)
+            assert page.evaluate(_CHROME_GEOMETRY)["state"] == "revealed"
+            result = page.evaluate("window.__okfPaintCLS()")
+            assert result["cls"] < 0.02, result
+        finally:
+            context.close()
+            browser.close()
+
+
+@pytest.mark.parametrize("coarse", [True, False])
+def test_phone_chrome_returns_for_keyboard_focus_overlays_menus_and_captures(server_url: str, coarse: bool) -> None:
+    with sync_playwright() as playwright:
+        browser, context = _phone_page(playwright, 390, 844, coarse)
+        try:
+            page = context.new_page()
+            page.goto(server_url + "/tables/orders")
+            _wait_live_document(page)
+            _scroll(page, 600)
+            _settle(page)
+            assert page.evaluate(_CHROME_GEOMETRY)["state"] == "compact"
+            y = page.evaluate("scrollY")
+
+            # The pinned Sections row is already on screen: focusing it moves
+            # nothing. Shift+Tab into the hidden view tabs, then the top bar,
+            # brings the whole chrome back at once without scrolling the page.
+            page.locator('.okf-outline-jump__toggle').focus()
+            _frames(page)
+            pinned = page.evaluate(_CHROME_GEOMETRY)
+            assert pinned["state"] == "compact" and pinned["top"]["bottom"] <= 0, pinned
+            page.keyboard.press("Shift+Tab")
+            revealed = page.evaluate(_CHROME_GEOMETRY)
+            assert revealed["state"] == "revealed" and abs(revealed["top"]["top"]) < 0.5, revealed
+            assert page.evaluate("document.activeElement.closest('.okf-viewswitch') !== null")
+            for _ in range(8):
+                if page.evaluate("document.activeElement.closest('.okf-shell') !== null"):
+                    break
+                page.keyboard.press("Shift+Tab")
+            assert page.evaluate("document.activeElement.closest('.okf-shell') !== null")
+            assert page.evaluate("""() => { const n = document.activeElement, r = n.getBoundingClientRect();
+              return r.top >= 0 && r.bottom <= innerHeight; }""")
+            assert page.evaluate("scrollY") == y
+
+            # Reading resumes: focus back in the document, scroll down, compact.
+            page.evaluate("() => { const h = document.querySelector('.okf-page__title'); h.focus({preventScroll: true}); }")
+            _scroll(page, 200)
+            _settle(page)
+            assert page.evaluate(_CHROME_GEOMETRY)["state"] == "compact"
+
+            # The command palette (a registered overlay) brings the chrome back.
+            page.keyboard.press("Control+k")
+            expect(page.locator('.okf-palette-overlay')).to_be_visible()
+            assert page.evaluate(_CHROME_GEOMETRY)["state"] == "revealed"
+            page.keyboard.press("Escape")
+            expect(page.locator('.okf-palette-overlay')).to_be_hidden()
+
+            # The Appearance menu keeps the chrome while it is open.
+            page.locator('.okf-appearance-trigger').click()
+            expect(page.locator('#okf-appearance-menu')).to_be_visible()
+            _scroll(page, 300)
+            _settle(page)
+            assert abs(page.evaluate(_CHROME_GEOMETRY)["top"]["top"]) < 0.5
+            page.keyboard.press("Escape")
+            expect(page.locator('#okf-appearance-menu')).to_be_hidden()
+            page.evaluate("() => { const h = document.querySelector('.okf-page__title'); h.focus({preventScroll: true}); }")
+            _scroll(page, 300)
+            _settle(page)
+            assert page.evaluate(_CHROME_GEOMETRY)["top"]["bottom"] <= 0
+
+            # A capture always gets the full chrome, immediately (no slide).
+            page.evaluate("() => { window.okfCaptureReadiness.start(); }")
+            captured = page.evaluate(_CHROME_GEOMETRY)
+            assert abs(captured["top"]["top"]) < 0.5 and captured["topTransition"] == "0s", captured
+        finally:
+            context.close()
+            browser.close()
+
+
+@pytest.mark.parametrize("coarse", [True, False])
+def test_phone_fragment_and_sections_jumps_land_below_the_pinned_row(server_url: str, coarse: bool) -> None:
+    with sync_playwright() as playwright:
+        browser, context = _phone_page(playwright, 390, 844, coarse)
+        try:
+            page = context.new_page()
+            page.goto(server_url + "/tables/orders")
+            _wait_live_document(page)
+            heading_id = page.evaluate("""() => [...document.querySelectorAll('.okf-page__body :is(h2,h3)[id]')]
+              .filter(h => h.getBoundingClientRect().top + scrollY > 900).map(h => h.id)[0] || null""")
+            assert heading_id, "the demo page needs a heading below the fold"
+            below_row = """id => { const h = document.getElementById(id).getBoundingClientRect();
+              const box = sel => { const n = document.querySelector(sel); return n.getBoundingClientRect(); };
+              const chrome = Math.max(0, box('.okf-topbar').bottom, box('.okf-concept-viewbar').bottom);
+              return {heading: h.top, chrome, state: document.documentElement.getAttribute('data-okf-chrome')}; }"""
+
+            page.goto("about:blank")
+            page.goto(f"{server_url}/tables/orders#{heading_id}")
+            _wait_live_document(page)
+            page.wait_for_function("id => document.activeElement && document.activeElement.id === id", arg=heading_id)
+            _settle(page)
+            landed = page.evaluate(below_row, heading_id)
+            assert landed["chrome"] - 1 <= landed["heading"] <= landed["chrome"] + 40, landed
+
+            # Sections popover activation from the top of the page.
+            _scroll(page, -10000)
+            _settle(page)
+            page.locator('.okf-outline-jump__toggle').click()
+            page.locator(f'#okf-outline-jump-panel a[href="#{heading_id}"]').click()
+            _settle(page)
+            jumped = page.evaluate(below_row, heading_id)
+            assert jumped["state"] == "compact", jumped
+            assert jumped["chrome"] <= 56, jumped
+            assert jumped["chrome"] - 1 <= jumped["heading"] <= jumped["chrome"] + 40, jumped
+        finally:
+            context.close()
+            browser.close()
+
+
+@pytest.mark.parametrize("motion", ["reduce", "no-preference"])
+def test_phone_chrome_slides_only_without_reduced_motion(server_url: str, motion: str) -> None:
+    with sync_playwright() as playwright:
+        browser, context = _phone_page(playwright, 390, 844, True, reduced_motion=motion)
+        try:
+            page = context.new_page()
+            page.goto(server_url + "/tables/orders")
+            _wait_live_document(page)
+            _scroll(page, 600)
+            moving = page.evaluate(_CHROME_GEOMETRY)
+            assert moving["state"] == "compact", moving
+            if motion == "reduce":
+                assert moving["topTransition"] == "0s" and moving["top"]["bottom"] <= 0, moving
+                assert page.evaluate("document.getAnimations().length") == 0
+            else:
+                assert moving["topTransition"] == "0.18s", moving
+        finally:
+            context.close()
+            browser.close()
+
+
+def test_wide_and_graph_chrome_keep_their_sticky_layout(page, server_url: str) -> None:
+    page.set_viewport_size({"width": 1440, "height": 900})
+    page.goto(server_url + "/tables/orders")
+    _wait_live_document(page)
+    _scroll(page, 600)
+    wide = page.evaluate(_CHROME_GEOMETRY)
+    assert wide["state"] is None and wide["top"]["top"] == 0, wide
+    assert abs(wide["bar"]["top"] - wide["top"]["bottom"]) < 1, wide
+    assert page.evaluate("getComputedStyle(document.querySelector('.okf-topbar')).transform") == "none"
+
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(server_url + "/__graph")
+    page.wait_for_function("() => window.__okfLoomGraph && window.__okfLoomGraph.layoutStats.lastAppliedSeq >= 1")
+    assert page.evaluate("document.documentElement.hasAttribute('data-okf-chrome')") is False
+    assert page.evaluate("getComputedStyle(document.querySelector('.okf-topbar')).transform") == "none"
+
+
+@pytest.fixture(scope="module")
+def portable_sites(tmp_path_factory):
+    """The demo bundle built as static and SPA sites, each served at its own root
+    (the SPA links its assets from "/")."""
+    root = tmp_path_factory.mktemp("portable-chrome")
+    with contextlib.ExitStack() as stack:
+        sites = {}
+        for target in ("static", "spa"):
+            out = root / target
+            result = subprocess.run(
+                okf_module_argv("build", str(DEMO_BUNDLE), "--target", target, "--out", str(out)),
+                cwd=str(TOOLKIT_ROOT), env=okf_subprocess_env(), capture_output=True, text=True,
+            )
+            assert result.returncode == 0, result.stdout + result.stderr
+            port = free_port()
+            sites[target] = f"http://127.0.0.1:{port}"
+            stack.enter_context(managed_server(
+                [sys.executable, "-m", "http.server", str(port), "--bind", "127.0.0.1", "--directory", str(out)],
+                sites[target], root / f"http-{target}-{port}.log"))
+        yield sites
+
+
+@pytest.mark.parametrize("target", ["static", "spa"])
+@pytest.mark.parametrize("width,height,coarse", [(390, 844, True), (320, 700, False)])
+def test_portable_phone_top_bar_scrolls_away_and_returns(
+    portable_sites: dict, target: str, width: int, height: int, coarse: bool,
+) -> None:
+    with sync_playwright() as playwright:
+        browser, context = _phone_page(playwright, width, height, coarse)
+        try:
+            context.add_init_script(_FIRST_PAINT_CLS)
+            page = context.new_page()
+            page.goto(f"{portable_sites[target]}/tables/orders.html")
+            page.wait_for_function("() => document.documentElement.getAttribute('data-okf-chrome') === 'revealed'")
+            page.evaluate("() => document.fonts.ready")
+            assert page.locator('.okf-concept-viewbar').count() == 0
+            _scroll(page, 300)
+            _scroll(page, 300)
+            _settle(page)
+            down = page.evaluate(_CHROME_GEOMETRY)
+            assert down["state"] == "compact" and down["sticky"] == 0, down
+            _scroll(page, -50)
+            _settle(page)
+            up = page.evaluate(_CHROME_GEOMETRY)
+            assert up["state"] == "revealed" and abs(up["top"]["top"]) < 0.5, up
+            assert page.evaluate(_HITS, _SHELL_CONTROLS) == []
+            assert page.evaluate("window.__okfPaintCLS()")["cls"] < 0.02
+        finally:
+            context.close()
+            browser.close()

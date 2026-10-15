@@ -690,9 +690,14 @@
   // Source scrolls locally and becomes a keyboard-focusable region.
   let sourceWrap = true;
   try { sourceWrap = localStorage.getItem("okf-source-wrap") !== "off"; } catch (e) {}
+  // One label element (a single flex item, so wide layouts render exactly
+  // as plain text did); phones hide " lines" visually (wiki.css) so the view
+  // tabs keep one row, while the button's name stays "Wrap lines".
+  const wrapLabel = el("span", { class: "okf-viewswitch__label" });
+  wrapLabel.append("Wrap", el("span", { class: "okf-viewswitch__more", text: " lines" }));
   const wrapBtn = el("button", { type: "button", class: "okf-viewswitch__btn okf-source-wrap",
-    "aria-pressed": sourceWrap ? "true" : "false", text: "Wrap lines",
-    title: "Wrap long Source lines", hidden: state.view === "rendered" });
+    "aria-pressed": sourceWrap ? "true" : "false",
+    title: "Wrap long Source lines", hidden: state.view === "rendered" }, [wrapLabel]);
   wrapBtn.addEventListener("click", () => {
     sourceWrap = !sourceWrap;
     try { localStorage.setItem("okf-source-wrap", sourceWrap ? "on" : "off"); } catch (e) {}

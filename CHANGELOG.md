@@ -29,6 +29,15 @@ follow [Semantic Versioning](https://semver.org/). The product version
   trade hue for node shape or stroke weight (with a matching key), badges,
   count chips and the overview map stay readable, and leaving forced colours
   restores the Ledger palette exactly.
+- On phones (640px and narrower) the page chrome no longer takes a third to
+  half of the screen while reading. Scrolling down slides the top bar and view
+  tabs away and keeps only the Sections row pinned (about 45-49px); scrolling
+  up, returning to the top, moving keyboard focus into the chrome, or opening a
+  menu, the command palette or a Studio dialog brings all of it back. Static
+  and SPA pages get the same scroll-away top bar. The top bar fits on two rows
+  at 390px and the view tabs on one row down to 320px. Reduced motion skips
+  the slide; captures always show the full chrome; wider screens and the graph
+  are unchanged.
 - On touch screens the code-block Copy button no longer covers the first
   line of code, and stays in view while a long line is scrolled sideways.
 - Graph JSON tolerates unknown query parameters (including cache-busters);
