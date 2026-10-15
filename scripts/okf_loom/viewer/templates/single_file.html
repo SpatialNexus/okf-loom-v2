@@ -195,6 +195,27 @@ __APPLICATION_SHELL__
 <script>
 window.BUNDLE_NAME = __BUNDLE_NAME__;
 window.BUNDLE = __BUNDLE_DATA__;
+// Canonical search chunks are the sole serialized passage source. Preserve
+// the public in-memory BUNDLE shape for consumers (including overrides),
+// without embedding a second copy of every excerpt and metadata record.
+window.BUNDLE.retrieval_corpus.chunks.forEach(function (chunk) {
+  Object.defineProperty(chunk, "payload", {
+    configurable: true,
+    enumerable: true,
+    get: function () {
+      var payload = JSON.parse(chunk.canonical_chunk);
+      Object.defineProperty(chunk, "payload", {
+        configurable: true, enumerable: true, writable: true, value: payload
+      });
+      return payload;
+    },
+    set: function (payload) {
+      Object.defineProperty(chunk, "payload", {
+        configurable: true, enumerable: true, writable: true, value: payload
+      });
+    }
+  });
+});
 window.OKF_LOOM_INITIAL_LAYOUT = "__INITIAL_LAYOUT__";
 </script>
 <script>

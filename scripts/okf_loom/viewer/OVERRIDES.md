@@ -379,6 +379,18 @@ Portable viewers retain their existing transport: single-file uses embedded
 `window.BUNDLE`; static/SPA graph pages read their emitted graph JSON. This
 seam adds no assets, origins, CSP permissions or portable requests.
 
+Single-file serialization stores each retrieval chunk's `canonical_chunk` once,
+without a second serialized `payload`. Before viewer scripts run, the bootstrap
+provides the existing enumerable `window.BUNDLE.retrieval_corpus.chunks[i].payload`
+property as a lazy JSON parse, cached on first access as an ordinary mutable
+property. Assignment before first access is also supported. Overrides reading
+`window.BUNDLE` see the same shape and exact values; the literal embedded JSON
+is a private transport, not the runtime API. Canonical bytes, hashes, strict
+retrieval validation, rendered `bodies`, CSP and static/SPA exports are unchanged.
+Custom single-file templates that differ from the built-in template retain the
+original serialized `payload` as well, so older bootstraps remain compatible;
+they do not receive this size reduction.
+
 Ledger fonts (Public Sans and Azeret Mono, normal/italic) are verified vendored
 assets, not external network dependencies. For live, static and SPA pages,
 `ledger-fonts.css` references relative WOFF2 files under
