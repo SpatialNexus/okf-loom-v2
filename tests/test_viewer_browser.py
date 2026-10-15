@@ -8369,8 +8369,10 @@ def test_graph_refresh_latest_wins(server_url: str, page) -> None:
     page.wait_for_function("() => window.__graphGate.pending.length >= 1", timeout=5000)
     page.evaluate("() => window.okfLoomLive.emit('graph', {})")
     page.wait_for_function("() => window.__graphGate.pending.length >= 2", timeout=5000)
-    # Resolve the NEWER refresh (pending[1]) first, then the STALE one (pending[0]).
-    page.evaluate(
+    # Observe acceptance and start the pending-capture proof in the browser's
+    # same turn. Sleeping between RPCs can consume the entire 300ms transition
+    # on a loaded host, so a later sample would legitimately capture ready.
+    pending = page.evaluate(
         """(base) => {
               const mk = (extraId) => {
                   const b = JSON.parse(JSON.stringify(base));
@@ -8380,22 +8382,28 @@ def test_graph_refresh_latest_wins(server_url: str, page) -> None:
             };
             const R = (body) => new Response(
                 JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
-            window.__graphGate.pending[1](R(mk('okf-fence-new')));
-            return new Promise((done) => setTimeout(() => {
-                window.__graphGate.pending[0](R(mk('okf-fence-stale')));
-                setTimeout(done, 80);
-            }, 80));
+            return new Promise((resolve) => {
+                const observer = new MutationObserver(() => {
+                    if (!window.okfGraphCaptureState().transitionPending) return;
+                    observer.disconnect();
+                    const run = window.okfCaptureReadiness.start({target: 'graph'});
+                    Promise.race([
+                        run.promise.then(() => ({authorized: true}))
+                            .catch(e => ({authorized: e.screenshotAllowed})),
+                        new Promise(done => setTimeout(() => done({pending: true}), 50)),
+                    ]).then(result => {
+                        window.__graphGate.pending[0](R(mk('okf-fence-stale')));
+                        resolve(result);
+                    });
+                });
+                observer.observe(document.body, {attributes: true});
+                window.__graphGate.pending[1](R(mk('okf-fence-new')));
+            });
         }""",
         base,
     )
-    page.wait_for_function("() => window.okfGraphCaptureState().transitionPending")
-    pending = page.evaluate("""async () => {
-        const run=window.okfCaptureReadiness.start({target:'graph'});
-        const raced=await Promise.race([run.promise.then(()=>({authorized:true})).catch(e=>({authorized:e.screenshotAllowed})),new Promise(resolve=>setTimeout(()=>resolve({pending:true}),50))]);
-        return raced;
-    }""")
     assert pending == {"pending": True}, "capture authorized a screenshot while refreshed transition was pending"
-    page.wait_for_function("() => !window.okfGraphCaptureState().transitionPending && window.okfGraphCaptureState().layoutSettled")
+    page.wait_for_function("() => window.__okfLoomGraph.refreshStats.skippedStale >= 1 && !window.okfGraphCaptureState().transitionPending && window.okfGraphCaptureState().layoutSettled")
     res = page.evaluate(
         """() => ({
             hasNew: window.__okfLoomGraph.cy.getElementById('okf-fence-new').length > 0,
@@ -10739,7 +10747,11 @@ def test_phase4_final_node_index_arrows_shift_space_and_focus_escape(server_url:
 
 
 def test_phase4_final_focus_lens_waiting_and_direct_routes_restore_origin(server_url: str,page)->None:
-    _open_graph(page,server_url);_preset(page, "themes");page.wait_for_function("()=>window.__okfLoomGraph.getState().lens==='themes'")
+    _open_graph(page,server_url);_preset(page, "themes");page.wait_for_function("()=>window.__okfLoomGraph.getState().lens==='themes'&&window.okfGraphCaptureState().layoutSettled")
+    # A real viewport interaction disables the initial auto-fit policy. A
+    # programmatic cy.pan alone is not reader intent: a late ResizeObserver
+    # (for example when graph settings opens) is allowed to fit it away.
+    page.locator('#okf-graph canvas').first.click(position={"x": 5, "y": 5})
     origin=page.evaluate("()=>{const G=window.__okfLoomGraph;G.cy.zoom(.73);G.cy.pan({x:31,y:47});return {zoom:G.cy.zoom(),pan:G.cy.pan()}}")
     _preset(page, "focus");assert page.evaluate("()=>window.__okfLoomGraph.getState().lens==='focus'&&window.__okfLoomGraph.focusRoot()===null")
     node=page.evaluate("()=>window.__okfLoomGraph.cy.nodes().first().id()");page.evaluate("id=>window.__okfLoomGraph.interaction.dispatch({type:'SELECT',id})",node)

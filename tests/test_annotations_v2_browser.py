@@ -1528,6 +1528,10 @@ def test_successful_capture_focuses_save_anchor(server_url, page):
     _boot(page, server_url); _seed_comment(page)
     _set_doc_and_selection(page, "target text\n", "<p>target text</p>", "target text")
     page.get_by_role("button", name="Re-anchor").click()
+    # Opening the editor may scroll/resize the document and retire its old
+    # selection affordance. Select in the now-open editor's document, as a
+    # reader does, instead of racing the pre-open selectionchange frame.
+    _select_text_in(page, ".okf-page__body", "target text")
     page.wait_for_function("() => document.body.dataset.okfSelectionReady === 'true'")
     page.get_by_role("button", name="Use selected text").click()
     page.wait_for_function("() => window.okfLoomStudio.state.annotationEditor && window.okfLoomStudio.state.annotationEditor.anchor !== null")
