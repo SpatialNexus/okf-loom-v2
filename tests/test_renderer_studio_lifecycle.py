@@ -88,6 +88,7 @@ function element(tag, text) {
     getBoundingClientRect() { return { width: 10, height: 10, top: 0, left: 0, right: 10, bottom: 10 }; },
   };
   Object.defineProperty(node, "textContent", {
+    configurable: true,
     get() { return textValue; },
     set(value) { textValue = String(value); inner = ""; node.__hasSvg = false; },
   });
@@ -201,7 +202,7 @@ async function raceProof() {
   if (s.win.okfRendererReadiness.generation !== winningGeneration) throw new Error("late renderer changed readiness");
   if (second.innerHTML.indexOf('data-render="B"') < 0) throw new Error("late old render changed the new body");
 
-  // Bone -> Slate (light -> dark) restores the source and renders once. This
+  // Bone -> Slate (light -> dark) re-renders once, in place. This
   // VM host exposes no CSS tokens, so Mermaid falls back to its own scheme
   // theme; the security level is strict on every render.
   s.root.setAttribute("data-theme", "slate");
@@ -273,11 +274,77 @@ async function tokenProof() {
   };
 }
 
+async function swapProof() {
+  // A palette re-render never puts the source text back: the old SVG stays
+  // (aria-busy) until the new one replaces it in one write. Renders are held
+  // and released out of order to prove latest-wins and failure retention.
+  const s = sandbox();
+  const el = element("div", "graph S"); el.classList.add("mermaid"); s.nodes.mermaid = [el];
+  let sourceWrites = 0;
+  const textDesc = Object.getOwnPropertyDescriptor(el, "textContent");
+  Object.defineProperty(el, "textContent", {get: textDesc.get, set(v) { sourceWrites += 1; textDesc.set(v); }});
+  const held = [];
+  let serial = 0;
+  let holding = false;
+  const render = s.mermaid.render.bind(s.mermaid);
+  s.mermaid.render = (id, source, host) => {
+    render(id, source);
+    const theme = s.renderCalls.at(-1).theme;
+    const svg = '<svg data-n="' + (++serial) + '" data-theme="' + theme + '"></svg>';
+    if (!holding) return Promise.resolve({svg});
+    return new Promise((resolve, reject) => held.push({resolve: () => resolve({svg}), reject, svg, hostInBody: !!host && s.body.children.includes(host)}));
+  };
+  vm.runInNewContext(SOURCE, s.context, {filename: "renderers.js"});
+  s.document.fire("DOMContentLoaded");
+  s.moduleGate.resolve({default: s.mermaid});
+  await settle();
+  const ready = () => s.win.okfRendererReadiness;
+  const check = (cond, msg) => { if (!cond) throw new Error(msg + " " + JSON.stringify({html: el.innerHTML, busy: el.getAttribute("aria-busy"), stamp: el.getAttribute("data-okf-mermaid-theme"), readiness: ready()})); };
+  const theme = (name) => { const prev = s.root.getAttribute("data-theme"); s.root.setAttribute("data-theme", name); s.win.dispatchEvent(new s.win.CustomEvent("okf-loom:themeChanged", {detail: {theme: name, previous: prev}})); };
+  check(el.innerHTML.includes('data-n="1"') && el.getAttribute("data-okf-mermaid-theme") === "bone" && ready().status === "ready", "first render did not stamp its palette");
+  holding = true;
+
+  // Bone -> Slate: the Bone SVG stays visible while Slate renders.
+  theme("slate"); await settle();
+  check(held.length === 1 && held[0].hostInBody, "slate render was not started in a hidden host");
+  check(el.innerHTML.includes('data-n="1"') && el.getAttribute("aria-busy") === "true" && ready().status === "loading", "old diagram was not kept busy while re-rendering");
+  // Slate -> Plum before Slate finished; Plum finishes first, Slate late.
+  theme("plum"); await settle();
+  check(held.length === 2, "plum render did not start");
+  held[1].resolve(); await settle();
+  check(el.innerHTML === held[1].svg && el.getAttribute("data-okf-mermaid-theme") === "plum" && !el.hasAttribute("aria-busy") && ready().status === "ready" && ready().themeName === "plum", "newest render did not swap in");
+  held[0].resolve(); await settle();
+  check(el.innerHTML === held[1].svg && ready().themeName === "plum", "stale render replaced a newer diagram");
+
+  // A failed re-render keeps the previous diagram, reports failure, and is
+  // retried by the next cycle (here a body patch reusing the element).
+  theme("bone"); await settle();
+  held[2].reject(new Error("parse exploded")); await settle();
+  check(el.innerHTML === held[1].svg && !el.classList.contains("mermaid--fallback") && !el.hasAttribute("aria-busy") && el.getAttribute("data-okf-mermaid-theme") === "plum", "failed re-render did not keep the old diagram");
+  check(ready().status === "failed" && ready().themeName === "bone", "failed re-render did not publish failure");
+  s.win.dispatchEvent(new s.win.CustomEvent("okf-loom:bodyPatched")); await settle();
+  check(held.length === 4, "stale diagram was not retried by the next cycle");
+  held[3].resolve(); await settle();
+  check(el.innerHTML === held[3].svg && el.getAttribute("data-okf-mermaid-theme") === "bone" && ready().status === "ready", "retry did not swap in");
+
+  // Bone -> Slate -> Bone before Slate finishes: Bone is already painted.
+  const callsBefore = s.renderCalls.length;
+  theme("slate"); await settle();
+  theme("bone"); await settle();
+  check(s.renderCalls.length === callsBefore + 1 && !el.hasAttribute("aria-busy") && ready().status === "ready" && ready().themeName === "bone", "returning to the painted palette did not settle");
+  held[4].resolve(); await settle();
+  check(el.innerHTML === held[3].svg, "fenced slate render replaced the bone diagram");
+  check(sourceWrites === 0, "source text was written back into a rendered diagram");
+  check(!s.body.children.some(n => n.hasAttribute && n.hasAttribute("data-okf-mermaid-render-host")), "render hosts leaked");
+  return {renders: serial, final: el.getAttribute("data-okf-mermaid-theme"), status: ready().status};
+}
+
 (async () => {
   const race = await raceProof();
   const failure = await failureProof();
   const tokens = await tokenProof();
-  console.log(JSON.stringify({race, failure, tokens}));
+  const swap = await swapProof();
+  console.log(JSON.stringify({race, failure, tokens, swap}));
 })().catch(error => { console.error(error.stack || error); process.exit(1); });
 """
 
@@ -302,6 +369,7 @@ def test_renderer_generation_fence_and_theme_mode_policy() -> None:
     }
     # An unresolved token never reaches Mermaid: its own scheme theme is used.
     assert tokens["broken"] == {"theme": "default", "variables": None}
+    assert result["swap"] == {"renders": 6, "final": "bone", "status": "ready"}
 
 
 _CAPTURE_HARNESS = r"""
@@ -438,6 +506,114 @@ def test_mermaid_shared_tooltip_uses_square_viewer_geometry(lifecycle_server, li
     expect(tooltip).to_have_count(1)
     assert tooltip.evaluate("t => getComputedStyle(t).borderRadius") == '0px'
     assert tooltip.evaluate("t => t.style.borderRadius") == ''
+
+
+_MERMAID_SWAP_PROBE = """() => {
+  // Every mutation (MutationObserver, before paint) and every animation frame
+  // must show a drawn SVG, no raw source text and the same container box.
+  const el = document.querySelector('div.mermaid');
+  const r0 = el.getBoundingClientRect();
+  const p = {violations: [], frames: 0, mutations: 0, svgIds: [], stop: false};
+  const inspect = (where) => {
+    const svg = el.querySelector(':scope > svg');
+    const text = Array.from(el.childNodes).filter(n => n.nodeType === 3)
+      .map(n => n.textContent).join('').trim();
+    if (!svg) p.violations.push({where, kind: 'no-svg', text: text.slice(0, 40)});
+    if (text) p.violations.push({where, kind: 'source-text', text: text.slice(0, 40)});
+    const r = el.getBoundingClientRect();
+    if (Math.abs(r.width - r0.width) > 0.5 || Math.abs(r.height - r0.height) > 0.5 ||
+        Math.abs(r.top - r0.top) > 0.5 || Math.abs(r.left - r0.left) > 0.5) {
+      p.violations.push({where, kind: 'shift', rect: [r.left, r.top, r.width, r.height],
+        initial: [r0.left, r0.top, r0.width, r0.height]});
+    }
+    if (svg && p.svgIds[p.svgIds.length - 1] !== svg.id) p.svgIds.push(svg.id);
+  };
+  p.observer = new MutationObserver(() => { p.mutations += 1; inspect('mutation'); });
+  p.observer.observe(el, {childList: true, subtree: true, characterData: true});
+  const loop = () => { p.frames += 1; inspect('frame'); if (!p.stop) requestAnimationFrame(loop); };
+  requestAnimationFrame(loop);
+  window.__okfMermaidProbe = p;
+}"""
+
+_MERMAID_PALETTE_STATE = """() => {
+  const el = document.querySelector('div.mermaid');
+  const rgb = (value) => {
+    const probe = document.createElement('span');
+    probe.style.color = value; document.body.appendChild(probe);
+    const out = getComputedStyle(probe).color; probe.remove(); return out;
+  };
+  const rect = el.querySelector('svg .node rect, svg .node polygon');
+  const root = getComputedStyle(document.documentElement);
+  return {
+    theme: document.documentElement.getAttribute('data-theme'),
+    painted: el.getAttribute('data-okf-mermaid-theme'),
+    busy: el.getAttribute('aria-busy'),
+    nodeFill: rect ? getComputedStyle(rect).fill : null,
+    surface2: rgb(root.getPropertyValue('--surface-2').trim()),
+    readiness: window.okfRendererReadiness && window.okfRendererReadiness.status,
+    readinessTheme: window.okfRendererReadiness && window.okfRendererReadiness.themeName,
+    hosts: document.querySelectorAll('[data-okf-mermaid-render-host]').length,
+  };
+}"""
+
+
+@pytest.mark.browser
+def test_mermaid_palette_switch_swaps_without_showing_source(lifecycle_server, lifecycle_page):
+    """Bone -> Slate -> Bone (and back to Slate) in quick succession: the old
+    diagram stays until the new one is drawn, no frame shows the raw source,
+    the box never moves, the latest palette wins and capture waits for it."""
+    page = lifecycle_page
+    page.goto(lifecycle_server + '/playbooks/refund_flow')
+    page.wait_for_function("() => window.okfRendererReadiness && window.okfRendererReadiness.ready")
+    page.evaluate("() => window.OKFLoomTheme.setTheme('bone')")
+    page.wait_for_function("() => window.okfRendererReadiness.ready && window.okfRendererReadiness.themeName === 'bone'"
+                           " && document.querySelector('div.mermaid').getAttribute('data-okf-mermaid-theme') === 'bone'")
+    expect(page.locator('div.mermaid > svg')).to_have_count(1)
+    bone = page.evaluate(_MERMAID_PALETTE_STATE)
+    page.evaluate(_MERMAID_SWAP_PROBE)
+
+    settled = ("(name) => window.okfRendererReadiness.status === 'ready' && window.okfRendererReadiness.themeName === name"
+               " && document.querySelector('div.mermaid').getAttribute('data-okf-mermaid-theme') === name"
+               " && !document.querySelector('div.mermaid').hasAttribute('aria-busy')")
+    # Bone -> Slate -> Bone, one frame apart.
+    page.evaluate("""async () => {
+      const frame = () => new Promise(r => requestAnimationFrame(r));
+      window.OKFLoomTheme.setTheme('slate'); await frame();
+      window.OKFLoomTheme.setTheme('bone');
+    }""")
+    page.wait_for_function(settled, arg='bone')
+    page.wait_for_timeout(400)  # a fenced Slate render must not land late
+    back_to_bone = page.evaluate(_MERMAID_PALETTE_STATE)
+
+    # Slate -> Bone -> Slate; capture readiness started mid-flight must only
+    # resolve on the final Slate diagram.
+    captured = page.evaluate("""async () => {
+      const frame = () => new Promise(r => requestAnimationFrame(r));
+      const T = window.OKFLoomTheme;
+      T.setTheme('slate'); await frame();
+      T.setTheme('bone'); await frame();
+      T.setTheme('slate');
+      await window.okfCaptureReadiness.start({target: 'document'}).promise;
+      const el = document.querySelector('div.mermaid');
+      return {painted: el.getAttribute('data-okf-mermaid-theme'), busy: el.getAttribute('aria-busy')};
+    }""")
+    page.wait_for_function(settled, arg='slate')
+    page.wait_for_timeout(400)
+    slate = page.evaluate(_MERMAID_PALETTE_STATE)
+    probe = page.evaluate("""() => { const p = window.__okfMermaidProbe; p.stop = true; p.observer.disconnect();
+      return {violations: p.violations.slice(0, 5), count: p.violations.length, frames: p.frames,
+              mutations: p.mutations, svgIds: p.svgIds}; }""")
+
+    assert probe["count"] == 0, probe
+    assert probe["frames"] > 5 and probe["mutations"] > 0, probe
+    assert len(probe["svgIds"]) >= 2, probe  # a real swap happened
+    assert captured == {"painted": "slate", "busy": None}, captured
+    assert bone["nodeFill"] == bone["surface2"], bone
+    assert back_to_bone["painted"] == "bone" and back_to_bone["nodeFill"] == bone["surface2"], back_to_bone
+    assert slate["theme"] == "slate" and slate["painted"] == "slate", slate
+    assert slate["nodeFill"] == slate["surface2"] != bone["surface2"], slate
+    assert slate["readiness"] == "ready" and slate["readinessTheme"] == "slate", slate
+    assert slate["hosts"] == 0 and slate["busy"] is None, slate
 
 
 @pytest.mark.browser
