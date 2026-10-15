@@ -18,7 +18,9 @@ follow [Semantic Versioning](https://semver.org/). The product version
   replacing reader controls and comment drafts; read-only viewers stay live too.
 - Atomic content writes preserve existing file permissions and ownership; new
   bundle files and build outputs use normal umask-derived permissions instead
-  of becoming 0600. Private Studio state remains explicitly owner-only, including
+  of becoming owner-only. Published build directories are traversable by other
+  users when the umask permits; rebuilds preserve an operator-set output root
+  mode. Staging and recovery stay private, as does Studio state, including
   rewrites of files whose permissions were previously wider.
 - Under forced colours (Windows High Contrast) the graph canvas paints only
   system colours: Canvas nodes with CanvasText strokes, glyphs, labels and
