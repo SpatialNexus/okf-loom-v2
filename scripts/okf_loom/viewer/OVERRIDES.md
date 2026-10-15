@@ -59,6 +59,19 @@ boot, including when its module never runs, the notice joins the flow below the
 bar and the unfilled placeholders collapse.
 Custom templates without the placeholders keep the legacy client mount path.
 
+At 640px and narrower (viewports taller than 480px) `wiki.js` scrolls the
+`.okf-topbar.okf-shell` chrome away while the reader scrolls down. It keeps
+the state on `<html data-okf-chrome="revealed|compact">` (absent on wider
+screens and on the graph route) and publishes `--okf-chrome-shift-top` and
+`--okf-chrome-shift-bar`; `shell.css` moves the bar and view bar by
+`transform` only, keeping a viewbar `.okf-outline-jump` row pinned. Any
+change to `window.OKFOverlayStack` dispatches `okf-loom:overlaychange` on
+`window`, and an open overlay keeps the chrome revealed. Starting
+`okfCaptureReadiness` sets `data-okf-capture` on `<html>`, which forces the
+revealed chrome for the rest of the page. A `shell.css` override that drops
+these rules keeps the bar sticky.
+
+
 ## 2. Static asset overrides
 
 Drop a file at `.okf-loom/viewer/static/<file>` to replace the built-in asset.
