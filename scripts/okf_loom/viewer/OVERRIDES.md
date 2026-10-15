@@ -368,8 +368,8 @@ Overrides must not rely on these globals during parsing. `theme.js` remains
 parser-blocking for first-paint appearance. Single-file output retains its
 parser-blocking vendor chain ahead of its inline graph runtime.
 
-On live graph pages, `window.okfGraphData` is a promise for the full
-`/__data/graph.json` projection. Whichever of graph.js or studio.js needs it
+On live graph pages, `window.okfGraphData` is a promise for the compact
+`/__data/graph.json?view=structure` projection (or its admitted client form). Whichever of graph.js or studio.js needs it
 first creates it; the other reuses it. Failed initial acquisition clears the
 promise for retry; pagehide clears it and fences late Studio completions.
 An accepted initial acquisition also emits the event below, so a BFCache
@@ -380,13 +380,13 @@ Studio does not depend on the diagnostic `window.__okfLoomGraph` hook.
 Graph.js retains ownership of refresh aborts, deadlines and latest-wins
 admission. Only an accepted refresh replaces the promise and emits
 `okf-loom:graph-data` with the accepted projection as `event.detail`; Studio
-reconciles that event instead of issuing another full request. Non-graph live
+reconciles that event instead of issuing another graph request. Non-graph live
 pages use `?view=structure` (no bodies or reserved-document HTML) when visible
 connection/comment chips or index recency need it, or lazily when the command
 palette opens. Accepted structural live updates refresh those consumers.
 Pagehide fences pending Studio acquisitions; persisted pageshow reacquires
 structure for those consumers under the same lazy refresh rules, while graph.js
-retains ownership of full graph-page acquisition.
+retains ownership of graph-page structure acquisition.
 
 Live index inventory/statistics and document Connections reconcile separately
 from graph acquisition. Content notifications (`changed`, `created`, `removed`,
@@ -406,8 +406,32 @@ seam adds no assets, origins, CSP permissions or portable requests.
 The live graph HTTP transport caches final bytes and their strong ETag separately
 for full and structure views, including over-size refusals. Source generation,
 name, palette, comment-summary revision and exact metadata-expiry transitions
-invalidate those bytes. This does not change `window.okfGraphData`, its full-view
-shape, refresh ownership, capture readiness, or the portable data transport.
+invalidate those bytes. The full/tool view stays byte-compatible. The internal structure view has
+`structure_schema:1`: nodes omit unused advisory metadata, duplicated grouping
+keys and empty/zero defaults (but preserve available zero comment counts);
+edges carry each read relation record once, inherit source/target/direction
+from their edge, and identify the primary by `primary_relation_index`.
+Graph.js restores its ordinary relation objects before validation. Reserved
+`document_paths` preserve index/log link routing without rendered documents.
+Structure has a 16 MiB cap; full JSON retains 4 MiB, for at most 20 MiB of cached
+wire bytes per Bundle. Per-view single-flight keeps identical public/local reads
+from multiplying cold graph work. These are transport bounds, not a general
+HTTP-thread or temporary-allocation bound.
+
+Only live data URLs select lazy HTML. Selection reads
+`/__data/graph-body?id=…&revision=…`, whose escaped body and advisory HTML match
+the old full projection, not the plugin/annotation `/__data/doc` projection.
+The latter re-parses canonical source and builds annotation/graph data, so it is
+not the graph's body transport. Body reads share retrieval's bounded executor
+and 4 MiB cap. The client admits two reads, at most one latest queued selection,
+a 10 s timeout, and a 32-entry/8 MiB LRU per accepted graph acquisition.
+Selection, graph refresh, pagehide and BFCache restoration fence late bodies;
+pagehide aborts reads and drops the cache. An accepted refresh invalidates even
+same-content-revision advisory HTML (metadata expiry can change independently).
+Capture's graph adapter reports selected-body work as `transitionPending`, or
+a `graph-body` terminal failure; no-selection captures need no bodies. Hover
+cards and the command palette show identity/metrics only and make no body read.
+Portable embedded/full-data paths, markup, CSP and network behaviour are unchanged.
 The live index thumbnail now receives only identities/topology and relationship
 counts rather than constructing rendered node metadata or document bodies; its
 visible miniature and count semantics are unchanged.

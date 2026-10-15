@@ -321,6 +321,10 @@
     function syncEffectiveViewport(){var viewport=window.visualViewport,width=readLiveViewportWidth(),narrow=width<=640;document.body.style.setProperty("--okf-effective-vw",Math.max(1,width)+"px");document.body.style.setProperty("--okf-effective-left",Math.max(0,viewport?viewport.offsetLeft:0)+"px");document.body.toggleAttribute("data-okf-narrow-reflow",narrow);syncCriticalMobileChrome(narrow);if(!narrow&&paneNav&&paneNavHome&&paneNavHome.parentNode)paneNavHome.parentNode.insertBefore(paneNav,paneNavHome.nextSibling);}
   syncEffectiveViewport();window.addEventListener("resize",syncEffectiveViewport);window.addEventListener("load",syncEffectiveViewport);window.addEventListener("pageshow",function(event){if(event.persisted)syncEffectiveViewport();});setTimeout(syncEffectiveViewport,0);setTimeout(syncEffectiveViewport,120);setTimeout(syncEffectiveViewport,500);if(window.visualViewport){window.visualViewport.addEventListener("resize",syncEffectiveViewport);window.visualViewport.addEventListener("scroll",syncEffectiveViewport);}
   var DATA_URL = (graphEl && graphEl.getAttribute("data-graph-url")) || window.OKF_LOOM_GRAPH_DATA_URL || null;
+  var LIVE_GRAPH = DATA_URL === "/__data/graph.json" && document.body.dataset.okfMode === "serve";
+  var GRAPH_REQUEST_URL = LIVE_GRAPH ? DATA_URL + "?view=structure" : DATA_URL;
+  var cancelGraphBodies = null;
+  var detailBodyPending = false, detailBodyError = null;
   var CONCEPT_PREFIX = (graphEl && graphEl.getAttribute("data-concept-prefix")) || window.OKF_CONCEPT_PAGE_PREFIX || "/";
   var INITIAL_LAYOUT = (graphEl && graphEl.getAttribute("data-initial-layout")) || window.OKF_LOOM_INITIAL_LAYOUT || "cose";
   // P1-3: build mode (serve|spa|static) is emitted on <body data-okf-mode>
@@ -442,6 +446,7 @@
   }
     window.addEventListener("pagehide",function(){
       graphPageActive = false;
+      if (cancelGraphBodies) cancelGraphBodies();
       graphRequestGeneration++;
       if (DATA_URL === "/__data/graph.json") window.okfGraphData = null;
       if (graphInitialController) graphInitialController.abort();
@@ -498,6 +503,7 @@
   } catch (e) {}
     function publishGraphSelection(conceptId, source) {
       teardownGraphLifecycle(conceptId ? "selection-rebind" : "selection-clear", { invalidateProvider: false });
+      detailBodyPending = false; detailBodyError = null;
       selectedConceptId = conceptId || null;
       if (latestGraphInteractionSnapshot) latestGraphInteractionSnapshot = Object.freeze(Object.assign({}, latestGraphInteractionSnapshot, { selected: selectedConceptId }));
     selectionGeneration++;
@@ -764,8 +770,16 @@
       ids[id] = true;
     });
     var edgeIds={}, edgePairs={};
-    edges.forEach(function (edge) {
+    edges.forEach(function (edge, edgeIndex) {
       var data = edge && edge.data, source = data && data.source, target = data && data.target;
+      if (raw.structure_schema === 1 && data) {
+        data = Object.assign({}, data);
+        edge = edges[edgeIndex] = { data: data };
+        if (!Array.isArray(data.relations) || !Number.isInteger(data.primary_relation_index) || data.primary_relation_index < 0 || data.primary_relation_index >= data.relations.length) throw Object.assign(new Error("Graph primary relation index is invalid."), { okfPhase: "graph-schema" });
+        data.relations = data.relations.map(function (relation) { return Object.assign({}, relation, { source: source, target: target, direction: "outgoing" }); });
+        data.primary_relation = data.relations[data.primary_relation_index];
+        delete data.primary_relation_index;
+      }
       if (typeof source !== "string" || typeof target !== "string" || !ids[source] || !ids[target]) throw Object.assign(new Error("Graph edge endpoints must reference current nodes."), { okfPhase: "graph-schema" });
       if(data.id==null)data.id=legacyEdgeId(source,target);
       var pairKey=endpointKey(source,target);
@@ -792,7 +806,9 @@
         if (!ids[id] || !Array.isArray(supplied[id]) || supplied[id].some(function (other) { return typeof other !== "string" || !ids[other]; })) throw Object.assign(new Error("Graph maps must contain current node IDs."), { okfPhase: "graph-schema" });
       });
     });
-    return Object.assign({}, raw, { bundle_revision: revision.trim(), nodes: nodes, edges: edges, outgoing: outgoing, backlinks: backlinks });
+    var candidate = Object.assign({}, raw, { bundle_revision: revision.trim(), nodes: nodes, edges: edges, outgoing: outgoing, backlinks: backlinks });
+    delete candidate.structure_schema;
+    return candidate;
   }
 
   function publishGraphTerminal(code, phase, error) {
@@ -807,11 +823,13 @@
     // Live graph and Studio share initial acquisition, regardless of script
     // order. Portable DATA_URL/window.BUNDLE paths retain their own transport.
     if (DATA_URL === "/__data/graph.json" && window.okfGraphData) return window.okfGraphData;
-    var acquisition = fetch(DATA_URL, { signal: controller.signal, cache: "no-cache", headers: { Accept: "application/json" } }).catch(function (error) {
+    var acquisition = fetch(GRAPH_REQUEST_URL, { signal: controller.signal, cache: "no-cache", headers: { Accept: "application/json" } }).catch(function (error) {
       if (error && error.name === "AbortError") throw error;
       throw Object.assign(new Error("Graph data request failed."), { okfPhase: "graph-fetch", okfCode: "network-failure", cause: error });
     }).then(function (r) {
-      if (!r.ok) throw Object.assign(new Error("HTTP " + r.status), { okfPhase: "graph-http", okfCode: "network-failure" });
+      if (!r.ok) return r.json().catch(function () { return null; }).then(function (data) {
+        throw Object.assign(new Error(data && data.error && data.error.message || "HTTP " + r.status), { okfPhase: "graph-http", okfCode: "network-failure" });
+      });
       return r.json().catch(function (error) { throw Object.assign(new Error("Graph JSON is malformed."), { okfPhase: "graph-json", okfCode: "network-failure", cause: error }); });
     });
     if (DATA_URL === "/__data/graph.json") {
@@ -896,6 +914,7 @@
       // Viewport reads can flush layout after chrome writes. The viewport
       // cannot resize during this synchronous init task; later fits read live.
       var initialMobileViewport = readMobileGraphViewport();
+      if (cancelGraphBodies) cancelGraphBodies();
       if (graphMountGeneration++) teardownGraphLifecycle("graph-remount", { invalidateProvider: true });
       graphBundleRevision = String(bundle.bundle_revision || bundle.revision || "");
       singleSourceRevisions =
@@ -927,9 +946,65 @@
 
       var palette = bundle.palette || {};
       var bodies = bundle.bodies || {};
+      // Serve-only lazy HTML. Two active reads, one latest queued selection,
+      // 8 MiB / 32-entry LRU per accepted graph, and a 10 s read deadline.
+      // Abort never releases admission until the underlying promise settles.
+      var bodyEpoch = 0, bodyActive = 0, bodyQueue = [], bodyControllers = new Set();
+      var bodyCache = new Map(), bodyCacheBytes = 0, bodyFlights = new Map();
+      cancelGraphBodies = function () {
+        bodyEpoch++; detailBodyPending = false; detailBodyError = null;
+        bodyControllers.forEach(function (controller) { controller.abort(); });
+        bodyQueue.splice(0).forEach(function (job) { job.reject(new DOMException("Superseded", "AbortError")); });
+        bodyCache.clear(); bodyCacheBytes = 0; bodyFlights.clear();
+      };
+      function pumpGraphBodies() {
+        while (bodyActive < 2 && bodyQueue.length) startGraphBody(bodyQueue.shift());
+      }
+      function startGraphBody(job) {
+        bodyActive++;
+        var controller = new AbortController(); bodyControllers.add(controller);
+        var timer = setTimeout(function () { controller.abort(); }, 10000);
+        fetch("/__data/graph-body?id=" + encodeURIComponent(job.id) + "&revision=" + encodeURIComponent(job.revision),
+          { signal: controller.signal, cache: "no-cache", headers: { Accept: "application/json" } })
+          .then(function (response) { if (!response.ok) throw new Error("Concept body unavailable (HTTP " + response.status + ")."); return response.json(); })
+          .then(function (doc) {
+            if (controller.signal.aborted || job.epoch !== bodyEpoch) throw new DOMException("Superseded", "AbortError");
+            if (!doc || doc.id !== job.id || doc.bundle_revision !== job.revision || typeof doc.html !== "string" || typeof doc.metadata_html !== "string") throw new Error("Concept body revision is invalid.");
+            var bytes = 2 * (doc.html.length + doc.metadata_html.length);
+            if (bytes <= 8 * 1024 * 1024) {
+              bodyCache.set(job.id, { doc: doc, bytes: bytes }); bodyCacheBytes += bytes;
+              while (bodyCache.size > 32 || bodyCacheBytes > 8 * 1024 * 1024) {
+                var oldest = bodyCache.keys().next().value;
+                bodyCacheBytes -= bodyCache.get(oldest).bytes; bodyCache.delete(oldest);
+              }
+            }
+            job.resolve(doc);
+          }).catch(job.reject).finally(function () {
+            clearTimeout(timer); bodyControllers.delete(controller); bodyActive--;
+            if (bodyFlights.get(job.id) === job.promise) bodyFlights.delete(job.id);
+            pumpGraphBodies();
+          });
+      }
+      function readGraphBody(id) {
+        if (bodyCache.has(id)) {
+          var entry = bodyCache.get(id); bodyCache.delete(id); bodyCache.set(id, entry);
+          return Promise.resolve(entry.doc);
+        }
+        if (bodyFlights.has(id)) return bodyFlights.get(id);
+        bodyQueue.splice(0).forEach(function (job) { job.reject(new DOMException("Superseded", "AbortError")); bodyFlights.delete(job.id); });
+        var job = { id: id, revision: graphBundleRevision, epoch: bodyEpoch };
+        job.promise = new Promise(function (resolve, reject) { job.resolve = resolve; job.reject = reject; });
+        bodyFlights.set(id, job.promise); bodyQueue.push(job); pumpGraphBodies();
+        return job.promise;
+      }
       // Reserved documents (root/directory indexes, logs): {document, html}
       // reading records. They are never nodes and never selectable.
-      var reservedDocuments = bundle.documents || {};
+      var reservedDocuments = graphDocuments(bundle);
+      function graphDocuments(candidate) {
+        var documents = candidate.documents || {};
+        (candidate.document_paths || []).forEach(function (path) { documents[path] = { document: path }; });
+        return documents;
+      }
       var external = bundle.external || [];
       var conceptPagePrefix = CONCEPT_PREFIX;
 
@@ -4921,6 +4996,49 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
         activateRelationship(0, false);
       }
 
+      function paintDetailMetadata(metadataSlot, html) {
+        // Escaped server HTML, never constructed from raw metadata.
+        metadataSlot.innerHTML = html || "";
+        metadataSlot.querySelectorAll("[data-okf-source-concept]").forEach(function (link) {
+          var target = link.dataset.okfSourceConcept;
+          var fragment = link.dataset.okfSourceFragment;
+          if (!nodeIndex[target]) { link.removeAttribute("href"); return; }
+          if (!IS_SINGLE) link.href = conceptPagePrefix.replace(/\/$/, "") + "/" + target + (MODE === "static" ? ".html" : "") + (fragment ? "#" + encodeURIComponent(fragment) : "");
+          else link.addEventListener("click", function (event) {
+            event.preventDefault(); dispatchInteraction({type:"SELECT",id:target,source:"detail-link"});
+            var heading = document.getElementById("detail-title");
+            if (fragment) heading = Array.from(document.querySelectorAll("#detail-body [id]")).find(function(el) { return el.id === fragment; }) || heading;
+            if (heading) { heading.tabIndex = -1; heading.focus(); }
+          });
+        });
+      }
+      function paintDetailBody(bodyEl, html) {
+        bodyEl.innerHTML = html;
+        bodyEl.removeAttribute("aria-busy");
+        rewriteInternalLinks(bodyEl);
+        var fragment = bodyEl.dataset.okfPendingFragment;
+        delete bodyEl.dataset.okfPendingFragment;
+        if (fragment) focusDetailFragment(bodyEl, fragment, document.getElementById("detail-title"));
+        // Existing progressive renderers also see lazily loaded bodies.
+        try { window.dispatchEvent(new Event("okf-loom:bodyPatched")); } catch (e) {}
+      }
+      function showSelectedBody(conceptId, bodyEl, metadataSlot) {
+        if (!bodyEl || !metadataSlot) return;
+        if (LIVE_GRAPH && !bundle.bodies) {
+          var owner = selectionGeneration, epoch = bodyEpoch;
+          detailBodyPending = true; detailBodyError = null;
+          bodyEl.textContent = "Loading concept…"; bodyEl.setAttribute("aria-busy", "true");
+          readGraphBody(conceptId).then(function (doc) {
+            if (!graphPageActive || epoch !== bodyEpoch || owner !== selectionGeneration || selectedConceptId !== conceptId) return;
+            paintDetailMetadata(metadataSlot, doc.metadata_html);
+            paintDetailBody(bodyEl, doc.html); detailBodyPending = false;
+          }).catch(function (error) {
+            if (!graphPageActive || epoch !== bodyEpoch || owner !== selectionGeneration || selectedConceptId !== conceptId) return;
+            detailBodyPending = false; detailBodyError = String(error.message || error);
+            bodyEl.removeAttribute("aria-busy"); bodyEl.textContent = detailBodyError;
+          });
+        } else paintDetailBody(bodyEl, bodies[conceptId] || "");
+      }
       function showDetail(conceptId, provenance) {
       var data = nodeIndex[conceptId];
       if (!data) return;
@@ -5015,21 +5133,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
         var detailDescription = document.getElementById("detail-description");
         if (detailDescription) detailDescription.after(metadataSlot);
       }
-      // Like bodies, this fragment is escaped by the server renderer. Never
-      // construct markup from raw okf_metadata in the browser.
-      metadataSlot.innerHTML = data.metadata_html || "";
-      metadataSlot.querySelectorAll("[data-okf-source-concept]").forEach(function (link) {
-        var target = link.dataset.okfSourceConcept;
-        var fragment = link.dataset.okfSourceFragment;
-        if (!nodeIndex[target]) { link.removeAttribute("href"); return; }
-        if (!IS_SINGLE) link.href = conceptPagePrefix.replace(/\/$/, "") + "/" + target + (MODE === "static" ? ".html" : "") + (fragment ? "#" + encodeURIComponent(fragment) : "");
-        else link.addEventListener("click", function (event) {
-          event.preventDefault(); dispatchInteraction({type:"SELECT",id:target,source:"detail-link"});
-          var heading = document.getElementById("detail-title");
-          if (fragment) heading = Array.from(document.querySelectorAll("#detail-body [id]")).find(function(el) { return el.id === fragment; }) || heading;
-          if (heading) { heading.tabIndex = -1; heading.focus(); }
-        });
-      });
+      paintDetailMetadata(metadataSlot, data.metadata_html || "");
 
       // Computed relationship explanation — why this node connects and
       // stands out. Every figure comes from the SAME client-side metrics that
@@ -5042,19 +5146,14 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
       // client-side XSS surface (no marked.parse, no DOMPurify needed).
       var bodyEl = document.getElementById("detail-body");
       if (bodyEl) {
-        bodyEl.innerHTML = bodies[conceptId] || "";
+        bodyEl.innerHTML = "";
+        delete bodyEl.dataset.okfPendingFragment;
         // Stamp the concept id so studio.js's comment affordance can
         // anchor comments to the right concept when the user selects
         // text in the graph detail panel.
         bodyEl.setAttribute("data-concept-id", conceptId);
         bodyEl.className = "okf-page__body okf-graph-detail__body";
-        rewriteInternalLinks(bodyEl);
-        // User feedback: the detail panel shows the SAME
-        // server-rendered concept HTML as the wiki pages, so the same
-        // progressive renderers must run over it. renderers.js listens
-        // for okf-loom:bodyPatched (the event the studio dispatches after live
-        // patches) and re-scans for mermaid/code/math blocks.
-        try { window.dispatchEvent(new Event("okf-loom:bodyPatched")); } catch (e) {}
+        showSelectedBody(conceptId, bodyEl, metadataSlot);
       }
 
       // Open-page link (graph view only).
@@ -5368,6 +5467,10 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
       });
     }
     function focusDetailFragment(scope, fragment, fallback) {
+      if (fragment && scope && scope.getAttribute("aria-busy") === "true") {
+        scope.dataset.okfPendingFragment = fragment;
+        return;
+      }
       var target = fallback;
       if (fragment && scope) {
         target = Array.prototype.slice.call(scope.querySelectorAll("[id]")).filter(function (node) {
@@ -5785,7 +5888,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
           var deadlineTimer = setTimeout(function () { controller.abort("deadline"); classifyDeadline(); }, GRAPH_REFRESH_DEADLINE);
           refreshStats.started++;
           publishGraphCaptureReady("loading");
-          return fetch(DATA_URL, { signal: controller.signal, cache: "no-cache", headers: { Accept: "application/json" } })
+          return fetch(GRAPH_REQUEST_URL, { signal: controller.signal, cache: "no-cache", headers: { Accept: "application/json" } })
             .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
               .then(function (fresh) {
             // A newer refresh started while this one was in flight → this
@@ -5815,8 +5918,9 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
                 bundle = fresh;
                 document.body.dataset.okfRevision = freshRevision;
                 document.body.dataset.okfCaptureRevision = freshRevision;
+                if (cancelGraphBodies) cancelGraphBodies();
                 bodies = fresh.bodies || {};
-                reservedDocuments = fresh.documents || {};
+                reservedDocuments = graphDocuments(fresh);
               backlinks = fresh.backlinks;
               outgoing = fresh.outgoing;
               recomputeLodState(fresh);
@@ -5877,7 +5981,10 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
                 animateGraphDelta(n, n.id(), deltaOwner, true);
               });
               buildNodeIndex(fresh);
-              if (selectedConceptId && freshIds[selectedConceptId]) renderSignalExplain(selectedConceptId);
+              if (selectedConceptId && freshIds[selectedConceptId]) {
+                renderSignalExplain(selectedConceptId);
+                if (LIVE_GRAPH) showSelectedBody(selectedConceptId, document.getElementById("detail-body"), document.getElementById("detail-okf-metadata"));
+              }
               if (selectedConceptId && !freshIds[selectedConceptId]) {
                 // Phase 4 compatibility boundary for the existing Phase 5
                 // refresh: reconcile interaction state after acceptance only.
@@ -6312,7 +6419,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
           payloadNodeCount: authoritativePayloadNodeCount,
           layoutRequired: layoutRequired,
           layoutSettled: layoutSettled && !interactionPending,
-          transitionPending: graphDeltaPending > 0,
+          transitionPending: graphDeltaPending > 0 || detailBodyPending,
           layoutGeneration: layoutSeq,
           appliedLayoutGeneration: lastAppliedSeq,
           initialSeedApplied: initialSeedApplied,
@@ -6324,6 +6431,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
             sessionIds: Object.keys(ghostNodes).sort()
           }
         };
+        if (detailBodyError) { state.terminalCode = "network-failure"; state.terminalPhase = "graph-body"; }
         if (layoutTerminalCode) { state.terminalCode = layoutTerminalCode; state.terminalPhase = layoutTerminalPhase; }
         return state;
       };
