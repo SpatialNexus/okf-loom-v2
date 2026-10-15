@@ -455,26 +455,36 @@ def _process_umask() -> int:
 def _set_atomic_metadata(fd: int, path: Path, mode: int | None) -> None:
     """Apply final metadata only after flushing, while the temp fd is open.
 
-    Ownership preservation fails closed if the writer cannot retain it. Chown
-    precedes chmod because chown (and writing) can clear setuid/setgid bits.
+    Preserve ownership when permitted, otherwise try retaining the group alone.
+    Chown precedes chmod because it can clear privilege bits. Rewritten content
+    never retains setuid, nor setgid if the original ownership could not be kept.
     Explicit modes always win: private rewrites never preserve a wider mode.
     """
     try:
         previous = path.stat()
     except FileNotFoundError:
         previous = None
+    ownership_preserved = True
     if previous is not None:
         current = os.fstat(fd)
         if (current.st_uid, current.st_gid) != (previous.st_uid, previous.st_gid):
-            os.fchown(fd, previous.st_uid, previous.st_gid)
+            try:
+                os.fchown(fd, previous.st_uid, previous.st_gid)
+            except PermissionError:
+                ownership_preserved = False
+                try:
+                    os.fchown(fd, -1, previous.st_gid)
+                except PermissionError:
+                    pass  # Shared content remains writable as the writing user.
     if mode is None:
-        mode = previous.st_mode & 0o7777 if previous is not None else 0o666 & ~_process_umask()
+        mode = (previous.st_mode & (0o3777 if ownership_preserved else 0o1777)
+                if previous is not None else 0o666 & ~_process_umask())
     os.fchmod(fd, mode)
 
 
 def atomic_write_text(path: str | Path, text: str, *, encoding: str = "utf-8",
                       mode: int | None = None) -> None:
-    """Atomically write text, preserving ownership and existing permission bits.
+    """Atomically write text, retaining permissions and ownership when possible.
 
     New content uses 0666 & ~umask, like open(path, 'w'). Explicit ``mode``
     overrides both defaults, even on replacement: private callers must pass

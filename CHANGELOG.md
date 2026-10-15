@@ -34,9 +34,11 @@ follow [Semantic Versioning](https://semver.org/). The product version
 - Live index cards, type/count statistics and document Connections now refresh
   in other open tabs after watcher or CLI edits, without reloading the page or
   replacing reader controls and comment drafts; read-only viewers stay live too.
-- Atomic content writes preserve existing file permissions and ownership; new
-  bundle files and build outputs use normal umask-derived permissions instead
-  of becoming owner-only. Published build directories are traversable by other
+- Atomic content writes preserve existing file permissions (except setuid) and
+  ownership when permitted. Shared-file rewrites that cannot retain ownership
+  try keeping the group alone, otherwise proceeding as the writing user, without
+  carrying setuid/setgid across owners. New bundle files and build outputs use
+  normal umask-derived permissions instead of becoming owner-only. Published build directories are traversable by other
   users when the umask permits; rebuilds preserve an operator-set output root
   mode. Staging and recovery stay private, as does Studio state, including
   rewrites of files whose permissions were previously wider.
