@@ -289,12 +289,15 @@ def test_replace_text_keeps_concept_readable(mode_dir):
 
 
 @pytest.mark.parametrize("target", ("static", "spa", "single-file"))
-def test_docs_build_files_readable_by_others(mode_dir, target):
-    output = mode_dir / ("site" if target == "static" else "site.html")
-    _cli_with_umask(0o022, "build", "docs-bundle", "--target", target, "--out", output)
-    files = list(output.rglob("*")) if output.is_dir() else [output]
-    files = [path for path in files if path.is_file()]
-    assert files
-    unreadable = [str(path.relative_to(mode_dir)) for path in files
-                  if not path.stat().st_mode & stat.S_IROTH]
-    assert unreadable == []
+@pytest.mark.parametrize("mask", (0o022, 0o027))
+def test_docs_build_tree_uses_umask(mode_dir, target, mask):
+    output = mode_dir / "site"
+    _cli_with_umask(mask, "build", "docs-bundle", "--target", target, "--out", output)
+    paths = [output, *output.rglob("*")]
+    assert (output / "index.html").is_file()
+    wrong_modes = {
+        str(path.relative_to(mode_dir)): oct(stat.S_IMODE(path.stat().st_mode))
+        for path in paths
+        if stat.S_IMODE(path.stat().st_mode) != (0o777 if path.is_dir() else 0o666) & ~mask
+    }
+    assert wrong_modes == {}
