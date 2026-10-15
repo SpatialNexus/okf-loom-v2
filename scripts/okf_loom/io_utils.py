@@ -544,8 +544,29 @@ def durable_atomic_write_text(path: str | Path, text: str, *, encoding: str = "u
         raise
 
 
+def _set_tree_directory_modes(parent_fd: int, name: str, mode: int, *,
+                              root_mode: int | None = None) -> None:
+    """Set completed build directories bottom-up, never following symlinks.
+
+    The caller keeps the tree inside a private staging parent until publication;
+    neither that parent nor recovery/state directories are part of this walk.
+    """
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+    fd = os.open(name, flags, dir_fd=parent_fd)
+    try:
+        with os.scandir(fd) as entries:
+            for entry in entries:
+                if entry.is_symlink():
+                    raise ValueError(f"build staging must not use symlinks: {entry.name}")
+                if entry.is_dir(follow_symlinks=False):
+                    _set_tree_directory_modes(fd, entry.name, mode)
+        os.fchmod(fd, mode if root_mode is None else root_mode)
+    finally:
+        os.close(fd)
+
+
 def atomic_replace_tree(src: str | Path, dst: str | Path, *,
-                        verify_previous=None) -> None:
+                        verify_previous=None, publish_directory_modes: bool = False) -> None:
     """Publish a staged directory, retaining prior output if rollback fails.
 
     Individual renames are atomic, not the pair: readers may briefly see no
@@ -564,6 +585,12 @@ def atomic_replace_tree(src: str | Path, dst: str | Path, *,
     and with ``"quarantined"`` (``backup_fd``, ``"previous"``) between the two
     renames; raising there rolls the old tree back. ``None`` is the unchanged
     legacy path.
+
+    ``publish_directory_modes`` opts completed build output into 0777 & ~umask
+    for every directory, preserving an existing destination root's permission
+    bits. The caller must render inside a private staging parent: modes are set
+    under the publication lock immediately before rename, after verification.
+    The default leaves modes alone (including private callers).
     """
     import fcntl
     import shutil
@@ -595,12 +622,17 @@ def atomic_replace_tree(src: str | Path, dst: str | Path, *,
                 backup_name = candidate
                 backup_fd = os.open(backup_name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
                                     dir_fd=dst_fd)
+                os.fchmod(backup_fd, 0o700)  # Drop an inherited setgid bit, too.
             try:
                 if backup_fd is not None:
                     retain = True
                     os.rename(dst.name, "previous", src_dir_fd=dst_fd, dst_dir_fd=backup_fd)
                     if verify_previous is not None:
                         verify_previous(backup_fd, "previous", "quarantined")
+                if publish_directory_modes:
+                    mode = 0o777 & ~_process_umask()
+                    root_mode = previous.st_mode & 0o7777 if previous is not None else mode
+                    _set_tree_directory_modes(src_fd, src.name, mode, root_mode=root_mode)
                 os.rename(src.name, dst.name, src_dir_fd=src_fd, dst_dir_fd=dst_fd)
             except BaseException as publish_error:
                 if backup_fd is not None:

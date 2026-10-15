@@ -3544,19 +3544,36 @@ def build_site(
             file=sys.stderr,
         )
 
+    from .config import OkfConfig
+    session_roots = (source / ".okf-loom/session",
+                     source / OkfConfig.load(bundle.root).studio.session_path)
+    publish_directory_modes = not any(destination.is_relative_to(path.resolve())
+                                      for path in session_roots)
+
     if target == "single-file":
-        out_dir.mkdir(parents=True, exist_ok=True)
+        out_dir.parent.mkdir(parents=True, exist_ok=True)
         single_kwargs: dict[str, Any] = {}
         if offline is not None:
             single_kwargs = {"assets": "offline", "_offline_assets": offline}
-        single = render_single_file(
-            bundle,
-            out_dir / "index.html",
-            name=name,
-            include_comment_summary=include_comment_summary,
-            include_portable_feedback=include_portable_feedback,
-            **single_kwargs,
-        )
+        with tempfile.TemporaryDirectory(prefix=".okf-build-", dir=str(out_dir.parent)) as tmp:
+            tmp_root = Path(tmp) / ".okf-build-tree"
+            tmp_root.mkdir(mode=0o700)
+            single = render_single_file(
+                bundle,
+                tmp_root / "index.html",
+                name=name,
+                include_comment_summary=include_comment_summary,
+                include_portable_feedback=include_portable_feedback,
+                **single_kwargs,
+            )
+            if out_dir.exists():
+                # Keep single-file rebuilds' existing contract: only replace
+                # index.html, preserving its metadata and unrelated siblings.
+                _atomic_write_bytes(out_dir / "index.html", (tmp_root / "index.html").read_bytes())
+            else:
+                from .io_utils import atomic_replace_tree
+                atomic_replace_tree(tmp_root, out_dir,
+                                    publish_directory_modes=publish_directory_modes)
         stats.update(single)
         stats["files"] = 1
         return stats
@@ -3585,10 +3602,12 @@ def build_site(
             bundle.root, allow_active_code=effective_allow,
         )
 
-    # Stage to a tmp dir, then atomically swap into place.
+    # Render behind a private parent, which remains 0700 even while the
+    # completed child receives public directory modes immediately before rename.
     out_dir.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".okf-build-", dir=str(out_dir.parent)) as tmp:
-        tmp_root = Path(tmp)
+        tmp_root = Path(tmp) / ".okf-build-tree"
+        tmp_root.mkdir(mode=0o700)
         _emit_site(bundle, tmp_root, mode=mode, name=display_name,
                    palette=palette, graph_data=graph_data, config=config,
                    plugin=plugin, comment_summary=comment_summary,
@@ -3611,10 +3630,8 @@ def build_site(
                 file_count += 1
                 total_bytes += p.stat().st_size
         from .io_utils import atomic_replace_tree as _replace_tree
-        if verifier is None:
-            _replace_tree(tmp_root, out_dir)
-        else:
-            _replace_tree(tmp_root, out_dir, verify_previous=verifier)
+        _replace_tree(tmp_root, out_dir, verify_previous=verifier,
+                      publish_directory_modes=publish_directory_modes)
 
     stats.update({
         "concepts": len(bundle.concepts),

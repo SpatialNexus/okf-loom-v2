@@ -77,6 +77,19 @@ DirectiveStore and PresenceStore retain their independent 0600 creation paths;
 proposal authority I/O additionally rejects existing non-0600 files. None of
 these private paths inherit ordinary content's permission-preservation policy.
 
+Builds render inside a 0700 temporary parent on the destination filesystem.
+Only the completed output child receives `0777 & ~umask` on all directories,
+under the publication lock immediately before rename; the private parent is
+never widened. Rebuilds preserve an existing destination root's `st_mode &
+0o7777` (including an operator's restrictive mode), but use current umask-derived
+modes for the new generation's subdirectories. `.okf-recovery-*` quarantine
+parents remain 0700 and are never traversed by the mode normalizer. Generic tree
+publication leaves modes alone unless the build explicitly opts in. Builds under
+the bundle's default or configured Studio session root never opt in. Single-file
+builds stage new output the same way; when their destination already exists,
+they atomically replace only `index.html`, preserving its metadata and unrelated
+siblings rather than replacing or chmodding the existing directory tree.
+
 ### Internal section-navigation proof
 
 `RetrievalService.verified_section_fragment(concept_id, passage_id, revision=...)`
