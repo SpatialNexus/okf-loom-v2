@@ -111,6 +111,44 @@ def test_umask_read_never_changes_parent_mask(mode_dir, mask, procfs):
     assert stat.S_IMODE((mode_dir / "new").stat().st_mode) == 0o666 & ~mask
 
 
+def test_concurrent_new_files_read_fallback_umask_only_once(mode_dir, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    import time
+
+    monkeypatch.setattr(io_utils, "_CACHED_UMASK", None)
+    real_read, real_child = Path.read_text, subprocess.check_output
+    proc_reads, child_calls = [], []
+
+    def no_proc(path, *args, **kwargs):
+        if path == Path("/proc/self/status"):
+            proc_reads.append(path)
+            raise PermissionError("procfs hidden")
+        return real_read(path, *args, **kwargs)
+
+    def child(*args, **kwargs):
+        child_calls.append(args)
+        time.sleep(.02)  # Let other writers contend on first use.
+        return real_child(*args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", no_proc)
+    monkeypatch.setattr(subprocess, "check_output", child)
+    monkeypatch.setattr(os, "umask", lambda *_: pytest.fail("changed parent umask"))
+
+    def write(i):
+        writer = WRITERS[i % len(WRITERS)]
+        getattr(io_utils, writer)(mode_dir / str(i), b"new" if writer == "atomic_write_bytes" else "new")
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(write, range(24)))
+    assert len(child_calls) == len(proc_reads) == 1
+    mask = io_utils._CACHED_UMASK
+    assert mask is not None
+    for i in range(24):
+        path = mode_dir / str(i)
+        assert path.read_bytes() == b"new"
+        assert stat.S_IMODE(path.stat().st_mode) == 0o666 & ~mask
+
+
 @pytest.mark.parametrize("writer", WRITERS)
 def test_metadata_failure_keeps_target_and_cleans_closed_temp(mode_dir, monkeypatch, writer):
     target = mode_dir / "existing"

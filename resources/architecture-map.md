@@ -63,9 +63,10 @@ then preserves an existing target's ownership when permitted, and its mode
 without setuid before replacement. If ownership cannot be retained, it tries
 retaining the group alone, otherwise proceeding as the writing user; inherited
 modes are then masked with `0o1777` so neither setuid nor setgid crosses owners.
-New ordinary content uses `0666 & ~umask`. Linux reads the live mask from
-`/proc/self/status`; if unavailable, an isolated Python child reads its inherited
-mask without ever changing the multithreaded parent's umask. The durable helper
+New ordinary content uses `0666 & ~umask`, snapshotted once at first use behind
+a process-wide lock. Linux reads the mask from `/proc/self/status`; if unavailable,
+one isolated Python child reads its inherited mask, not one child per output
+file. Neither path ever changes the multithreaded parent's umask. The durable helper
 still fsyncs the file before replace and the parent directory afterward.
 
 Private writers explicitly pass `mode=0o600`, overriding even a wider existing
