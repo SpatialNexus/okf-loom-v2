@@ -805,3 +805,306 @@ def test_graph_forced_colours_keep_system_palette_across_theme_event(
         assert after["selected"] == before["selected"], (palette, before, after)
         assert after["capture"]["layoutSettled"] is True, after
         assert after["capture"]["appliedLayoutGeneration"] == before["capture"]["appliedLayoutGeneration"]
+
+
+# ---- Forced colours: the system-colour canvas layer -------------------------
+# Canvas pixels are never adjusted by the browser, so graph.js resolves the
+# system colours itself. These proofs read the computed Cytoscape style of
+# every element (window.__okfLoomGraph.cy is the diagnostic hook) and compare
+# it with the system colours resolved in the same document.
+
+_RGB_JS = """
+  const rgb = value => {
+    const m = String(value || '').match(/[\\d.]+/g);
+    return m ? m.slice(0, 3).map(v => Math.round(Number(v))).join(',') : null;
+  };
+  const system = () => {
+    const probe = document.createElement('span');
+    probe.style.position = 'fixed';
+    probe.style.forcedColorAdjust = 'none';
+    document.body.appendChild(probe);
+    const out = {};
+    for (const [name, keyword] of Object.entries({canvas: 'Canvas', text: 'CanvasText',
+        highlight: 'Highlight', gray: 'GrayText', link: 'LinkText',
+        buttonText: 'ButtonText', buttonFace: 'ButtonFace'})) {
+      probe.style.color = keyword;
+      out[name] = rgb(getComputedStyle(probe).color);
+    }
+    probe.remove();
+    return out;
+  };
+  const inkOf = (uri, attr) => {
+    if (!uri || uri === 'none') return [];
+    const svg = decodeURIComponent(uri);
+    return [...svg.matchAll(new RegExp(attr + '="([^"]+)"', 'g'))].map(m => rgb(m[1]));
+  };
+"""
+
+_FORCED_CANVAS_AUDIT_JS = """() => {
+  const G = window.__okfLoomGraph, cy = G.cy;""" + _RGB_JS + """
+  const STATE = ':selected, .okf-hover, .okf-search-match, .okf-path, .okf-focus-root, '
+    + '.okf-tour-target, .okf-presence-halo, .dim, .okf-hover-dim, .okf-path-dim, .okf-search-nonmatch';
+  const node = n => ({
+    id: n.id(), state: n.is(STATE), cue: n.data('lensCue') || '',
+    fill: rgb(n.style('background-color')), stroke: rgb(n.style('border-color')),
+    strokeWidth: parseFloat(n.style('border-width')), strokeStyle: n.style('border-style'),
+    shape: n.style('shape'), label: rgb(n.style('color')),
+    plate: rgb(n.style('text-background-color')), plateOpacity: Number(n.style('text-background-opacity')),
+    halo: rgb(n.style('text-outline-color')), opacity: Number(n.style('opacity')),
+    glyphInk: inkOf(n.data('iconUrl'), 'stroke'),
+    brokenInk: inkOf(n.data('brokenBadgeUrl'), 'stroke').concat(inkOf(n.data('brokenBadgeUrl'), 'fill')),
+    commentInk: inkOf(n.data('commentBadgeUrl'), 'stroke').concat(inkOf(n.data('commentBadgeUrl'), 'fill')),
+  });
+  const edge = e => ({
+    id: e.id(), dim: e.is('.dim, .okf-hover-dim, .okf-path-dim, .okf-unrelated'),
+    state: e.is(':selected, .okf-path'), chip: e.hasClass('okf-multi-edge'),
+    line: rgb(e.style('line-color')), arrow: rgb(e.style('target-arrow-color')),
+    width: parseFloat(e.style('width')), lineStyle: e.style('line-style'),
+    label: rgb(e.style('color')), plate: rgb(e.style('text-background-color')),
+    chipBorder: rgb(e.style('text-border-color')), opacity: Number(e.style('opacity')),
+  });
+  const legend = [...document.querySelectorAll('.okf-graph-legend__swatch[data-forced-cue]')]
+    .map(s => s.getAttribute('data-forced-cue'));
+  return {
+    forced: matchMedia('(forced-colors: active)').matches,
+    body: document.body.hasAttribute('data-okf-forced-colors'),
+    lens: G.getState().lens, system: system(),
+    nodes: cy.nodes().map(node), edges: cy.edges().map(edge), legend,
+    legendTitle: (document.querySelector('.okf-graph-legend__title') || {}).textContent || '',
+    indexCues: [...document.querySelectorAll('.okf-node-index__swatch[data-forced-cue]')].length,
+  };
+}"""
+
+
+def _assert_system_canvas(audit) -> None:
+    sys = audit["system"]
+    assert audit["forced"] and audit["body"], audit
+    assert sys["canvas"] != sys["text"], sys
+    for n in audit["nodes"]:
+        assert n["fill"] == sys["canvas"], n
+        assert n["plate"] == sys["canvas"] and n["plateOpacity"] == 1, n
+        assert n["halo"] == sys["canvas"] and n["opacity"] == 1, n
+        assert n["glyphInk"] == [sys["text"]], n
+        assert set(n["brokenInk"]) <= {sys["canvas"], sys["text"]}, n
+        assert set(n["commentInk"]) <= {sys["canvas"], sys["text"]}, n
+        if not n["state"]:
+            assert n["stroke"] == sys["text"] and n["label"] == sys["text"], n
+    for e in audit["edges"]:
+        if e["dim"] and not e["state"]:
+            # Dimmed context (including its count chip) recedes to GrayText
+            # with a dotted line: a non-colour cue alongside the hue.
+            assert e["line"] == e["arrow"] == e["label"] == sys["gray"], e
+            assert e["lineStyle"] == "dotted", e
+            continue
+        if e["chip"]:
+            assert e["label"] == sys["buttonText"] and e["plate"] == sys["buttonFace"], e
+            assert e["chipBorder"] == sys["buttonText"], e
+        if e["state"]:
+            continue
+        assert e["line"] == e["arrow"] == sys["text"], e
+        assert e["width"] >= 3 and e["opacity"] == 1, e
+        if not e["chip"]:
+            assert e["label"] == sys["text"] and e["plate"] == sys["canvas"], e
+
+
+def _forced_open(page, server_url: str, scheme: str) -> None:
+    page.emulate_media(forced_colors="active", color_scheme=scheme)
+    _open_graph(page, server_url)
+    page.wait_for_function("() => document.body.hasAttribute('data-okf-forced-colors')")
+
+
+@pytest.mark.parametrize("scheme", ["light", "dark"])
+def test_forced_colours_paint_every_element_from_system_colours(
+    docs_server_url: str, page, scheme: str
+) -> None:
+    """Under forced colours every node is a Canvas disc with a CanvasText
+    stroke, glyph and label on a Canvas plate, every edge is CanvasText,
+    badges and count chips use system pairs, and lenses trade hue for shape
+    (categories) or stroke weight (ordered values) on the canvas and in the
+    key -- in the light and the dark system palette alike."""
+    _forced_open(page, docs_server_url, scheme)
+    audit = page.evaluate(_FORCED_CANVAS_AUDIT_JS)
+    _assert_system_canvas(audit)
+    assert any(n["brokenInk"] for n in audit["nodes"]), "fixture has a broken-link badge"
+    assert {n["shape"] for n in audit["nodes"]} == {"ellipse"}, audit["nodes"][:3]
+    assert {n["strokeWidth"] for n in audit["nodes"] if not n["state"]} >= {2}, audit["nodes"][:3]
+
+    _apply_lens(page, "themes")
+    themes = page.evaluate(_FORCED_CANVAS_AUDIT_JS)
+    _assert_system_canvas(themes)
+    shapes = {n["cue"]: n["shape"] for n in themes["nodes"]}
+    assert len(set(shapes.values())) >= 3, shapes
+    # One cue, one shape: equal categories share a shape, different ones never do.
+    assert len(set(shapes.values())) == len(shapes), shapes
+    assert themes["legendTitle"].startswith("Shape:"), themes["legendTitle"]
+    assert themes["legend"] and set(themes["legend"]) <= set(shapes), (themes["legend"], shapes)
+    assert themes["indexCues"] > 0, themes
+
+    _apply_lens(page, "recent")
+    recent = page.evaluate(_FORCED_CANVAS_AUDIT_JS)
+    _assert_system_canvas(recent)
+    widths = {n["cue"]: n["strokeWidth"] for n in recent["nodes"] if n["cue"].startswith("level-")}
+    assert widths, recent["nodes"][:3]
+    for cue, width in widths.items():
+        # Ordered lenses: the stroke weight grows with the level.
+        assert width == [1, 2.5, 4, 5.5, 7][int(cue[-1])], (cue, width)
+    for n in recent["nodes"]:
+        if n["cue"] == "undated" and not n["state"]:
+            assert n["strokeStyle"] == "dotted", n
+    assert recent["legendTitle"].startswith("Outline:"), recent["legendTitle"]
+    assert {"level-4", "level-0", "undated"} <= set(recent["legend"]), recent["legend"]
+
+    _apply_lens(page, "map")
+    neutral = page.evaluate(_FORCED_CANVAS_AUDIT_JS)
+    _assert_system_canvas(neutral)
+    assert {n["shape"] for n in neutral["nodes"]} == {"ellipse"}, neutral["nodes"][:3]
+    assert neutral["legend"] == [], neutral["legend"]
+
+    # The overview map stays available and paints system ink only.
+    page.get_by_role("button", name="Show minimap").click()
+    minimap = page.locator(".okf-graph-minimap")
+    expect(minimap).to_be_visible()
+    painted = minimap.locator("canvas").evaluate(
+        """(c, sys) => {
+          const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+          const seen = new Set();
+          for (let i = 0; i < d.length; i += 4) if (d[i + 3] === 255) seen.add(d[i] + ',' + d[i + 1] + ',' + d[i + 2]);
+          return {seen: [...seen], text: sys.text, highlight: sys.highlight};
+        }""",
+        audit["system"],
+    )
+    assert painted["text"] in painted["seen"] and painted["highlight"] in painted["seen"], painted
+
+
+def test_forced_colour_states_differ_by_more_than_colour(docs_server_url: str, page) -> None:
+    """Selection, path, search hits and the focus root are Highlight, and
+    each also has its own stroke width/style, so no state is colour alone;
+    dimmed context is GrayText with a dotted stroke."""
+    _forced_open(page, docs_server_url, "light")
+    cues_js = """() => {
+      const cy = window.__okfLoomGraph.cy;""" + _RGB_JS + """
+      const cue = el => el && el.length ? [rgb(el.style('border-color')), parseFloat(el.style('border-width')), el.style('border-style')] : null;
+      const line = el => el && el.length ? [rgb(el.style('line-color')), parseFloat(el.style('width')), el.style('line-style')] : null;
+      const plain = cy.nodes().not(':selected, .okf-path, .okf-search-match, .okf-focus-root, .okf-hover, .okf-bridge, .okf-orphan, .dim, .okf-path-dim, .okf-hover-dim, .okf-search-nonmatch').first();
+      return {
+        system: system(),
+        base: cue(plain),
+        selected: cue(cy.nodes(':selected').not('.okf-focus-root').first()),
+        path: cue(cy.nodes('.okf-path').not(':selected').first()),
+        search: cue(cy.nodes('.okf-search-match').not(':selected, .okf-path').first()),
+        focus: cue(cy.nodes('.okf-focus-root').first()),
+        dimNode: cue(cy.nodes('.okf-path-dim, .dim').not(':selected, .okf-path').first()),
+        pathEdge: line(cy.edges('.okf-path').first()),
+        dimEdge: line(cy.edges('.okf-path-dim, .okf-unrelated, .dim').not('.okf-path').first()),
+      };
+    }"""
+    plain = page.evaluate(cues_js)
+    page.evaluate(
+        """() => {
+          const G = window.__okfLoomGraph, cy = G.cy;
+          const edge = cy.edges().filter(e => e.source().id() !== e.target().id()).first();
+          G.interaction.dispatch({type: 'SELECT', id: edge.source().id(), source: 'test', quietUrl: true});
+          G.tracePath(cy.getElementById(edge.source().id()), cy.getElementById(edge.target().id()));
+        }"""
+    )
+    page.wait_for_function("() => window.__okfLoomGraph.cy.edges('.okf-path').length > 0")
+    first = page.evaluate(cues_js)
+    sys = first["system"]
+    assert plain["base"] == [sys["text"], 2, "solid"], plain
+    assert first["selected"] == [sys["highlight"], 6, "solid"], first
+    assert first["path"] == [sys["highlight"], 5, "dotted"], first
+    assert first["dimNode"] == [sys["gray"], 2, "dotted"], first
+    assert first["pathEdge"] == [sys["highlight"], 7, "solid"], first
+    assert first["dimEdge"][0] == sys["gray"] and first["dimEdge"][2] == "dotted", first
+
+    page.evaluate("() => window.__okfLoomGraph.clearPath()")
+    page.get_by_role("searchbox", name="Search graph concepts").fill("graph")
+    page.wait_for_function("() => window.__okfLoomGraph.cy.nodes('.okf-search-match').not(':selected').length > 0")
+    searched = page.evaluate(cues_js)
+    assert searched["search"] == [sys["highlight"], 5, "dashed"], searched
+    page.get_by_role("searchbox", name="Search graph concepts").fill("")
+
+    _apply_lens(page, "focus")
+    page.wait_for_function("() => window.__okfLoomGraph.cy.nodes('.okf-focus-root').length === 1")
+    focused = page.evaluate(cues_js)
+    assert focused["focus"] == [sys["highlight"], 7, "double"], focused
+
+    # Every reader state differs from the plain node and from each other by
+    # a non-colour property (stroke width/style), never by colour alone.
+    shapes = [tuple(plain["base"][1:]), tuple(first["selected"][1:]), tuple(first["path"][1:]),
+              tuple(searched["search"][1:]), tuple(focused["focus"][1:])]
+    assert len(set(shapes)) == len(shapes), shapes
+
+
+_RESTORE_SNAPSHOT_JS = """() => {
+  const cy = window.__okfLoomGraph.cy;
+  const NODE = ['background-color', 'border-color', 'border-width', 'border-style', 'shape', 'color',
+    'text-background-color', 'text-background-opacity', 'text-outline-color', 'underlay-color',
+    'underlay-opacity', 'underlay-padding', 'outline-width', 'opacity', 'width'];
+  const EDGE = ['line-color', 'target-arrow-color', 'width', 'opacity', 'line-style', 'color',
+    'text-background-color', 'text-background-opacity', 'text-border-color'];
+  const out = {};
+  cy.nodes().forEach(n => {
+    out[n.id()] = NODE.map(p => n.style(p)).concat([n.data('iconUrl'), n.data('commentBadgeUrl'), n.data('brokenBadgeUrl'), n.data('color')]);
+  });
+  cy.edges().forEach(e => { out[e.id()] = EDGE.map(p => e.style(p)).concat([e.data('relColor')]); });
+  out.__legend = [...document.querySelectorAll('.okf-graph-legend__swatch')].map(s => s.getAttribute('style'));
+  out.__legendTitle = [...document.querySelectorAll('.okf-graph-legend__title')].map(t => t.textContent);
+  out.__body = document.body.hasAttribute('data-okf-forced-colors');
+  return out;
+}"""
+
+
+def _set_forced(page, active: bool) -> None:
+    page.emulate_media(forced_colors="active" if active else "none")
+    page.wait_for_function(
+        "on => document.body.hasAttribute('data-okf-forced-colors') === on", arg=active
+    )
+
+
+def test_toggling_forced_colours_restores_the_ledger_palette_exactly(
+    docs_server_url: str, page
+) -> None:
+    """Forced colours switched on and off at runtime -- including a palette
+    change while they are on and a second entry -- hand every element back
+    exactly the Ledger values it had: fills, strokes, labels, halos, edges,
+    glyph and badge URIs, lens colours and the legend."""
+    page.emulate_media(forced_colors="none", color_scheme="light")
+    _open_graph(page, docs_server_url)
+    _set_palette(page, "bone")
+    page.evaluate(
+        """() => {
+          const G = window.__okfLoomGraph, cy = G.cy;
+          const edge = cy.edges().first();
+          G.interaction.dispatch({type: 'SELECT', id: edge.source().id(), source: 'test', quietUrl: true});
+          G.tracePath(cy.getElementById(edge.source().id()), cy.getElementById(edge.target().id()));
+        }"""
+    )
+    page.wait_for_function("() => window.__okfLoomGraph.cy.edges('.okf-path').length > 0")
+    _apply_lens(page, "themes")
+    bone = page.evaluate(_RESTORE_SNAPSHOT_JS)
+    _set_palette(page, "slate")
+    slate = page.evaluate(_RESTORE_SNAPSHOT_JS)
+    _set_palette(page, "bone")
+    assert page.evaluate(_RESTORE_SNAPSHOT_JS) == bone
+
+    _set_forced(page, True)
+    forced = page.evaluate(_RESTORE_SNAPSHOT_JS)
+    changed = [key for key in bone if not key.startswith("__") and forced[key] != bone[key]]
+    assert len(changed) == len([k for k in bone if not k.startswith("__")]), "forced colours repaint every element"
+
+    # A palette change while forced colours own the canvas, then leaving them.
+    _set_palette(page, "slate")
+    _set_forced(page, False)
+    assert page.evaluate(_RESTORE_SNAPSHOT_JS) == slate
+
+    # A second entry must win over the palette rules appended on exit.
+    _set_forced(page, True)
+    assert page.evaluate(_RESTORE_SNAPSHOT_JS) != slate
+    again = page.evaluate(_FORCED_CANVAS_AUDIT_JS)
+    _assert_system_canvas(again)
+    _set_forced(page, False)
+    _set_palette(page, "bone")
+    assert page.evaluate(_RESTORE_SNAPSHOT_JS) == bone
+    capture = page.evaluate("() => window.okfGraphCaptureState()")
+    assert capture["layoutSettled"] is True, capture

@@ -6486,11 +6486,25 @@ def test_graph_phase3_comment_badges_follow_theme_and_accessibility_media(
           return {light,dark,theme:document.documentElement.dataset.theme,aria:item.getAttribute('aria-label'),badge:badge.textContent,warn:!!warn,badgeBorder:getComputedStyle(badge).borderTopColor,motion:matchMedia('(prefers-reduced-motion: reduce)').matches,forced:matchMedia('(forced-colors: active)').matches,overflow:document.documentElement.scrollWidth>innerWidth+1};
         }"""
     )
-    assert result["light"] != result["dark"] and result["theme"] == "slate"
+    # Under forced colours the canvas badge is drawn in system colours, so a
+    # palette change leaves it alone; outside them it follows the palette.
+    assert result["light"] == result["dark"] and result["theme"] == "slate"
     assert result["badge"] == "99+" and "1000 active comments" in result["aria"]
     assert "4 broken links" in result["aria"] and result["warn"] is True
     assert result["motion"] is True and result["forced"] is True
     assert result["badgeBorder"] and result["overflow"] is False
+    page.emulate_media(reduced_motion="reduce", forced_colors="none")
+    page.wait_for_function("() => !document.body.hasAttribute('data-okf-forced-colors')")
+    themed = page.evaluate(
+        r"""async () => {
+          const cy=window.__okfLoomGraph.cy,node=cy.nodes().filter(n=>n.data('active_comment_count')>0).first(),uri=()=>node.data('commentBadgeUrl');
+          window.OKFLoomTheme.setTheme('bone');await new Promise(requestAnimationFrame);const light=uri();
+          window.OKFLoomTheme.setTheme('slate');await new Promise(requestAnimationFrame);const dark=uri();
+          return {light,dark};
+        }"""
+    )
+    assert themed["light"] != themed["dark"], themed
+    assert result["light"] not in (themed["light"], themed["dark"]), (result, themed)
 
 
 def test_static_graph_comment_badges_never_open_comment_network(static_url: str, page) -> None:
