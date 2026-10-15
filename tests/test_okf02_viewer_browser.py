@@ -354,7 +354,10 @@ def test_metadata_clock_and_nojs_static(tmp_path):
         browser = launch_chromium(pw)
         try:
             page = browser.new_page(viewport={'width':320, 'height':900})
-            page.clock.install(time=datetime(2026,9,8,11,59,59,tzinfo=timezone.utc))
+            page.clock.install(time=datetime(2026,9,8,11,59,58,tzinfo=timezone.utc))
+            # Keep navigation/host load from consuming the one second before
+            # the freshness boundary. Only the explicit advance crosses it.
+            page.clock.pause_at(datetime(2026,9,8,11,59,59,tzinfo=timezone.utc))
             page.goto((out / 'notes/review.html').as_uri())
             expect(page.locator('[data-okf-freshness]')).to_have_text('Not stale')
             page.clock.fast_forward(1000)

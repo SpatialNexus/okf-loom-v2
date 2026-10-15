@@ -2305,11 +2305,18 @@ def _post_real_comment_and_get_mark_id(page, server_url, mod):
     composer = page.get_by_role("textbox", name="Comment for agent")
     composer.fill("Integration probe for resolved-mark helpers.")
     page.get_by_role("button", name="Send", exact=True).click()
+    # The first mark is optimistic and its local id is renamed after POST.
+    # Bind the helper proof to the settled canonical row, not that transient id.
+    page.wait_for_function("""() => {
+        const s = window.okfLoomStudio.state;
+        return s.commentsStatus === 'ready' && !s.composerPost && s.comments.some(c =>
+            c.body === 'Integration probe for resolved-mark helpers.' && c.row_token &&
+            document.querySelector('mark.okf-comment-mark[data-comment-id="' + CSS.escape(c.id) + '"]'));
+    }""")
     page.wait_for_function(
         "() => document.querySelector('mark.okf-comment-mark') !== null")
-    comment_id = page.evaluate(
-        "() => document.querySelector('mark.okf-comment-mark')"
-        ".getAttribute('data-comment-id')")
+    comment_id = page.evaluate("""() => window.okfLoomStudio.state.comments.find(c =>
+        c.body === 'Integration probe for resolved-mark helpers.' && c.row_token).id""")
     if not comment_id:
         raise AssertionError("no data-comment-id on the rendered mark")
     return comment_id

@@ -2602,7 +2602,19 @@ def test_seeded_undo_all_mixed_group_and_standalone_restores_pre_burst_bytes(
     _wait_for_studio(page)
     _install_undo_journal(page)
 
-    seeded = page.evaluate(
+    # Seeding five HTTP writes is not itself a 500ms browser burst on a
+    # loaded host. Hold the browser clock until all five real SSE activities
+    # arrive, then advance the unchanged coalescing window as one burst.
+    page.wait_for_function("() => window.okfLoomLive.state === 'online'")
+    page.clock.install(time=0)
+    page.clock.pause_at(1000)
+    page.evaluate("""() => {
+        let received = 0;
+        window.okfLoomLive.on('activity', () => {
+            if (++received === 5) console.debug('mixed-burst-activities-received');
+        });
+    }""")
+    seed_burst = (
         """async (group) => {
             const apply = (target, args, groupId) =>
                 window.okfLoomStudio.ctx().tokenFetch("/__apply", {
@@ -2625,9 +2637,15 @@ def test_seeded_undo_all_mixed_group_and_standalone_restores_pre_burst_bytes(
             out.push(await apply("services/checkout",
                 { heading: "Endpoints", body: "Mixed-burst standalone services edit." }));
             return out;
-        }""",
-        group,
+        }"""
     )
+    with page.expect_console_message(
+        predicate=lambda message: message.text == 'mixed-burst-activities-received',
+        timeout=15000,
+    ):
+        seeded = page.evaluate(seed_burst, group)
+    page.clock.fast_forward(500)
+    page.clock.resume()
     assert seeded == [200, 200, 200, 200, 200], seeded
     # The burst really happened on disk.
     assert touched["tables/orders"].read_text(encoding="utf-8") != originals["tables/orders"]
