@@ -16,7 +16,6 @@ follow [Semantic Versioning](https://semver.org/). The product version
 - Live index cards, type/count statistics and document Connections now refresh
   in other open tabs after watcher or CLI edits, without reloading the page or
   replacing reader controls and comment drafts; read-only viewers stay live too.
-
 - On touch screens the code-block Copy button no longer covers the first
   line of code, and stays in view while a long line is scrolled sideways.
 - Graph JSON tolerates unknown query parameters (including cache-busters);
