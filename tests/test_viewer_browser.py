@@ -10747,11 +10747,13 @@ def test_phase4_final_node_index_arrows_shift_space_and_focus_escape(server_url:
 
 
 def test_phase4_final_focus_lens_waiting_and_direct_routes_restore_origin(server_url: str,page)->None:
-    _open_graph(page,server_url);_preset(page, "themes");page.wait_for_function("()=>window.__okfLoomGraph.getState().lens==='themes'&&window.okfGraphCaptureState().layoutSettled")
-    # A real viewport interaction disables the initial auto-fit policy. A
-    # programmatic cy.pan alone is not reader intent: a late ResizeObserver
-    # (for example when graph settings opens) is allowed to fit it away.
-    page.locator('#okf-graph canvas').first.click(position={"x": 5, "y": 5})
+    _open_graph(page,server_url)
+    generation = page.evaluate("()=>window.okfGraphCaptureState().layoutGeneration")
+    _preset(page, "themes")
+    # Lens controls update before their debounced layout starts. Waiting only
+    # on layoutSettled can sample the PREVIOUS generation, whose successor
+    # would then fit away the origin we are about to record.
+    page.wait_for_function("generation=>window.__okfLoomGraph.getState().lens==='themes'&&window.okfGraphCaptureState().layoutGeneration>generation&&window.okfGraphCaptureState().layoutSettled", arg=generation)
     origin=page.evaluate("()=>{const G=window.__okfLoomGraph;G.cy.zoom(.73);G.cy.pan({x:31,y:47});return {zoom:G.cy.zoom(),pan:G.cy.pan()}}")
     _preset(page, "focus");assert page.evaluate("()=>window.__okfLoomGraph.getState().lens==='focus'&&window.__okfLoomGraph.focusRoot()===null")
     node=page.evaluate("()=>window.__okfLoomGraph.cy.nodes().first().id()");page.evaluate("id=>window.__okfLoomGraph.interaction.dispatch({type:'SELECT',id})",node)
