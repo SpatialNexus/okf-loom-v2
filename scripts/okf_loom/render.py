@@ -3304,6 +3304,12 @@ def render_single_file(
     # schema-versioned passage corpus used by portable search rather than a
     # second concept-only approximation.
     data["retrieval_corpus"] = _browser_passage_corpus(bundle, data.get("edges", []))
+    # The canonical chunk already contains the complete passage payload. Ship
+    # it once; the single-file bootstrap restores the legacy payload property
+    # lazily before any BUNDLE consumer runs. Keep the shared corpus/export
+    # path (including its integrity hashes and exact canonical bytes) unchanged.
+    for chunk in data["retrieval_corpus"]["chunks"]:
+        del chunk["payload"]
     template = load_template("single_file.html", bundle)
     if offline is not None:
         template = offline.single_file_template(template)

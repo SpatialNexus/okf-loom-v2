@@ -10,6 +10,9 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Single-file exports store portable search passages once instead of embedding
+  both canonical JSON and its parsed copy. Existing `window.BUNDLE` consumers
+  retain lazy, mutable `payload` access; static/SPA and live output are unchanged.
 - On touch screens the code-block Copy button no longer covers the first
   line of code, and stays in view while a long line is scrolled sideways.
 - Graph JSON tolerates unknown query parameters (including cache-busters);
