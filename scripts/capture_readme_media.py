@@ -12,6 +12,10 @@ media is refreshed:
 * ``graph-map.png``          — full-page graph, Map lens, light mode
 * ``graph-bridges-dark.png`` — Bridges lens, dark mode
 * ``search.png``             — live search results
+* ``phone-top.png``          — a tutorial on a 390x844 touch phone, at the
+                               top of the page with the full chrome
+* ``phone-scrolled.png``     — the same page after two swipes, with the
+                               chrome scrolled away to the Sections row
 * ``social-preview.png``     — 1280x640 repository card built from the
                                dark Bridges still and the live design tokens
 
@@ -29,8 +33,8 @@ Browser resolution order: ``--chrome PATH``, ``OKF_CHROME``,
 channel, then Playwright-managed Chromium. Stills are DPR-2 for crispness.
 
 The stills show the product defaults a new reader gets: no appearance
-storage is seeded, so theme.js resolves Technical / Auto / compact / borders
-off, and the browser's ``prefers-color-scheme`` picks light or dark. The
+storage is seeded, and each still selects its Ledger palette (Bone, or
+Slate for the dark graph) through theme.js's public API only. The
 studio is served from a snapshot of the bundle's git-tracked files, so
 ignored session state in a working checkout (comment history, activity
 logs, lock files) never leaks into the media; ``--in-place`` serves the
@@ -77,6 +81,13 @@ SHOWCASE_VIEWPORT = {"width": 1440, "height": 1000}
 # The comments drawer pushes the page; below 1600px the header wraps.
 COMPOSER_VIEWPORT = {"width": 1600, "height": 1000}
 SOCIAL_VIEWPORT = {"width": 1280, "height": 640}
+# A phone held upright, with touch input. At this width the top bar and the
+# view tabs scroll away while reading, leaving the Sections row pinned.
+PHONE_VIEWPORT = {"width": 390, "height": 844}
+PHONE_PAGE = "tutorials/live_studio_basics"
+# Two upward swipes of this finger travel land in the tutorial's opening prose.
+PHONE_SWIPES = 2
+PHONE_SWIPE_PX = 560
 
 COMPOSER_PAGE = "explanation/live_studio_design"
 COMPOSER_SENTENCE = "This essay explains the reasoning behind the live collaborative studio."
@@ -204,7 +215,8 @@ class _BrowserDiagnostics:
 
 
 def _new_page(browser, *, viewport: dict, dpr: int, color_scheme: str = "light",
-              diagnostics: _BrowserDiagnostics | None = None, label: str = ""):
+              diagnostics: _BrowserDiagnostics | None = None, label: str = "",
+              touch: bool = False):
     """Context+page for one capture.
 
     No appearance storage is written, so theme.js (the only owner of that
@@ -213,7 +225,7 @@ def _new_page(browser, *, viewport: dict, dpr: int, color_scheme: str = "light",
     it behind an invitation button.
     """
     ctx = browser.new_context(viewport=viewport, device_scale_factor=dpr,
-                              color_scheme=color_scheme)
+                              color_scheme=color_scheme, is_mobile=touch, has_touch=touch)
     page = ctx.new_page()
     if diagnostics is not None:
         diagnostics.watch(page, label)
@@ -283,6 +295,89 @@ _SCROLL_UNDER_CHROME_JS = """([selector, pattern, gap]) => {
                      behavior: 'instant'});
   return true;
 }"""
+
+
+# Both Mermaid diagrams and the KaTeX block have rendered, so the showcase
+# frame is measured against its final layout.
+_SHOWCASE_RENDERED_JS = """() => {
+  const diagrams = [...document.querySelectorAll('.okf-page__body .mermaid')];
+  return diagrams.length >= 2 && diagrams.every(d => d.querySelector('svg'))
+    && !!document.querySelector('.okf-page__body .katex-display');
+}"""
+
+
+_POPOVER_HIDDEN_JS = """() => {
+  const pop = document.getElementById('okf-popover');
+  return !pop || getComputedStyle(pop).display === 'none';
+}"""
+
+
+# Resolves once the page has not scrolled for ten consecutive frames.
+_SCROLL_SETTLED_JS = """() => new Promise(resolve => {
+  let last = -1, still = 0;
+  const tick = () => {
+    const y = scrollY;
+    still = y === last ? still + 1 : 0;
+    last = y;
+    if (still >= 10) resolve(y); else requestAnimationFrame(tick);
+  };
+  tick();
+})"""
+
+
+# The phone chrome has finished sliding away: the top bar is above the
+# viewport and the view bar's Sections row is pinned at the top.
+_CHROME_COMPACT_JS = """() => {
+  if (document.documentElement.dataset.okfChrome !== 'compact') return false;
+  const sliding = document.getAnimations().some(a => {
+    const el = a.effect && a.effect.target;
+    return a.playState === 'running' && el && el.closest
+      && el.closest('.okf-topbar, .okf-concept-viewbar');
+  });
+  const bar = document.querySelector('.okf-topbar.okf-shell');
+  const row = document.querySelector('.okf-concept-viewbar .okf-outline-jump');
+  if (sliding || !bar || !row) return false;
+  const pinned = row.getBoundingClientRect();
+  return bar.getBoundingClientRect().bottom <= 0 && pinned.top >= 0 && pinned.top < 40;
+}"""
+
+
+def _swipe_up(page, cdp, distance: float, *, x: float = 195, start_y: float = 700) -> None:
+    """One finger swipe upward, which scrolls the page down by ``distance``.
+
+    The finger rests before lifting, so the swipe ends without a fling and
+    the scroll position is repeatable.
+    """
+    steps = 40
+    cdp.send("Input.dispatchTouchEvent",
+             {"type": "touchStart", "touchPoints": [{"x": x, "y": start_y}]})
+    for i in range(1, steps + 1):
+        cdp.send("Input.dispatchTouchEvent", {
+            "type": "touchMove",
+            "touchPoints": [{"x": x, "y": start_y - distance * i / steps}]})
+        page.wait_for_timeout(16)
+    page.wait_for_timeout(150)
+    cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
+
+
+def _scroll_chrome_away(ctx, page) -> None:
+    """Swipe a ready phone page down until its chrome has scrolled away.
+
+    The capture readiness owner marks the page ``data-okf-capture`` so stills
+    show the full chrome. Here the scrolled-away chrome is the subject, and
+    the page has already passed readiness, so that hold is released before
+    the reader-style swipes.
+    """
+    page.evaluate("() => document.documentElement.removeAttribute('data-okf-capture')")
+    cdp = ctx.new_cdp_session(page)
+    try:
+        for _ in range(PHONE_SWIPES):
+            _swipe_up(page, cdp, PHONE_SWIPE_PX)
+    finally:
+        cdp.detach()
+    page.evaluate(_SCROLL_SETTLED_JS)
+    page.wait_for_function(_CHROME_COMPACT_JS, timeout=5_000)
+    page.evaluate("() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))")
 
 
 _SELECT_SENTENCE_JS = """(sentence) => {
@@ -379,9 +474,9 @@ def _stage_stills(browser, base: str, stage: Path,
         names.append(name)
         return stage / name
 
-    def page_for(label: str, viewport: dict, color_scheme: str = "light"):
+    def page_for(label: str, viewport: dict, color_scheme: str = "light", touch: bool = False):
         return _new_page(browser, viewport=viewport, dpr=2, color_scheme=color_scheme,
-                         diagnostics=diagnostics, label=label)
+                         diagnostics=diagnostics, label=label, touch=touch)
 
     def settled_light(p) -> None:
         _settle(p, theme="bone")
@@ -396,6 +491,8 @@ def _stage_stills(browser, base: str, stage: Path,
     # chrome so the Mermaid diagrams and the KaTeX block share the frame.
     def frame_showcase(p) -> None:
         settled_light(p)
+        p.wait_for_function(_SHOWCASE_RENDERED_JS, timeout=15_000)
+        p.evaluate("() => document.fonts.ready.then(() => true)")
         if not p.evaluate(_SCROLL_UNDER_CHROME_JS, ["h2, h3", r"^\s*Diagrams", 16]):
             raise RuntimeError("demo/showcase has no Diagrams heading")
         # End the frame just above the Code section so no heading is sliced.
@@ -419,7 +516,14 @@ def _stage_stills(browser, base: str, stage: Path,
         if not p.evaluate(_SELECT_SENTENCE_JS, COMPOSER_SENTENCE):
             raise RuntimeError(f"could not select {COMPOSER_SENTENCE!r} on /{COMPOSER_PAGE}")
         p.click(".okf-comment-afford button", timeout=5_000)
-        p.fill('textarea[aria-label="Comment for agent"]', COMPOSER_NOTE)
+        composer = p.locator('textarea[aria-label="Comment for agent"]')
+        composer.fill(COMPOSER_NOTE)
+        # The opening drawer pushes the page, which can leave a link under the
+        # pointer; park it on the composer so no link preview covers the text.
+        box = composer.bounding_box()
+        if box:
+            p.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+        p.wait_for_function(_POPOVER_HIDDEN_JS, timeout=5_000)
     ctx, page = page_for("comment-composer", COMPOSER_VIEWPORT)
     capture_target(page, f"{base}/{COMPOSER_PAGE}", "document", still("comment-composer.png"),
                    full_page=False, prepare=compose)
@@ -434,6 +538,9 @@ def _stage_stills(browser, base: str, stage: Path,
     def bridges(p) -> None:
         _settle(p, theme="slate")
         _click_lens(p, "Bridges")
+        # Clicking the lens scrolls the detail panel; show it from its top so
+        # the overview note is not sliced.
+        p.evaluate("() => { const d = document.getElementById('okf-detail'); if (d) d.scrollTop = 0; }")
     ctx, page = page_for("graph-bridges-dark", STILL_VIEWPORT, color_scheme="dark")
     capture_target(page, f"{base}/__graph", "graph", still("graph-bridges-dark.png"),
                    full_page=False, prepare=bridges)
@@ -443,6 +550,15 @@ def _stage_stills(browser, base: str, stage: Path,
     ctx, page = page_for("search", STILL_VIEWPORT)
     capture_target(page, f"{base}/__search?q={SEARCH_QUERY}", "search", still("search.png"),
                    full_page=False, prepare=settled_light)
+    ctx.close()
+
+    # Phone: a tutorial at the top with the full chrome, then the same page
+    # after two swipes with the chrome scrolled away to the Sections row.
+    ctx, page = page_for("phone", PHONE_VIEWPORT, touch=True)
+    capture_target(page, f"{base}/{PHONE_PAGE}", "document", still("phone-top.png"),
+                   full_page=False, prepare=settled_light)
+    _scroll_chrome_away(ctx, page)
+    page.screenshot(path=str(still("phone-scrolled.png")), type="png", full_page=False)
     ctx.close()
 
     # Repository card, composed from the dark Bridges still.
@@ -477,15 +593,17 @@ _SOCIAL_CARD = string.Template("""<!doctype html>
 <head>
 <meta charset="utf-8">
 <title>okf-loom</title>
+<link rel="stylesheet" href="$fonts">
 <link rel="stylesheet" href="$stylesheet">
 <style>
   html, body { margin: 0; width: 1280px; height: 640px; overflow: hidden;
     background: var(--okf-bg); }
-  .card { position: relative; width: 1280px; height: 640px; color: var(--okf-fg); }
+  .card { position: relative; width: 1280px; height: 640px; color: var(--okf-fg);
+    font-family: var(--okf-font-body); }
   .card__copy { position: absolute; left: 72px; top: 0; bottom: 0; width: 500px;
     display: flex; flex-direction: column; justify-content: center; }
   .card__eyebrow { margin: 0 0 18px; color: var(--okf-fg-muted);
-    font: 600 16px/1.2 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font: 600 16px/1.2 var(--font-mono);
     letter-spacing: 0.04em; }
   .card__title { margin: 0; font-family: var(--okf-font-display); font-size: 96px;
     line-height: 1; font-weight: 700; letter-spacing: -0.02em; }
@@ -495,7 +613,7 @@ _SOCIAL_CARD = string.Template("""<!doctype html>
     color: var(--okf-fg-muted); }
   .card__pitch { margin: 0 0 34px; font-size: 27px; line-height: 1.35; font-weight: 700; }
   .card__cmd { margin: 0; color: var(--okf-accent);
-    font: 500 21px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+    font: 500 21px/1 var(--font-mono); }
   .card__shot { position: absolute; margin: 0; left: 612px; top: 56px; width: 668px;
     height: 528px; overflow: hidden; border: 1px solid var(--okf-border-strong);
     border-right: 0; border-radius: 12px 0 0 12px; background: var(--okf-bg-elev);
@@ -520,13 +638,13 @@ _SOCIAL_CARD = string.Template("""<!doctype html>
 """)
 
 
-def _stylesheet_href(base: str) -> str:
-    """The wiki.css URL exactly as the live studio links it."""
+def _stylesheet_href(base: str, name: str = "wiki.css") -> str:
+    """The ``name`` stylesheet URL exactly as the live studio links it."""
     with urllib.request.urlopen(f"{base}/", timeout=5) as resp:
         page_html = resp.read().decode("utf-8", "replace")
-    match = re.search(r'<link[^>]+href="([^"]*wiki\.css[^"]*)"', page_html)
+    match = re.search(rf'<link[^>]+href="([^"]*/{re.escape(name)}[^"]*)"', page_html)
     if not match:
-        raise RuntimeError("the live studio index does not link wiki.css")
+        raise RuntimeError(f"the live studio index does not link {name}")
     return html.unescape(match.group(1))
 
 
@@ -541,6 +659,7 @@ def _capture_social_preview(browser, base: str, shot: Path, out_path: Path,
     shot_url = f"{base}/__readme-media/{shot.name}"
     card = _SOCIAL_CARD.substitute(
         stylesheet=html.escape(_stylesheet_href(base), quote=True),
+        fonts=html.escape(_stylesheet_href(base, "ledger-fonts.css"), quote=True),
         shot=html.escape(shot_url, quote=True),
         eyebrow=html.escape(f"v{LOOM_VERSION} · implements OKF {SPEC_VERSION}"),
     )
@@ -561,6 +680,10 @@ def _capture_social_preview(browser, base: str, shot: Path, out_path: Path,
           .getPropertyValue('--okf-accent').trim()""")
         if not accent:
             raise RuntimeError("social card did not pick up the studio design tokens")
+        if not page.evaluate("""() => ['Public Sans', 'Azeret Mono'].every(family =>
+          [...document.fonts].some(face => face.family.replace(/["']/g, '') === family
+            && face.status === 'loaded'))"""):
+            raise RuntimeError("social card did not load the Ledger faces")
         page.screenshot(path=str(out_path), type="png", full_page=False)
     finally:
         ctx.close()
@@ -657,7 +780,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"# wrote {len(captured)} media files to {out_dir}")
     for path in captured:
         size = path.stat().st_size if path.exists() else 0
-        print(f"  {path.relative_to(REPO_ROOT)}  ({size / 1024:.0f} KiB)")
+        shown = path.relative_to(REPO_ROOT) if path.is_relative_to(REPO_ROOT) else path
+        print(f"  {shown}  ({size / 1024:.0f} KiB)")
     return 0
 
 
