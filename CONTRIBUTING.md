@@ -198,8 +198,9 @@ It serves a snapshot of the docs bundle's git-tracked files, so local comment
 history and activity never appear in the media (`--in-place` serves the bundle
 as-is instead). It seeds no appearance settings, so the stills show the
 shipped defaults, and it fails on any browser console, page or network error.
-It also composes `docs/media/social-preview.png`, the 1280×640 repository
-card. Options: `--bundle`, `--out-dir`, `--chrome`.
+It also captures the two phone stills (`phone-top.png`, `phone-scrolled.png`)
+on a 390×844 touch viewport, swiping the page so the chrome scrolls away, and
+composes `docs/media/social-preview.png`, the 1280×640 repository card. Options: `--bundle`, `--out-dir`, `--chrome`.
 
 **Clips (MP4 and GIF):**
 

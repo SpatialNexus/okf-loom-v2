@@ -76,17 +76,16 @@ unless you opt in, see [Sharing and security](#sharing-and-security)).
 
 Select a sentence and leave a comment. Your agent's `wait` picks it up, then
 it claims the comment, edits the Markdown (the page updates live) and resolves
-the thread with a reply. [Watch the MP4](docs/media/comment-loop.mp4) (28 s).
+the thread with a reply. [Watch the MP4](docs/media/comment-loop.mp4) (32 s).
 
 ### Restyle the page from one menu
 
-![Earlier Appearance menu demonstration; media refresh for Ledger is pending](docs/media/appearance.gif)
+![Screen recording: the Appearance menu is opened on the rendering showcase page and the page restyles live through the Slate, Clay and Plum palettes, then System, and back to Bone, with its Mermaid diagrams following each palette](docs/media/appearance.gif)
 
 One Appearance menu applies Ledger live: **Bone** (the light default), **Slate**,
 **Clay**, **Plum**, or **System** (Bone in OS light mode, Slate in dark mode).
 Public Sans and Azeret Mono are self-hosted, including offline and single-file
-output. The [earlier MP4](docs/media/appearance.mp4) (22 s) predates Ledger;
-screenshots and recordings will be refreshed separately.
+output. [Watch the MP4](docs/media/appearance.mp4) (17 s).
 
 ### Explore the bundle as a graph
 
@@ -94,7 +93,7 @@ screenshots and recordings will be refreshed separately.
 
 The bundle graph under the Themes, Bridges and Map lenses. Hover a concept to
 preview it; double-click to open its page.
-[Watch the MP4](docs/media/graph.mp4) (20 s).
+[Watch the MP4](docs/media/graph.mp4) (22 s).
 
 ### Search and jump
 
@@ -102,7 +101,7 @@ preview it; double-click to open its page.
 
 Search as you type in the header, hover a link to preview where it goes, or
 press `Ctrl+K` to open the command palette and jump straight to a page.
-[Watch the MP4](docs/media/search.mp4) (13 s).
+[Watch the MP4](docs/media/search.mp4) (14 s).
 
 ### Screenshots
 
@@ -126,6 +125,14 @@ renderer on one page.
 bundle's topic areas.
 
 ![The graph view in dark mode under the Bridges lens: concept nodes joined by numbered relationship bundles, zoom, fit, fullscreen and reset controls beside the canvas, and a ranked Top bridgers list with CLI command reference first](docs/media/graph-bridges-dark.png)
+
+**Phone.** The top bar and view tabs fit above the page. Scroll down and they
+slide away, leaving only the Sections row pinned; scroll up to bring them back.
+
+<p>
+<img src="docs/media/phone-top.png" width="300" alt="A tutorial page on a phone, at the top: the site name and Appearance menu, the search box with Index, Graph and Studio, the Rendered, Source, Split and Focus view tabs, and the Sections menu above the page header">
+<img src="docs/media/phone-scrolled.png" width="300" alt="The same tutorial scrolled down on a phone: the top bar and view tabs have slid away, and only the Sections row stays pinned above the text">
+</p>
 
 ## What's new in v2
 
