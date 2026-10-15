@@ -56,6 +56,27 @@ current lifecycle and test seams.
 
 Tests in `tests/` are the executable examples for checkout-local behavior.
 
+### Atomic-write permissions
+
+`io_utils.py` keeps temporary files at 0600 until their content is flushed,
+then preserves an existing target's ownership and `st_mode & 0o7777` before
+replacement. New ordinary content uses `0666 & ~umask`. Linux reads the live
+mask from `/proc/self/status`; if unavailable, an isolated Python child reads
+its inherited mask without ever changing the multithreaded parent's umask.
+Ownership that cannot be retained fails the write rather than silently changing
+owners. The durable helper still fsyncs the file before replace and the parent
+directory afterward.
+
+Private writers explicitly pass `mode=0o600`, overriding even a wider existing
+file: Studio rotation counters, idempotency/dedup maps, event sequence state,
+comment/reanchor WALs, receipts and compaction filters, denial audits, undo
+snapshots/group manifests, and index/update rollback of session sidecars. Local
+derived-index caches and generated state-directory ignore files do likewise.
+Studio CSRF tokens/server state, descriptor-relative comment receipts,
+DirectiveStore and PresenceStore retain their independent 0600 creation paths;
+proposal authority I/O additionally rejects existing non-0600 files. None of
+these private paths inherit ordinary content's permission-preservation policy.
+
 ### Internal section-navigation proof
 
 `RetrievalService.verified_section_fragment(concept_id, passage_id, revision=...)`

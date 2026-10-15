@@ -10,6 +10,11 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Atomic content writes preserve existing file permissions and ownership; new
+  bundle files and build outputs use normal umask-derived permissions instead
+  of becoming 0600. Private Studio state remains explicitly owner-only, including
+  rewrites of files whose permissions were previously wider.
+
 - On touch screens the code-block Copy button no longer covers the first
   line of code, and stays in view while a long line is scrolled sideways.
 - Graph JSON tolerates unknown query parameters (including cache-busters);

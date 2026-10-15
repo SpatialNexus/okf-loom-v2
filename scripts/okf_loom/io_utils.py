@@ -7,7 +7,10 @@ through these helpers. The pattern is:
        as the target (so ``os.replace`` is atomic on POSIX — same
        filesystem). The tmp file is created mode 0600 by ``mkstemp``, so
        it is private even on shared hosts.
-    2. Write the content via ``os.fdopen``.
+    2. Write and flush the content via ``os.fdopen``. Preserve an existing
+       target's owner and permission bits, or apply 0666 masked by the current
+       umask for new content. An explicit ``mode`` overrides preservation (use
+       ``mode=0o600`` for private state, even if a prior file was wider).
     3. ``os.replace(tmp, path)`` to swap into place atomically.
     4. On ANY exception during write or replace, ``os.unlink`` the tmp
        file in a ``finally`` block — no orphans left behind.
@@ -420,17 +423,63 @@ def ensure_self_ignored(dirpath: str | Path) -> None:
         return
     try:
         dirpath.mkdir(parents=True, exist_ok=True)
-        atomic_write_text(gi, SELF_IGNORE)
+        atomic_write_text(gi, SELF_IGNORE, mode=0o600)
     except OSError:
         pass  # best-effort: a read-only checkout must not break serving
 
 
-def atomic_write_text(path: str | Path, text: str, *, encoding: str = "utf-8") -> None:
-    """Atomically write ``text`` to ``path`` (tmp + os.replace).
+def _process_umask() -> int:
+    """Read the live umask without ever changing the parent process's mask.
 
-    The tmp file is created in the same directory as ``path`` (so the
-    rename is atomic on POSIX) with mode 0600 via ``mkstemp``. Parents
-    are created if missing. On any exception, the tmp file is unlinked.
+    Linux exposes it read-only in procfs. Elsewhere (or with procfs hidden),
+    a short-lived isolated Python child reads its inherited mask. A lock around
+    os.umask in this process would not protect unrelated server threads, and
+    an import-time snapshot would miss later operator changes.
+    """
+    try:
+        for line in Path("/proc/self/status").read_text(encoding="ascii").splitlines():
+            if line.startswith("Umask:"):
+                mask = int(line.split()[1], 8)
+                if 0 <= mask <= 0o777:
+                    return mask
+    except (OSError, ValueError, IndexError):
+        pass
+    import subprocess
+    import sys
+    return int(subprocess.check_output(
+        [sys.executable, "-I", "-S", "-c", "import os; print(oct(os.umask(0)))"],
+        text=True,
+    ).strip(), 8)
+
+
+def _set_atomic_metadata(fd: int, path: Path, mode: int | None) -> None:
+    """Apply final metadata only after flushing, while the temp fd is open.
+
+    Ownership preservation fails closed if the writer cannot retain it. Chown
+    precedes chmod because chown (and writing) can clear setuid/setgid bits.
+    Explicit modes always win: private rewrites never preserve a wider mode.
+    """
+    try:
+        previous = path.stat()
+    except FileNotFoundError:
+        previous = None
+    if previous is not None:
+        current = os.fstat(fd)
+        if (current.st_uid, current.st_gid) != (previous.st_uid, previous.st_gid):
+            os.fchown(fd, previous.st_uid, previous.st_gid)
+    if mode is None:
+        mode = previous.st_mode & 0o7777 if previous is not None else 0o666 & ~_process_umask()
+    os.fchmod(fd, mode)
+
+
+def atomic_write_text(path: str | Path, text: str, *, encoding: str = "utf-8",
+                      mode: int | None = None) -> None:
+    """Atomically write text, preserving ownership and existing permission bits.
+
+    New content uses 0666 & ~umask, like open(path, 'w'). Explicit ``mode``
+    overrides both defaults, even on replacement: private callers must pass
+    ``mode=0o600``. The same-directory temp stays 0600 until fully written.
+    Parents are created if missing; errors unlink the temp without publishing.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -438,6 +487,8 @@ def atomic_write_text(path: str | Path, text: str, *, encoding: str = "utf-8") -
     try:
         with os.fdopen(fd, "w", encoding=encoding) as f:
             f.write(text)
+            f.flush()
+            _set_atomic_metadata(f.fileno(), path, mode)
         os.replace(tmp, path)
     except BaseException:
         # BaseException so we also clean up on KeyboardInterrupt.
@@ -448,7 +499,7 @@ def atomic_write_text(path: str | Path, text: str, *, encoding: str = "utf-8") -
         raise
 
 
-def atomic_write_bytes(path: str | Path, data: bytes) -> None:
+def atomic_write_bytes(path: str | Path, data: bytes, *, mode: int | None = None) -> None:
     """Atomically write ``data`` to ``path`` (binary). See ``atomic_write_text``."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -456,6 +507,8 @@ def atomic_write_bytes(path: str | Path, data: bytes) -> None:
     try:
         with os.fdopen(fd, "wb") as f:
             f.write(data)
+            f.flush()
+            _set_atomic_metadata(f.fileno(), path, mode)
         os.replace(tmp, path)
     except BaseException:
         try:
@@ -465,8 +518,9 @@ def atomic_write_bytes(path: str | Path, data: bytes) -> None:
         raise
 
 
-def durable_atomic_write_text(path: str | Path, text: str, *, encoding: str = "utf-8") -> None:
-    """Atomically replace a durability-critical file and fsync file + directory."""
+def durable_atomic_write_text(path: str | Path, text: str, *, encoding: str = "utf-8",
+                              mode: int | None = None) -> None:
+    """Write with atomic_write_text's modes, plus fsync of file and directory."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(prefix=".okf-", suffix=".tmp", dir=str(path.parent))
@@ -474,6 +528,7 @@ def durable_atomic_write_text(path: str | Path, text: str, *, encoding: str = "u
         with os.fdopen(fd, "w", encoding=encoding) as fh:
             fh.write(text)
             fh.flush()
+            _set_atomic_metadata(fh.fileno(), path, mode)
             os.fsync(fh.fileno())
         os.replace(tmp, path)
         dir_fd = os.open(path.parent, os.O_RDONLY)

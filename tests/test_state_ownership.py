@@ -332,12 +332,13 @@ def test_deferred_history_batch_failure_unwinds_snapshots_and_group_capacity(
     real_write = studio_module.atomic_write_bytes
     calls = 0
 
-    def fail_second(path: Path, raw: bytes) -> None:
+    def fail_second(path: Path, raw: bytes, *, mode: int | None = None) -> None:
         nonlocal calls
+        assert mode == 0o600
         calls += 1
         if calls == 2:
             raise OSError("history staging failed")
-        real_write(path, raw)
+        real_write(path, raw, mode=mode)
 
     monkeypatch.setattr(studio_module, "atomic_write_bytes", fail_second)
     with pytest.raises(OSError, match="history staging"):
