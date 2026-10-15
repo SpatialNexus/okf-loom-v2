@@ -8,8 +8,8 @@ yuv420p, faststart) and a looping README GIF (960 px wide):
                       ``wait`` returns the comment, then it claims it, edits the
                       Markdown (the page patches live), and resolves the thread,
                       ending on the whole resolved card in the Comments rail
-* ``appearance``   -- the Appearance menu restyling a page live: colour mode,
-                      the four families, contrast, borders, then reset
+* ``appearance``   -- the Appearance menu restyling a page live through the
+                      Ledger palettes: Slate, Clay, Plum, System, back to Bone
 * ``graph``        -- the bundle graph: lenses, a hover preview, and opening a
                       node's page
 * ``search``       -- live header search, a link's hover preview, then the
@@ -922,7 +922,7 @@ def direct_appearance(take: _Take, rec: _Screencast) -> None:
     for palette in ("slate", "clay", "plum", "system", "bone"):
         take.caption("Palette", palette.title())
         take.click(_appearance_option(page, "theme", palette), ms=450)
-        take.hold(1150)
+        take.hold(1500)
 
     take.keys("Esc")
     page.keyboard.press("Escape")
@@ -987,6 +987,11 @@ def direct_graph(take: _Take, rec: _Screencast) -> None:
                            " && window.__okfLoomGraph.cy.nodes().length > 5", timeout=15_000)
     page.wait_for_function(_GRAPH_SETTLED_JS, timeout=15_000)
     take.hold(900)
+    # At 1280x720 the lens disclosure sits below the detail panel's fold.
+    # Scroll it into view before recording, so the GIF budget goes on the
+    # lenses rather than on a panel scroll.
+    summary = page.locator("details.okf-signal__lenses summary")
+    _reveal_in_detail_panel(take, summary)
     take.park(650, 330)  # empty canvas, clear of nodes and the detail panel
     take.check_public("graph start")
 
@@ -994,7 +999,10 @@ def direct_graph(take: _Take, rec: _Screencast) -> None:
     take.caption("The graph: every concept and how it links")
     take.hold(1800)
     take.caption("Lenses reframe the same bundle")
-    take.click(page.locator("details.okf-signal__lenses summary"), ms=700)
+    _reveal_in_detail_panel(take, summary)
+    take.click(summary, ms=700)
+    if not page.locator("details.okf-signal__lenses").evaluate("d => d.open"):
+        raise RuntimeError("the Explore with lenses disclosure did not open")
     take.hold(450)
     for lens in GRAPH_LENSES:
         radio = page.get_by_role("radio", name=re.compile(rf"^{re.escape(lens)}:"))
@@ -1045,7 +1053,7 @@ def direct_search(take: _Take, rec: _Screencast) -> None:
     page.keyboard.type(SEARCH_QUERY, delay=75)
     results = page.locator(".okf-shell [role=listbox] [role=option], .okf-shell [role=option]")
     results.first.wait_for(state="visible", timeout=5_000)
-    take.hold(1100)
+    take.hold(900)
     take.click(results.first, ms=600, dx=0.3)
     page.wait_for_load_state("load")
     page.wait_for_function(_STUDIO_SETTLED_JS, timeout=15_000)
@@ -1086,7 +1094,7 @@ def direct_search(take: _Take, rec: _Screencast) -> None:
     target = palette.locator("[role=option]", has=page.locator(
         ".okf-palette__item-title", has_text=re.compile(rf"^{re.escape(PALETTE_TARGET)}$")))
     target.wait_for(state="visible", timeout=5_000)
-    take.hold(650)
+    take.hold(500)
     for _ in range(10):
         if target.get_attribute("aria-selected") == "true":
             break
@@ -1101,7 +1109,7 @@ def direct_search(take: _Take, rec: _Screencast) -> None:
     page.wait_for_url(re.compile(r"search_modes"), timeout=10_000)
     page.wait_for_load_state("load")
     page.wait_for_function(_STUDIO_SETTLED_JS, timeout=15_000)
-    take.hold(1100)
+    take.hold(800)
     take.check_public("search end")
 
 
