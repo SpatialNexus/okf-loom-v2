@@ -198,7 +198,10 @@ window.BUNDLE = __BUNDLE_DATA__;
 // Canonical search chunks are the sole serialized passage source. Preserve
 // the public in-memory BUNDLE shape for consumers (including overrides),
 // without embedding a second copy of every excerpt and metadata record.
-window.BUNDLE.retrieval_corpus.chunks.forEach(function (chunk) {
+(window.BUNDLE.retrieval_corpus && Array.isArray(window.BUNDLE.retrieval_corpus.chunks)
+  ? window.BUNDLE.retrieval_corpus.chunks : []).forEach(function (chunk) {
+  // Leave malformed evidence for the portable validator, not a bootstrap error.
+  if (!chunk || typeof chunk !== "object" || Array.isArray(chunk)) return;
   Object.defineProperty(chunk, "payload", {
     configurable: true,
     enumerable: true,

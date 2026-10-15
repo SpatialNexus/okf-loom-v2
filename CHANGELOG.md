@@ -10,6 +10,8 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Missing or malformed embedded search evidence in single-file exports settles as
+  unavailable without an uncaught bootstrap error; graph and shell setup still run.
 - Switching palettes no longer flashes a Mermaid diagram's source text. The old
   diagram stays in place (marked busy) until the new palette's diagram is ready,
   then swaps in without moving the layout; the latest switch wins and a failed
