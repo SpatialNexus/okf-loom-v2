@@ -281,11 +281,12 @@ With no `view` parameter, returns the full projection including rendered concept
 `bodies` and reserved `documents`; this full/tool projection is unchanged.
 Exactly one `view=structure` selects an internal compact client contract, with
 `structure_schema:1`, no rendered bodies/documents/advisory metadata, and only
-fields the graph and Studio read. Empty/zero defaults may be absent (an available
-zero `active_comment_count` remains explicit). Grouping lives in `metadata`, not
+graph/Studio fields and relation provenance. Empty/zero defaults may be absent
+(an available zero `active_comment_count` remains explicit). Grouping lives in `metadata`, not
 also in duplicated top-level node keys. Each edge's relation list retains
-`id`, `label`, `type`, `kind`, and optional `detail`; source/target/direction are
-inherited from the edge (`direction:outgoing`), multiplicity is the list length,
+`id`, `label`, `type`, `kind`, `origin`, `source_id`, and optional `detail`;
+`source_id` may be null. Source/target/direction are inherited from the edge
+(`direction:outgoing`), multiplicity is the list length,
 and `primary_relation_index` references its primary member instead of duplicating
 it. `document_paths` lists reserved reading destinations without their HTML.
 Graph.js expands this transport before its ordinary validation. Any other

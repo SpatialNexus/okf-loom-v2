@@ -57,7 +57,7 @@ def graph_size_floor(bundle, *, structure=False):
     for link in bundle.graph().edges:
         if link.source not in ids or link.target not in ids:
             continue
-        total += _record_floor(("id", "label", "type", "kind") if structure else _RELATION_KEYS)
+        total += _record_floor(("id", "label", "type", "kind", "origin", "source_id") if structure else _RELATION_KEYS)
         if not structure:
             total += len(concept_id_to_str(link.source)) + len(concept_id_to_str(link.target))
         pair = (link.source, link.target)

@@ -2286,7 +2286,7 @@ def test_graph_comment_badges_appear_only_for_positive_counts(server_url: str, p
         route.fulfill(response=response, body=_json.dumps(body),
                       content_type="application/json")
 
-    page.route("**/graph.json", handle)
+    page.route(lambda url: urllib.parse.urlsplit(url).path == "/__data/graph.json", handle)
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto(server_url + "/__graph", wait_until="domcontentloaded")
     page.wait_for_function(
@@ -4925,7 +4925,8 @@ def test_search_context_fallback_reflows_at_320px_css_viewport_dpr4(static_url: 
     assert zoomed["headerOverlaps"] == []
 
 
-def test_malformed_single_file_corpus_settles_unavailable(tmp_path: Path, page) -> None:
+@pytest.mark.parametrize("malformation", ["schema", "missing-chunks", "non-array-chunks", "null-chunk", "invalid-json"])
+def test_malformed_single_file_corpus_settles_unavailable(tmp_path: Path, page, malformation: str) -> None:
     """Malformed evidence keeps Search reachable but disables evidence actions."""
     from okf_loom import Bundle
     from okf_loom.render import render_single_file
@@ -4935,11 +4936,22 @@ def test_malformed_single_file_corpus_settles_unavailable(tmp_path: Path, page) 
     html = output.read_text(encoding="utf-8")
     prefix = "window.BUNDLE = "
     start = html.index(prefix) + len(prefix)
-    end = html.index(";\nwindow.OKF_LOOM_INITIAL_LAYOUT", start)
-    payload = json.loads(html[start:end])
-    payload["retrieval_corpus"]["manifest"]["schema_version"] = 999
+    payload, end = json.JSONDecoder().raw_decode(html, start)
+    corpus = payload["retrieval_corpus"]
+    if malformation == "schema":
+        corpus["manifest"]["schema_version"] = 999
+    elif malformation == "missing-chunks":
+        del corpus["chunks"]
+    elif malformation == "non-array-chunks":
+        corpus["chunks"] = {}
+    elif malformation == "null-chunk":
+        corpus["chunks"][0] = None
+    else:
+        corpus["chunks"][0]["canonical_chunk"] = "{invalid JSON"
     output.write_text(html[:start] + json.dumps(payload) + html[end:], encoding="utf-8")
 
+    page_errors = []
+    page.on("pageerror", lambda error: page_errors.append(str(error)))
     page.goto(output.as_uri(), wait_until="domcontentloaded")
     page.locator("#okf-single-search-toggle").click()
     expect(page.locator("[data-single-search-status]")).to_contain_text("Portable search unavailable")
@@ -4950,6 +4962,8 @@ def test_malformed_single_file_corpus_settles_unavailable(tmp_path: Path, page) 
     expect(page.locator("#okf-single-search-toggle")).to_be_enabled()
     expect(page.locator("#okf-single-search input, #okf-single-search button[type=submit]").first).to_be_disabled()
     expect(page.locator("[data-single-page-context]")).to_be_disabled()
+    assert page.evaluate("() => window.OKF_LOOM_INITIAL_LAYOUT") == "cose"
+    assert page_errors == []
 
 
 def test_single_file_nojs_and_missing_corpus_are_honest(tmp_path: Path, page) -> None:
@@ -4970,11 +4984,12 @@ def test_single_file_nojs_and_missing_corpus_are_honest(tmp_path: Path, page) ->
     html = output.read_text(encoding="utf-8")
     prefix = "window.BUNDLE = "
     start = html.index(prefix) + len(prefix)
-    end = html.index(";\nwindow.OKF_LOOM_INITIAL_LAYOUT", start)
-    payload = json.loads(html[start:end])
+    payload, end = json.JSONDecoder().raw_decode(html, start)
     del payload["retrieval_corpus"]
     missing = tmp_path / "single-missing.html"
     missing.write_text(html[:start] + json.dumps(payload) + html[end:], encoding="utf-8")
+    page_errors = []
+    page.on("pageerror", lambda error: page_errors.append(str(error)))
     page.goto(missing.as_uri(), wait_until="domcontentloaded")
     expect(page.locator("[data-single-search-status]")).to_contain_text("unavailable")
     expect(page.locator("#okf-single-search-toggle")).to_be_enabled()
@@ -4995,6 +5010,8 @@ def test_single_file_nojs_and_missing_corpus_are_honest(tmp_path: Path, page) ->
     assert page.evaluate("() => document.body.dataset.okfGraphCaptureReady") == "ready"
     authorization = page.evaluate("async () => { try { await window.okfCaptureReadiness.start({target:'search'}).promise; return null; } catch (error) { return {code:error.code, screenshotAllowed:error.screenshotAllowed}; } }")
     assert authorization == {"code": "unavailable", "screenshotAllowed": False}
+    assert page.evaluate("() => window.OKF_LOOM_INITIAL_LAYOUT") == "cose"
+    assert page_errors == []
 
 
 def test_backlinks_show(server_url: str, page) -> None:

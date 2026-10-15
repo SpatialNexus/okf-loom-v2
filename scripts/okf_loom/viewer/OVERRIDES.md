@@ -409,8 +409,9 @@ name, palette, comment-summary revision and exact metadata-expiry transitions
 invalidate those bytes. The full/tool view stays byte-compatible. The internal structure view has
 `structure_schema:1`: nodes omit unused advisory metadata, duplicated grouping
 keys and empty/zero defaults (but preserve available zero comment counts);
-edges carry each read relation record once, inherit source/target/direction
-from their edge, and identify the primary by `primary_relation_index`.
+edges carry each read relation record once, including OKF provenance `origin`
+and `source_id`, inherit source/target/direction from their edge, and identify the
+primary by `primary_relation_index`.
 Graph.js restores its ordinary relation objects before validation. Reserved
 `document_paths` preserve index/log link routing without rendered documents.
 Structure has a 16 MiB cap; full JSON retains 4 MiB, for at most 20 MiB of cached

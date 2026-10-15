@@ -1231,11 +1231,12 @@ Key routes:
 
 The compact `view=structure` graph contract carries `structure_schema:1` and
 omits rendered `bodies`, `documents`, and advisory metadata HTML. It retains only
-graph/Studio fields; empty/zero defaults may be absent, except an available zero
-`active_comment_count` remains explicit. Grouping appears in `metadata`, not
+graph/Studio fields and relation provenance; empty/zero defaults may be absent,
+except an available zero `active_comment_count` remains explicit. Grouping appears in `metadata`, not
 also in top-level node keys. Edge relation members retain `id`, `label`, `type`,
-`kind`, and optional `detail`; source/target and outgoing direction are inherited
-from the edge, multiplicity is the relation-list length, and
+`kind`, `origin`, `source_id`, and optional `detail`; `source_id` may be null.
+Source/target and outgoing direction are inherited from the edge, multiplicity
+is the relation-list length, and
 `primary_relation_index` references the primary member rather than duplicating
 it. `document_paths` identifies reserved reading destinations without HTML.
 Graph.js expands this transport before ordinary validation. Unknown or repeated

@@ -33,10 +33,25 @@ def test_structure_fits_documented_cap_at_5000_without_rendering_html(tmp_path, 
     assert etag.startswith('"')
 
 
-def test_compact_relations_preserve_every_read_field_and_primary_identity(graph_server):
-    _, base = graph_server
-    full = json.loads(_get(base)[2])
-    slim = json.loads(_get(base, '/__data/graph.json?view=structure')[2])
+def test_compact_relations_preserve_every_read_field_and_primary_identity(tmp_path):
+    from okf_loom import Bundle
+
+    (tmp_path / 'a.md').write_text(
+        '---\ntype: note\nsources:\n  - id: evidence\n    resource: /b.md\n'
+        'relations:\n  - target: b\n    type: references\n    detail: Authored detail\n---\n'
+        '# Alpha\n\n[Body link](b.md)\n', encoding='utf-8')
+    (tmp_path / 'b.md').write_text('---\ntype: note\n---\n# Beta\n', encoding='utf-8')
+    bundle = Bundle.load(tmp_path)
+    full, slim = [json.loads(transport.graph_response(
+        bundle, name='Provenance', comment_summary=None, structure=structure,
+        limit=transport.MAX_STRUCTURE_BYTES)[0]) for structure in (False, True)]
+    assert len(full['edges']) == len(slim['edges']) == 1
+    relations = slim['edges'][0]['data']['relations']
+    assert len(relations) == 3
+    assert {r['origin']: r['source_id'] for r in relations} == {
+        'markdown': None, 'relations': None, 'sources': 'evidence'}
+    assert next(r for r in relations if r['origin'] == 'relations')['detail'] == 'Authored detail'
+    assert next(r for r in relations if r['origin'] == 'sources')['type'] == 'derived_from'
     for old, new in zip(full['nodes'], slim['nodes']):
         for key, value in old['data'].items():
             if key in {'okf_metadata', 'metadata_html', 'generated_at', 'body_chars', 'color', 'graph_cluster', 'source_system'}:
@@ -48,7 +63,7 @@ def test_compact_relations_preserve_every_read_field_and_primary_identity(graph_
         assert new['relations'][new['primary_relation_index']]['id'] == old['primary_relation']['id']
         assert new['source'] == old['source'] and new['target'] == old['target']
         assert new['relations'] == [{key: value for key, value in relation.items()
-                                    if key in {'id', 'label', 'type', 'kind', 'detail'}}
+                                    if key in {'id', 'label', 'type', 'kind', 'detail', 'origin', 'source_id'}}
                                    for relation in old['relations']]
     assert len(canonical_json_bytes(slim)) < len(canonical_json_bytes(full))
 

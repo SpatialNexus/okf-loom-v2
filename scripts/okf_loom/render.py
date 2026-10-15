@@ -2372,7 +2372,7 @@ def build_graph_data(
             del data["multiplicity"]  # exactly len(relations), restored by the client
             data["relations"] = [
                 {key: value for key, value in relation.items()
-                 if key in ("id", "label", "type", "kind", "detail")}
+                 if key in ("id", "label", "type", "kind", "detail", "origin", "source_id")}
                 for relation in data["relations"]
             ]
 

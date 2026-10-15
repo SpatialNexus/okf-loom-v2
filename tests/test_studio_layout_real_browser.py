@@ -349,7 +349,7 @@ def test_split_is_admitted_by_workspace_width_and_returns_with_the_room(layout_b
     assert not page.console_errors, page.console_errors
 
 
-# --- Reading Focus workspace + persistent document view controls ----------
+# --- Reading Focus workspace + scroll-aware document view controls --------
 
 BAR_STACK = """() => {
   const rect = (sel) => { const n = document.querySelector(sel); if (!n || !n.getClientRects().length) return null;
@@ -371,6 +371,51 @@ BAR_STACK = """() => {
     overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
   };
 }"""
+
+
+def _assert_view_controls_hit(page):
+    """Every painted view control must receive pointer input, not just exist."""
+    controls = page.locator(".okf-concept-viewbar .okf-viewswitch__btn")
+    assert controls.count() >= 5
+    for control in controls.all():
+        if not control.is_visible():
+            continue  # Wrap is absent in Rendered; it is checked again in Source.
+        assert control.evaluate("""node => {
+          const r = node.getBoundingClientRect();
+          const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          return r.top >= 0 && r.bottom <= innerHeight && !!hit && node.contains(hit);
+        }"""), control.inner_text()
+
+
+def _reveal_phone_viewbar_after_scroll(page):
+    """Down hides the tabs by transform; a small upward scroll reveals them."""
+    page.wait_for_function("() => document.documentElement.dataset.okfChrome === 'compact'")
+    page.wait_for_function("""() => !document.getAnimations().some(a =>
+      a.transitionProperty === 'transform' && a.playState === 'running')""")
+    hidden = page.evaluate("""() => {
+      const bar = document.querySelector('.okf-concept-viewbar');
+      const tabs = bar.querySelector('.okf-viewswitch');
+      const jump = bar.querySelector('.okf-outline-jump');
+      const top = document.querySelector('.okf-topbar');
+      return {shift: new DOMMatrixReadOnly(getComputedStyle(bar).transform).m42,
+        tabsBottom: tabs.getBoundingClientRect().bottom,
+        topBottom: top.getClientRects().length ? top.getBoundingClientRect().bottom : 0,
+        jumpTop: jump && jump.getClientRects().length ? jump.getBoundingClientRect().top : null};
+    }""")
+    assert hidden["shift"] < 0 and hidden["tabsBottom"] <= 1 and hidden["topBottom"] <= 1, hidden
+    if hidden["jumpTop"] is not None:
+        assert 0 <= hidden["jumpTop"] <= 8, hidden  # Only Sections stays pinned.
+    page.evaluate("() => scrollBy(0, -50)")
+    page.wait_for_function("() => document.documentElement.dataset.okfChrome === 'revealed'")
+    page.wait_for_function("""() => !document.getAnimations().some(a =>
+      a.transitionProperty === 'transform' && a.playState === 'running')""")
+    g = page.evaluate(BAR_STACK)
+    if g["topbar"] is None:  # Reading Focus has no top bar.
+        assert g["bar"]["y"] == 0, g
+    else:
+        assert g["topbar"]["y"] == 0, g
+        assert abs(g["bar"]["y"] - g["topbar"]["bottom"]) <= 1, g
+    _assert_view_controls_hit(page)
 
 
 @pytest.mark.parametrize("width", [1600, 1920])
@@ -574,8 +619,8 @@ def test_headingless_concept_publishes_chrome_geometry_and_keeps_toolbar_operabl
     a live patch without a reload), and the measured sticky-chrome variables
     (--okf-viewbar-top/-h) must still be published — with only the nominal
     token fallback, a wrapped shell paints over the pinned viewbar. Prove the
-    geometry, then prove the controls with real clicks at a deep scroll, in
-    Focus and after exiting it."""
+    geometry, then prove the phone tabs scroll away and return on scroll-up,
+    with real clicks at a deep scroll, in Focus and after exiting it."""
     page = _open(browser, headingless_base, "plain", 390, 844)
     assert page.evaluate("""() => {
         const host = document.querySelector('[data-okf-document-outline]');
@@ -590,17 +635,24 @@ def test_headingless_concept_publishes_chrome_geometry_and_keeps_toolbar_operabl
 
     page.evaluate("() => scrollTo(0, document.documentElement.scrollHeight)")
     page.wait_for_timeout(150)
+    _reveal_phone_viewbar_after_scroll(page)
     g = page.evaluate(BAR_STACK)
-    assert g["bar"]["y"] >= g["topbar"]["bottom"] - 1, f"viewbar pinned under the wrapped shell: {g}"
+    assert g["bar"]["y"] >= g["topbar"]["bottom"] - 1, f"revealed viewbar pinned under the wrapped shell: {g}"
     assert g["bar"]["bottom"] <= g["viewport"]["h"], f"viewbar scrolled out of the viewport: {g}"
     assert abs(g["bar"]["y"] - float(g["viewbarTopVar"].replace("px", ""))) <= 1, g
     assert abs(float(g["viewbarHVar"].replace("px", "")) - g["bar"]["h"]) <= 1, g
 
-    # Real clicks on the pinned bar at the deepest scroll position.
+    # Real clicks on the revealed bar while still deep in the document.
+    # Split is aria-disabled at this width but still explains a real pointer press.
+    split = page.locator('.okf-viewswitch__btn[data-mode="split"]').bounding_box()
+    page.mouse.click(split["x"] + split["width"] / 2, split["y"] + split["height"] / 2)
+    expect(page.locator("#okf-annotation-status")).to_contain_text("Split needs a wider workspace")
+    assert page.evaluate(BAR_STACK)["mode"] == "rendered"
     page.locator('.okf-viewswitch__btn[data-mode="source"]').click()
     page.wait_for_function("() => document.querySelector('.okf-view').dataset.okfView === 'source'")
     wrap = page.get_by_role("button", name="Wrap lines")
     expect(wrap).to_be_visible()
+    _assert_view_controls_hit(page)
     wrap.click()
     expect(wrap).to_have_attribute("aria-pressed", "false")
 
@@ -629,14 +681,15 @@ def test_headingless_concept_publishes_chrome_geometry_and_keeps_toolbar_operabl
 
 @pytest.mark.parametrize("width", [1600, 390])
 def test_view_controls_stay_visible_and_operable_while_scrolled(layout_base, browser, width):
-    """The Rendered/Source/Split/Wrap/Focus toolbar must persist — visibly in
-    the viewport and really clickable — at any scroll depth, in normal view
-    (stacked below the measured sticky shell) and in Reading Focus (pinned at
-    the very top with the shell hidden)."""
+    """Desktop keeps the toolbar pinned; phone tabs hide on scroll-down and
+    return on scroll-up. Once revealed every control is really clickable at
+    depth, below the measured shell or at the top in Reading Focus."""
     page = _open(browser, layout_base, "rich", width, 900)
     page.wait_for_timeout(250)
     page.evaluate("() => scrollTo(0, document.documentElement.scrollHeight)")
     page.wait_for_timeout(150)
+    if width <= 640:
+        _reveal_phone_viewbar_after_scroll(page)
     g = page.evaluate(BAR_STACK)
     assert g["bar"], g
     assert g["bar"]["y"] >= 0 and g["bar"]["bottom"] <= g["viewport"]["h"], \
@@ -645,14 +698,29 @@ def test_view_controls_stay_visible_and_operable_while_scrolled(layout_base, bro
     assert abs(g["bar"]["y"] - float(g["viewbarTopVar"].replace("px", ""))) <= 1, g
     assert abs(float(g["viewbarHVar"].replace("px", "")) - g["bar"]["h"]) <= 1, g
 
-    # A real Playwright click (visibility + actionability required) proves the
-    # pinned controls are operable, not merely present in the DOM.
+    # Hit-testing plus real Playwright clicks prove the pinned/revealed controls
+    # are operable, not merely present in the DOM.
+    _assert_view_controls_hit(page)
     if width >= 900:
         page.locator('.okf-viewswitch__btn[data-mode="split"]').click()
         page.wait_for_function("() => document.querySelector('.okf-view').dataset.okfView === 'split'")
         wrap = page.get_by_role("button", name="Wrap lines")
         expect(wrap).to_be_visible()
     else:
+        # aria-disabled Split still explains a real pointer press, without a forced click.
+        split = page.locator('.okf-viewswitch__btn[data-mode="split"]').bounding_box()
+        page.mouse.click(split["x"] + split["width"] / 2, split["y"] + split["height"] / 2)
+        expect(page.locator("#okf-annotation-status")).to_contain_text("Split needs a wider workspace")
+        assert page.evaluate(BAR_STACK)["mode"] == "rendered"
+        page.locator('.okf-viewswitch__btn[data-mode="source"]').click()
+        page.wait_for_function("() => document.querySelector('.okf-view').dataset.okfView === 'source'")
+        _assert_view_controls_hit(page)
+        wrap = page.get_by_role("button", name="Wrap lines")
+        expect(wrap).to_be_visible()
+        wrap.click()
+        expect(wrap).to_have_attribute("aria-pressed", "false")
+        page.locator('.okf-viewswitch__btn[data-mode="rendered"]').click()
+        page.wait_for_function("() => document.querySelector('.okf-view').dataset.okfView === 'rendered'")
         page.locator('.okf-viewswitch__btn[data-mode="source"]').click()
         page.wait_for_function("() => document.querySelector('.okf-view').dataset.okfView === 'source'")
 
@@ -665,6 +733,8 @@ def test_view_controls_stay_visible_and_operable_while_scrolled(layout_base, bro
 
     page.evaluate("() => scrollTo(0, Math.round(document.documentElement.scrollHeight / 2))")
     page.wait_for_timeout(150)
+    if width <= 640:
+        _reveal_phone_viewbar_after_scroll(page)
     g = page.evaluate(BAR_STACK)
     assert g["bar"]["y"] == 0 and g["bar"]["bottom"] <= g["viewport"]["h"], \
         f"viewbar did not stay pinned mid-scroll in focus: {g}"
