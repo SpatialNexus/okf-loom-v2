@@ -1210,7 +1210,8 @@ Key routes:
 | `GET /__search` | Read-only six-mode HTML search or compatibility JSON array over one bundle snapshot. |
 | `GET /__search-form` | Native-form normalization and 303 redirect to strict search; no retrieval or mutation. |
 | `GET /__context` | Read-only deterministic schema-v1 context pack as JSON or Markdown over one bundle snapshot. |
-| `GET /__data/graph.json[?view=structure]` | Read-only graph projection; `view=structure` omits `bodies` and `documents` only. Strong final-byte ETag, `Cache-Control: no-cache`, and `If-None-Match`/304 revalidation; metadata freshness and comment counts participate in the validator independently of bundle revision. The projection is identical across local and public read-only ingress; no authority is encoded. |
+| `GET /__data/graph.json[?view=structure]` | Read-only graph projection; the full/tool view retains bodies/documents and its 4 MiB cap. `view=structure` selects the compact schema-1 live client contract described below, with a separate 16 MiB cap (`413` on refusal). Strong final-byte ETag, `Cache-Control: private, no-cache`, and `If-None-Match`/304 revalidation; metadata freshness and comment counts participate independently of bundle revision. Local and public read-only ingress receive identical data; no authority is encoded. |
+| `GET /__data/graph-body?id=<concept_id>&revision=<bundle_revision>` | Read-only, serve-only selected body and advisory HTML: `{id,bundle_revision,html,metadata_html}`. Exactly one `id` and `revision`, no other parameters (`400` otherwise); invalid/missing concept `404`, stale revision `409`. Uses one loaded generation and bounded retrieval work: 4 MiB cap (`413`), capacity/deadline `503`. `Cache-Control: private, no-cache`; rendering/admission failures use `no-store`. Identical local/public visibility; portable viewers retain inline bodies. |
 | `GET /__data/doc?id=<concept_id>` | One concept's `{rev, html, raw, frontmatter, backlinks, outgoing, headings}` for in-place patching. |
 | `GET /__data/page?document=<path.md>` | Schema-1 canonical Markdown page read: document, nullable concept, document_content_rev, raw, html, page anchor; no guessed projection. |
 | `GET /__data/events?since=&limit=&actor=&concept=&order=` | Filtered change-list read over `events.jsonl`. |
@@ -1227,6 +1228,29 @@ Key routes:
 | `POST /__undo` | Single or group undo. |
 | `POST /__preview` | Render capped in-flight Markdown. |
 | `POST /__tunnel` | Server admin: attach/detach/status a quick tunnel at runtime (`action: start\|stop\|status`; start-only `allow_public_edit: boolean`, default `false`). Exempt from `--no-edit` for read-only sharing, but public-edit start is rejected for a no-edit studio; never exempt from the token + Origin/Host guard. |
+
+The compact `view=structure` graph contract carries `structure_schema:1` and
+omits rendered `bodies`, `documents`, and advisory metadata HTML. It retains only
+graph/Studio fields; empty/zero defaults may be absent, except an available zero
+`active_comment_count` remains explicit. Grouping appears in `metadata`, not
+also in top-level node keys. Edge relation members retain `id`, `label`, `type`,
+`kind`, and optional `detail`; source/target and outgoing direction are inherited
+from the edge, multiplicity is the relation-list length, and
+`primary_relation_index` references the primary member rather than duplicating
+it. `document_paths` identifies reserved reading destinations without HTML.
+Graph.js expands this transport before ordinary validation. Unknown or repeated
+`view` values are `400`; unrelated query parameters are ignored. Certainly
+oversized structures are refused before rendering/encoding, then exact UTF-8
+bytes enforce the 16 MiB cap: refusals are cached, return `413` with a readable
+`response_too_large` message, and send `Cache-Control: no-store`.
+
+Graph-body HTML is the full graph's escaped, heading-demoted, source-footnoted,
+link-normalized projection, with graph advisory metadata, not concept-page
+plugins or annotation projections. Clients discard late bodies across selections,
+accepted graph updates, pagehide and BFCache restoration; capture readiness
+waits for the selected body. A stale body revision triggers one structure refresh
+and one retry even when live push is disabled; further failure is readable and
+retryable. See [HTTP routes](/reference/http_routes.md) for the detailed contracts.
 
 Bundle-local media serving is contract-bound: only an allowlisted media
 extension routes to the file handler; the file must be reachable by the §5
