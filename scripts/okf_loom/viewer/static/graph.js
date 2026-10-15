@@ -963,10 +963,10 @@
       function startGraphBody(job) {
         bodyActive++;
         var controller = new AbortController(); bodyControllers.add(controller);
-        var timer = setTimeout(function () { controller.abort(); }, 10000);
+        var timer = setTimeout(function () { controller.abort(); }, Number((window.OKF_LOOM_TEST_DEADLINES || {}).graphBody || 10000));
         fetch("/__data/graph-body?id=" + encodeURIComponent(job.id) + "&revision=" + encodeURIComponent(job.revision),
           { signal: controller.signal, cache: "no-cache", headers: { Accept: "application/json" } })
-          .then(function (response) { if (!response.ok) { var error = new Error("Concept body unavailable (HTTP " + response.status + ")."); error.status = response.status; throw error; } return response.json(); })
+          .then(function (response) { if (!response.ok) { var error = new Error("Concept body unavailable."); error.status = response.status; throw error; } return response.json(); })
           .then(function (doc) {
             if (controller.signal.aborted || job.epoch !== bodyEpoch) throw new DOMException("Superseded", "AbortError");
             if (!doc || doc.id !== job.id || doc.bundle_revision !== job.revision || typeof doc.html !== "string" || typeof doc.metadata_html !== "string") throw new Error("Concept body revision is invalid.");
@@ -5022,15 +5022,38 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
         // Existing progressive renderers also see lazily loaded bodies.
         try { window.dispatchEvent(new Event("okf-loom:bodyPatched")); } catch (e) {}
       }
+      function graphBodyErrorMessage(error) {
+        if (error.status === 409) return "This bundle changed while the concept was loading. Try again to load the latest version.";
+        if (error.status === 413) return "This concept is too large to display here. Open its page to read it.";
+        if (error.status === 503) return "The server is busy or took too long to load this concept. Try again.";
+        if (error.name === "AbortError" || error.name === "TimeoutError") return "Loading this concept took too long or was interrupted. Try again.";
+        if (error instanceof TypeError) return "Could not reach the server to load this concept. Check your connection and try again.";
+        return "This concept could not be loaded. Try again.";
+      }
       function showSelectedBody(conceptId, bodyEl, metadataSlot, retriedRevision) {
         if (!bodyEl || !metadataSlot) return;
         if (LIVE_GRAPH && !bundle.bodies) {
           var owner = selectionGeneration, epoch = bodyEpoch;
+          var bodyStatus = document.getElementById("detail-body-status");
+          if (!bodyStatus) {
+            bodyStatus = document.createElement("div"); bodyStatus.id = "detail-body-status";
+            bodyStatus.setAttribute("role", "status"); bodyEl.before(bodyStatus);
+          }
+          bodyStatus.textContent = "";
           function stillSelected() { return graphPageActive && epoch === bodyEpoch && owner === selectionGeneration && selectedConceptId === conceptId; }
           function showBodyError(error) {
             if (!stillSelected()) return;
-            detailBodyPending = false; detailBodyError = String(error.message || error);
-            bodyEl.removeAttribute("aria-busy"); bodyEl.textContent = detailBodyError;
+            detailBodyPending = false; detailBodyError = graphBodyErrorMessage(error);
+            bodyEl.removeAttribute("aria-busy"); bodyEl.textContent = "";
+            var message = document.createElement("p"); message.textContent = detailBodyError;
+            var retry = document.createElement("button"); retry.type = "button";
+            retry.className = "okf-btn okf-detail-body-retry"; retry.textContent = "Retry";
+            retry.addEventListener("click", function () {
+              if (!stillSelected()) return;
+              showSelectedBody(conceptId, bodyEl, metadataSlot);
+              bodyEl.tabIndex = -1; bodyEl.focus({ preventScroll: true });
+            });
+            bodyStatus.replaceChildren(message, retry);
           }
           detailBodyPending = true; detailBodyError = null;
           bodyEl.textContent = "Loading concept…"; bodyEl.setAttribute("aria-busy", "true");

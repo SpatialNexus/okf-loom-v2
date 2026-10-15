@@ -129,3 +129,71 @@ def test_body_queue_is_bounded_latest_wins_and_pagehide_fences_ignored_abort(tmp
         page.evaluate("window.releaseBody(4,'restored body')")
         assert capture(page)['screenshotAllowed']
         assert page.locator('#detail-body').inner_text() == 'restored body'
+
+
+@pytest.mark.parametrize('failure, message', [
+    ('409', 'This bundle changed while the concept was loading. Try again to load the latest version.'),
+    ('413', 'This concept is too large to display here. Open its page to read it.'),
+    ('503', 'The server is busy or took too long to load this concept. Try again.'),
+    ('network', 'Could not reach the server to load this concept. Check your connection and try again.'),
+    ('abort', 'Loading this concept took too long or was interrupted. Try again.'),
+    ('timeout', 'Loading this concept took too long or was interrupted. Try again.'),
+])
+def test_body_errors_are_readable_announced_and_keyboard_retryable(tmp_path, page, monkeypatch, failure, message):
+    generated_bundle(tmp_path, 2, write=True)
+    monkeypatch.setattr('browser_support.free_port', lambda: 9070)
+    # A touch-enabled desktop viewport exercises the coarse-pointer target
+    # without the unrelated compact-pane navigation changing the keyboard path.
+    context = page.context.browser.new_context(has_touch=True, viewport={'width': 1280, 'height': 900})
+    pg = context.new_page()
+    try:
+        pg.add_init_script('window.bodyFailure = ' + json.dumps(failure))
+        pg.add_init_script("""(() => {
+          const native = window.fetch.bind(window); window.bodyAttempts = 0;
+          window.OKF_LOOM_TEST_DEADLINES = {graphBody: 80};
+          window.fetch = (url, options) => {
+            if (!String(url).startsWith('/__data/graph-body?')) return native(url, options);
+            window.bodyAttempts++;
+            if (window.bodyFailure === 'network') return Promise.reject(new TypeError('Failed to fetch'));
+            if (window.bodyFailure === 'abort') return Promise.reject(new DOMException('raw abort text', 'AbortError'));
+            if (window.bodyFailure === 'timeout') return new Promise((resolve, reject) => {
+              options.signal.addEventListener('abort', () => reject(new DOMException('raw timeout text', 'AbortError')));
+            });
+            if (window.bodyFailure !== 'none') return Promise.resolve(new Response('{}', {status:Number(window.bodyFailure)}));
+            return native(url, options);
+          };
+        })();""")
+        with live_server(tmp_path, '--no-watch-ui') as base:
+            pg.goto(base + '/__graph', wait_until='load')
+            assert capture(pg)['screenshotAllowed']
+            if pg.locator('.okf-graph-tour__skip').is_visible():
+                pg.locator('.okf-graph-tour__skip').click()
+            select(pg, 'node-00000')
+            status = pg.locator('#detail-body-status[role="status"]')
+            pg.wait_for_function("() => !!document.querySelector('#detail-body-status button')")
+            assert status.locator('p').inner_text() == message
+            assert 'HTTP' not in status.inner_text()
+            assert not pg.locator('#detail-body').get_attribute('aria-busy')
+            assert pg.evaluate('window.bodyAttempts') == (2 if failure == '409' else 1)
+            result = pg.evaluate("""async () => await window.okfCaptureReadiness.start({target:'graph'}).promise
+                .catch(error => ({code:error.code}))""")
+            assert result == {'code': 'network-failure'}, result
+            assert pg.evaluate('window.okfGraphCaptureState().terminalPhase') == 'graph-body'
+            retry = status.get_by_role('button', name='Retry', exact=True)
+            assert retry.evaluate("el => el.classList.contains('okf-btn') && el.tabIndex === 0")
+            assert pg.evaluate("matchMedia('(pointer: coarse)').matches")
+            bounds = retry.bounding_box()
+            assert bounds['width'] >= 44 and bounds['height'] >= 44, bounds
+            # Reach the control in native sequential focus order, then activate
+            # it with the keyboard, not a synthetic click handler invocation.
+            retry.focus()
+            pg.keyboard.press('Shift+Tab')
+            pg.keyboard.press('Tab')
+            assert retry.evaluate('el => el === document.activeElement')
+            pg.evaluate("window.bodyFailure = 'none'; window.OKF_LOOM_TEST_DEADLINES.graphBody = 10000")
+            pg.keyboard.press('Enter')
+            pg.wait_for_function("() => document.querySelector('#detail-body h2')?.textContent === 'Detail'")
+            assert status.inner_text() == ''
+            assert capture(pg)['screenshotAllowed']
+    finally:
+        context.close()
