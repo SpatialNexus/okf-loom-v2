@@ -353,7 +353,7 @@ def test_managed_tree_changes_deny_without_writes(
 
 def test_socket_denies_as_special(tiny_good_bundle, capsys, monkeypatch):
     # AF_UNIX paths are short; pytest's tmp_path may be too deep to bind.
-    root = Path(tempfile.mkdtemp(prefix="okf-x7-", dir="/tmp"))
+    root = Path(tempfile.mkdtemp(prefix="okf-x7-"))
     sock = socket.socket(socket.AF_UNIX)
     try:
         site = root / "site"

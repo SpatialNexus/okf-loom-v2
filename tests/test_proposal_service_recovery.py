@@ -130,6 +130,7 @@ def _same_key_worker(path: str, start, results, key: str = "S" * 32) -> None:
         results.put((exc.code, None, None))
 
 
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_service_02_supersede_uniqueness(tmp_path: Path) -> None:
     root = tmp_path / "race"; root.mkdir(mode=0o700); os.chmod(root, 0o700)
     repository = ProposalRepositoryV1.bootstrap(_adapter(root), clock=Clock(), entropy=SystemEntropy())
@@ -152,6 +153,7 @@ def test_service_02_supersede_uniqueness(tmp_path: Path) -> None:
     assert sorted(revisions) == [1, 2]
 
 
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_service_06_reconcile_precedence(tmp_path: Path) -> None:
     root = tmp_path / "same-key"; root.mkdir(mode=0o700); os.chmod(root, 0o700)
     # Establish repository root before workers race its mutation protocol.
@@ -169,6 +171,7 @@ def test_service_06_reconcile_precedence(tmp_path: Path) -> None:
     assert len([w for w in reopened.snapshot().aggregate("proposals") if w.kind == "proposal"]) == 1
 
 
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_concurrent_unrelated_creates_keep_proposal_specific_tokens(tmp_path: Path) -> None:
     root = tmp_path / "unrelated"; root.mkdir(mode=0o700); os.chmod(root, 0o700)
     ProposalRepositoryV1.bootstrap(_adapter(root), clock=Clock(), entropy=SystemEntropy())
@@ -300,6 +303,7 @@ def _race_mutation_worker(path: str, start, results, operation: str,
         results.put((exc.code, None))
 
 
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_cross_process_decisions_on_different_ops_are_cas_serialized(tmp_path: Path) -> None:
     root = tmp_path / "decision-race"; root.mkdir(mode=0o700); os.chmod(root, 0o700)
     repository = ProposalRepositoryV1.bootstrap(_adapter(root), clock=Clock(), entropy=SystemEntropy())
@@ -328,6 +332,7 @@ def test_cross_process_decisions_on_different_ops_are_cas_serialized(tmp_path: P
         item[1] for item in observed if item[0] == "ok")
 
 
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_cross_process_decision_vs_withdraw_has_one_authoritative_winner(tmp_path: Path) -> None:
     root = tmp_path / "decision-withdraw"; root.mkdir(mode=0o700); os.chmod(root, 0o700)
     capture, proposal_id, token = _base_for_mutation(root)
@@ -349,6 +354,7 @@ def test_cross_process_decision_vs_withdraw_has_one_authoritative_winner(tmp_pat
 
 
 @pytest.mark.parametrize("operation", ["decision", "withdraw"])
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_service_real_lock_contention_deadline_has_no_late_admission(
         operation: str, tmp_path: Path) -> None:
     root = tmp_path / operation; root.mkdir(mode=0o700); os.chmod(root, 0o700)

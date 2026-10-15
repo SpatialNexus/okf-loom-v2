@@ -191,21 +191,38 @@ def test_failed_recapture_preserves_existing_destination(tmp_path, failure):
     assert_no_capture_tmp(tmp_path)
 
 
-def test_prepare_hang_obeys_total_deadline_and_aborts(tmp_path, monkeypatch):
+@pytest.fixture
+def preclaimed_destination(tmp_path, monkeypatch):
+    """Phase-deadline proofs must not spend their 25ms on disk fsync setup.
+
+    Allocate the real ownership token before measuring the injected phase hang.
+    Publication/destination sequencing has separate real-disk/process proofs.
+    The capture budget and real signal deadline remain unchanged.
+    """
+    out = tmp_path / "x.png"
+    claim = capture._claim_destination(out)
+    def already_claimed(path):
+        assert path == out
+        return claim
+    monkeypatch.setattr(capture, "_claim_destination", already_claimed)
+    return out
+
+
+def test_prepare_hang_obeys_total_deadline_and_aborts(tmp_path, monkeypatch, preclaimed_destination):
     monkeypatch.setattr(capture, "_CAPTURE_BUDGET_MS", 25)
     page = FakePage()
     with pytest.raises(capture.CaptureFailure) as caught:
-        capture.capture_target(page, "http://viewer/", "document", tmp_path / "x.png",
+        capture.capture_target(page, "http://viewer/", "document", preclaimed_destination,
                                prepare=lambda _page: time.sleep(1))
     assert caught.value.diagnostic["phase"] == "prepare"
     assert caught.value.diagnostic["code"] == "timeout"
     assert page.abort_calls == 1
 
 
-def test_frozen_raf_obeys_deadline_and_leaves_no_temp(tmp_path, monkeypatch):
+def test_frozen_raf_obeys_deadline_and_leaves_no_temp(tmp_path, monkeypatch, preclaimed_destination):
     monkeypatch.setattr(capture, "_CAPTURE_BUDGET_MS", 25)
     page = FakePage(evaluate_hang="requestAnimationFrame")
-    out = tmp_path / "x.png"
+    out = preclaimed_destination
     with pytest.raises(capture.CaptureFailure) as caught:
         capture.capture_target(page, "http://viewer/", "document", out)
     assert caught.value.diagnostic["phase"] == "paint-boundary"
@@ -214,11 +231,11 @@ def test_frozen_raf_obeys_deadline_and_leaves_no_temp(tmp_path, monkeypatch):
     assert_no_capture_tmp(tmp_path)
 
 
-def test_late_readiness_is_aborted_by_consumer_deadline(tmp_path, monkeypatch):
+def test_late_readiness_is_aborted_by_consumer_deadline(tmp_path, monkeypatch, preclaimed_destination):
     monkeypatch.setattr(capture, "_CAPTURE_BUDGET_MS", 25)
     page = FakePage(evaluate_hang="okfCaptureReadiness.start")
     with pytest.raises(capture.CaptureFailure) as caught:
-        capture.capture_target(page, "http://viewer/", "document", tmp_path / "x.png")
+        capture.capture_target(page, "http://viewer/", "document", preclaimed_destination)
     assert caught.value.diagnostic["phase"] == "readiness"
     assert page.abort_calls == 1
     assert "options.signal = controller.signal" in page.readiness_script

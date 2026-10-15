@@ -73,6 +73,7 @@ def test_mig_07_cli(tmp_path: Path) -> None:
     assert not (bundle / ".okf-loom/session/proposal-review-v1").exists()
 
 
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_mig_11_cli_direct_compatibility(tmp_path: Path) -> None:
     """Every direct writer family is byte/CLI/lock compatible after activation."""
     executable = str(Path(__file__).parents[1] / "scripts/okf-loom")

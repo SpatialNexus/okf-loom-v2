@@ -398,6 +398,7 @@ def _process_initialize(session: str, ready, release, result) -> None:
         result.put(f"error:{type(exc).__name__}:{exc}")
 
 
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_process_and_thread_initializers_serialize_on_canonical_lock(tmp_path: Path) -> None:
     session = tmp_path / "session"
     session.mkdir()
