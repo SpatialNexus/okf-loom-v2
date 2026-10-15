@@ -3245,7 +3245,7 @@ def test_cytoscape_unavailable_exposes_only_working_fallback_actions(static_url:
 def test_empty_graph_is_semantically_settled_without_layout_generation(static_url: str, page) -> None:
     """An authoritative empty graph is ready; zero layout generation is not a timeout."""
     page.route(
-        "**/__data/graph.json",
+        "**/__data/graph.json*",
         lambda route: route.fulfill(
             status=200,
             content_type="application/json",
@@ -3789,7 +3789,7 @@ def test_graph_refresh_empty_transition_capture_truth(server_url: str, page) -> 
     result = page.evaluate("""async () => {
       const graph=document.getElementById('okf-graph'),url=graph.dataset.graphUrl,native=window.fetch.bind(window),base=await native(url).then(r=>r.json());
       let current={...base,bundle_revision:'empty-refresh',nodes:[],edges:[],outgoing:{},backlinks:{},bodies:{}};
-      window.fetch=(request,options)=>String(request)===url?Promise.resolve(new Response(JSON.stringify(current),{status:200,headers:{'Content-Type':'application/json'}})):native(request,options);
+      window.fetch=(request,options)=>String(request).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(current),{status:200,headers:{'Content-Type':'application/json'}})):native(request,options);
       await window.__okfLoomGraph.refreshGraph();
       const empty=window.okfGraphCaptureState();
       const emptyReady=await window.okfCaptureReadiness.start({target:'graph',expectedRevision:'empty-refresh'}).promise;
@@ -3826,7 +3826,7 @@ def test_graph_live_delta_preserves_camera_and_animates_owned_add_remove(server_
       const G=window.__okfLoomGraph,cy=G.cy,graph=document.getElementById('okf-graph'),url=graph.dataset.graphUrl,native=window.fetch.bind(window),base=await native(url).then(r=>r.json());
       cy.pan({x:37,y:-19});cy.zoom(.73);const before={pan:cy.pan(),zoom:cy.zoom(),layouts:G.layoutStats.starts};
       const anchor=base.nodes[0].data.id,id='live-delta-owned',baseOutgoing=base.outgoing||{},baseBacklinks=base.backlinks||{};let current={...base,bundle_revision:'live-add',nodes:[...base.nodes,{data:{id,label:'Live delta',type:'concept'}}],edges:[...base.edges,{data:{source:anchor,target:id,label:'links'}}],outgoing:{...baseOutgoing,[anchor]:[...(baseOutgoing[anchor]||[]),id]},backlinks:{...baseBacklinks,[id]:[anchor]}};
-      window.fetch=(request,options)=>String(request)===url?Promise.resolve(new Response(JSON.stringify(current),{status:200,headers:{'Content-Type':'application/json'}})):native(request,options);
+      window.fetch=(request,options)=>String(request).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(current),{status:200,headers:{'Content-Type':'application/json'}})):native(request,options);
       await G.refreshGraph();const added=cy.getElementById(id),duringAdd={opacity:Number(added.style('opacity')),width:Number(added.style('width')),pending:window.okfGraphCaptureState().transitionPending};
       await new Promise(resolve=>{const check=()=>!window.okfGraphCaptureState().transitionPending?resolve():requestAnimationFrame(check);check();});
       current={...base,bundle_revision:'live-remove'};await G.refreshGraph();const existsDuringExit=cy.getElementById(id).length===1;
@@ -3852,7 +3852,7 @@ def test_graph_explicit_layout_motion_and_refresh_deadline(server_url: str, page
     assert options["animate"] == "end" and options["animationDuration"] == 400
     deadline = page.evaluate("""async () => {
       const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,before=G.refreshStats.applied,native=window.fetch.bind(window);
-      window.fetch=(request,options)=>String(request)===url?new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(new DOMException('Aborted','AbortError')),{once:true})):native(request,options);
+      window.fetch=(request,options)=>String(request).split('?')[0]===url?new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(new DOMException('Aborted','AbortError')),{once:true})):native(request,options);
       await G.refreshGraph();return {before,after:G.refreshStats.applied,timedOut:G.refreshStats.timedOut,error:document.body.dataset.okfGraphRefreshError};
     }""")
     assert deadline == {"before": deadline["before"], "after": deadline["before"], "timedOut": 1, "error": "graph-refresh-timeout"}
@@ -3865,7 +3865,7 @@ def test_graph_reduced_motion_makes_explicit_layout_and_delta_instant(server_url
     result = page.evaluate("""async () => {
       const G=window.__okfLoomGraph,cy=G.cy,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),base=await native(url).then(r=>r.json());let opts;
       cy.layout=o=>{opts=o;const hs=[];return {on(n,f){if(n==='layoutstop')hs.push(f);return this;},run(){hs.forEach(f=>f());},stop(){}}};document.querySelector('.okf-graph-layout-settings button[aria-label="Re-run layout"]').click();
-      const id='reduced-delta',fresh={...base,bundle_revision:'reduced',nodes:[...base.nodes,{data:{id,label:'Reduced',type:'concept'}}]};window.fetch=(r,o)=>String(r)===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(r,o);await G.refreshGraph();
+      const id='reduced-delta',fresh={...base,bundle_revision:'reduced',nodes:[...base.nodes,{data:{id,label:'Reduced',type:'concept'}}]};window.fetch=(r,o)=>String(r).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(r,o);await G.refreshGraph();
       return {animate:opts.animate,opacity:Number(cy.getElementById(id).style('opacity')),settled:window.okfGraphCaptureState().layoutSettled};
     }""")
     assert result["animate"] is False and result["settled"] is True
@@ -3877,7 +3877,7 @@ def test_graph_transition_then_failed_refresh_settles_current_readiness(server_u
     _open_graph(page, server_url)
     result = page.evaluate("""async () => {
       const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),base=await native(url).then(r=>r.json()),id='readiness-race';
-      let mode='add',rejectB;window.fetch=(r,o)=>String(r)!==url?native(r,o):mode==='add'?Promise.resolve(new Response(JSON.stringify({...base,bundle_revision:'race-a',nodes:[...base.nodes,{data:{id,label:'Race',type:'concept'}}]}),{status:200,headers:{'Content-Type':'application/json'}})):new Promise((resolve,reject)=>rejectB=reject);
+      let mode='add',rejectB;window.fetch=(r,o)=>String(r).split('?')[0]!==url?native(r,o):mode==='add'?Promise.resolve(new Response(JSON.stringify({...base,bundle_revision:'race-a',nodes:[...base.nodes,{data:{id,label:'Race',type:'concept'}}]}),{status:200,headers:{'Content-Type':'application/json'}})):new Promise((resolve,reject)=>rejectB=reject);
       await G.refreshGraph();mode='fail';const failed=G.refreshGraph();
       await new Promise(resolve=>{const check=()=>!window.okfGraphCaptureState().transitionPending?resolve():requestAnimationFrame(check);check();});
       const whileFailed=document.body.dataset.okfGraphCaptureReady;rejectB(new TypeError('network failed'));await failed;
@@ -3891,7 +3891,7 @@ def test_graph_deadline_classifies_ignored_abort_and_fences_late_completion(serv
     _open_graph(page, server_url)
     result = page.evaluate("""async () => {
       const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),base=await native(url).then(r=>r.json());let release;
-      window.fetch=(r,o)=>String(r)===url?new Promise(resolve=>release=()=>resolve(new Response(JSON.stringify({...base,bundle_revision:'must-not-land',nodes:[...base.nodes,{data:{id:'late-ignored-abort',label:'Late',type:'concept'}}]}),{status:200,headers:{'Content-Type':'application/json'}}))):native(r,o);
+      window.fetch=(r,o)=>String(r).split('?')[0]===url?new Promise(resolve=>release=()=>resolve(new Response(JSON.stringify({...base,bundle_revision:'must-not-land',nodes:[...base.nodes,{data:{id:'late-ignored-abort',label:'Late',type:'concept'}}]}),{status:200,headers:{'Content-Type':'application/json'}}))):native(r,o);
       const pending=G.refreshGraph();await new Promise(resolve=>{const check=()=>G.refreshStats.timedOut?resolve():requestAnimationFrame(check);check();});const atDeadline={error:document.body.dataset.okfGraphRefreshError,timedOut:G.refreshStats.timedOut};release();await pending;
       return {atDeadline,late:G.cy.getElementById('late-ignored-abort').length,revision:document.body.dataset.okfRevision};
     }""")
@@ -3903,7 +3903,7 @@ def test_graph_same_id_transition_supersession_and_pagehide_cleanup(server_url: 
     _open_graph(page, server_url)
     result = page.evaluate("""async () => {
       const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),base=await native(url).then(r=>r.json()),id='same-id';let current;
-      window.fetch=(r,o)=>String(r)===url?Promise.resolve(new Response(JSON.stringify(current),{status:200,headers:{'Content-Type':'application/json'}})):native(r,o);
+      window.fetch=(r,o)=>String(r).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(current),{status:200,headers:{'Content-Type':'application/json'}})):native(r,o);
       current={...base,bundle_revision:'same-add',nodes:[...base.nodes,{data:{id,label:'First',type:'concept'}}]};await G.refreshGraph();
       current={...base,bundle_revision:'same-remove'};await G.refreshGraph();
       current={...base,bundle_revision:'same-readd',nodes:[...base.nodes,{data:{id,label:'Final',type:'concept'}}]};await G.refreshGraph();
@@ -3922,7 +3922,7 @@ def test_presence_hidden_lod_focus_never_moves_or_lays_out(server_url: str, page
     result = page.evaluate("""async () => {
       const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),base=await native(url).then(r=>r.json());
       const nodes=Array.from({length:105},(_,i)=>({data:{id:'presence-'+i,label:'Presence '+i,type:'concept'}})),fresh={...base,bundle_revision:'presence-lod',nodes,edges:[],outgoing:{},backlinks:{}};
-      window.fetch=(r,o)=>String(r)===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(r,o);await G.refreshGraph();await new Promise(resolve=>{const check=()=>!window.okfGraphCaptureState().transitionPending?resolve():requestAnimationFrame(check);check();});
+      window.fetch=(r,o)=>String(r).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(r,o);await G.refreshGraph();await new Promise(resolve=>{const check=()=>!window.okfGraphCaptureState().transitionPending?resolve():requestAnimationFrame(check);check();});
       const hidden=nodes.map(n=>n.data.id).find(id=>G.cy.getElementById(id).length===0);G.cy.pan({x:43,y:-23});G.cy.zoom(.69);const before={pan:G.cy.pan(),zoom:G.cy.zoom(),starts:G.layoutStats.starts};window.okfLoomLive.emit('presence',{focus:hidden});await new Promise(requestAnimationFrame);
       return {hidden,absent:G.cy.getElementById(hidden).length===0,before,after:{pan:G.cy.pan(),zoom:G.cy.zoom(),starts:G.layoutStats.starts},halos:G.cy.nodes('.okf-presence-halo').length};
     }""")
@@ -4140,7 +4140,7 @@ def test_group_d_graph_refresh_deletion_rebuilds_authoritative_state(server_url:
     page.evaluate("id=>{const G=window.__okfLoomGraph,n=G.cy.getElementById(id),other=n.neighborhood('node').first();G.interaction.dispatch({type:'PATH',from:id,id:other.id()})}",selected)
     page.get_by_role("toolbar",name="Selected concept actions").get_by_role("button",name="Explore neighborhood").click();page.wait_for_function("()=>window.__okfLoomGraph.getState().lens==='focus'&&window.okfGraphCaptureState().layoutSettled")
     before_motion=page.evaluate("""id=>{const G=window.__okfLoomGraph,positions={};G.cy.nodes().filter(n=>n.id()!==id).forEach(n=>positions[n.id()]=n.position());return {pan:G.cy.pan(),zoom:G.cy.zoom(),starts:G.layoutStats.starts,positions};}""",selected)
-    page.evaluate("""async selected => { const graph=document.getElementById('okf-graph'),url=graph.dataset.graphUrl,native=window.fetch.bind(window),fresh=await native(url).then(r=>r.json());fresh.nodes=fresh.nodes.filter(n=>n.data.id!==selected);fresh.edges=fresh.edges.filter(e=>e.data.source!==selected&&e.data.target!==selected);fresh.outgoing=fresh.outgoing||{};fresh.backlinks=fresh.backlinks||{};delete fresh.outgoing[selected];delete fresh.backlinks[selected];Object.keys(fresh.outgoing).forEach(id=>fresh.outgoing[id]=fresh.outgoing[id].filter(other=>other!==selected));Object.keys(fresh.backlinks).forEach(id=>fresh.backlinks[id]=fresh.backlinks[id].filter(other=>other!==selected));fresh.bundle_revision='replacement-revision';window.okfPortableProvider={manifest:{bundle_revision:'stale-revision'}};window.fetch=(request,options)=>String(request)===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(request,options);window.__okfLoomGraph.refreshGraph(); }""", selected)
+    page.evaluate("""async selected => { const graph=document.getElementById('okf-graph'),url=graph.dataset.graphUrl,native=window.fetch.bind(window),fresh=await native(url).then(r=>r.json());fresh.nodes=fresh.nodes.filter(n=>n.data.id!==selected);fresh.edges=fresh.edges.filter(e=>e.data.source!==selected&&e.data.target!==selected);fresh.outgoing=fresh.outgoing||{};fresh.backlinks=fresh.backlinks||{};delete fresh.outgoing[selected];delete fresh.backlinks[selected];Object.keys(fresh.outgoing).forEach(id=>fresh.outgoing[id]=fresh.outgoing[id].filter(other=>other!==selected));Object.keys(fresh.backlinks).forEach(id=>fresh.backlinks[id]=fresh.backlinks[id].filter(other=>other!==selected));fresh.bundle_revision='replacement-revision';window.okfPortableProvider={manifest:{bundle_revision:'stale-revision'}};window.fetch=(request,options)=>String(request).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(request,options);window.__okfLoomGraph.refreshGraph(); }""", selected)
     page.wait_for_function("() => window.okfGraphSelection.conceptId === null")
     expect(page.locator(f'.okf-node-index__item[data-target="{selected}"]')).to_have_count(0)
     assert page.evaluate("() => window.okfPortableProvider === null")
@@ -4164,7 +4164,7 @@ def test_group_d_large_graph_refresh_show_all_never_resurrects_deleted_hidden_no
         return {...base,bundle_revision:'large-'+count+'-'+(drop||'all'),nodes,edges,outgoing,backlinks,bodies:{},types:['concept']};
       };
       let current=make(105,null);
-      window.fetch=(request,options)=>String(request)===url?Promise.resolve(new Response(JSON.stringify(current),{status:200,headers:{'Content-Type':'application/json'}})):native(request,options);
+      window.fetch=(request,options)=>String(request).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(current),{status:200,headers:{'Content-Type':'application/json'}})):native(request,options);
       await window.__okfLoomGraph.refreshGraph();
       const hidden=current.nodes.map(n=>n.data.id).find(id=>window.__okfLoomGraph.cy.getElementById(id).length===0);
       current=make(104,hidden);
@@ -4189,7 +4189,7 @@ def test_group_d_malformed_refresh_is_atomic(server_url: str, page, mutation: st
       fresh.bundle_revision='must-not-commit';
       if(mutation==='missing-nodes') delete fresh.nodes;
       else fresh.edges=[{data:{source:fresh.nodes[0].data.id,target:'missing-endpoint'}}];
-      window.fetch=(request,options)=>String(request)===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(request,options);
+      window.fetch=(request,options)=>String(request).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(request,options);
       await window.__okfLoomGraph.refreshGraph();
     }""", mutation)
     after = page.evaluate("() => {const state=window.okfGraphCaptureState();return {revision:document.body.dataset.okfRevision,captureRevision:document.body.dataset.okfCaptureRevision,nodeCount:state.nodeCount,payloadNodeCount:state.payloadNodeCount,ids:window.__okfLoomGraph.cy.nodes().map(n=>n.id()).sort()};}")
@@ -4201,7 +4201,7 @@ def test_group_d_malformed_refresh_is_atomic(server_url: str, page, mutation: st
     ('{"bundle_revision":"x","edges":[]}', "unavailable", "graph-schema"),
 ])
 def test_group_d_current_initial_failure_publishes_capture_terminal(static_url: str, page, body: str, code: str, phase: str) -> None:
-    page.route("**/__data/graph.json", lambda route: route.fulfill(status=200, content_type="application/json", body=body))
+    page.route("**/__data/graph.json*", lambda route: route.fulfill(status=200, content_type="application/json", body=body))
     page.goto(static_url + "/__graph.html", wait_until="domcontentloaded")
     page.wait_for_function("() => window.okfGraphCaptureState?.().terminalCode")
     outcome = page.evaluate("""async () => {try{await window.okfCaptureReadiness.start({target:'graph'}).promise;return {ok:true};}catch(e){return {ok:false,code:e.code,phase:e.metadata.readinessPhase,allowed:e.screenshotAllowed};}}""")
@@ -4273,7 +4273,7 @@ def test_group_d_inflight_comment_refresh_pagehide_publishes_nothing(server_url:
     result = page.evaluate(r"""async () => {
       const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),base=await native(url).then(r=>r.json()),id=base.nodes[0].data.id;
       const before=G.cy.getElementById(id).data('active_comment_count');let release;
-      window.fetch=(req,opt)=>String(req)===url?new Promise(resolve=>release=()=>{const payload=JSON.parse(JSON.stringify(base));payload.nodes[0].data.active_comment_count=88;resolve(new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}}));}):native(req,opt);
+      window.fetch=(req,opt)=>String(req).split('?')[0]===url?new Promise(resolve=>release=()=>{const payload=JSON.parse(JSON.stringify(base));payload.nodes[0].data.active_comment_count=88;resolve(new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}}));}):native(req,opt);
       const pending=G.refreshGraph();await new Promise(requestAnimationFrame);
       window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));
       const hidden={graph:document.body.dataset.okfGraphCaptureReady,page:document.body.dataset.okfCaptureReady,count:G.cy.getElementById(id).data('active_comment_count'),applied:G.refreshStats.applied};
@@ -5952,11 +5952,16 @@ def _live_payload_setup(page) -> str:
 
 
 def _live_serve(page, which: str) -> None:
-    """Point window.fetch at one of the stashed payloads and run one refresh."""
+    """Serve full-shape fixtures over the live structure transport, then refresh.
+
+    Ignore the view query when matching: these tests deliberately retain the
+    legacy/full relation objects to exercise ordinary candidate validation.
+    Compact-wire decoding has its own scale/acquisition browser proofs.
+    """
     page.evaluate(
         """(which) => {
           const P=window.__okfP1, o=P[which], url=P.url, native=P.native;
-          window.fetch=(req,opt)=>String(req)===url?Promise.resolve(new Response(JSON.stringify(o),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
+          window.fetch=(req,opt)=>String(req).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(o),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
         }""",
         which,
     )
@@ -6105,7 +6110,7 @@ def test_graph_phase3_comment_badge_semantics_index_detail_and_canvas(
           const payload=Object.assign({},base,{nodes,edges});
           delete payload.outgoing; delete payload.backlinks;
           let opts=null;
-          window.fetch=(req,opt)=>String(req)===url?(opts=opt,Promise.resolve(new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}}))):native(req,opt);
+          window.fetch=(req,opt)=>String(req).split('?')[0]===url?(opts=opt,Promise.resolve(new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}}))):native(req,opt);
           await G.refreshGraph(); await new Promise(requestAnimationFrame);
           const rows=nodes.map(n=>{const id=n.data.id,b=document.querySelector('.okf-node-index__item[data-target="'+CSS.escape(id)+'"]');const cy=G.cy.getElementById(id);return {id,aria:b&&b.getAttribute('aria-label'),badge:b&&b.querySelector('.okf-node-index__comments')&&b.querySelector('.okf-node-index__comments').textContent,hasCanvas:cy.data('has_active_comment_count'),canvas:String(cy.data('commentBadgeUrl')||'')};});
           const selected=nodes[4].data.id; window.okfActivateGraphConcept(selected,'pointer');
@@ -6147,7 +6152,7 @@ def test_graph_phase3_comment_refresh_rejects_malformed_and_preserves_last_good(
           const native=window.fetch.bind(window), base=await native(url).then(r=>r.json()), id=base.nodes[0].data.id;
           function payload(value){const p=JSON.parse(JSON.stringify(base));p.nodes[0].data.active_comment_count=value;return p;}
           let current=payload(7), options=[];
-          window.fetch=(req,opt)=>String(req)===url?(options.push(opt),Promise.resolve(current instanceof Response?current:new Response(JSON.stringify(current),{status:200,headers:{'Content-Type':'application/json'}}))):native(req,opt);
+          window.fetch=(req,opt)=>String(req).split('?')[0]===url?(options.push(opt),Promise.resolve(current instanceof Response?current:new Response(JSON.stringify(current),{status:200,headers:{'Content-Type':'application/json'}}))):native(req,opt);
           const read=()=>{const b=document.querySelector('.okf-node-index__item[data-target="'+CSS.escape(id)+'"]');return b&&b.getAttribute('aria-label');};
           const refresh=async()=>{await G.refreshGraph();await new Promise(requestAnimationFrame);};
           await refresh(); const good=read();
@@ -6155,9 +6160,9 @@ def test_graph_phase3_comment_refresh_rejects_malformed_and_preserves_last_good(
           const goodReady=ready();
           current=payload(-1); await refresh(); const malformed=read(),malformedReady=ready();
           current=new Response('',{status:503}); await refresh(); const unavailable=read(),unavailableReady=ready();
-          window.fetch=(req,opt)=>String(req)===url?Promise.reject(new TypeError('offline')):native(req,opt);
+          window.fetch=(req,opt)=>String(req).split('?')[0]===url?Promise.reject(new TypeError('offline')):native(req,opt);
           await refresh(); const network=read(),networkReady=ready();
-          window.fetch=(req,opt)=>String(req)===url?(options.push(opt),Promise.resolve(new Response(JSON.stringify(payload(11)),{status:200,headers:{'Content-Type':'application/json'}}))):native(req,opt);
+          window.fetch=(req,opt)=>String(req).split('?')[0]===url?(options.push(opt),Promise.resolve(new Response(JSON.stringify(payload(11)),{status:200,headers:{'Content-Type':'application/json'}}))):native(req,opt);
           await refresh(); const recovered=read(),recoveredReady=ready();
           return {good,malformed,unavailable,network,recovered,goodReady,malformedReady,unavailableReady,networkReady,recoveredReady,revalidates:options.every(o=>o.cache==='no-cache')};
         }"""
@@ -6223,7 +6228,7 @@ def test_multi_edge_refresh_validation_is_fail_closed(server_url: str, page, mut
       if(mutation==='bad-multiplicity')edge.data.multiplicity+=1;
       if(mutation==='bad-primary')edge.data.primary_relation={id:'missing',type:'x',label:'x'};
       if(mutation==='empty-relations')edge.data.relations=[];
-      window.__multiEdgePayload=fresh;window.fetch=(req,opt)=>String(req)===url?Promise.resolve(new Response(JSON.stringify(window.__multiEdgePayload),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
+      window.__multiEdgePayload=fresh;window.fetch=(req,opt)=>String(req).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(window.__multiEdgePayload),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
       await G.refreshGraph();return {revision:document.body.dataset.okfRevision,error:document.body.dataset.okfGraphRefreshError};
     }""", mutation)
     assert result["revision"] == before
@@ -6240,7 +6245,7 @@ def test_multi_edge_refresh_rebuilds_index_and_preserves_panel_focus(server_url:
       const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),fresh=await native(url).then(r=>r.json());
       const edge=fresh.edges.find(e=>e.data.source==='services/checkout'&&e.data.target==='tables/orders');
       edge.data.relations.push({id:'rel-refresh-fourth',label:'audits orders',type:'audits',kind:'relation',direction:'outgoing',source:edge.data.source,target:edge.data.target,target_raw:'relation:tables/orders',authored_identity:'refresh'});edge.data.multiplicity=4;
-      window.__multiEdgePayload=fresh;window.fetch=(req,opt)=>String(req)===url?Promise.resolve(new Response(JSON.stringify(window.__multiEdgePayload),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
+      window.__multiEdgePayload=fresh;window.fetch=(req,opt)=>String(req).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(window.__multiEdgePayload),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
       await G.refreshGraph();await new Promise(requestAnimationFrame);
       return {focus:document.activeElement&&document.activeElement.textContent,panel:document.getElementById('okf-edge-bundle-panel').textContent,expanded:document.querySelectorAll('.okf-edge-bundle-index__item[aria-selected=true]').length};
     }""")
@@ -6272,7 +6277,7 @@ def test_relationship_filter_counts_rebuild_on_live_instance_add_remove(server_u
     initial=page.evaluate("t=>window.__okfLoomGraph.cy.edges().reduce((n,e)=>n+(e.data('relations')||[]).filter(r=>r.type===t).length,0)",first)
     expect(chips.first).to_have_attribute("aria-label",re.compile(rf"^{re.escape(first)}, {initial} relationships?, shown$"))
     chips.first.click();chips.nth(1).focus();assert chips.nth(1).evaluate("b=>document.activeElement===b");assert page.locator("body").get_attribute("data-okf-relationship-filter-focus")==second
-    result=page.evaluate(r"""async ([first,second])=>{const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),fresh=await native(url).then(r=>r.json()),edge=fresh.edges.find(e=>e.data.relations&&e.data.relations.length);edge.data.relations.push({id:'live-new-instance',type:'live_type',label:'Human label differs',kind:'relation',direction:'outgoing',source:edge.data.source,target:edge.data.target});edge.data.relations.push({id:'live-existing-instance',type:first,label:'Second human label',kind:'relation',direction:'outgoing',source:edge.data.source,target:edge.data.target});edge.data.multiplicity=edge.data.relations.length;fresh.bundle_revision='relation-filter-add';window.fetch=(req,opt)=>String(req)===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);await G.refreshGraph();await new Promise(requestAnimationFrame);return {focus:document.activeElement&&document.activeElement.dataset.filterValue,active:document.activeElement&&document.activeElement.outerHTML,hidden:G.getState().hiddenRelations[first],url:location.search};}""",[first,second])
+    result=page.evaluate(r"""async ([first,second])=>{const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),fresh=await native(url).then(r=>r.json()),edge=fresh.edges.find(e=>e.data.relations&&e.data.relations.length);edge.data.relations.push({id:'live-new-instance',type:'live_type',label:'Human label differs',kind:'relation',direction:'outgoing',source:edge.data.source,target:edge.data.target});edge.data.relations.push({id:'live-existing-instance',type:first,label:'Second human label',kind:'relation',direction:'outgoing',source:edge.data.source,target:edge.data.target});edge.data.multiplicity=edge.data.relations.length;fresh.bundle_revision='relation-filter-add';window.fetch=(req,opt)=>String(req).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);await G.refreshGraph();await new Promise(requestAnimationFrame);return {focus:document.activeElement&&document.activeElement.dataset.filterValue,active:document.activeElement&&document.activeElement.outerHTML,hidden:G.getState().hiddenRelations[first],url:location.search};}""",[first,second])
     result["controls"]=page.get_by_label("Relationship filters").locator("button.okf-filter-chip").count()
     result["open"]=page.locator("details.okf-signal__advanced").get_attribute("open") is not None
     result["targetVisible"]=page.get_by_label("Relationship filters").locator(f'[data-filter-value="{second}"]').is_visible()
@@ -6283,7 +6288,7 @@ def test_relationship_filter_counts_rebuild_on_live_instance_add_remove(server_u
     owner=page.get_by_label("Relationship filters")
     expect(owner.locator('[data-filter-value="live_type"]')).to_have_attribute("aria-label","live_type, 1 relationship, shown")
     expect(owner.locator(f'[data-filter-value="{first}"]')).to_have_attribute("aria-label",re.compile(rf"^{re.escape(first)}, {initial+1} relationships?, hidden$"))
-    removed=page.evaluate(r"""async () => {const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),fresh=await native(url).then(r=>r.json());fresh.edges.forEach(e=>{e.data.relations=(e.data.relations||[]).filter(r=>r.id!=='live-new-instance'&&r.id!=='live-existing-instance');e.data.multiplicity=e.data.relations.length;});fresh.edges=fresh.edges.filter(e=>e.data.relations.length);fresh.bundle_revision='relation-filter-remove';window.fetch=(req,opt)=>String(req)===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);await G.refreshGraph();await new Promise(requestAnimationFrame);return {hasLive:!!document.querySelector('[data-filter-value="live_type"]'),focus:document.activeElement&&document.activeElement.dataset.filterValue};}""")
+    removed=page.evaluate(r"""async () => {const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),fresh=await native(url).then(r=>r.json());fresh.edges.forEach(e=>{e.data.relations=(e.data.relations||[]).filter(r=>r.id!=='live-new-instance'&&r.id!=='live-existing-instance');e.data.multiplicity=e.data.relations.length;});fresh.edges=fresh.edges.filter(e=>e.data.relations.length);fresh.bundle_revision='relation-filter-remove';window.fetch=(req,opt)=>String(req).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);await G.refreshGraph();await new Promise(requestAnimationFrame);return {hasLive:!!document.querySelector('[data-filter-value="live_type"]'),focus:document.activeElement&&document.activeElement.dataset.filterValue};}""")
     assert not removed["hasLive"] and removed["focus"]==second
 
 
@@ -6293,7 +6298,7 @@ def test_multi_edge_old_payload_and_malicious_label_are_safe(server_url: str, pa
       const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),fresh=await native(url).then(r=>r.json());
       fresh.edges.forEach(e=>{delete e.data.relations;delete e.data.multiplicity;delete e.data.primary_relation;});
       fresh.edges[0].data.label='<img src=x onerror=window.__multiEdgeXss=1>';
-      window.fetch=(req,opt)=>String(req)===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
+      window.fetch=(req,opt)=>String(req).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
       await G.refreshGraph();const edge=G.cy.edges()[0];edge.emit('tap');
       return {xss:window.__multiEdgeXss||0,text:document.getElementById('okf-edge-bundle-panel').textContent,images:document.getElementById('okf-edge-bundle-panel').querySelectorAll('img').length,multiplicity:edge.data('multiplicity')};
     }""")
@@ -6309,7 +6314,7 @@ def test_multi_edge_endpoint_collision_ids_coexist_through_live_refresh(server_u
       const ids=['a__b','c','a','b__c'];ids.forEach(id=>base.nodes.push({data:{id,label:id,type:'concept'}}));
       function relation(relationId,s,t){const relation={id:relationId,label:'link',type:'link',kind:'body_link',direction:'outgoing',source:s,target:t,target_raw:t};return {data:{source:s,target:t,label:'link',multiplicity:1,relations:[relation],primary_relation:relation}};}
       base.edges.push(relation('collision-left-r','a__b','c'),relation('collision-right-r','a','b__c'));
-      window.fetch=(req,opt)=>String(req)===url?Promise.resolve(new Response(JSON.stringify(base),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
+      window.fetch=(req,opt)=>String(req).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(base),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
       await G.refreshGraph();return [['a__b','c'],['a','b__c']].map(pair=>{const edge=G.cy.edges().filter(e=>e.data('source')===pair[0]&&e.data('target')===pair[1]);return {id:edge.id(),length:G.cy.getElementById(edge.id()).length,source:edge.data('source'),target:edge.data('target')};});
     }""")
     assert result == [
@@ -6449,7 +6454,7 @@ def test_graph_phase3_comment_event_updates_every_surface_without_layout(
           const base=await native(url).then(r=>r.json()),id=base.nodes[0].data.id;
           const payload=JSON.parse(JSON.stringify(base));payload.nodes[0].data.active_comment_count=137;
           const before={nodes:G.cy.nodes().length,edges:G.cy.edges().length,capture:window.okfGraphCaptureState()};
-          window.fetch=(req,opt)=>String(req)===url?Promise.resolve(new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
+          window.fetch=(req,opt)=>String(req).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
           window.okfLoomLive.emit('comment',{concept_id:id});
           await new Promise(resolve=>setTimeout(resolve,850));await new Promise(requestAnimationFrame);
           const button=document.querySelector('.okf-node-index__item[data-target="'+CSS.escape(id)+'"]');
@@ -6478,7 +6483,7 @@ def test_graph_phase3_comment_badges_follow_theme_and_accessibility_media(
           const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),base=await native(url).then(r=>r.json());
           const payload=JSON.parse(JSON.stringify(base)),id=payload.nodes[0].data.id;
           payload.nodes[0].data.label='Sehr langer Wissensgraph-Begriff العربية 日本語 with broken destination';payload.nodes[0].data.active_comment_count=1000;payload.nodes[0].data.unresolved_count=4;
-          window.fetch=(req,opt)=>String(req)===url?Promise.resolve(new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);await G.refreshGraph();
+          window.fetch=(req,opt)=>String(req).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);await G.refreshGraph();
           const uri=()=>G.cy.getElementById(id).data('commentBadgeUrl');
           window.OKFLoomTheme.setTheme('bone');await new Promise(requestAnimationFrame);const light=uri();
           window.OKFLoomTheme.setTheme('slate');await new Promise(requestAnimationFrame);const dark=uri();
@@ -6540,7 +6545,7 @@ def _inject_orphan_fixture(page, server_url) -> None:
            window.__okfOrphUrl=url; window.__okfOrphNative=native;
            const G=window.__okfLoomGraph;G.cy.pan({x:31,y:-17});G.cy.zoom(.71);
            const before={pan:G.cy.pan(),zoom:G.cy.zoom(),starts:G.layoutStats.starts};
-           window.fetch=(req,opt)=>String(req)===url?Promise.resolve(new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
+           window.fetch=(req,opt)=>String(req).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
            return G.refreshGraph().then(()=>{window.__okfOrphanMotion={before,after:{pan:G.cy.pan(),zoom:G.cy.zoom(),starts:G.layoutStats.starts},capture:window.okfGraphCaptureState()};});
         }"""
     )
@@ -7494,7 +7499,7 @@ def test_graph_phase3_broken_canvas_glyph_composes_with_other_states(server_url:
     result = page.evaluate(
         r"""async () => {const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=fetch.bind(window),p=await native(url).then(r=>r.json()),id=p.nodes[0].data.id;
           p.nodes[0].data.unresolved_count=3;p.nodes[0].data.active_comment_count=120;
-          window.fetch=(r,o)=>String(r)===url?Promise.resolve(new Response(JSON.stringify(p),{headers:{'Content-Type':'application/json'}})):native(r,o);
+          window.fetch=(r,o)=>String(r).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(p),{headers:{'Content-Type':'application/json'}})):native(r,o);
           await G.refreshGraph();const n=G.cy.getElementById(id);n.addClass('okf-hub');n.select();
           const row=document.querySelector('.okf-node-index__item[data-target="'+CSS.escape(id)+'"]');
           return {broken:n.hasClass('okf-broken-link'),aggregated:n.hasClass('okf-broken-aggregated'),selected:n.selected(),hub:n.hasClass('okf-hub'),warning:decodeURIComponent(n.data('brokenBadgeUrl')),comment:decodeURIComponent(n.data('commentBadgeUrl')),aria:row.getAttribute('aria-label'),warn:!!row.querySelector('.okf-node-index__warn'),count:row.querySelector('.okf-node-index__comments').textContent};}"""
@@ -7512,7 +7517,7 @@ def test_graph_phase3_mobile_concept_title_two_lines_without_overflow(server_url
     result = page.evaluate(
         r"""async () => {const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=fetch.bind(window),p=await native(url).then(r=>r.json());
           p.nodes[0].data.label='A deliberately long concept title that needs exactly two readable lines';p.nodes[0].data.unresolved_count=2;p.nodes[0].data.active_comment_count=500;
-          window.fetch=(r,o)=>String(r)===url?Promise.resolve(new Response(JSON.stringify(p),{headers:{'Content-Type':'application/json'}})):native(r,o);await G.refreshGraph();
+          window.fetch=(r,o)=>String(r).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(p),{headers:{'Content-Type':'application/json'}})):native(r,o);await G.refreshGraph();
           document.querySelector('[data-graph-pane="concepts"]').click();const row=document.querySelector('.okf-node-index__item'),label=row.querySelector('.okf-node-index__label'),s=getComputedStyle(label);
           return {lines:Math.round(label.getBoundingClientRect().height/parseFloat(s.lineHeight)),overflow:document.documentElement.scrollWidth>innerWidth+1,warn:!!row.querySelector('.okf-node-index__warn'),badge:row.querySelector('.okf-node-index__comments').textContent};}"""
     )
@@ -7832,7 +7837,7 @@ def test_graph_phase3_r5_broken_warning_prevalence_and_selected_exception(
         r"""async () => {const G=window.__okfLoomGraph,cy=G.cy,url=document.getElementById('okf-graph').dataset.graphUrl,native=fetch.bind(window),p=await native(url).then(r=>r.json());
           const prevalent=Math.ceil(p.nodes.length*0.3);
           p.nodes.forEach((n,i)=>{n.data.unresolved_count=i<prevalent?2:0;});
-          window.fetch=(r,o)=>String(r)===url?Promise.resolve(new Response(JSON.stringify(p),{headers:{'Content-Type':'application/json'}})):native(r,o);
+          window.fetch=(r,o)=>String(r).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(p),{headers:{'Content-Type':'application/json'}})):native(r,o);
           await G.refreshGraph();
           const broken=cy.nodes().filter(n=>Number(n.data('unresolved_count'))>0), first=broken.first();
           const before=first.style('background-image'); first.select();
@@ -7864,7 +7869,7 @@ def test_graph_phase3_r4_dense_overview_canvas_state_priority(docs_server_url: s
           // Repaired live docs carry too few broken concepts to aggregate; set
           // the >25% prevalence explicitly on the remaining payload nodes.
           p.nodes.forEach((n,i)=>{if(i>2)n.data.unresolved_count=i%2===0?1:0;});
-          window.fetch=(r,o)=>String(r)===url?Promise.resolve(new Response(JSON.stringify(p),{headers:{'Content-Type':'application/json'}})):native(r,o);await G.refreshGraph();
+          window.fetch=(r,o)=>String(r).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(p),{headers:{'Content-Type':'application/json'}})):native(r,o);await G.refreshGraph();
           const snap=id=>{const n=cy.getElementById(id),row=document.querySelector('.okf-node-index__item[data-target="'+CSS.escape(id)+'"]');return {zero:n.hasClass('okf-density-overview-zero'),broken:n.hasClass('okf-density-overview-broken'),aggregated:n.hasClass('okf-broken-aggregated'),aria:row.getAttribute('aria-label')};};
           const overview=ids.map(snap);cy.zoom(1.3);await new Promise(r=>setTimeout(r,80));return {overview,detail:ids.map(snap)};}"""
     )
@@ -7884,7 +7889,7 @@ def test_graph_phase3_r3_compound_state_layers_and_dense_titles(docs_server_url:
     result = page.evaluate(
         r"""async () => {const G=window.__okfLoomGraph,cy=G.cy,url=document.getElementById('okf-graph').dataset.graphUrl,native=fetch.bind(window),p=await native(url).then(r=>r.json()),id=p.nodes[0].data.id;
           p.nodes[0].data.unresolved_count=2;p.nodes[0].data.active_comment_count=12;
-          window.fetch=(r,o)=>String(r)===url?Promise.resolve(new Response(JSON.stringify(p),{headers:{'Content-Type':'application/json'}})):native(r,o);
+          window.fetch=(r,o)=>String(r).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(p),{headers:{'Content-Type':'application/json'}})):native(r,o);
           await G.refreshGraph();const n=cy.getElementById(id);n.addClass('okf-hub');n.select();
           const pos=n.style('background-position-x'),warn=decodeURIComponent(n.data('brokenBadgeUrl')),comment=decodeURIComponent(n.data('commentBadgeUrl')),
             row=document.querySelector('.okf-lens-summary__row'),label=row&&row.querySelector('.okf-lens-summary__label'),note=row&&row.querySelector('.okf-lens-summary__note');
@@ -8461,7 +8466,7 @@ def test_graph_phase3_density_refresh_sparse_to_dense_is_current_bundle_derived(
       const nodes=Array.from({length:25},(_,i)=>({data:{id:'cross-d-'+i,label:'Dense '+i,type:'concept',unresolved_count:i<8?1:0,active_comment_count:0}}));
       const edges=[];outer:for(let i=0;i<nodes.length;i++)for(let j=0;j<nodes.length;j++){if(i===j)continue;edges.push({data:{source:nodes[i].data.id,target:nodes[j].data.id,label:'rel'}});if(edges.length===120)break outer;}
       const payload={...base,bundle_revision:'cross-dense',nodes,edges,outgoing:null,backlinks:null};
-      window.fetch=(r,o)=>String(r)===url?Promise.resolve(new Response(JSON.stringify(payload),{headers:{'Content-Type':'application/json'}})):native(r,o);
+      window.fetch=(r,o)=>String(r).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(payload),{headers:{'Content-Type':'application/json'}})):native(r,o);
       await G.refreshGraph();await new Promise(requestAnimationFrame);
       const cy=G.cy, disclosure=document.querySelector('.okf-graph-density');
       const capture=window.okfGraphCaptureState(),pendingRaw=cy.nodes().length;
@@ -8489,8 +8494,8 @@ def test_graph_phase3_density_refresh_dense_to_sparse_and_stale_dense_cannot_res
       const make=(count,edgeCount,revision)=>{const nodes=Array.from({length:count},(_,i)=>({data:{id:revision+'-'+i,label:revision+' '+i,type:'concept',unresolved_count:1}})),edges=[];
         outer:for(let i=0;i<count;i++)for(let j=0;j<count;j++){if(i===j)continue;edges.push({data:{source:nodes[i].data.id,target:nodes[j].data.id}});if(edges.length===edgeCount)break outer;}return {...base,bundle_revision:revision,nodes,edges,outgoing:null,backlinks:null};};
       const dense=make(25,120,'accepted-dense'),sparse=make(24,23,'accepted-sparse'),stale=make(26,121,'stale-dense');
-      let payload=dense;window.fetch=(r,o)=>String(r)===url?Promise.resolve(new Response(JSON.stringify(payload),{headers:{'Content-Type':'application/json'}})):native(r,o);await G.refreshGraph();
-      window.fetch=(r,o)=>String(r)===url?new Promise(resolve=>held.push({resolve,signal:o.signal})):native(r,o);
+      let payload=dense;window.fetch=(r,o)=>String(r).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(payload),{headers:{'Content-Type':'application/json'}})):native(r,o);await G.refreshGraph();
+      window.fetch=(r,o)=>String(r).split('?')[0]===url?new Promise(resolve=>held.push({resolve,signal:o.signal})):native(r,o);
       const a=G.refreshGraph();await new Promise(requestAnimationFrame);const b=G.refreshGraph();await new Promise(requestAnimationFrame);
       held[1].resolve(new Response(JSON.stringify(sparse),{headers:{'Content-Type':'application/json'}}));await b;
       held[0].resolve(new Response(JSON.stringify(stale),{headers:{'Content-Type':'application/json'}}));await a;await new Promise(requestAnimationFrame);
@@ -10301,7 +10306,7 @@ def test_phase3_refresh_a_superseded_by_failing_b_restores_last_accepted_readine
     result = page.evaluate(r"""async () => {
       const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl;
       const native=window.fetch.bind(window),base=await native(url).then(r=>r.json()),held=[];
-      window.fetch=(req,opt)=>String(req)===url?new Promise((resolve,reject)=>{
+      window.fetch=(req,opt)=>String(req).split('?')[0]===url?new Promise((resolve,reject)=>{
         const call={resolve,reject,signal:opt.signal};held.push(call);
         opt.signal.addEventListener('abort',()=>reject(new DOMException('Aborted','AbortError')),{once:true});
       }):native(req,opt);
@@ -10328,7 +10333,7 @@ def test_phase3_post_mutation_pre_raf_pagehide_revokes_readiness_owner_and_bfcac
     result = page.evaluate(r"""async () => {
       const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,nativeFetch=window.fetch.bind(window),nativeRaf=window.requestAnimationFrame.bind(window),base=await nativeFetch(url).then(r=>r.json());
       let revision='phase3-paused',held=[];window.requestAnimationFrame=cb=>{held.push(cb);return held.length;};
-      window.fetch=(req,opt)=>{if(String(req)!==url)return nativeFetch(req,opt);const payload=JSON.parse(JSON.stringify(base));payload.bundle_revision=revision;return Promise.resolve(new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}}));};
+      window.fetch=(req,opt)=>{if(String(req).split('?')[0]!==url)return nativeFetch(req,opt);const payload=JSON.parse(JSON.stringify(base));payload.bundle_revision=revision;return Promise.resolve(new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}}));};
       const pending=G.refreshGraph();while(!held.length)await new Promise(resolve=>nativeRaf(resolve));
       window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));
       const hidden={graph:document.body.dataset.okfGraphCaptureReady,page:document.body.dataset.okfCaptureReady,error:document.body.dataset.okfGraphRefreshError||null};
@@ -10418,7 +10423,7 @@ def test_phase3_accepted_metadata_and_same_endpoint_label_reconcile_before_ready
       nd.metadata=Object.assign({},nd.metadata,{project:'accepted-project',graph_cluster:'accepted-cluster'});
       fresh.edges.find(e=>e.data.source===edge.data.source&&e.data.target===edge.data.target).data.label='accepted_relationship';
       let queue=[old];
-      window.fetch=(req,opt)=>String(req)===url?Promise.resolve(new Response(JSON.stringify(queue.shift()),{headers:{'Content-Type':'application/json'}})):native(req,opt);
+      window.fetch=(req,opt)=>String(req).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(queue.shift()),{headers:{'Content-Type':'application/json'}})):native(req,opt);
       await G.refreshGraph(); await new Promise(requestAnimationFrame);
       G.applyLens('recent'); await new Promise(resolve=>setTimeout(resolve,300));
       const beforeColor=G.cy.getElementById(id).data('color');
@@ -10456,7 +10461,7 @@ def test_phase3_overlapping_comment_refresh_latest_count_wins_every_surface(
       const native=window.fetch.bind(window),base=await native(url).then(r=>r.json()),id=base.nodes[0].data.id;
       function payload(count,revision){const p=JSON.parse(JSON.stringify(base));p.bundle_revision=revision;p.nodes[0].data.active_comment_count=count;return p;}
       let firstResolve,calls=0;
-      window.fetch=(req,opt)=>{if(String(req)!==url)return native(req,opt);calls++;
+      window.fetch=(req,opt)=>{if(String(req).split('?')[0]!==url)return native(req,opt);calls++;
         if(calls===1)return new Promise(resolve=>{firstResolve=()=>resolve(new Response(JSON.stringify(payload(3,'comments-old')),{headers:{'Content-Type':'application/json'}}));});
         return Promise.resolve(new Response(JSON.stringify(payload(29,'comments-new')),{headers:{'Content-Type':'application/json'}}));};
       const older=G.refreshGraph();await new Promise(requestAnimationFrame);const newer=G.refreshGraph();await newer;
@@ -10822,7 +10827,7 @@ def test_phase4_final_non_owned_keyboard_matrix_and_alt_filter_equivalence(serve
 
 def test_phase4_final_phase5_sse_presence_tour_compatibility_boundary(server_url: str,page)->None:
     _open_graph(page,server_url)
-    setup=page.evaluate("""async()=>{const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=fetch.bind(window),payload=await native(url).then(r=>r.json()),id=payload.nodes[0].data.id;payload.nodes[0].data.active_comment_count=23;window.fetch=(r,o)=>String(r)===url?Promise.resolve(new Response(JSON.stringify(payload),{headers:{'Content-Type':'application/json'}})):native(r,o);G.interaction.dispatch({type:'SELECT',id});window.okfLoomLive.emit('presence',{version:2,online:true,own_session_id:'browser-own',records:[{session_id:'agent-review',kind:'agent',state:'working',focus:id,label:'Agent'}]});return {id,applied:G.refreshStats.applied}}""")
+    setup=page.evaluate("""async()=>{const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=fetch.bind(window),payload=await native(url).then(r=>r.json()),id=payload.nodes[0].data.id;payload.nodes[0].data.active_comment_count=23;window.fetch=(r,o)=>String(r).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(payload),{headers:{'Content-Type':'application/json'}})):native(r,o);G.interaction.dispatch({type:'SELECT',id});window.okfLoomLive.emit('presence',{version:2,online:true,own_session_id:'browser-own',records:[{session_id:'agent-review',kind:'agent',state:'working',focus:id,label:'Agent'}]});return {id,applied:G.refreshStats.applied}}""")
     page.wait_for_function("id=>window.__okfLoomGraph.cy.getElementById(id).hasClass('okf-presence-halo')",arg=setup["id"])
     page.evaluate("()=>window.okfLoomLive.emit('comment',{})");page.wait_for_function("n=>window.__okfLoomGraph.refreshStats.applied>n",arg=setup["applied"])
     applied=page.evaluate("()=>window.__okfLoomGraph.refreshStats.applied");page.evaluate("()=>window.okfLoomLive.emit('graph',{})");page.wait_for_function("n=>window.__okfLoomGraph.refreshStats.applied>n",arg=applied)
@@ -10841,7 +10846,7 @@ def test_phase4_edge_background_clear_preserves_focus_root(server_url: str,page)
 def test_phase4_edge_selected_neighbour_refresh_keeps_surviving_focus_root(server_url: str,page)->None:
     _open_graph(page,server_url);setup=page.evaluate("""async()=>{const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=fetch.bind(window),fresh=await native(url).then(r=>r.json()),e=G.cy.edges().first(),root=e.source().id(),selected=e.target().id();G.interaction.dispatch({type:'SELECT',id:root});return {url,fresh,root,selected}}""")
     page.get_by_role("toolbar",name="Selected concept actions").get_by_role("button",name="Explore neighborhood").click();page.wait_for_function("()=>window.__okfLoomGraph.getState().lens==='focus'&&window.okfGraphCaptureState().layoutSettled");page.evaluate("id=>window.__okfLoomGraph.interaction.dispatch({type:'SELECT',id})",setup["selected"])
-    page.evaluate("""s=>{const native=fetch.bind(window),f=JSON.parse(JSON.stringify(s.fresh));f.bundle_revision='focus-survives';f.nodes=f.nodes.filter(n=>n.data.id!==s.selected);f.edges=f.edges.filter(e=>e.data.source!==s.selected&&e.data.target!==s.selected);f.outgoing=f.outgoing||{};f.backlinks=f.backlinks||{};delete f.outgoing[s.selected];delete f.backlinks[s.selected];Object.keys(f.outgoing).forEach(id=>f.outgoing[id]=f.outgoing[id].filter(x=>x!==s.selected));Object.keys(f.backlinks).forEach(id=>f.backlinks[id]=f.backlinks[id].filter(x=>x!==s.selected));window.fetch=(r,o)=>String(r)===s.url?Promise.resolve(new Response(JSON.stringify(f),{headers:{'Content-Type':'application/json'}})):native(r,o)}""",setup)
+    page.evaluate("""s=>{const native=fetch.bind(window),f=JSON.parse(JSON.stringify(s.fresh));f.bundle_revision='focus-survives';f.nodes=f.nodes.filter(n=>n.data.id!==s.selected);f.edges=f.edges.filter(e=>e.data.source!==s.selected&&e.data.target!==s.selected);f.outgoing=f.outgoing||{};f.backlinks=f.backlinks||{};delete f.outgoing[s.selected];delete f.backlinks[s.selected];Object.keys(f.outgoing).forEach(id=>f.outgoing[id]=f.outgoing[id].filter(x=>x!==s.selected));Object.keys(f.backlinks).forEach(id=>f.backlinks[id]=f.backlinks[id].filter(x=>x!==s.selected));window.fetch=(r,o)=>String(r).split('?')[0]===s.url?Promise.resolve(new Response(JSON.stringify(f),{headers:{'Content-Type':'application/json'}})):native(r,o)}""",setup)
     page.evaluate("()=>window.__okfLoomGraph.refreshGraph()");page.wait_for_function("()=>document.body.dataset.okfRevision==='focus-survives'")
     assert page.evaluate("id=>window.__okfLoomGraph.focusRoot()===id&&window.__okfLoomGraph.getState().focusEnabled&&window.__okfLoomGraph.interaction.snapshot().selected===null",setup["root"])
 
@@ -11156,7 +11161,7 @@ def test_phase5_real_ssr_failure_and_delayed_settle(tmp_path: Path, page) -> Non
     proc = subprocess.Popen(okf_module_argv("serve", str(root), "--host", "127.0.0.1", "--port", str(port), "--no-watch", "--no-open"), cwd=str(TOOLKIT_ROOT), env=okf_subprocess_env(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         _wait_for_server(proc, base)
-        page.route("**/__data/graph.json", lambda route: route.abort())
+        page.route("**/__data/graph.json*", lambda route: route.abort())
         page.goto(base + "/", wait_until="domcontentloaded"); page.wait_for_timeout(900)
         assert page.locator("#okf-recent-rail").count() == 1
         assert page.locator(".okf-card__comments").count() == 1
@@ -11164,7 +11169,7 @@ def test_phase5_real_ssr_failure_and_delayed_settle(tmp_path: Path, page) -> Non
         page.wait_for_timeout(500)
         assert page.locator("#okf-recent-rail").count() == 1
         assert page.locator("#okf-recent-rail").inner_text() == ssr
-        page.unroute("**/__data/graph.json")
+        page.unroute("**/__data/graph.json*")
         page.reload(wait_until="domcontentloaded"); page.wait_for_timeout(1200)
         assert page.locator("#okf-recent-rail").count() == 1
         assert page.locator(".okf-card__comments").inner_text() == "1 active comment"

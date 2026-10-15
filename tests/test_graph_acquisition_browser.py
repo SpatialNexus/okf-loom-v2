@@ -28,8 +28,8 @@ def test_graph_requests_are_shared_or_structure_only(acquisition_server, page, r
     page.wait_for_function('() => window.okfLoomStudio.state.graphReady')
     if route == '/__graph':
         page.wait_for_function('() => window.okfGraphCaptureState?.().initialized')
-        assert [urlparse(url).query for url in requests] == ['']
-        assert page.evaluate('() => !!window.okfGraphData && !!window.okfLoomStudio.state.graph.bodies')
+        assert [urlparse(url).query for url in requests] == ['view=structure']
+        assert page.evaluate('() => !!window.okfGraphData && !window.okfLoomStudio.state.graph.bodies')
     else:
         # Index recency/comment badges and document connection chips need only
         # structure. No full body payload on either surface.
@@ -50,7 +50,7 @@ def test_shared_initial_acquisition_in_either_script_order(acquisition_server, p
         const native = window.fetch.bind(window);
         window.graphFetchOwners = [];
         window.fetch = (url, options) => {
-            if (String(url) === '/__data/graph.json') window.graphFetchOwners.push(new Error().stack);
+            if (String(url) === '/__data/graph.json?view=structure') window.graphFetchOwners.push(new Error().stack);
             return native(url, options);
         };
     })();''')

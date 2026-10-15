@@ -279,7 +279,11 @@ def test_graph_nonbody_inputs_and_structure_view_remain_fresh(graph_server, monk
     slim = json.loads(slim_body)
     assert 'bodies' not in slim and 'documents' not in slim
     full = json.loads(_get(base)[2])
-    assert slim == {key: value for key, value in full.items() if key not in {'bodies', 'documents'}}
+    assert slim['structure_schema'] == 1
+    assert slim['nodes'][0]['data']['active_comment_count'] == 3
+    assert 'metadata_html' not in slim['nodes'][0]['data']
+    assert slim['backlinks'] == full['backlinks']
+    assert len(slim_body) < len(canonical_json_bytes(full))
     assert _get(base, '/__data/graph.json?view=structure', slim_headers['ETag'])[0] == 304
     assert _get(base, '/__data/graph.json?view=unknown')[0] == 400
     server.bundle = Bundle.load(server.bundle.root)
@@ -315,6 +319,12 @@ def test_graph_public_and_local_views_are_identical(tmp_path):
             assert local_response[2] == public_response[2]
             assert local_response[1]['ETag'] == public_response[1]['ETag']
             assert _get(public, path, local_response[1]['ETag'])[0] == 304
+        revision = json.loads(_get(local)[2])['bundle_revision']
+        path = '/__data/graph-body?id=a&revision=' + revision
+        local_response, public_response = _get(local, path), _get(public, path)
+        assert local_response[0] == public_response[0] == 200
+        assert local_response[2] == public_response[2]
+        assert public_response[1]['Cache-Control'] == 'private, no-cache'
     finally:
         ingress.shutdown()
         ingress.server_close()

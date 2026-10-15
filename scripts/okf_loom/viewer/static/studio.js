@@ -9205,10 +9205,12 @@
     let acquisition;
     if (fullGraphPage) {
       if (!window.okfGraphData) {
-        const pending = fetch("/__data/graph.json", { cache: "no-cache", headers: { Accept: "application/json" } })
+        const pending = fetch("/__data/graph.json?view=structure", { cache: "no-cache", headers: { Accept: "application/json" } })
           .catch((error) => { throw Object.assign(new Error("Graph data request failed."), { okfPhase: "graph-fetch", okfCode: "network-failure", cause: error }); })
           .then((res) => {
-            if (!res.ok) throw Object.assign(new Error("HTTP " + res.status), { okfPhase: "graph-http", okfCode: "network-failure" });
+            if (!res.ok) return res.json().catch(() => null).then((data) => {
+              throw Object.assign(new Error(data && data.error && data.error.message || "HTTP " + res.status), { okfPhase: "graph-http", okfCode: "network-failure" });
+            });
             return res.json().catch((error) => { throw Object.assign(new Error("Graph JSON is malformed."), { okfPhase: "graph-json", okfCode: "network-failure", cause: error }); });
           });
         window.okfGraphData = pending;

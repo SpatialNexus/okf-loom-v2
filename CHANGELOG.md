@@ -13,7 +13,13 @@ follow [Semantic Versioning](https://semver.org/). The product version
 - Live graph JSON reuses final serialized bytes and strong ETags, with independent
   per-view coalescing and exact metadata-expiry invalidation. Certainly oversized
   projections are refused before rendering/encoding, and repeated size refusals
-  no longer rebuild the graph. The 4 MiB cap and full/structure schemas are unchanged.
+  no longer rebuild the graph. The full/tool view retains its 4 MiB cap and bytes.
+- Live graph pages share one compact structure request, with deduplicated relation
+  records and a graph-only 16 MiB cap, supporting 1,500–5,000 ordinary concepts.
+  Selected bodies/advisory HTML load on demand with bounded reads, revision and
+  lifecycle fences, and explicit capture readiness; graph refusals show the
+  server's readable message. Portable data, markup, CSP and offline behaviour
+  retain their full/inline path; only shared graph/Studio runtime bytes change.
 - Live index thumbnails derive only identities, topology and relationship counts
   instead of building unused graph metadata HTML. The root inventory has a separate
   8 MiB HTML cap so 5,000 ordinary cards fit; other response caps and portable

@@ -1930,15 +1930,18 @@ def _graph_grouping_metadata(concept: Concept) -> dict[str, str]:
     return out
 
 
+def render_graph_body(concept: Concept) -> str:
+    """The graph's exact body projection, shared by full data and lazy reads."""
+    return _decorate_content_scrollports(normalize_document_links(
+        _demote_headings(join_source_footnotes(markdown_to_html(concept.body), concept)),
+        concept_id_to_str(concept.id) + '.md', 'serve',
+    ))
+
+
 def _render_graph_documents(bundle: Bundle) -> tuple[dict[str, str], dict[str, Any]]:
     """Content-pure graph HTML; never cache clock-sensitive metadata here."""
     bodies = {
-        concept_id_to_str(c.id): _decorate_content_scrollports(
-            normalize_document_links(
-                _demote_headings(join_source_footnotes(markdown_to_html(c.body), c)),
-                concept_id_to_str(c.id) + '.md', 'serve',
-            )
-        )
+        concept_id_to_str(c.id): render_graph_body(c)
         for c in sorted(bundle.concepts.values(), key=lambda c: c.id)
     }
     documents = {
@@ -2022,6 +2025,7 @@ def build_graph_data(
     cache_bodies: bool = False,
     include_bodies: bool = True,
     metadata_now: Any = None,
+    structure: bool = False,
 ) -> dict[str, Any]:
     """Serialise a Bundle into the JSON shape consumed by the viewer.
 
@@ -2029,7 +2033,9 @@ def build_graph_data(
     ``cache_bodies``. Name, palette, graph structure, comment counts and
     clock-sensitive metadata are always derived afresh. ``include_bodies=False``
     skips that HTML entirely for structural consumers; portable payloads keep
-    the default full projection.
+    the default full projection. ``structure=True`` additionally selects the
+    compact live-only field/relation transport; graph_response removes its
+    empty body/document placeholders. No portable caller selects this flag.
 
     Shape (consumed by ``viewer/static/graph.js``):
         {
@@ -2211,13 +2217,22 @@ def build_graph_data(
                 "relations": governed["relations"],
                 "metadata": grouping_meta,
                 "okf_metadata": c.metadata,
-                "metadata_html": render_metadata(c, bundle, mode="graph", now=metadata_now),
+                "metadata_html": "" if structure else render_metadata(c, bundle, mode="graph", now=metadata_now),
                 "generated_at": c.generated_at,
                 "graph_cluster": grouping_meta.get("graph_cluster", ""),
                 "source_system": grouping_meta.get("source_system", ""),
         }
         if comment_counts is not None:
             node_data["active_comment_count"] = comment_counts.get(cid_str, 0)
+        if structure:
+            # Live internal contract: only fields read by graph.js/Studio.
+            # Advisory HTML is fetched with the selected body. Comment-count
+            # presence means availability, so an available zero MUST survive.
+            for key in ("okf_metadata", "metadata_html", "generated_at", "body_chars", "color",
+                        "graph_cluster", "source_system"):
+                del node_data[key]
+            node_data = {key: value for key, value in node_data.items()
+                         if value or key in ("id", "label", "type", "active_comment_count")}
         nodes.append({"data": node_data})
 
     # Final node ID set for the dangling-endpoint invariant (layout-graph):
@@ -2350,6 +2365,17 @@ def build_graph_data(
         elif primary["label"] and not primary["label"].startswith("/"):
             data["label"] = primary["label"]
 
+    if structure:
+        for edge in edges:
+            data = edge["data"]
+            data["primary_relation_index"] = data["relations"].index(data.pop("primary_relation"))
+            del data["multiplicity"]  # exactly len(relations), restored by the client
+            data["relations"] = [
+                {key: value for key, value in relation.items()
+                 if key in ("id", "label", "type", "kind", "detail")}
+                for relation in data["relations"]
+            ]
+
     external = [
         {
             "source": concept_id_to_str(e.source),
@@ -2368,11 +2394,15 @@ def build_graph_data(
     backlinks = {k: sorted(v) for k, v in sorted(backlinks.items())}
 
     return {
+        **({"structure_schema": 1, "document_paths": [
+            rel.as_posix() for rel, doc in sorted({**bundle.indexes, **bundle.logs}.items())
+            if doc.path.resolve().is_relative_to(bundle.root.resolve())
+        ]} if structure else {}),
         "name": name or bundle.name,
         "bundle_revision": bundle_revision(bundle),
         "nodes": nodes,
         "edges": edges,
-        "raw_relationship_count": sum(edge["data"]["multiplicity"] for edge in edges),
+        "raw_relationship_count": sum(len(edge["data"]["relations"]) for edge in edges),
         "external": external,
         "bodies": bodies,
         # Navigation documents are not graph concepts or synthetic nodes.

@@ -295,6 +295,7 @@ _PUBLIC_GET_INTERNAL_ROUTES = frozenset({
     "/__context",
     "/__events",
     "/__data/doc",
+    "/__data/graph-body",
     "/__data/events",
     "/__comments",
     "/__data/page",
@@ -2748,6 +2749,8 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
             return self._handle_events(query)
         if path == "/__presence":
             return self._handle_presence_get()
+        if path == "/__data/graph-body":
+            return self._handle_graph_body(query)
         if path == "/__data/doc":
             return self._handle_data_doc(query)
         if path == "/__data/page":
@@ -3311,12 +3314,13 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
                     {"ok": False, "error": "comment_summary_unavailable"},
                     extra_headers={"Cache-Control": "no-store"},
                 )
-        from .graph_response import graph_response
+        from .graph_response import MAX_STRUCTURE_BYTES, graph_response
         from .retrieval import MAX_RESPONSE_BYTES, RetrievalContractError
+        limit = MAX_STRUCTURE_BYTES if structure else MAX_RESPONSE_BYTES
         try:
             response = graph_response(
                 bundle, name=display_name, comment_summary=comment_summary,
-                structure=structure, limit=MAX_RESPONSE_BYTES,
+                structure=structure, limit=limit,
             )
         except RetrievalContractError:
             return self._send_json(500, {"ok": False, "error": {
@@ -3326,7 +3330,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         if response is None:
             return self._send_json(413, {"ok": False, "error": {
                 "code": "response_too_large",
-                "message": "Graph exceeds the 4 MiB response limit. Open a smaller bundle or use a portable build.",
+                "message": f"This bundle's graph is too large to display (limit {limit / (1024 * 1024):g} MiB). Open a smaller bundle or use a portable build.",
                 "fields": {},
             }}, extra_headers={"Cache-Control": "no-store"})
         # No authority/viewer-specific fields: local and public ingress share
@@ -3337,6 +3341,44 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         not_modified = _if_none_match_matches(self.headers.get_all("If-None-Match", []), etag)
         self._send_bytes(304 if not_modified else 200, b"" if not_modified else body,
                          content_type="application/json; charset=utf-8", extra_headers=headers)
+
+    def _handle_graph_body(self, query: dict[str, list[str]]) -> None:
+        """One graph body, not the annotation/plugin concept-page projection.
+
+        /__data/doc does canonical disk I/O, parses again, copies the bundle and
+        builds its graph/projection. This read instead uses one already loaded
+        generation and exactly the full graph's HTML. Never serve a newer body
+        under an older graph revision; public and local readers see the same data.
+        """
+        from .render import render_graph_body
+        from .retrieval import bundle_revision, RetrievalContractError
+        from .viewer.metadata import render_metadata
+
+        headers = {"Cache-Control": "private, no-cache"}
+        if set(query) != {"id", "revision"} or any(len(values) != 1 for values in query.values()):
+            return self._send_json(400, {"error": "invalid_request"}, extra_headers=headers)
+        try:
+            cid = concept_id_from_str(query["id"][0])
+        except ConceptIdError:
+            return self._send_json(404, {"error": "target_not_found"}, extra_headers=headers)
+        bundle, _, _, _ = self._state_snapshot()
+        concept = bundle.concepts.get(cid)
+        if concept is None:
+            return self._send_json(404, {"error": "target_not_found"}, extra_headers=headers)
+        revision = bundle_revision(bundle)
+        if query["revision"][0] != revision:
+            return self._send_json(409, {"error": "revision_mismatch"}, extra_headers=headers)
+        def prepare_body():
+            return self._prepare_retrieval_json({
+                "id": concept_id_to_str(cid), "bundle_revision": revision,
+                "html": render_graph_body(concept),
+                "metadata_html": render_metadata(concept, bundle, mode="graph"),
+            })
+        try:
+            code, body = self._run_retrieval_bounded(prepare_body)
+        except RetrievalContractError as exc:
+            return self._send_json(exc.status, exc.as_error(), extra_headers={"Cache-Control": "no-store"})
+        return self._send_bytes(code, body, content_type="application/json; charset=utf-8", extra_headers=headers)
 
     def _handle_content_json(self) -> None:
         data = _content_index_json(self.bundle)

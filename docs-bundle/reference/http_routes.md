@@ -45,7 +45,8 @@ is owned by `session_authority.py` and Studio; see the
 | GET | `/__context` | Read-only deterministic schema-v1 Agent Context Pack as JSON or Markdown. |
 | GET | `/__raw/<concept_id>` | Raw markdown body. |
 | GET | `/__data/summary?id=` | One concept's identity card (title, type, description, type colour/icon, link and relation counts) for link previews. |
-| GET | `/__data/graph.json` | Graph JSON for external tools. |
+| GET | `/__data/graph.json` | Full graph JSON for tools; `?view=structure` is the compact live client contract. |
+| GET | `/__data/graph-body?id=&revision=` | One revision-bound graph detail body and advisory metadata. |
 | GET | `/__data/content.json` | Full content index JSON. |
 | GET | `/__data/doc?id=` | One concept's rendered data plus canonical annotation source/revision and DOM projection map. |
 | GET | `/__data/page?document=` | Bounded canonical Markdown page read, including indexes/logs; see document targets below. |
@@ -135,7 +136,8 @@ or generated) plus the type-grouped concept listing. The studio
 bootstrap (token + asset links) is injected into the `</head>`.
 
 The root inventory has its own 8 MiB HTML response cap (oversize returns `413`),
-independent of the 4 MiB retrieval/graph JSON cap. It lists every concept, so
+independent of the 4 MiB retrieval/full-graph JSON cap and the 16 MiB
+structure-view cap. It lists every concept, so
 5,000 ordinary cards can exceed 4 MiB even with a tiny graph thumbnail. The
 thumbnail uses only identities/topology/counts and renders its existing small
 subset; it does not construct rendered graph metadata or document bodies.
@@ -161,7 +163,9 @@ segments are validated; `..`, `.`, and NUL bytes return 404.
 ## `/__graph`
 
 Full-page Cytoscape.js force-directed graph of the whole bundle.
-The graph data comes from `/__data/graph.json`.
+Live graph data comes from `/__data/graph.json?view=structure`; selected
+concept HTML loads on demand from the revision-bound `/__data/graph-body`.
+Portable viewers keep their emitted/embedded full graph data.
 
 ## `/__search`
 
@@ -274,8 +278,17 @@ including wikilinks with `form="wikilink"`). Same shape as
 [`graph --format json`](cli.md#graph).
 
 With no `view` parameter, returns the full projection including rendered concept
-`bodies` and reserved `documents`. Exactly one `view=structure` returns the same
-projection without those two fields (and does not render their HTML). Any other
+`bodies` and reserved `documents`; this full/tool projection is unchanged.
+Exactly one `view=structure` selects an internal compact client contract, with
+`structure_schema:1`, no rendered bodies/documents/advisory metadata, and only
+fields the graph and Studio read. Empty/zero defaults may be absent (an available
+zero `active_comment_count` remains explicit). Grouping lives in `metadata`, not
+also in duplicated top-level node keys. Each edge's relation list retains
+`id`, `label`, `type`, `kind`, and optional `detail`; source/target/direction are
+inherited from the edge (`direction:outgoing`), multiplicity is the list length,
+and `primary_relation_index` references its primary member instead of duplicating
+it. `document_paths` lists reserved reading destinations without their HTML.
+Graph.js expands this transport before its ordinary validation. Any other
 `view` value, including an empty value, or repeated `view` parameters returns
 `400 {"ok": false, "error": "invalid_request"}`. Unknown query parameters are
 ignored, including cache-busters alongside `view=structure`.
@@ -295,23 +308,46 @@ rebuilding or JSON encoding. Expiry intervals change at the authored instant,
 not at a rounded clock bucket. Concurrent identical reads coalesce independently
 per view, so a slow full-body render does not hold up structure reads.
 
-Both views currently retain the 4 MiB response cap. A conservative lower bound
+Full JSON retains its 4 MiB cap; structure has a separate **16 MiB** cap.
+Measured synthetic 5,000-concept structure is about 7.9 MB after slimming (versus
+23.7 MB previously), so 4 MiB is insufficient even without bodies. A conservative lower bound
 from mandatory graph records refuses certainly oversized graphs before rendering
 or encoding; other responses are checked before encoding when their projected
 size already proves refusal, then against their exact UTF-8 bytes. Refusals are
 cached too, but sent with `Cache-Control: no-store` and status `413`:
 
 ```json
-{"ok":false,"error":{"code":"response_too_large","message":"Graph exceeds the 4 MiB response limit. Open a smaller bundle or use a portable build.","fields":{}}}
+{"ok":false,"error":{"code":"response_too_large","message":"This bundle's graph is too large to display (limit 16 MiB). Open a smaller bundle or use a portable build.","fields":{}}}
 ```
 
 There is no viewer-dependent cache key or visibility change. At most two accepted
-wire responses (8 MiB total) are retained per loaded Bundle, in addition to the
-existing rendered-document cache. This bounds retained response bytes, not all
-cold rendering allocations or the HTTP server's thread count. The current graph
-client still requests the full view and displays only the HTTP status on refusal;
-on-demand body acquisition and richer error presentation remain separate work.
-Portable builds do not use this live transport cache or cap.
+wire responses (20 MiB total) are retained per loaded Bundle, in addition to the
+existing rendered-document cache. All viewers, including the public read-only
+tunnel, share the same response and per-view single-flight. Cold graph work is
+therefore paid once per edit/metadata-expiry/comment-summary generation, not once
+per viewer. The pre-encoding lower bound and exact UTF-8 check refuse oversized
+data without byte-cutting. These bounds do not limit all cold allocations, old
+in-flight generations or HTTP threads; the larger cap is not general admission
+control. The graph page displays the JSON error message rather than only its
+HTTP status. Portable builds do not use this live transport cache or cap.
+
+## `/__data/graph-body?id=<concept_id>&revision=<bundle_revision>`
+
+Read-only, serve-only graph detail HTML. Exactly one `id` and `revision` are
+required; unknown/duplicate parameters return `400`, absent/malformed concepts
+`404`, and a graph revision different from the loaded snapshot `409`.
+Success returns `{id,bundle_revision,html,metadata_html}` with
+`Cache-Control: private, no-cache`. Body HTML is exactly the full graph's
+escaped, heading-demoted, source-footnoted and link-normalized projection;
+advisory HTML uses the graph metadata renderer. It does not run concept-page
+plugins, read raw source, build annotation projections, or render other bodies.
+It captures one loaded Bundle generation, uses the existing bounded retrieval
+executor/deadline, and retains the normal 4 MiB JSON cap (`413`); capacity/timeout
+returns typed `503`. Errors carry no-store where rendering/admission fails.
+There is no new authority or viewer-dependent visibility: the route is equally
+readable locally and through the public read-only ingress. Portable viewers
+never call it. Clients discard late results across selections, accepted graph
+updates, pagehide and BFCache restoration; selected-body capture waits explicitly.
 
 ## `/__data/content.json`
 
@@ -329,8 +365,9 @@ OKF 0.2 adds `metadata` (normalized read-only fields) and `metadata_html`
 (escaped advisory presentation). Existing raw frontmatter, annotation source,
 projection, and revision contracts remain distinct and unchanged. Generation,
 verification, lifecycle, and computation display never grants mutation authority
-or runs an executor/attester. Graph nodes expose `okf_metadata`, `metadata_html`,
-and `generated_at` without replacing the older grouping `metadata` field.
+or runs an executor/attester. Full graph nodes expose `okf_metadata`,
+`metadata_html`, and `generated_at` without replacing the older grouping
+`metadata` field; the compact live view loads advisory HTML only on selection.
 
 ```json
 {
