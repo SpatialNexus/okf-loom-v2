@@ -224,6 +224,43 @@
     return pal;
   }
 
+  // Forced colours (Windows High Contrast). The browser never adjusts canvas
+  // pixels, so the graph resolves the active system colours itself from a
+  // probe (forced-color-adjust:none keeps the keyword's own value instead of
+  // the forced `color`) and paints the canvas from them. Chrome reports
+  // Highlight with 0.8 alpha; the canvas paints the opaque system colour so
+  // strokes never blend into a non-system tint. Cached per sync pass;
+  // syncGraphTheme invalidates it on every palette/media change.
+  var SYSTEM_COLOUR_KEYWORDS = {
+    canvas: "Canvas", text: "CanvasText", highlight: "Highlight", link: "LinkText", gray: "GrayText", buttonText: "ButtonText", buttonFace: "ButtonFace"
+  };
+  var _systemColourCache = null;
+  function invalidateSystemColours() { _systemColourCache = null; }
+  function systemColours() {
+    if (_systemColourCache) return _systemColourCache;
+    var out = {}, host = document.body || document.documentElement, probe = document.createElement("span");
+    probe.style.position = "fixed";
+    probe.style.visibility = "hidden";
+    probe.style.forcedColorAdjust = "none";
+    host.appendChild(probe);
+    Object.keys(SYSTEM_COLOUR_KEYWORDS).forEach(function (name) {
+      probe.style.color = SYSTEM_COLOUR_KEYWORDS[name];
+      var value = window.getComputedStyle(probe).color;
+      var rgb = value.match(/^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/);
+      out[name] = rgb ? "rgb(" + Math.round(+rgb[1]) + ", " + Math.round(+rgb[2]) + ", " + Math.round(+rgb[3]) + ")" : value;
+    });
+    probe.remove();
+    return (_systemColourCache = out);
+  }
+  // The ink baked into SVG glyph and badge data URIs: the Ledger palette, or
+  // the system pair while forced colours own the canvas. Normal mode returns
+  // graphPalette() itself, so its URIs are byte-identical to the palette's.
+  function graphInk() {
+    if (!FORCED_COLORS) return graphPalette();
+    var sys = systemColours();
+    return { nodeIcon: sys.text, nodeText: sys.text, nodeBorder: sys.text, chip: sys.canvas, halo: sys.canvas, error: sys.text };
+  }
+
   // ---- Config from data-* attributes (CSP-safe; no inline script) ------
   // The graph_page.html template passes config via data-* attributes on
   // #okf-graph instead of window.* globals, so the server's CSP
@@ -1049,7 +1086,7 @@
     function iconDataUri(key) {
       if (!key || !ICON_PATHS[key]) key = "file";
       if (!ICON_PATHS[key]) return null;
-      var ink = graphPalette().nodeIcon, cacheKey = key + "|" + ink;
+      var ink = graphInk().nodeIcon, cacheKey = key + "|" + ink;
       if (_iconUriCache[cacheKey]) return _iconUriCache[cacheKey];
       // Explicit width/height give the glyph an intrinsic size. Without it,
       // Chrome drew the image about twice too large on HiDPI canvases
@@ -1119,7 +1156,7 @@
       // the platform monospace inside the data URI.)
       var text = commentCountText(count);
       var width = 26;
-      var badgePalette = graphPalette();
+      var badgePalette = graphInk();
       var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="18" viewBox="0 0 ' + width + ' 18">' +
         '<path d="M1 1H' + (width - 1) + 'V17H1Z" fill="' + badgePalette.chip + '" stroke="' + badgePalette.nodeBorder + '" stroke-width="1.2"/>' +
         '<text x="' + (width / 2) + '" y="12.6" text-anchor="middle" font-family="Azeret Mono,ui-monospace,monospace" font-size="9.5" font-weight="500" fill="' + badgePalette.nodeText + '">' + text + '</text></svg>';
@@ -1130,7 +1167,7 @@
       // triangle and "!" in the muted error hue (status hues mark strokes and
       // glyphs, never fills), on the halo so it reads over edges. The shape
       // keeps broken+comment+selected+hub states distinguishable.
-      var badgePalette=graphPalette();
+      var badgePalette=graphInk();
       var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="20" viewBox="0 0 22 20">' +
         '<path d="M11 1.5 20.5 18.5H1.5Z" fill="'+badgePalette.halo+'" stroke="'+badgePalette.error+'" stroke-width="1.6" stroke-linejoin="miter"/>' +
         '<text x="11" y="15.5" text-anchor="middle" font-family="Azeret Mono,ui-monospace,monospace" font-size="10" font-weight="700" fill="'+badgePalette.error+'">!</text></svg>';
@@ -1635,6 +1672,26 @@
       return pal.ramp.relation[hashHue(label) % pal.ramp.relation.length];
     }
     function relDashClass(label) { return "okf-reld-" + (hashHue(label) % 3 + 1); }
+    // Forced-colours lens cues: the lens encoding without hue. A category
+    // index picks one of eight node shapes (the same index the categorical
+    // ramp uses), an ordered value one of five stroke weights; undated
+    // concepts are dotted. The canvas layer and the legend/index keys read
+    // the same cue, so they always agree.
+    function lensShapeCue(i) { return "shape-" + ((((Number(i) || 0) % 8) + 8) % 8); }
+    function lensLevelCue(t) { return "level-" + Math.round(Math.max(0, Math.min(1, Number(t) || 0)) * 4); }
+    function recencyCue(days) { return isFinite(days) ? lensLevelCue(1 - Math.min(1, days / 180)) : "undated"; }
+    function groupCue(g) {
+      if (!g) return "";
+      var idx = groupList.indexOf(g);
+      return lensShapeCue(idx >= 0 ? idx : hashHue(g));
+    }
+    function lensKeyTitle(cue, name) {
+      return (FORCED_COLORS ? (cue === "shape" ? "Shape: " : "Outline: ") : "Colour: ") + name;
+    }
+    function setForcedCue(el, cue) {
+      if (cue) el.setAttribute("data-forced-cue", cue);
+      else el.removeAttribute("data-forced-cue");
+    }
     function importanceColor(w) {
       // Neutral (low) → muted accent (high): one ordered ramp, not a
       // categorical palette (a11y: ordered scale).
@@ -2135,48 +2192,114 @@
       syncStatefulGraphColours(pal);
     }
       if(reducedMotionQuery){var syncGraphMotion=function(){try{cy.style().selector("node.okf-hover").style("transition-duration",REDUCED_MOTION?"0ms":"120ms").update();}catch(e){}};if(reducedMotionQuery.addEventListener)reducedMotionQuery.addEventListener("change",syncGraphMotion);else if(reducedMotionQuery.addListener)reducedMotionQuery.addListener(syncGraphMotion);}
-      function resolvedSystemColor(value){var probe=document.createElement("span");probe.style.color=value;probe.style.position="fixed";probe.style.visibility="hidden";document.body.appendChild(probe);var color=getComputedStyle(probe).color;probe.remove();return color;}
+      // ---- Forced colours: the system-colour canvas layer -----------------
+      // Canvas pixels are never adjusted by the browser, so under forced
+      // colours the graph paints itself from the resolved system colours
+      // (systemColours). The layer is one block of rules scoped to the
+      // okf-forced class, appended after every palette rule so it wins
+      // Cytoscape's last-rule-wins cascade, and carried by elements only
+      // while forced colours are active. Leaving forced colours removes the
+      // class, so every ordinary rule (every Ledger palette value) applies
+      // again exactly as before; the block is re-appended on the next entry
+      // whenever palette passes have appended rules after it.
+      // Hue never carries meaning here: lens categories become node shapes,
+      // ordered lenses become stroke weights, and every reader state is
+      // Highlight plus its own stroke width, style or ring.
+      //   node          Canvas fill; CanvasText 2px solid stroke and label on
+      //                 a Canvas plate
+      //   lens category shape (FORCED_LENS_SHAPES; the legend draws the same)
+      //   lens order    stroke 1 / 2.5 / 4 / 5.5 / 7px; undated dotted 2px
+      //   orphan        dashed stroke        hub     thin CanvasText outer ring
+      //   bridge        6px double stroke    dimmed  GrayText dotted 2px
+      //   hover         Highlight 4px solid (plus the 15% growth)
+      //   search hit    Highlight 5px dashed
+      //   path node     Highlight 5px dotted
+      //   focus root    Highlight 7px double (over the selected stroke)
+      //   tour target   Highlight 4px solid ring, 6px outside the node
+      //   presence      LinkText 3px dashed ring, 4px outside the node
+      //   selected      Highlight 6px solid
+      //   edge          CanvasText, 3-5px by weight; typed edges keep dashes
+      //   dimmed edge   GrayText dotted 2px
+      //   path edge     Highlight 7px solid; selected edge Highlight 6px dashed
+      //   count chip    ButtonText on ButtonFace
+      var FORCED_CLASS = "okf-forced";
+      var FORCED_LENS_SHAPES = ["ellipse", "rectangle", "diamond", "triangle", "hexagon", "pentagon", "octagon", "rhomboid"];
+      var FORCED_LEVEL_WIDTHS = [1, 2.5, 4, 5.5, 7];
+      var forcedRulesEnd = -1, forcedRulesKey = "";
+      function forcedLensCue(n) { return String(n.data("lensCue") || ""); }
+      function forcedNodeShape(n) {
+        var cue = forcedLensCue(n);
+        if (cue.indexOf("shape-") === 0) return FORCED_LENS_SHAPES[(Number(cue.slice(6)) || 0) % FORCED_LENS_SHAPES.length];
+        return n.data("shape") || "ellipse";
+      }
+      function forcedNodeBorderWidth(n) {
+        var cue = forcedLensCue(n);
+        return cue.indexOf("level-") === 0 ? (FORCED_LEVEL_WIDTHS[Number(cue.slice(6))] || 2) : 2;
+      }
+      function forcedNodeBorderStyle(n) { return forcedLensCue(n) === "undated" ? "dotted" : "solid"; }
+      function appendForcedColourRules(sys, key) {
+        var dimNodes = "node.okf-forced.dim, node.okf-forced.okf-hover-dim, node.okf-forced.okf-path-dim, node.okf-forced.okf-search-nonmatch";
+        var dimEdges = "edge.okf-forced.dim, edge.okf-forced.okf-hover-dim, edge.okf-forced.okf-path-dim, edge.okf-forced.okf-unrelated";
+        cy.style()
+          .selector("node.okf-forced").style({
+            "background-color": sys.canvas, "background-opacity": 1, "shape": forcedNodeShape,
+            "border-color": sys.text, "border-opacity": 1, "border-width": forcedNodeBorderWidth, "border-style": forcedNodeBorderStyle,
+            "color": sys.text, "text-outline-color": sys.canvas, "text-outline-width": 2, "text-outline-opacity": 1,
+            "text-background-color": sys.canvas, "text-background-opacity": 1,
+            "underlay-color": sys.canvas, "underlay-opacity": 0, "outline-width": 0, "opacity": 1
+          })
+          .selector("node.okf-forced.okf-orphan").style({ "border-style": "dashed" })
+          .selector("node.okf-forced.okf-hub").style({ "outline-color": sys.text, "outline-style": "solid", "outline-width": 1.5, "outline-offset": 3, "outline-opacity": 1 })
+          .selector("node.okf-forced.okf-bridge").style({ "border-style": "double", "border-width": 6 })
+          .selector(dimNodes).style({ "border-color": sys.gray, "border-style": "dotted", "border-width": 2, "color": sys.gray, "outline-color": sys.gray })
+          .selector("node.okf-forced.okf-hover").style({ "border-color": sys.highlight, "border-style": "solid", "border-width": 4 })
+          .selector("node.okf-forced.okf-tour-target").style({ "outline-color": sys.highlight, "outline-style": "solid", "outline-width": 4, "outline-offset": 6, "outline-opacity": 1 })
+          .selector("node.okf-forced.okf-presence-halo").style({ "outline-color": sys.link, "outline-style": "dashed", "outline-width": 3, "outline-offset": 4, "outline-opacity": 1 })
+          .selector("node.okf-forced.okf-search-match").style({ "border-color": sys.highlight, "border-style": "dashed", "border-width": 5 })
+          .selector("node.okf-forced.okf-path").style({ "border-color": sys.highlight, "border-style": "dotted", "border-width": 5 })
+          .selector("node.okf-forced:selected").style({ "border-color": sys.highlight, "border-style": "solid", "border-width": 6 })
+          // The focus root is the selection Focus explores from; it keeps its
+          // own double stroke over the plain selected stroke.
+          .selector("node.okf-forced.okf-focus-root").style({ "border-color": sys.highlight, "border-style": "double", "border-width": 7 })
+          .selector("edge.okf-forced").style({
+            "line-color": sys.text, "target-arrow-color": sys.text, "width": "mapData(weight, 0, 1, 3, 5)", "opacity": 1,
+            "color": sys.text, "text-background-color": sys.canvas, "text-background-opacity": 1
+          })
+          .selector("edge.okf-forced.okf-multi-edge").style({
+            "color": sys.buttonText, "text-background-color": sys.buttonFace, "text-border-color": sys.buttonText, "text-border-width": 1, "text-border-opacity": 1
+          })
+          .selector(dimEdges).style({ "line-color": sys.gray, "target-arrow-color": sys.gray, "line-style": "dotted", "width": 2, "color": sys.gray })
+          .selector("edge.okf-forced.okf-path").style({ "line-color": sys.highlight, "target-arrow-color": sys.highlight, "line-style": "solid", "width": 7 })
+          .selector("edge.okf-forced:selected").style({
+            "line-color": sys.highlight, "target-arrow-color": sys.highlight, "line-style": "dashed", "line-dash-pattern": [12, 4], "width": 6
+          })
+          .update();
+        forcedRulesEnd = cy.style().length;
+        forcedRulesKey = key;
+      }
+      // The forced-colours hook: theme events and forced-colour media changes
+      // both route through syncGraphTheme to here. Under forced colours a
+      // palette event never reaches the ordinary synchroniser; leaving them
+      // hands the canvas back to it.
       function syncForcedColorGraph(){
         FORCED_COLORS=!!(forcedColorsQuery&&forcedColorsQuery.matches);
         try {
-          var canvasText=FORCED_COLORS?resolvedSystemColor("CanvasText"):graphPalette().nodeText;
-          var canvas=FORCED_COLORS?resolvedSystemColor("Canvas"):graphPalette().edgeLabelBg;
-          var highlight=FORCED_COLORS?resolvedSystemColor("Highlight"):graphPalette().select;
-          cy.style()
-            .selector("node")
-            .style({"color":canvasText,"text-background-color":canvas,"text-outline-color":canvas,"border-color":canvasText,"border-width":FORCED_COLORS?3:1.5})
-            .selector("edge")
-            // Edge label plates/text follow the system palette too: the
-            // theme's edgeLabelBg is no longer white (Soft Light), so it may
-            // not stand in for Canvas. syncLabelColour restores both.
-            .style({"line-color":canvasText,"target-arrow-color":canvasText,"color":canvasText,"text-background-color":canvas,"width":FORCED_COLORS?3:undefined,"opacity":FORCED_COLORS?1:undefined})
-            // Typed edge rules are later than the base edge rule; explicitly
-            // replace their hue so forced colours cannot leak ordinary HSL.
-            .selector("edge.okf-rel-edge")
-            .style({"line-color":canvasText,"target-arrow-color":canvasText})
-            .selector("node:selected, node.okf-search-match, node.okf-hover, node.okf-hub, node.okf-path, node.okf-focus-root, .okf-presence-halo")
-            .style({"underlay-color":highlight})
-            .selector("node:selected")
-            .style({"border-color":highlight,"border-width":FORCED_COLORS?6:4,"border-style":"solid"})
-            .selector("node.okf-search-match")
-            .style({"border-color":highlight,"border-width":FORCED_COLORS?5:3,"border-style":FORCED_COLORS?"dashed":"solid"})
-            .selector("node.okf-focus-root")
-            .style({"border-color":highlight,"border-width":FORCED_COLORS?7:4,"border-style":"double"})
-            .selector("node.okf-bridge")
-            .style({"border-color":canvasText})
-            .selector("node.okf-path, .okf-presence-halo")
-            .style({"border-color":highlight})
-            .selector("edge.okf-path, edge:selected")
-            .style({"line-color":highlight,"target-arrow-color":highlight})
-            .selector("edge.okf-path")
-            .style({"width":FORCED_COLORS?7:5,"line-style":"dashed"})
-            .selector("edge.okf-multi-edge")
-            .style("text-border-color", highlight)
-            .update();
-          if(!FORCED_COLORS)syncLabelColour();
+          if (FORCED_COLORS) {
+            var sys = systemColours(), key = Object.keys(sys).map(function (name) { return sys[name]; }).join("|");
+            // Re-append when the system colours changed or a palette pass
+            // appended rules after the layer: it must stay last to win.
+            if (key !== forcedRulesKey || cy.style().length !== forcedRulesEnd) appendForcedColourRules(sys, key);
+            cy.elements().addClass(FORCED_CLASS);
+          } else {
+            cy.elements().removeClass(FORCED_CLASS);
+            syncLabelColour();
+          }
         } catch(e) {}
         document.body.toggleAttribute("data-okf-forced-colors",FORCED_COLORS);
       }
+      // Elements added later (live refresh, LOD reveal, decluster) join the
+      // system layer immediately; their glyphs already use graphInk().
+      cy.on("add", function (evt) { if (FORCED_COLORS) evt.target.addClass(FORCED_CLASS); });
       // Theme events and forced-colour media changes share one route. A
       // resolved theme event must never call the ordinary synchronizer while
       // the system palette owns the graph.
@@ -2188,11 +2311,14 @@
     // elemFor() already stamped every node with this palette's glyph and
     // neutral fill, so first paint skips the per-node pass; it runs only once
     // a palette change resolves a new token set.
-    var glyphsPaintedFor = graphPalette();
+    var glyphsPaintedFor = graphPalette(), glyphInkPainted = graphInk().nodeIcon;
     function refreshNodeGlyphs() {
-      var pal = graphPalette();
-      if (pal === glyphsPaintedFor) return;
+      // The glyph ink also changes when forced colours start or stop (or the
+      // system colours change) while the Ledger palette stays the same.
+      var pal = graphPalette(), ink = graphInk().nodeIcon;
+      if (pal === glyphsPaintedFor && ink === glyphInkPainted) return;
       glyphsPaintedFor = pal;
+      glyphInkPainted = ink;
       var neutral = pal.node;
       cy.batch(function () {
         cy.nodes().forEach(function (node) {
@@ -2213,15 +2339,26 @@
       // A palette event invalidates the resolved token set; a forced-colours
       // media change keeps it (custom properties are not forced).
       if(event&&event.type==="okf-loom:themeChanged")invalidateGraphPalette();
+      // System colours are re-resolved on every pass: a forced-colour theme
+      // or colour-scheme switch changes them without a palette event.
+      invalidateSystemColours();
       cy.batch(function () {
         syncBadgeDataUris();
         repaintLensColours();
-        if(FORCED_COLORS)syncForcedColorGraph();else syncLabelColour();
+        // Both directions go through the forced-colours hook: entering
+        // applies the system layer, leaving removes it and re-runs the
+        // ordinary label/state synchroniser.
+        syncForcedColorGraph();
       });
       syncMinimap();
       }
       window.addEventListener("okf-loom:themeChanged",syncGraphTheme);
       if(forcedColorsQuery){if(forcedColorsQuery.addEventListener)forcedColorsQuery.addEventListener("change",syncGraphTheme);else if(forcedColorsQuery.addListener)forcedColorsQuery.addListener(syncGraphTheme);}
+      // A high-contrast theme switch can change the system colours while
+      // forced colours stay active; outside forced colours theme.js owns
+      // the System appearance and announces it with a palette event.
+      var forcedSchemeQuery=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)");
+      if(forcedSchemeQuery){var syncForcedScheme=function(){if(FORCED_COLORS)syncGraphTheme();};if(forcedSchemeQuery.addEventListener)forcedSchemeQuery.addEventListener("change",syncForcedScheme);else if(forcedSchemeQuery.addListener)forcedSchemeQuery.addListener(syncForcedScheme);}
       syncGraphTheme();
 
     // Legend overlay. Rebuilt by updateLegend() so it reflects the
@@ -2303,6 +2440,7 @@
           sw.className = "okf-node-index__swatch";
           var shelfNode = cy.getElementById(id);
           sw.style.background = (shelfNode && shelfNode.length && shelfNode.data("color")) || graphPalette().node;
+          setForcedCue(sw, shelfNode && shelfNode.length ? shelfNode.data("lensCue") : "");
           btn.appendChild(sw);
           var lbl = document.createElement("span");
           lbl.className = "okf-node-index__label";
@@ -2328,7 +2466,8 @@
       }
     // A legend row: a square swatch in the canvas colour it explains (the
     // muted lens ramp), or a hollow canvas-coloured square for "no data".
-    function legendRow(swatchBg, text) {
+    // `cue` is the row's forced-colours key (shape or stroke weight).
+    function legendRow(swatchBg, text, cue) {
       var item = document.createElement("div");
       item.className = "okf-graph-legend__item";
       var sw = document.createElement("span");
@@ -2336,6 +2475,7 @@
       if (swatchBg === "transparent") sw.classList.add("okf-graph-legend__swatch--none");
       else sw.style.background = swatchBg;
       sw.dataset.swatch = swatchBg;
+      setForcedCue(sw, cue);
       var label = document.createElement("span");
       label.textContent = text;
       item.appendChild(sw); item.appendChild(label);
@@ -2413,7 +2553,7 @@
         if (controlState.colorMode === "community") {
           var com = computeCommunities();
           var pr = computePageRank();
-          body.appendChild(legendTitle("Colour: themes"));
+          body.appendChild(legendTitle(lensKeyTitle("shape", "themes")));
           com.list.slice(0, 8).forEach(function (c) {
             if (!c.ids.length) return;
             var ex = c.ids.slice().sort(function (a, b) { return (pr[b] || 0) - (pr[a] || 0); })[0];
@@ -2422,31 +2562,31 @@
             // theme identity so the legend is readable without relying on the
             // theme palette alone.
             body.appendChild(legendRow(communityColor(c.index),
-              themeLabel(c.index) + " \u00b7 " + (d.label || ex)));
+              themeLabel(c.index) + " \u00b7 " + (d.label || ex), lensShapeCue(c.index)));
           });
           if (com.list.length > 8) body.appendChild(legendRow("transparent", "+ " + (com.list.length - 8) + " more"));
       } else if (controlState.colorMode === "recency") {
-          body.appendChild(legendTitle("Colour: freshness"));
-          body.appendChild(legendRow(recencyColor(7), "This month"));
-          body.appendChild(legendRow(recencyColor(90), "This quarter"));
-          body.appendChild(legendRow(recencyColor(365), "6 months +"));
-          var undatedRow = legendRow(recencyColor(Infinity), "No timestamp");
+          body.appendChild(legendTitle(lensKeyTitle("level", "freshness")));
+          body.appendChild(legendRow(recencyColor(7), "This month", recencyCue(7)));
+          body.appendChild(legendRow(recencyColor(90), "This quarter", recencyCue(90)));
+          body.appendChild(legendRow(recencyColor(365), "6 months +", recencyCue(365)));
+          var undatedRow = legendRow(recencyColor(Infinity), "No timestamp", recencyCue(Infinity));
           undatedRow.firstChild.classList.add("okf-graph-legend__swatch--hollow");
           body.appendChild(undatedRow);
       } else if (controlState.colorMode === "bridge") {
-          body.appendChild(legendTitle("Colour: bridging power"));
-          body.appendChild(legendRow(bridgeColor(0.1), "On few paths"));
-          body.appendChild(legendRow(bridgeColor(0.6), "Connective"));
-          body.appendChild(legendRow(bridgeColor(1), "Holds areas together"));
+          body.appendChild(legendTitle(lensKeyTitle("level", "bridging power")));
+          body.appendChild(legendRow(bridgeColor(0.1), "On few paths", lensLevelCue(0.1)));
+          body.appendChild(legendRow(bridgeColor(0.6), "Connective", lensLevelCue(0.6)));
+          body.appendChild(legendRow(bridgeColor(1), "Holds areas together", lensLevelCue(1)));
       } else if (controlState.colorBy === "group" && controlState.groupBy !== "type") {
-          body.appendChild(legendTitle("Colour: " + GROUP_LABELS[controlState.groupBy]));
-          groupList.slice(0, 12).forEach(function (g) { body.appendChild(legendRow(groupColor(g), g)); });
+          body.appendChild(legendTitle(lensKeyTitle("shape", GROUP_LABELS[controlState.groupBy])));
+          groupList.slice(0, 12).forEach(function (g) { body.appendChild(legendRow(groupColor(g), g, groupCue(g))); });
           if (groupList.length > 12) body.appendChild(legendRow("transparent", "+ " + (groupList.length - 12) + " more"));
       } else if (controlState.colorBy === "importance") {
-          body.appendChild(legendTitle("Node colour: importance (" + SIGNAL_LABELS[controlState.primarySignal] + ")"));
-          body.appendChild(legendRow(importanceColor(0.1), "Low"));
-          body.appendChild(legendRow(importanceColor(0.5), "Medium"));
-          body.appendChild(legendRow(importanceColor(0.95), "High"));
+          body.appendChild(legendTitle("Node " + (FORCED_COLORS ? "outline" : "colour") + ": importance (" + SIGNAL_LABELS[controlState.primarySignal] + ")"));
+          body.appendChild(legendRow(importanceColor(0.1), "Low", lensLevelCue(0.1)));
+          body.appendChild(legendRow(importanceColor(0.5), "Medium", lensLevelCue(0.5)));
+          body.appendChild(legendRow(importanceColor(0.95), "High", lensLevelCue(0.95)));
       }
         // Without a colour lens the nodes are neutral (content types are not
         // colour-coded), so there is no colour key; types stay filterable
@@ -2621,13 +2761,16 @@
           else if (controlState.sizeMode === "betweenness" && bt) vs = 22 + 50 * (bt[id] || 0);
           else if (controlState.scaleByImportance) vs = 26 + 44 * nodeWeight(id);
           n.data("vizSize", vs);
-          var col = n.data("baseColor");
-          if (controlState.colorMode === "community") col = communityColor(communityOf[id] || 0);
-          else if (controlState.colorMode === "recency") col = recencyColor(recencyDays(id));
-          else if (controlState.colorMode === "bridge" && bt) col = bridgeColor(bt[id] || 0);
-          else if (controlState.colorBy === "group") col = groupColor(groupOf[id]);
-          else if (controlState.colorBy === "importance") col = importanceColor(nodeWeight(id));
+          // lensCue is the same encoding without hue (shape or stroke
+          // weight); only the forced-colours layer and its keys read it.
+          var col = n.data("baseColor"), cue = "";
+          if (controlState.colorMode === "community") { col = communityColor(communityOf[id] || 0); cue = lensShapeCue(communityOf[id] || 0); }
+          else if (controlState.colorMode === "recency") { var days = recencyDays(id); col = recencyColor(days); cue = recencyCue(days); }
+          else if (controlState.colorMode === "bridge" && bt) { col = bridgeColor(bt[id] || 0); cue = lensLevelCue(bt[id] || 0); }
+          else if (controlState.colorBy === "group") { col = groupColor(groupOf[id]); cue = groupCue(groupOf[id]); }
+          else if (controlState.colorBy === "importance") { col = importanceColor(nodeWeight(id)); cue = lensLevelCue(nodeWeight(id)); }
           n.data("color", col);
+          n.data("lensCue", cue);
           // Bridges: the glow marks the TOP bridgers by real betweenness
           // (was: heuristic cross-group edge counting).
           n.toggleClass("okf-bridge", !!(controlState.showBridges && bt && (bt[id] || 0) >= BRIDGE_CUT));
@@ -3497,6 +3640,7 @@
         // default, the muted lens colour while a colour lens is on.
         var node = cy.getElementById(id);
         sw.style.background = (node && node.length && node.data("color")) || graphPalette().node;
+        setForcedCue(sw, node && node.length ? node.data("lensCue") : "");
       });
     }
 
@@ -4539,7 +4683,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
     var minimapWrap=null,minimapCanvas=null,viewportRerunButton=null,fullscreenButton=null,fullscreenGeneration=0,fullscreenPending=false;
     function viewportIcon(name){var svg=document.createElementNS("http://www.w3.org/2000/svg","svg");svg.setAttribute("viewBox","0 0 24 24");svg.setAttribute("aria-hidden","true");svg.classList.add("okf-viewport-icon");var paths={plus:"M12 5v14M5 12h14",minus:"M5 12h14",/* fit: four arrows pointing in at a centre content box (never bare corner brackets: those read as fullscreen) */fit:"M9 9h6v6H9zM3 3l3.5 3.5M6.5 3.5v3h-3M21 3l-3.5 3.5M17.5 3.5v3h3M3 21l3.5-3.5M6.5 20.5v-3h-3M21 21l-3.5-3.5M17.5 20.5v-3h3",/* reset: counter-clockwise circular arrow (rotate-ccw) */reset:"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5",fullscreen:"M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5",exit:"M9 9H4V4M15 9h5V4M9 15H4v5M15 15h5v5",minimap:"M4 5h16v14H4zM8 15l3-4 3 2 3-5",layout:"M12 3a9 9 0 0 1 8 5M20 3v5h-5M12 21a9 9 0 0 1-8-5M4 21v-5h5"};var p=document.createElementNS(svg.namespaceURI,"path");p.setAttribute("d",paths[name]||paths.layout);p.setAttribute("fill","none");p.setAttribute("stroke","currentColor");p.setAttribute("stroke-width","2");p.setAttribute("stroke-linecap","round");p.setAttribute("stroke-linejoin","round");svg.appendChild(p);return svg;}
     function setViewportIcon(button,name){var old=button.querySelector(".okf-viewport-icon"),next=viewportIcon(name);if(old)button.replaceChild(next,old);else button.insertBefore(next,button.firstChild);}
-      function syncMinimap(){if(!minimapCanvas||!minimapWrap||minimapWrap.hidden)return;var ctx=minimapCanvas.getContext("2d");if(!ctx)return;var w=minimapCanvas.width,h=minimapCanvas.height,nodes=cy.nodes().not(".dim");ctx.clearRect(0,0,w,h);if(!nodes.length)return;/* Ledger overview: --text-3 dots on the panel, the viewport as a 1.5px ink frame (no tinted wash); forced colours use system ink and Highlight. */var pal=graphPalette(),nodeColour=FORCED_COLORS?resolvedSystemColor("CanvasText"):pal.muted,frameColour=FORCED_COLORS?resolvedSystemColor("Highlight"):pal.cue,bb=nodes.boundingBox(),sx=(w-12)/Math.max(1,bb.w),sy=(h-18)/Math.max(1,bb.h),s=Math.min(sx,sy);ctx.fillStyle=nodeColour;nodes.forEach(function(n){var p=n.position();ctx.beginPath();ctx.arc(6+(p.x-bb.x1)*s,12+(p.y-bb.y1)*s,FORCED_COLORS?3.5:2.5,0,Math.PI*2);ctx.fill();});var ext=cy.extent(),x=6+(ext.x1-bb.x1)*s,y=12+(ext.y1-bb.y1)*s,rw=Math.max(3,ext.w*s),rh=Math.max(3,ext.h*s);ctx.strokeStyle=frameColour;ctx.lineWidth=FORCED_COLORS?3:1.5;ctx.strokeRect(x,y,rw,rh);minimapCanvas.dataset.zoom=String(cy.zoom());minimapCanvas.dataset.nodeCount=String(nodes.length);minimapCanvas.title="Overview map: "+nodes.length+" visible concepts; outlined rectangle is the current viewport.";var label=minimapWrap.querySelector("span");if(label)label.textContent="Overview · "+nodes.length;}
+      function syncMinimap(){if(!minimapCanvas||!minimapWrap||minimapWrap.hidden)return;var ctx=minimapCanvas.getContext("2d");if(!ctx)return;var w=minimapCanvas.width,h=minimapCanvas.height,nodes=cy.nodes().not(".dim");ctx.clearRect(0,0,w,h);if(!nodes.length)return;/* Ledger overview: --text-3 dots on the panel, the viewport as a 1.5px ink frame (no tinted wash); forced colours use system ink and Highlight. */var pal=graphPalette(),sys=FORCED_COLORS?systemColours():null,nodeColour=sys?sys.text:pal.muted,frameColour=sys?sys.highlight:pal.cue,bb=nodes.boundingBox(),sx=(w-12)/Math.max(1,bb.w),sy=(h-18)/Math.max(1,bb.h),s=Math.min(sx,sy);ctx.fillStyle=nodeColour;nodes.forEach(function(n){var p=n.position();ctx.beginPath();ctx.arc(6+(p.x-bb.x1)*s,12+(p.y-bb.y1)*s,FORCED_COLORS?3.5:2.5,0,Math.PI*2);ctx.fill();});var ext=cy.extent(),x=6+(ext.x1-bb.x1)*s,y=12+(ext.y1-bb.y1)*s,rw=Math.max(3,ext.w*s),rh=Math.max(3,ext.h*s);ctx.strokeStyle=frameColour;ctx.lineWidth=FORCED_COLORS?3:1.5;ctx.strokeRect(x,y,rw,rh);minimapCanvas.dataset.zoom=String(cy.zoom());minimapCanvas.dataset.nodeCount=String(nodes.length);minimapCanvas.title="Overview map: "+nodes.length+" visible concepts; outlined rectangle is the current viewport.";var label=minimapWrap.querySelector("span");if(label)label.textContent="Overview · "+nodes.length;}
     // ---- Phase 4: zoom cluster (bottom-right) ---------------------------
     (function buildZoomCluster() {
       var wrap = document.createElement("div");

@@ -971,7 +971,7 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
 @media(max-width:640px){html,body,.okf-viewer--graph,.okf-layout,.okf-layout>.okf-graph,.okf-layout>.okf-detail{box-sizing:border-box;max-width:100%;min-width:0;overflow-x:hidden}.okf-graph-zoom{right:8px;bottom:8px}.okf-graph-zoom button,.okf-filter-chips button,.okf-graph-search-clear{min-width:44px;min-height:44px}.okf-graph-minimap{right:60px;bottom:8px;width:120px;height:92px}.okf-graph-minimap canvas{width:120px;height:76px}.okf-signal__seg{grid-template-columns:1fr}.okf-lens-choice{grid-template-columns:44px minmax(0,1fr)}.okf-lens-preview{width:44px;height:32px}.okf-filter-chip-group{max-width:100%}.okf-filter-chip{min-width:0;overflow-wrap:anywhere}.okf-filter-showall{min-width:88px}.okf-graph-focusbar{top:8px;max-width:calc(100% - 16px)}.okf-graph-actions{max-width:calc(100% - 16px)}.okf-detail-relationships__list{display:grid;grid-template-columns:minmax(0,1fr);width:100%;overflow-x:visible;overscroll-behavior-inline:auto}.okf-detail-relationships__list li{width:100%;max-width:100%;flex:none}.okf-detail-relationships__list button{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:break-word}}
 @media(max-width:360px){.okf-detail-relationships__list li{grid-template-columns:minmax(0,1fr)}.okf-detail-relationships__key{margin-top:4px}.okf-detail-relationships__key:first-child{margin-top:0}}
 .okf-graph-viewport-toolbar{display:none}
-@media(forced-colors:active){.okf-graph-minimap{display:none!important}.okf-graph-zoom button[aria-label="Show minimap"]{display:none}.okf-filter-chip,.okf-filter-solo,.okf-filter-showall,.okf-lens-preview{forced-color-adjust:auto;border:2px solid CanvasText}.okf-filter-chip.is-off{border-style:dashed}.okf-filter-chip.is-off::after{content:" · off"}.okf-filter-chip[aria-pressed=true]{outline:3px double Highlight;box-shadow:none}.okf-lens-preview line,.okf-lens-preview circle,.okf-preview-arrow,.okf-preview-hull,.okf-preview-ring{stroke:CanvasText!important}.okf-lens-preview circle{fill:Canvas!important}.okf-node-index__item.is-active{outline:3px dotted Highlight;outline-offset:-3px}.okf-detail-path__message::before{content:"Highlighted path: ";font-weight:700}.okf-graph-canvas-proxy:focus-visible{outline:4px double Highlight}}
+@media(forced-colors:active){.okf-graph-minimap{border:1px solid CanvasText;background:Canvas}.okf-graph-minimap>span{color:CanvasText;background:Canvas;border-bottom-color:CanvasText}.okf-filter-chip,.okf-filter-solo,.okf-filter-showall,.okf-lens-preview{forced-color-adjust:auto;border:2px solid CanvasText}.okf-filter-chip.is-off{border-style:dashed}.okf-filter-chip.is-off::after{content:" · off"}.okf-filter-chip[aria-pressed=true]{outline:3px double Highlight;box-shadow:none}.okf-lens-preview line,.okf-lens-preview circle,.okf-preview-arrow,.okf-preview-hull,.okf-preview-ring{stroke:CanvasText!important}.okf-lens-preview circle{fill:Canvas!important}.okf-node-index__item.is-active{outline:3px dotted Highlight;outline-offset:-3px}.okf-detail-path__message::before{content:"Highlighted path: ";font-weight:700}.okf-graph-canvas-proxy:focus-visible{outline:4px double Highlight}}
 
 /* ---- Phase 5: live "graph updated" chip --------------------------------- */
 .okf-graph-updated {
@@ -1612,6 +1612,32 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
     border: 1px solid CanvasText;
     background: Canvas !important;
   }
+  /* Lens keys under forced colours: the canvas trades hue for node shape
+   * (categories) and stroke weight (ordered lenses), so the legend and the
+   * concept-index swatches draw the same cue (graph.js data-forced-cue). */
+  :is(.okf-graph-legend__swatch, .okf-node-index__swatch)[data-forced-cue] {
+    width: 12px;
+    height: 12px;
+    box-sizing: border-box;
+  }
+  :is(.okf-graph-legend__swatch, .okf-node-index__swatch)[data-forced-cue^="shape-"] {
+    forced-color-adjust: none;
+    border: 0;
+    background: CanvasText !important;
+  }
+  :is(.okf-graph-legend__swatch, .okf-node-index__swatch)[data-forced-cue="shape-0"] { clip-path: circle(50%); }
+  :is(.okf-graph-legend__swatch, .okf-node-index__swatch)[data-forced-cue="shape-2"] { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+  :is(.okf-graph-legend__swatch, .okf-node-index__swatch)[data-forced-cue="shape-3"] { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  :is(.okf-graph-legend__swatch, .okf-node-index__swatch)[data-forced-cue="shape-4"] { clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); }
+  :is(.okf-graph-legend__swatch, .okf-node-index__swatch)[data-forced-cue="shape-5"] { clip-path: polygon(50% 0, 100% 38%, 82% 100%, 18% 100%, 0 38%); }
+  :is(.okf-graph-legend__swatch, .okf-node-index__swatch)[data-forced-cue="shape-6"] { clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%); }
+  :is(.okf-graph-legend__swatch, .okf-node-index__swatch)[data-forced-cue="shape-7"] { clip-path: polygon(30% 0, 100% 0, 70% 100%, 0 100%); }
+  :is(.okf-graph-legend__swatch, .okf-node-index__swatch)[data-forced-cue^="level-"] { border: 1px solid CanvasText; background: Canvas !important; }
+  :is(.okf-graph-legend__swatch, .okf-node-index__swatch)[data-forced-cue="level-1"] { border-width: 2px; }
+  :is(.okf-graph-legend__swatch, .okf-node-index__swatch)[data-forced-cue="level-2"] { border-width: 3px; }
+  :is(.okf-graph-legend__swatch, .okf-node-index__swatch)[data-forced-cue="level-3"] { border-width: 4px; }
+  :is(.okf-graph-legend__swatch, .okf-node-index__swatch)[data-forced-cue="level-4"] { border-width: 5px; }
+  :is(.okf-graph-legend__swatch, .okf-node-index__swatch)[data-forced-cue="undated"] { border: 2px dotted CanvasText; background: Canvas !important; }
   .okf-graph-legend__item--type-filter .okf-graph-legend__type-icon {
     color: CanvasText;
   }
