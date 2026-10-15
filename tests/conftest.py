@@ -145,7 +145,8 @@ def private_session_root(bundle: Path) -> Path:
     """
     # Proposal publication also correctly rejects a group-writable bundle
     # root. This is a disposable fixture copy, never the authored source.
-    bundle.chmod(0o700)
+    if stat.S_IMODE(bundle.stat().st_mode) & 0o022:
+        bundle.chmod(0o700)
     parent = bundle / ".okf-loom"
     parent.mkdir(exist_ok=True)
     session = parent / "session"

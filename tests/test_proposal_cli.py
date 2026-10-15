@@ -4,6 +4,7 @@ import pytest
 import json
 
 from okf_loom.cli import _normalize_proposal_value_argv, build_parser, main
+from conftest import private_session_root
 from okf_loom.proposal_review.activation import ProductionCapturePort
 from okf_loom.proposal_review.activation import activate
 from okf_loom.proposal_review.studio_outbox import StudioOutboxAppender
@@ -144,6 +145,7 @@ def test_cli_executes_create_list_show_decide_withdraw_json_only(
         tmp_path, capsys, monkeypatch) -> None:
     bundle = tmp_path / "bundle"
     bundle.mkdir()
+    private_session_root(bundle)
     (bundle / "orders.md").write_text(
         "---\ntype: Table\ntitle: Orders\ndescription: Orders table.\n"
         "tags: [commerce]\ntimestamp: 2026-07-15T00:00:00Z\nresource: /orders.md\n"
@@ -228,6 +230,7 @@ def test_cli_apply_undo_success_and_replay_use_real_service(
         tmp_path, capsys) -> None:
     bundle = tmp_path / "bundle"
     bundle.mkdir()
+    private_session_root(bundle)
     (bundle / "orders.md").write_text(
         "---\ntype: Table\ntitle: Orders\ndescription: Orders table.\n"
         "tags: [commerce]\ntimestamp: 2026-07-15T00:00:00Z\nresource: /orders.md\n"
