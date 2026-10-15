@@ -10,6 +10,8 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
+  including source derivations; the full/tool graph projection is unchanged.
 - Missing or malformed embedded search evidence in single-file exports settles as
   unavailable without an uncaught bootstrap error; graph and shell setup still run.
 - Switching palettes no longer flashes a Mermaid diagram's source text. The old
