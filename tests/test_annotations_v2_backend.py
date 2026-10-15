@@ -362,6 +362,7 @@ def test_event_cursors_are_distinct_numeric_across_studio_instances(tmp_path):
     assert all(isinstance(cursor, int) for cursor in cursors)
 
 
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_cross_process_same_key_different_comment_mutates_once(tmp_path):
     studio = Studio.for_bundle(tmp_path)
     source = "target\n"
@@ -386,6 +387,7 @@ def test_cross_process_same_key_different_comment_mutates_once(tmp_path):
     assert latest.count(2) == 1
 
 
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_spawn_same_comment_same_key_body_one_physical_transaction_and_restart(tmp_path):
     studio = Studio.for_bundle(tmp_path); source = "target\n"
     comment = studio.post_comment(concept="note", body="x")
@@ -416,6 +418,7 @@ def test_spawn_same_comment_same_key_body_one_physical_transaction_and_restart(t
     assert status == 200 and replayed and response["comment"]["id"] == comment["id"]
 
 
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_spawn_public_create_same_key_restart_and_different_body_conflict(tmp_path):
     request = {"concept": "note", "body": "create once"}; key = "create-spawn-key"
     ctx = multiprocessing.get_context("spawn"); gate = ctx.Event()
@@ -470,6 +473,7 @@ def test_public_create_wal_lost_response_faults_recover_once(tmp_path, fault):
                for event in studio.read_event_snapshot()) == 1
 
 
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_cross_process_event_cursor_race_restart_and_rotation(tmp_path):
     ctx = multiprocessing.get_context("spawn")
     gate = ctx.Event()
@@ -495,6 +499,7 @@ def test_cross_process_event_cursor_race_restart_and_rotation(tmp_path):
     ]
 
 
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_cross_process_directive_rotation_snapshot_and_append(tmp_path):
     studio = Studio.for_bundle(tmp_path)
     studio.session_dir.mkdir(parents=True, exist_ok=True)

@@ -1394,19 +1394,34 @@ class _LiveServer:
             command.append("--enable-proposal-review")
         self.runtime.audit("serve", executable=command[0], cwd=root, inputs=(self.bundle,))
         state_parent = next(
-            (candidate for candidate in (Path("/tmp"), Path("/var/tmp"))
+            (candidate for candidate in (Path(tempfile.gettempdir()),)
              if candidate.is_dir() and not candidate.resolve().is_relative_to(root.resolve(strict=True))),
             None,
         )
         if state_parent is None:
             raise CapturePreconditionError("no mutable state authority is available outside immutable runtime")
+        approved_parent = (None if state_parent in (Path("/tmp"), Path("/var/tmp"))
+                           else state_parent)
         try:
-            from okf_loom.session_authority import temporary_session_authority
-            self._state_authority = temporary_session_authority(
-                prefix=f"okf-live-{self.mode}-", parent=state_parent)
+            from okf_loom.session_authority import resolve_session_authority
+            # TMPDIR need not be a system temporary ancestor. Use the existing
+            # explicit private-parent admission in both this owner and child.
+            state_root = Path(tempfile.mkdtemp(
+                prefix=f"okf-live-{self.mode}-", dir=state_parent))
+            try:
+                state_root.chmod(0o700)
+                self._state_authority = resolve_session_authority(
+                    state_root, approved_root=approved_parent, create=False)
+            except BaseException:
+                state_root.rmdir()
+                raise
             self.state_root = self._state_authority.display_path
             env = _env(runtime=self.runtime)
             env["OKF_LOOM_SESSION_ROOT"] = str(self.state_root)
+            if approved_parent is not None:
+                env["OKF_LOOM_SESSION_TRUSTED_ROOT"] = str(approved_parent)
+            else:
+                env.pop("OKF_LOOM_SESSION_TRUSTED_ROOT", None)
             env["OKF_LOOM_IMMUTABLE_ROOT"] = str(root.resolve(strict=True))
             try:
                 reservation.release_for_spawn()

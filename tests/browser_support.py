@@ -226,7 +226,7 @@ def _owned_profile_dir():
     release of every reference and interpreter exit. Its only removal is
     the proven-quiescent ``shutil.rmtree`` in ``_stop_owned_browser_group``.
     """
-    return tempfile.mkdtemp(prefix="okf-headed-", dir="/tmp")
+    return tempfile.mkdtemp(prefix="okf-headed-")
 
 
 def _launch_owned_headed_chrome(owner, executable):
@@ -251,7 +251,7 @@ def _launch_owned_headed_chrome(owner, executable):
             "--no-first-run", "--no-default-browser-check", "--disable-background-networking",
             "--remote-debugging-address=127.0.0.1", f"--remote-debugging-port={port}",
             f"--user-data-dir={profile}", "about:blank"], stdout=log, stderr=log,
-            env={**os.environ, "TMPDIR": "/tmp", "TMP": "/tmp", "TEMP": "/tmp"},
+            env=os.environ.copy(),
             start_new_session=True)
     except BaseException:
         # Popen failure means no browser process exists, so the freshly

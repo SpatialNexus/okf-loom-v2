@@ -396,6 +396,8 @@ def test_http_adapter_withdraw_envelope() -> None:
 
 class _RealProposalHTTP:
     def __init__(self, root):
+        from conftest import private_session_root
+        private_session_root(root)
         self.root = root
         (root / "orders.md").write_text(
             "---\ntype: Table\ntitle: Orders\ndescription: Orders table.\n"

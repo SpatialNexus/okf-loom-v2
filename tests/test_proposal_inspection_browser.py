@@ -18,7 +18,7 @@ from urllib.parse import urlsplit
 
 import pytest
 
-from conftest import okf_module_argv, okf_subprocess_env
+from conftest import okf_module_argv, okf_subprocess_env, private_session_root
 from okf_loom.proposal_review.activation import ProductionCapturePort
 
 from browser_support import copy_bundle, expect, launch_chromium, live_server, sync_playwright
@@ -180,6 +180,7 @@ def _assert_read_only_traffic(requests, proposal_token: str) -> None:
 @pytest.mark.browser
 def test_inactive_capability_offers_no_proposals_entry_and_never_requests(tmp_path: Path, browser) -> None:
     bundle = copy_bundle(DEMO, tmp_path / "bundle")
+    private_session_root(bundle)
     with live_server(bundle) as base:
         context, page, requests, errors = _page(browser)
         try:
@@ -198,6 +199,7 @@ def test_inactive_capability_offers_no_proposals_entry_and_never_requests(tmp_pa
 @pytest.mark.browser
 def test_local_read_only_page_explains_cli_path_without_requests(tmp_path: Path, browser) -> None:
     bundle = copy_bundle(DEMO, tmp_path / "bundle")
+    private_session_root(bundle)
     with live_server(bundle, "--enable-proposal-review", "--no-edit") as base:
         context, page, requests, errors = _page(browser)
         try:
@@ -220,6 +222,7 @@ def test_local_read_only_page_explains_cli_path_without_requests(tmp_path: Path,
 @pytest.mark.browser
 def test_list_detail_diff_conflict_and_layouts_are_inspection_only(tmp_path: Path, browser) -> None:
     bundle = copy_bundle(DEMO, tmp_path / "bundle")
+    private_session_root(bundle)
     with live_server(bundle, "--enable-proposal-review") as base:
         _create_proposal(base, bundle, target="tables/orders", summary="Tag orders",
                          op_id="op_01J2Y8N5Z9Q3A7K6M4T1V0WXYZ", key="A" * 32, tags=["orders"])
@@ -362,6 +365,7 @@ def test_list_detail_diff_conflict_and_layouts_are_inspection_only(tmp_path: Pat
 @pytest.mark.browser
 def test_open_list_refetches_on_proposal_event_pages_and_filters(tmp_path: Path, browser) -> None:
     bundle = copy_bundle(DEMO, tmp_path / "bundle")
+    private_session_root(bundle)
     with live_server(bundle, "--enable-proposal-review") as base:
         _create_proposal(base, bundle, target="tables/orders", summary="Tag orders",
                          op_id="op_01J2Y8N5Z9Q3A7K6M4T1V0WXYZ", key="A" * 32, tags=["orders"])
@@ -415,6 +419,7 @@ def test_open_list_refetches_on_proposal_event_pages_and_filters(tmp_path: Path,
 def test_pagehide_drops_proposal_text_and_restore_refetches(tmp_path: Path, browser) -> None:
     """Pagehide empties open, detached and closed panels; restore reads again."""
     bundle = copy_bundle(DEMO, tmp_path / "bundle")
+    private_session_root(bundle)
     markers = ["X3 privacy summary", "X3 privacy rationale marker.", "x3-privacy-marker"]
     with live_server(bundle, "--enable-proposal-review") as base:
         _create_proposal(base, bundle, target="tables/orders", summary=markers[0], rationale=markers[1],
@@ -491,6 +496,7 @@ def test_connection_recovery_refetches_visible_view_keeping_selection_and_focus(
     TRACK_EVENT_SOURCES); reconnection is the real live.js path.
     """
     bundle = copy_bundle(DEMO, tmp_path / "bundle")
+    private_session_root(bundle)
     with live_server(bundle, "--enable-proposal-review") as base:
         _create_proposal(base, bundle, target="tables/orders", summary="Tag orders",
                          op_id="op_01J2Y8N5Z9Q3A7K6M4T1V0WXYZ", key="A" * 32, tags=["orders"])
@@ -562,6 +568,7 @@ def test_applied_proposal_never_claims_missing_apply_history(tmp_path: Path, bro
     # Apply publishes only over owner-private (0600) targets, as in
     # tests/test_proposal_cli.py; set that before the proposal snapshot.
     (bundle / "tables" / "orders.md").chmod(0o600)
+    private_session_root(bundle)
     with live_server(bundle, "--enable-proposal-review") as base:
         created = _create_proposal(base, bundle, target="tables/orders", summary="Tag orders",
                                    op_id=op_id, key="A" * 32, tags=["orders"])

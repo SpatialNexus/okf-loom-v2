@@ -482,6 +482,7 @@ def test_live_server_cleans_start_failure_normal_exit_and_kill_fallback(monkeypa
             popen_envs.append(kwargs["env"])
             state_roots.append(Path(kwargs["env"]["OKF_LOOM_SESSION_ROOT"]))
             assert state_roots[-1].is_dir()
+            assert state_roots[-1].parent == Path(tempfile.gettempdir())
             assert stat.S_IMODE(state_roots[-1].stat().st_mode) == 0o700
             return process
         monkeypatch.setattr(capture.subprocess, "Popen", popen)
@@ -1034,9 +1035,27 @@ def test_system_temp_ancestor_cannot_be_the_session_authority(candidate: Path) -
         before.st_dev, before.st_ino, before.st_mtime_ns)
 
 
-def test_private_child_below_system_temp_is_accepted_and_sanitized_with_root_retained() -> None:
+@pytest.fixture
+def approved_temp_parent(tmp_path: Path, monkeypatch):
+    """Keep mkdtemp proofs on TMPDIR while retaining real private admission.
+
+    temporary_session_authority's legacy convenience API only admits /tmp and
+    /var/tmp. These allocation/lifetime tests approve their own private ancestor;
+    the separate system-ancestor rejection test still checks the default policy.
+    """
+    from okf_loom import session_authority
+    resolve = session_authority.resolve_session_authority
+    monkeypatch.setattr(session_authority, "resolve_session_authority",
+                        lambda candidate, **kwargs: resolve(
+                            candidate, approved_root=tmp_path, **kwargs))
+    return tmp_path
+
+
+def test_private_child_below_system_temp_is_accepted_and_sanitized_with_root_retained(
+    tmp_path: Path, approved_temp_parent,
+) -> None:
     from okf_loom.session_authority import temporary_session_authority
-    authority = temporary_session_authority(prefix="okf-authority-proof-", parent=Path("/tmp"))
+    authority = temporary_session_authority(prefix="okf-authority-proof-", parent=tmp_path)
     root = authority.display_path
     assert authority.mode == 0o700
     try:
@@ -1603,7 +1622,9 @@ def test_retention_registry_rejects_unsafe_existing_file(
     shutil.rmtree(state)
 
 
-def test_live_state_authority_uses_finalizer_free_mkdtemp(monkeypatch, tmp_path: Path) -> None:
+def test_live_state_authority_uses_finalizer_free_mkdtemp(
+    monkeypatch, tmp_path: Path, approved_temp_parent,
+) -> None:
     from okf_loom import session_authority
     calls = []
     real_mkdtemp = tempfile.mkdtemp
@@ -1614,7 +1635,7 @@ def test_live_state_authority_uses_finalizer_free_mkdtemp(monkeypatch, tmp_path:
 
     monkeypatch.setattr(session_authority.tempfile, "mkdtemp", mkdtemp)
     authority = session_authority.temporary_session_authority(
-        prefix="okf-live-proof-", parent=Path("/tmp"))
+        prefix="okf-live-proof-", parent=tmp_path)
     root = authority.display_path
     try:
         assert calls and calls[0][1]["prefix"] == "okf-live-proof-"
@@ -2743,7 +2764,7 @@ def test_exact_root_compatibility_values_do_not_change_runner_behavior() -> None
 
 def test_bundle_admission_is_strictly_root_confined(tmp_path: Path) -> None:
     assert capture._validate_release_bundle(Path("samples/demo_bundle")) == (ROOT / "samples/demo_bundle").resolve()
-    with tempfile.TemporaryDirectory(prefix="okf-bundle-outside-", dir="/tmp") as name:
+    with tempfile.TemporaryDirectory(prefix="okf-bundle-outside-", dir=tmp_path) as name:
         outside = Path(name)
         for unsafe in (outside.resolve(), Path("../outside"), Path("nested/../samples/demo_bundle")):
             with pytest.raises(capture.CapturePreconditionError, match="inside sealed checkout"):
@@ -2752,7 +2773,7 @@ def test_bundle_admission_is_strictly_root_confined(tmp_path: Path) -> None:
 
 def test_bundle_admission_rejects_symlink_escape(tmp_path: Path) -> None:
     link = ROOT / "capture-root-escape-test"
-    with tempfile.TemporaryDirectory(prefix="okf-symlink-outside-", dir="/tmp") as name:
+    with tempfile.TemporaryDirectory(prefix="okf-symlink-outside-", dir=tmp_path) as name:
         try:
             link.symlink_to(name, target_is_directory=True)
             with pytest.raises(capture.CapturePreconditionError, match="inside sealed checkout"):
@@ -2763,7 +2784,7 @@ def test_bundle_admission_rejects_symlink_escape(tmp_path: Path) -> None:
 
 def test_import_global_mutation_cannot_redirect_repository_authority(monkeypatch, tmp_path: Path) -> None:
     physical = ROOT.resolve()
-    with tempfile.TemporaryDirectory(prefix="okf-root-mutation-", dir="/tmp") as outside_name:
+    with tempfile.TemporaryDirectory(prefix="okf-root-mutation-", dir=tmp_path) as outside_name:
       outside = Path(outside_name)
       for name in ("ROOT", "DEFAULT_BUNDLE", "DEFAULT_DENSE_BUNDLE", "DEFAULT_EMPTY_BUNDLE",
                    "_AUTHORITY", "_repo_root", "REPOSITORY_ROOT", "_sealed_repository_root",

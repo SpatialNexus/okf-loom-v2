@@ -412,15 +412,17 @@ def test_permanently_blocked_off_main_phase_cannot_keep_process_alive():
     assert "exited True" in result.stdout
 
 
-def _process_publish(path_text, payload, claimed, proceed, results):
+def _process_publish(path_text, payload, connection):
     path = Path(path_text)
     claim = capture._claim_destination(path)
     tmp = path.parent / f".{payload.decode()}.{claim}.capture-tmp{path.suffix}"
     tmp.write_bytes(payload)
-    claimed.put(claim)
-    proceed.wait(5)
-    results.put(capture._publish_if_current(tmp, path, claim))
+    connection.send(claim)
+    assert connection.poll(5), "publisher was not released"
+    connection.recv()
+    connection.send(capture._publish_if_current(tmp, path, claim))
     tmp.unlink(missing_ok=True)
+    connection.close()
 
 
 @pytest.mark.parametrize("name", ["proof.png", "comment-loop.gif"])
@@ -428,21 +430,37 @@ def test_cross_process_newest_claim_fences_late_finisher(tmp_path, name):
     ctx = multiprocessing.get_context("fork")
     out = tmp_path / name
     out.write_bytes(b"initial")
-    claimed = ctx.Queue(); results = ctx.Queue()
-    go_old = ctx.Event(); go_new = ctx.Event()
-    old = ctx.Process(target=_process_publish,
-                      args=(str(out), b"old", claimed, go_old, results))
-    old.start(); old_claim = claimed.get(timeout=3)
-    new = ctx.Process(target=_process_publish,
-                      args=(str(out), b"new", claimed, go_new, results))
-    new.start(); new_claim = claimed.get(timeout=3)
-    assert new_claim > old_claim
-    go_new.set(); assert results.get(timeout=3) is True
-    go_old.set(); assert results.get(timeout=3) is False
-    old.join(3); new.join(3)
-    assert old.exitcode == new.exitcode == 0
-    assert out.read_bytes() == b"new"
-    assert_no_capture_tmp(tmp_path)
+    # Pipes preserve the real process ordering without Queue/Event SemLocks
+    # (POSIX semaphores need /dev/shm, which restricted hosts may deny).
+    old_parent, old_child = ctx.Pipe()
+    new_parent, new_child = ctx.Pipe()
+    old = ctx.Process(target=_process_publish, args=(str(out), b"old", old_child))
+    new = ctx.Process(target=_process_publish, args=(str(out), b"new", new_child))
+    try:
+        old.start()
+        assert old_parent.poll(3), "old publisher did not claim"
+        old_claim = old_parent.recv()
+        new.start()
+        assert new_parent.poll(3), "new publisher did not claim"
+        new_claim = new_parent.recv()
+        assert new_claim > old_claim
+        new_parent.send(True)
+        assert new_parent.poll(3) and new_parent.recv() is True
+        old_parent.send(True)
+        assert old_parent.poll(3) and old_parent.recv() is False
+        old.join(3); new.join(3)
+        assert old.exitcode == new.exitcode == 0
+        assert out.read_bytes() == b"new"
+        assert_no_capture_tmp(tmp_path)
+    finally:
+        for process in (old, new):
+            if process.pid is not None:
+                if process.is_alive():
+                    process.terminate()
+                process.join(3)
+                process.close()
+        for connection in (old_parent, old_child, new_parent, new_child):
+            connection.close()
 
 
 def test_readme_media_serves_only_git_tracked_bundle_files(tmp_path):
