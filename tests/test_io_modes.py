@@ -16,6 +16,8 @@ from okf_loom import io_utils
 
 ROOT = Path(__file__).resolve().parents[1]
 WRITERS = ("atomic_write_text", "atomic_write_bytes", "durable_atomic_write_text")
+BUILDS = (("static", "replace"), ("spa", "replace"), ("single-file", "replace"),
+          ("static", "managed"), ("spa", "managed"))
 
 
 @pytest.fixture
@@ -288,11 +290,12 @@ def test_replace_text_keeps_concept_readable(mode_dir):
     assert stat.S_IMODE(concept.stat().st_mode) == 0o644
 
 
-@pytest.mark.parametrize("target", ("static", "spa", "single-file"))
+@pytest.mark.parametrize("target, policy", BUILDS)
 @pytest.mark.parametrize("mask", (0o022, 0o027))
-def test_docs_build_tree_uses_umask(mode_dir, target, mask):
+def test_docs_build_tree_uses_umask(mode_dir, target, policy, mask):
     output = mode_dir / "site"
-    _cli_with_umask(mask, "build", "docs-bundle", "--target", target, "--out", output)
+    _cli_with_umask(mask, "build", "docs-bundle", "--target", target, "--out", output,
+                    "--output-policy", policy)
     paths = [output, *output.rglob("*")]
     assert (output / "index.html").is_file()
     wrong_modes = {
@@ -301,3 +304,244 @@ def test_docs_build_tree_uses_umask(mode_dir, target, mask):
         if stat.S_IMODE(path.stat().st_mode) != (0o777 if path.is_dir() else 0o666) & ~mask
     }
     assert wrong_modes == {}
+
+
+def _mode_bundle(mode_dir):
+    source = mode_dir / "bundle"
+    (source / "nested").mkdir(parents=True)
+    (source / "index.md").write_text("# Bundle\n")
+    (source / "nested/note.md").write_text("---\ntype: note\n---\nBody\n")
+    return source
+
+
+@pytest.mark.parametrize("target, policy", BUILDS)
+@pytest.mark.parametrize("mask", (0o022, 0o027))
+def test_rebuild_preserves_operator_root_mode(mode_dir, target, policy, mask):
+    source = _mode_bundle(mode_dir)
+    output = mode_dir / "site"
+    args = ("build", source, "--target", target, "--out", output, "--output-policy", policy)
+    _cli_with_umask(mask, *args)
+    output.chmod(0o711)
+    # Freshly published subdirectories, unlike the operator-owned root, use
+    # the current mask rather than copying old directory permissions.
+    for path in output.rglob("*"):
+        if path.is_dir():
+            path.chmod(0o700)
+    if target == "single-file":
+        (output / "unrelated").write_text("keep")
+        (output / "unrelated").chmod(0o600)
+        (output / "index.html").chmod(0o640)
+    _cli_with_umask(mask, *args)
+    assert stat.S_IMODE(output.stat().st_mode) == 0o711
+    assert all(stat.S_IMODE(path.stat().st_mode) == 0o777 & ~mask
+               for path in output.rglob("*") if path.is_dir())
+    if target == "single-file":
+        assert (output / "unrelated").read_text() == "keep"
+        assert stat.S_IMODE((output / "unrelated").stat().st_mode) == 0o600
+        assert stat.S_IMODE((output / "index.html").stat().st_mode) == 0o640
+
+
+@pytest.mark.parametrize("target", ("static", "spa", "single-file"))
+def test_directory_modes_set_only_after_render_behind_private_parent(mode_dir, monkeypatch, target):
+    from okf_loom import render
+    from okf_loom.model import Bundle
+
+    source = _mode_bundle(mode_dir)
+    output = mode_dir / "site"
+    stages = []
+    renamed = []
+    rename = os.rename
+    monkeypatch.setattr(io_utils, "_process_umask", lambda: 0o022)
+
+    def emit(bundle, stage, **kwargs):
+        assert stat.S_IMODE(stage.stat().st_mode) == 0o700
+        assert stat.S_IMODE(stage.parent.stat().st_mode) == 0o700
+        assert not output.exists()
+        (stage / "private/nested").mkdir(parents=True)
+        (stage / "private").chmod(0o700)
+        (stage / "private/nested").chmod(0o700)
+        io_utils.atomic_write_text(stage / "index.html", "complete")
+        stages.append(stage)
+        return {"bytes": 8}
+
+    def single(bundle, path, **kwargs):
+        return emit(bundle, path.parent, **kwargs)
+
+    def publish(src, dst, **kwargs):
+        stage = stages[0]
+        assert str(src) == stage.name
+        assert stat.S_IMODE(stage.parent.stat().st_mode) == 0o700
+        assert all(stat.S_IMODE(path.stat().st_mode) == 0o755
+                   for path in (stage, stage / "private", stage / "private/nested"))
+        assert (stage / "index.html").read_text() == "complete"
+        assert not output.exists()
+        renamed.append(stage)
+        return rename(src, dst, **kwargs)
+
+    monkeypatch.setattr(render, "_emit_site", emit)
+    monkeypatch.setattr(render, "render_single_file", single)
+    monkeypatch.setattr(os, "rename", publish)
+    render.build_site(Bundle.load(source), output, target=target)
+    assert renamed == stages
+    assert not stages[0].parent.exists()
+    assert stat.S_IMODE(output.stat().st_mode) == 0o755
+
+
+@pytest.mark.parametrize("target", ("static", "spa", "single-file"))
+@pytest.mark.parametrize("existing", (False, True))
+def test_failed_render_never_exposes_partial_tree(mode_dir, monkeypatch, target, existing):
+    from okf_loom import render
+    from okf_loom.model import Bundle
+
+    source = _mode_bundle(mode_dir)
+    output = mode_dir / "site"
+    if existing:
+        output.mkdir(mode=0o711)
+        output.chmod(0o711)
+        (output / "index.html").write_text("previous")
+    stages = []
+
+    def fail(bundle, stage, **kwargs):
+        stages.append(stage)
+        io_utils.atomic_write_text(stage / "index.html", "partial")
+        assert stat.S_IMODE(stage.stat().st_mode) == 0o700
+        assert stat.S_IMODE(stage.parent.stat().st_mode) == 0o700
+        assert output.exists() == existing
+        if existing:
+            assert (output / "index.html").read_text() == "previous"
+        raise RuntimeError("injected render failure")
+
+    monkeypatch.setattr(render, "_emit_site", fail)
+    monkeypatch.setattr(render, "render_single_file",
+                        lambda bundle, path, **kwargs: fail(bundle, path.parent, **kwargs))
+    with pytest.raises(RuntimeError, match="injected render failure"):
+        render.build_site(Bundle.load(source), output, target=target)
+    assert stages and not stages[0].parent.exists()
+    assert output.exists() == existing
+    if existing:
+        assert (output / "index.html").read_text() == "previous"
+        assert stat.S_IMODE(output.stat().st_mode) == 0o711
+    assert not list(mode_dir.glob(".okf-build-*"))
+
+
+def test_directory_mode_failure_rolls_back_without_exposing_staging(mode_dir, monkeypatch):
+    from okf_loom import render
+    from okf_loom.model import Bundle
+
+    source = _mode_bundle(mode_dir)
+    output = mode_dir / "site"
+    output.mkdir(mode=0o711)
+    output.chmod(0o711)
+    (output / "old").write_text("previous")
+    chmod = os.fchmod
+    normalized = []
+
+    def fail(fd, mode):
+        if stat.S_ISDIR(os.fstat(fd).st_mode) and mode != 0o700:
+            normalized.append(fd)
+            assert all(stat.S_IMODE(stage.stat().st_mode) == 0o700
+                       for stage in mode_dir.glob(".okf-build-*"))
+            if len(normalized) == 2:
+                raise PermissionError("injected directory mode failure")
+        return chmod(fd, mode)
+
+    monkeypatch.setattr(os, "fchmod", fail)
+    with pytest.raises(PermissionError, match="directory mode failure"):
+        render.build_site(Bundle.load(source), output, target="static")
+    assert len(normalized) == 2
+    assert stat.S_IMODE(output.stat().st_mode) == 0o711
+    assert (output / "old").read_text() == "previous"
+    assert not list(mode_dir.glob(".okf-build-*"))
+    assert not list(mode_dir.glob(".okf-recovery-*"))
+
+
+def test_failed_publication_keeps_recovery_quarantine_private(mode_dir, monkeypatch):
+    from okf_loom import render
+    from okf_loom.model import Bundle
+
+    source = _mode_bundle(mode_dir)
+    mode_dir.chmod(0o2700)  # Quarantine must stay exactly 0700 even under setgid.
+    output = mode_dir / "site"
+    (output / "private").mkdir(parents=True)
+    output.chmod(0o711)
+    (output / "private").chmod(0o700)
+    (output / "private/old").write_text("previous")
+    rename = os.rename
+
+    def fail(src, dst, **kwargs):
+        if str(src).startswith(".okf-build-") or str(src) == "previous":
+            assert all(stage.stat().st_mode & 0o077 == 0
+                       for stage in mode_dir.glob(".okf-build-*"))
+            raise OSError("injected rename failure")
+        return rename(src, dst, **kwargs)
+
+    monkeypatch.setattr(os, "rename", fail)
+    with pytest.raises(io_utils.TreePublicationRecoveryError) as error:
+        render.build_site(Bundle.load(source), output, target="static")
+    previous = error.value.recovery_path
+    assert stat.S_IMODE(previous.parent.stat().st_mode) == 0o700
+    assert stat.S_IMODE(previous.stat().st_mode) == 0o711
+    assert stat.S_IMODE((previous / "private").stat().st_mode) == 0o700
+    assert (previous / "private/old").read_text() == "previous"
+    assert not output.exists()
+    assert not list(mode_dir.glob(".okf-build-*"))
+    monkeypatch.setattr(os, "rename", rename)
+    render.build_site(Bundle.load(source), output, target="static")
+    assert stat.S_IMODE(output.stat().st_mode) == 0o777 & ~io_utils._process_umask()
+    assert stat.S_IMODE(previous.parent.stat().st_mode) == 0o700
+    assert (previous / "private/old").read_text() == "previous"
+
+
+def test_generic_tree_publication_does_not_widen_private_directories(mode_dir):
+    stage = mode_dir / "stage"
+    (stage / "private").mkdir(parents=True)
+    stage.chmod(0o700)
+    (stage / "private").chmod(0o700)
+    output = mode_dir / "state"
+    io_utils.atomic_replace_tree(stage, output)
+    assert stat.S_IMODE(output.stat().st_mode) == 0o700
+    assert stat.S_IMODE((output / "private").stat().st_mode) == 0o700
+
+
+def test_directory_normalization_never_follows_staging_symlinks(mode_dir):
+    parent = mode_dir / "private-stage"
+    parent.mkdir(mode=0o700)
+    stage = parent / "tree"
+    stage.mkdir(mode=0o700)
+    private = mode_dir / "private-state"
+    private.mkdir(mode=0o700)
+    (stage / "link").symlink_to(private, target_is_directory=True)
+    output = mode_dir / "site"
+    output.mkdir(mode=0o711)
+    output.chmod(0o711)
+    (output / "old").write_text("previous")
+    with pytest.raises(ValueError, match="must not use symlinks"):
+        io_utils.atomic_replace_tree(stage, output, publish_directory_modes=True)
+    assert stat.S_IMODE(private.stat().st_mode) == 0o700
+    assert stat.S_IMODE(output.stat().st_mode) == 0o711
+    assert (output / "old").read_text() == "previous"
+    assert stat.S_IMODE(parent.stat().st_mode) == 0o700
+
+
+@pytest.mark.parametrize("target", ("static", "spa", "single-file"))
+@pytest.mark.parametrize("session", (".okf-loom/session", "custom-session"))
+def test_build_inside_session_never_normalizes_directory_modes(mode_dir, monkeypatch, target, session):
+    from okf_loom import render
+    from okf_loom.model import Bundle
+
+    source = _mode_bundle(mode_dir)
+    (source / "okf-loom.config.yaml").write_text(f"studio:\n  session_dir: {session}\n")
+    session_root = source / session
+    session_root.mkdir(parents=True, mode=0o700)
+    session_root.chmod(0o700)
+    (session_root / "private").mkdir(mode=0o700)
+    (session_root / "private").chmod(0o700)
+    output = session_root / "site"
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("must not normalize directories under a Studio session root")
+
+    monkeypatch.setattr(io_utils, "_set_tree_directory_modes", forbidden)
+    render.build_site(Bundle.load(source), output, target=target)
+    for directory in (output, session_root, session_root / "private"):
+        assert stat.S_IMODE(directory.stat().st_mode) == 0o700
