@@ -97,6 +97,8 @@ def test_sec_05_exposure_matrix(tmp_path) -> None:
 
 def test_sec_06_secret_sinks(tmp_path, capsys) -> None:
     (tmp_path / "a.md").write_text("---\ntype: Note\n---\n\nsecret proposal body\n")
+    from conftest import private_session_root
+    private_session_root(tmp_path)
     activation = activate_http(tmp_path)
     token = activation.proposal_token
     token_path = tmp_path / ".okf-loom/session/.proposal-http-token"

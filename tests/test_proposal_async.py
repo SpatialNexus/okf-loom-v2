@@ -118,12 +118,26 @@ def _capture_call(outcome, call):
     except BaseException as exc: outcome["error"] = exc
 
 
-def test_pre_authority_timeout_admission_wins_same_key_retry_has_one_transaction(tmp_path):
+@pytest.mark.parametrize("defer_admission", [False, True], ids=["ready", "delayed"])
+def test_pre_authority_timeout_admission_wins_same_key_retry_has_one_transaction(tmp_path, monkeypatch, defer_admission):
     import threading
     bundle, session, repository, coordinator, publication, request, activity = _ready_transaction(tmp_path)
     admitted = threading.Barrier(2); release = threading.Event()
+    intent_published = threading.Event(); cancellation_started = threading.Event()
+    cancel_admission = repository.cancel_transaction_admission
+    def cancel_after_intent(admission):
+        # Force this proof's admission-wins ordering at the real fence. Slow
+        # pre-admission I/O can otherwise make the unchanged 200ms wait expire
+        # before the intent exists, legitimately exercising the opposite case.
+        cancellation_started.set()
+        assert intent_published.wait(5), "worker did not publish its intent"
+        return cancel_admission(admission)
+    monkeypatch.setattr(repository, "cancel_transaction_admission", cancel_after_intent)
     def pause(boundary, evidence):
+        if boundary == "before_intent_admission" and defer_admission:
+            assert cancellation_started.wait(5), "caller did not reach cancellation fence"
         if boundary == "intent_published":
+            intent_published.set()
             admitted.wait(timeout=5); release.wait(10)
     coordinator.fault_injector = pause; coordinator.wait_seconds = .2
     first, second = {}, {}

@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import os
 import shutil
+import stat
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -134,12 +136,97 @@ def okf_module_argv(*args: str) -> list[str]:
     return [sys.executable, "-m", "okf_loom", *args]
 
 
+def private_session_root(bundle: Path) -> Path:
+    """Create this test's session authority, never inherit checkout permissions.
+
+    copytree preserves default ACLs from shared/setgid checkouts. An explicit
+    mkdir mode plus chmod on our newly owned fixture directory keeps activation
+    tests private without repairing or bypassing the product's privacy check.
+    """
+    # Proposal publication also correctly rejects a group-writable bundle
+    # root. This is a disposable fixture copy, never the authored source.
+    if stat.S_IMODE(bundle.stat().st_mode) & 0o022:
+        bundle.chmod(0o700)
+    parent = bundle / ".okf-loom"
+    parent.mkdir(exist_ok=True)
+    session = parent / "session"
+    session.mkdir(mode=0o700)
+    session.chmod(0o700)
+    return session
+
+
+def _short_chrome_tmpdir(effective: Path, candidates: tuple[Path, ...]) -> Path | None:
+    """Keep Chrome's SingletonSocket within Linux's 107-byte pathname limit.
+
+    Return a newly owned short directory when relocation is needed. Shared or
+    setgid temporary ancestors also need a private namespace: child directories
+    otherwise inherit setgid even with mkdir(mode=0700). Do not shorten paths
+    with symlinks: Chrome resolves them before binding its socket.
+    """
+    suffix = "/.com.google.Chrome.XXXXXX/SingletonSocket"
+    private = not effective.exists() or stat.S_IMODE(effective.stat().st_mode) == 0o700
+    if len(os.fsencode(str(effective.resolve()))) + len(suffix) <= 107 and private:
+        return None
+    errors = []
+    for candidate in candidates:
+        candidate = candidate.resolve()
+        if len(os.fsencode(str(candidate))) + len("/b-XXXXXXXX") + len(suffix) > 107:
+            continue
+        try:
+            path = Path(tempfile.mkdtemp(prefix="b-", dir=candidate))
+            path.chmod(0o700)
+            return path
+        except OSError as exc:
+            errors.append(f"{candidate}: {exc}")
+    raise pytest.UsageError(
+        f"TMPDIR {effective} is too long or not private for Chrome's 107-byte Unix socket path; "
+        "set TMPDIR to a short writable private directory (see CONTRIBUTING.md). "
+        + "; ".join(errors)
+    )
+
+
+@pytest.fixture
+def multiprocessing_semaphores():
+    """Probe the exact optional host primitive, not a broad platform skip."""
+    import multiprocessing
+    try:
+        lock = multiprocessing.Lock()
+    except PermissionError as exc:
+        pytest.skip(f"multiprocessing.Lock() denied by host POSIX semaphore policy: {exc}")
+    # Exercise the primitive too; other creation/acquisition errors are failures.
+    with lock:
+        pass
+
+
 # ---------------------------------------------------------------------------
 # pytest markers
 # ---------------------------------------------------------------------------
 
 
 def pytest_configure(config: pytest.Config) -> None:
+    # Before collection imports capture helpers or any session browser fixture
+    # starts its driver, give Chrome one short private temporary namespace.
+    effective = Path(tempfile.gettempdir())
+    short = _short_chrome_tmpdir(
+        effective, ((TOOLKIT_ROOT / ".shared-cache").resolve(),
+                    Path(sys.prefix).parent, Path("/tmp")))
+    if short is not None:
+        previous = {key: os.environ.get(key) for key in ("TMPDIR", "TMP", "TEMP")}
+        cached = tempfile.tempdir
+        for key in previous:
+            os.environ[key] = str(short)
+        tempfile.tempdir = str(short)
+
+        def cleanup():
+            tempfile.tempdir = cached
+            for key, value in previous.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+            shutil.rmtree(short)
+
+        config.add_cleanup(cleanup)
     config.addinivalue_line(
         "markers",
         "integration: tests that exercise upstream real-data bundles",

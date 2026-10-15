@@ -393,6 +393,7 @@ def test_terminal_startup_corruption_writes_marker_before_blocking(tmp_path):
 
 
 @pytest.mark.parametrize("mode", ["exclusive", "shared"])
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_recovery_serializes_with_direct_writer_and_shared_capture(tmp_path, mode):
     root = tmp_path / mode; root.mkdir()
     bundle, session, repository, coordinator, publication, request = _killed(root, "commit_decided")

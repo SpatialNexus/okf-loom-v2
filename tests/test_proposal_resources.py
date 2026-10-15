@@ -76,6 +76,7 @@ def test_resource_01_preparse_caps() -> None:
     assert decision.value.code == "body_too_large"
 
 
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_resource_02_locked_limits(tmp_path) -> None:
     repository = _repo(tmp_path)
     context = multiprocessing.get_context("spawn"); start = context.Event(); results = context.Queue()
@@ -124,6 +125,7 @@ def test_resource_02_locked_limits(tmp_path) -> None:
     assert quota_repo.snapshot().service_intents == ()
 
 
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_resource_03_preview_bounds(tmp_path) -> None:
     repository = _repo(tmp_path)
     first = repository.acquire_preview_lease(Clock().now(), timeout_seconds=1)
@@ -298,6 +300,7 @@ def test_resource_03_heartbeat_keeps_late_live_workers_at_capacity(tmp_path, mon
     assert active == []
 
 
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_resource_03_live_identity_survives_real_heartbeat_lock_failure(
         tmp_path, monkeypatch) -> None:
     class MovingClock:

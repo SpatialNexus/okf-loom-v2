@@ -8375,15 +8375,24 @@ def test_graph_refresh_latest_wins(server_url: str, page) -> None:
         }"""
     )
     assert base.get("nodes"), "graph JSON has no nodes to base the refresh bodies on"
+    # Drive the real debounce/transition timers on a controlled browser clock.
+    # Host scheduling must not turn a 50ms pending proof into a >300ms sample.
+    page.evaluate("async () => await window.okfCaptureReadiness.start({target:'graph'}).promise")
+    page.clock.install(time=0)
+    page.clock.pause_at(1000)
     # Turn the gate on and drive two overlapping refreshes via `graph` events.
     page.evaluate("() => { window.__graphGate.on = true; }")
     initial_capture = page.evaluate("() => window.okfGraphCaptureState()")
     motion_before = page.evaluate("() => {const G=window.__okfLoomGraph;G.cy.pan({x:31,y:-17});G.cy.zoom(.71);return {pan:G.cy.pan(),zoom:G.cy.zoom(),starts:G.layoutStats.starts};}")
     page.evaluate("() => window.okfLoomLive.emit('graph', {})")
+    page.clock.fast_forward(1000)
     page.wait_for_function("() => window.__graphGate.pending.length >= 1", timeout=5000)
     page.evaluate("() => window.okfLoomLive.emit('graph', {})")
+    page.clock.fast_forward(1000)
     page.wait_for_function("() => window.__graphGate.pending.length >= 2", timeout=5000)
-    # Resolve the NEWER refresh (pending[1]) first, then the STALE one (pending[0]).
+    # Observe acceptance and start the pending-capture proof in the browser's
+    # same turn. Sleeping between RPCs can consume the entire 300ms transition
+    # on a loaded host, so a later sample would legitimately capture ready.
     page.evaluate(
         """(base) => {
               const mk = (extraId) => {
@@ -8394,22 +8403,32 @@ def test_graph_refresh_latest_wins(server_url: str, page) -> None:
             };
             const R = (body) => new Response(
                 JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
-            window.__graphGate.pending[1](R(mk('okf-fence-new')));
-            return new Promise((done) => setTimeout(() => {
-                window.__graphGate.pending[0](R(mk('okf-fence-stale')));
-                setTimeout(done, 80);
-            }, 80));
+            return new Promise((resolve) => {
+                const observer = new MutationObserver(() => {
+                    if (!window.okfGraphCaptureState().transitionPending) return;
+                    observer.disconnect();
+                    const run = window.okfCaptureReadiness.start({target: 'graph'});
+                    Promise.race([
+                        run.promise.then(() => ({authorized: true}))
+                            .catch(e => ({authorized: e.screenshotAllowed})),
+                        new Promise(done => setTimeout(() => done({pending: true}), 50)),
+                    ]).then(result => { window.__graphPendingResult = result; });
+                    resolve();
+                });
+                observer.observe(document.body, {attributes: true});
+                window.__graphGate.releaseStale = () => window.__graphGate.pending[0](R(mk('okf-fence-stale')));
+                window.__graphGate.pending[1](R(mk('okf-fence-new')));
+            });
         }""",
         base,
     )
-    page.wait_for_function("() => window.okfGraphCaptureState().transitionPending")
-    pending = page.evaluate("""async () => {
-        const run=window.okfCaptureReadiness.start({target:'graph'});
-        const raced=await Promise.race([run.promise.then(()=>({authorized:true})).catch(e=>({authorized:e.screenshotAllowed})),new Promise(resolve=>setTimeout(()=>resolve({pending:true}),50))]);
-        return raced;
-    }""")
+    page.clock.run_for(50)
+    pending = page.evaluate("() => window.__graphPendingResult")
     assert pending == {"pending": True}, "capture authorized a screenshot while refreshed transition was pending"
-    page.wait_for_function("() => !window.okfGraphCaptureState().transitionPending && window.okfGraphCaptureState().layoutSettled")
+    page.evaluate("() => window.__graphGate.releaseStale()")
+    page.clock.run_for(400)
+    page.clock.resume()
+    page.wait_for_function("() => window.__okfLoomGraph.refreshStats.skippedStale >= 1 && !window.okfGraphCaptureState().transitionPending && window.okfGraphCaptureState().layoutSettled")
     res = page.evaluate(
         """() => ({
             hasNew: window.__okfLoomGraph.cy.getElementById('okf-fence-new').length > 0,
@@ -10753,7 +10772,13 @@ def test_phase4_final_node_index_arrows_shift_space_and_focus_escape(server_url:
 
 
 def test_phase4_final_focus_lens_waiting_and_direct_routes_restore_origin(server_url: str,page)->None:
-    _open_graph(page,server_url);_preset(page, "themes");page.wait_for_function("()=>window.__okfLoomGraph.getState().lens==='themes'")
+    _open_graph(page,server_url)
+    generation = page.evaluate("()=>window.okfGraphCaptureState().layoutGeneration")
+    _preset(page, "themes")
+    # Lens controls update before their debounced layout starts. Waiting only
+    # on layoutSettled can sample the PREVIOUS generation, whose successor
+    # would then fit away the origin we are about to record.
+    page.wait_for_function("generation=>window.__okfLoomGraph.getState().lens==='themes'&&window.okfGraphCaptureState().layoutGeneration>generation&&window.okfGraphCaptureState().layoutSettled", arg=generation)
     origin=page.evaluate("()=>{const G=window.__okfLoomGraph;G.cy.zoom(.73);G.cy.pan({x:31,y:47});return {zoom:G.cy.zoom(),pan:G.cy.pan()}}")
     _preset(page, "focus");assert page.evaluate("()=>window.__okfLoomGraph.getState().lens==='focus'&&window.__okfLoomGraph.focusRoot()===null")
     node=page.evaluate("()=>window.__okfLoomGraph.cy.nodes().first().id()");page.evaluate("id=>window.__okfLoomGraph.interaction.dispatch({type:'SELECT',id})",node)

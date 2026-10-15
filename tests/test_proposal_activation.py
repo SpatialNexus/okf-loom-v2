@@ -16,6 +16,7 @@ from okf_loom.proposal_review.activation import (ActivationError, CAPABILITY_ID,
 from okf_loom.proposal_review import schemas
 from okf_loom.proposal_review.errors import RepositoryError
 from okf_loom.server import OKFWikiHandler
+from conftest import private_session_root
 
 
 def _forbid_directory_chmod(monkeypatch):
@@ -69,6 +70,7 @@ def test_parser_registers_only_bundle_three_proposal_commands() -> None:
 
 def test_http_activation_rotates_private_proposal_token(tmp_path) -> None:
     (tmp_path / "a.md").write_text("---\ntype: Note\n---\n\nA\n")
+    private_session_root(tmp_path)
     first = activate_http(tmp_path)
     token_path = tmp_path / ".okf-loom/session/.proposal-http-token"
     assert len(first.proposal_token) == 64
@@ -91,6 +93,11 @@ def test_public_activation_creates_private_repository_under_setgid_parent(
     inherited_gid = next((gid for gid in os.getgroups() if gid != os.getegid()), os.getegid())
     os.chown(bundle, -1, inherited_gid)
     bundle.chmod(0o2755)
+    # This proof asserts umask + setgid inheritance, not default-ACL policy.
+    # Remove only this newly owned fixture's default ACL so umask actually
+    # governs its children; never strip ACLs from the source checkout.
+    if "system.posix_acl_default" in os.listxattr(bundle):
+        os.removexattr(bundle, "system.posix_acl_default")
     (bundle / "a.md").write_text("---\ntype: Note\n---\n\nA\n")
     credentials = (os.geteuid(), os.getegid(), os.getgroups())
     _forbid_directory_chmod(monkeypatch)
@@ -432,6 +439,7 @@ def test_proposal_activation_ignores_mutated_legacy_authority_anchor(
 ])
 def test_legacy_duplicate_malformed_stale_fail_without_mutation(tmp_path, rows, identity, code) -> None:
     (tmp_path / "a.md").write_text("---\ntype: Note\n---\n\nA\n")
+    private_session_root(tmp_path)
     service = activate(tmp_path)
     path = tmp_path / ".okf-loom/session/proposals.jsonl"
     path.write_text("".join(json.dumps(row, separators=(",", ":")) + "\n" for row in rows))
@@ -486,6 +494,7 @@ def test_activation_rejects_unsafe_bundle_root(tmp_path) -> None:
 
 
 def test_run_server_real_activation_inactive_and_active_loopback(tmp_path, monkeypatch) -> None:
+    private_session_root(tmp_path)
     import okf_loom.server as server_module
     (tmp_path / "a.md").write_text("---\ntype: Note\n---\n\nA\n")
     real_type = server_module.ThreadingHTTPServer
@@ -507,6 +516,7 @@ def test_run_server_real_activation_inactive_and_active_loopback(tmp_path, monke
 
 
 def test_run_server_real_public_no_edit_activation(tmp_path, monkeypatch) -> None:
+    private_session_root(tmp_path)
     import okf_loom.server as server_module
     (tmp_path / "a.md").write_text("---\ntype: Note\n---\n\nA\n")
     real_type = server_module.ThreadingHTTPServer
@@ -567,6 +577,7 @@ def _proposal_threads() -> set[int | None]:
 
 def test_direct_repeat_start_stop_closes_resources_and_releases_bundle(tmp_path) -> None:
     bundle = tmp_path / "bundle"; bundle.mkdir()
+    private_session_root(bundle)
     (bundle / "a.md").write_text("---\ntype: Note\n---\n\nA\n")
     gc.collect()
     baseline_fds = len(os.listdir("/proc/self/fd"))
@@ -587,6 +598,7 @@ def test_direct_repeat_start_stop_closes_resources_and_releases_bundle(tmp_path)
 def test_activation_failure_closes_resources_and_releases_bundle(tmp_path, monkeypatch, mode) -> None:
     bundle = tmp_path / "bundle"; bundle.mkdir()
     bundle.chmod(mode)
+    private_session_root(bundle)
     (bundle / "a.md").write_text("---\ntype: Note\n---\n\nA\n")
     gc.collect()
     baseline_fds = len(os.listdir("/proc/self/fd"))
@@ -611,6 +623,7 @@ def test_activation_failure_closes_resources_and_releases_bundle(tmp_path, monke
 def test_server_repeat_start_stop_closes_activation_chain(tmp_path, monkeypatch) -> None:
     import okf_loom.server as server_module
     bundle = tmp_path / "bundle"; bundle.mkdir()
+    private_session_root(bundle)
     (bundle / "a.md").write_text("---\ntype: Note\n---\n\nA\n")
     real_type = server_module.ThreadingHTTPServer
     class OneShot(real_type):

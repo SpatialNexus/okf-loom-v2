@@ -191,21 +191,38 @@ def test_failed_recapture_preserves_existing_destination(tmp_path, failure):
     assert_no_capture_tmp(tmp_path)
 
 
-def test_prepare_hang_obeys_total_deadline_and_aborts(tmp_path, monkeypatch):
+@pytest.fixture
+def preclaimed_destination(tmp_path, monkeypatch):
+    """Phase-deadline proofs must not spend their 25ms on disk fsync setup.
+
+    Allocate the real ownership token before measuring the injected phase hang.
+    Publication/destination sequencing has separate real-disk/process proofs.
+    The capture budget and real signal deadline remain unchanged.
+    """
+    out = tmp_path / "x.png"
+    claim = capture._claim_destination(out)
+    def already_claimed(path):
+        assert path == out
+        return claim
+    monkeypatch.setattr(capture, "_claim_destination", already_claimed)
+    return out
+
+
+def test_prepare_hang_obeys_total_deadline_and_aborts(tmp_path, monkeypatch, preclaimed_destination):
     monkeypatch.setattr(capture, "_CAPTURE_BUDGET_MS", 25)
     page = FakePage()
     with pytest.raises(capture.CaptureFailure) as caught:
-        capture.capture_target(page, "http://viewer/", "document", tmp_path / "x.png",
+        capture.capture_target(page, "http://viewer/", "document", preclaimed_destination,
                                prepare=lambda _page: time.sleep(1))
     assert caught.value.diagnostic["phase"] == "prepare"
     assert caught.value.diagnostic["code"] == "timeout"
     assert page.abort_calls == 1
 
 
-def test_frozen_raf_obeys_deadline_and_leaves_no_temp(tmp_path, monkeypatch):
+def test_frozen_raf_obeys_deadline_and_leaves_no_temp(tmp_path, monkeypatch, preclaimed_destination):
     monkeypatch.setattr(capture, "_CAPTURE_BUDGET_MS", 25)
     page = FakePage(evaluate_hang="requestAnimationFrame")
-    out = tmp_path / "x.png"
+    out = preclaimed_destination
     with pytest.raises(capture.CaptureFailure) as caught:
         capture.capture_target(page, "http://viewer/", "document", out)
     assert caught.value.diagnostic["phase"] == "paint-boundary"
@@ -214,11 +231,11 @@ def test_frozen_raf_obeys_deadline_and_leaves_no_temp(tmp_path, monkeypatch):
     assert_no_capture_tmp(tmp_path)
 
 
-def test_late_readiness_is_aborted_by_consumer_deadline(tmp_path, monkeypatch):
+def test_late_readiness_is_aborted_by_consumer_deadline(tmp_path, monkeypatch, preclaimed_destination):
     monkeypatch.setattr(capture, "_CAPTURE_BUDGET_MS", 25)
     page = FakePage(evaluate_hang="okfCaptureReadiness.start")
     with pytest.raises(capture.CaptureFailure) as caught:
-        capture.capture_target(page, "http://viewer/", "document", tmp_path / "x.png")
+        capture.capture_target(page, "http://viewer/", "document", preclaimed_destination)
     assert caught.value.diagnostic["phase"] == "readiness"
     assert page.abort_calls == 1
     assert "options.signal = controller.signal" in page.readiness_script
@@ -412,15 +429,17 @@ def test_permanently_blocked_off_main_phase_cannot_keep_process_alive():
     assert "exited True" in result.stdout
 
 
-def _process_publish(path_text, payload, claimed, proceed, results):
+def _process_publish(path_text, payload, connection):
     path = Path(path_text)
     claim = capture._claim_destination(path)
     tmp = path.parent / f".{payload.decode()}.{claim}.capture-tmp{path.suffix}"
     tmp.write_bytes(payload)
-    claimed.put(claim)
-    proceed.wait(5)
-    results.put(capture._publish_if_current(tmp, path, claim))
+    connection.send(claim)
+    assert connection.poll(5), "publisher was not released"
+    connection.recv()
+    connection.send(capture._publish_if_current(tmp, path, claim))
     tmp.unlink(missing_ok=True)
+    connection.close()
 
 
 @pytest.mark.parametrize("name", ["proof.png", "comment-loop.gif"])
@@ -428,21 +447,37 @@ def test_cross_process_newest_claim_fences_late_finisher(tmp_path, name):
     ctx = multiprocessing.get_context("fork")
     out = tmp_path / name
     out.write_bytes(b"initial")
-    claimed = ctx.Queue(); results = ctx.Queue()
-    go_old = ctx.Event(); go_new = ctx.Event()
-    old = ctx.Process(target=_process_publish,
-                      args=(str(out), b"old", claimed, go_old, results))
-    old.start(); old_claim = claimed.get(timeout=3)
-    new = ctx.Process(target=_process_publish,
-                      args=(str(out), b"new", claimed, go_new, results))
-    new.start(); new_claim = claimed.get(timeout=3)
-    assert new_claim > old_claim
-    go_new.set(); assert results.get(timeout=3) is True
-    go_old.set(); assert results.get(timeout=3) is False
-    old.join(3); new.join(3)
-    assert old.exitcode == new.exitcode == 0
-    assert out.read_bytes() == b"new"
-    assert_no_capture_tmp(tmp_path)
+    # Pipes preserve the real process ordering without Queue/Event SemLocks
+    # (POSIX semaphores need /dev/shm, which restricted hosts may deny).
+    old_parent, old_child = ctx.Pipe()
+    new_parent, new_child = ctx.Pipe()
+    old = ctx.Process(target=_process_publish, args=(str(out), b"old", old_child))
+    new = ctx.Process(target=_process_publish, args=(str(out), b"new", new_child))
+    try:
+        old.start()
+        assert old_parent.poll(3), "old publisher did not claim"
+        old_claim = old_parent.recv()
+        new.start()
+        assert new_parent.poll(3), "new publisher did not claim"
+        new_claim = new_parent.recv()
+        assert new_claim > old_claim
+        new_parent.send(True)
+        assert new_parent.poll(3) and new_parent.recv() is True
+        old_parent.send(True)
+        assert old_parent.poll(3) and old_parent.recv() is False
+        old.join(3); new.join(3)
+        assert old.exitcode == new.exitcode == 0
+        assert out.read_bytes() == b"new"
+        assert_no_capture_tmp(tmp_path)
+    finally:
+        for process in (old, new):
+            if process.pid is not None:
+                if process.is_alive():
+                    process.terminate()
+                process.join(3)
+                process.close()
+        for connection in (old_parent, old_child, new_parent, new_child):
+            connection.close()
 
 
 def test_readme_media_serves_only_git_tracked_bundle_files(tmp_path):

@@ -392,7 +392,14 @@ def test_ledger_hover_press_and_breadcrumb_cues_remain_visible(open_page, theme)
     assert rows and all(row['ratio'] >= 4.5 for row in rows), rows
     page.locator('.okf-studio-launcher').click()
     button = page.locator('#okf-panel').get_by_role('button', name='Comments', exact=True)
-    colour = 'b => getComputedStyle(b).backgroundColor'
+    # Sampling immediately after hover/down can read the first (unchanged)
+    # frame of the CSS transition. Observe each real state after its own
+    # animations finish, rather than relying on host scheduling or a sleep.
+    colour = '''async b => {
+        getComputedStyle(b).backgroundColor;
+        await Promise.all(b.getAnimations().map(animation => animation.finished));
+        return getComputedStyle(b).backgroundColor;
+    }'''
     idle = button.evaluate(colour)
     button.hover()
     hovered = button.evaluate(colour)

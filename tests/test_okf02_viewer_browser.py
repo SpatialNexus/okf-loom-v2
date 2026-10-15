@@ -52,7 +52,7 @@ def test_okf02_real_viewer_flow(tmp_path, mode, width):
         expect(metadata).to_contain_text('Trust (advisory): human-reviewed')
         expect(metadata).to_contain_text('Lifecycle (advisory): draft')
         expect(metadata.locator('[data-okf-freshness]')).to_have_text('Stale')
-        evidence = Path(os.environ.get('OKF02_EVIDENCE', '/tmp/okf02-ui-evidence'))
+        evidence = Path(os.environ.get('OKF02_EVIDENCE', tmp_path / 'evidence'))
         evidence.mkdir(parents=True, exist_ok=True)
         # Claim joins by source id even though a Loom citation uses the same id.
         ref = page.get_by_role('link', name='Source alpha', exact=True)
@@ -255,7 +255,7 @@ def test_search_metadata_hierarchy_in_every_viewer(tmp_path, mode, width):
     path.write_text('---\n' + yaml.safe_dump(fm, sort_keys=False) + '---\nLedger findings with a claim[^alpha].\n')
     (path.parent / 'plain.md').write_text(
         '---\ntype: Note\ntitle: Plain ledger note\n---\nThe ledger note records no advisory metadata.\n')
-    evidence = Path(os.environ.get('OKF02_EVIDENCE', '/tmp/okf02-ui-evidence'))
+    evidence = Path(os.environ.get('OKF02_EVIDENCE', tmp_path / 'evidence'))
     evidence.mkdir(parents=True, exist_ok=True)
     with ExitStack() as stack:
         if mode == 'live':
@@ -354,7 +354,10 @@ def test_metadata_clock_and_nojs_static(tmp_path):
         browser = launch_chromium(pw)
         try:
             page = browser.new_page(viewport={'width':320, 'height':900})
-            page.clock.install(time=datetime(2026,9,8,11,59,59,tzinfo=timezone.utc))
+            page.clock.install(time=datetime(2026,9,8,11,59,58,tzinfo=timezone.utc))
+            # Keep navigation/host load from consuming the one second before
+            # the freshness boundary. Only the explicit advance crosses it.
+            page.clock.pause_at(datetime(2026,9,8,11,59,59,tzinfo=timezone.utc))
             page.goto((out / 'notes/review.html').as_uri())
             expect(page.locator('[data-okf-freshness]')).to_have_text('Not stale')
             page.clock.fast_forward(1000)
@@ -367,7 +370,7 @@ def test_metadata_clock_and_nojs_static(tmp_path):
             expect(metadata.get_by_role('link', name='Local evidence')).to_be_visible()
             expect(metadata).to_contain_text('Metadata only — never executed')
             assert plain.evaluate('document.documentElement.scrollWidth <= innerWidth + 1')
-            evidence = Path(os.environ.get('OKF02_EVIDENCE', '/tmp/okf02-ui-evidence'))
+            evidence = Path(os.environ.get('OKF02_EVIDENCE', tmp_path / 'evidence'))
             evidence.mkdir(parents=True, exist_ok=True)
             plain.screenshot(path=str(evidence / 'static-nojs-320.png'))
         finally:
@@ -450,7 +453,7 @@ def test_source_derivation_in_real_graph(tmp_path, mode):
         assert page.evaluate('() => window.__okfLoomGraph.cy.nodes().every(n => Number.isFinite(n.position("x")))')
         assert not errors, errors
         link.focus(); link.scroll_into_view_if_needed()
-        evidence = Path(os.environ.get('OKF02_EVIDENCE', '/tmp/okf02-ui-evidence'))
+        evidence = Path(os.environ.get('OKF02_EVIDENCE', tmp_path / 'evidence'))
         evidence.mkdir(parents=True, exist_ok=True)
         page.screenshot(path=str(evidence / f'{mode}-graph-1280.png'))
         link.click()

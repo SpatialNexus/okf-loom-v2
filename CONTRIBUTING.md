@@ -64,8 +64,14 @@ This is the core run. It collects without importing Playwright and covers local
 HTTP, persistence, capture validators, retrieval and proposal runtime
 identity. Only real browser tests and the optional external upstream-bundle
 integration tests are deselected. Fixtures that serve shipped bundles use
-disposable copies, and no stored evidence is regenerated. Set `TMPDIR=/tmp` to
-relocate pytest's temporary directories. `requirements-dev.txt` pins the
+disposable copies, and no stored evidence is regenerated. On restricted hosts,
+set `TMPDIR` to a writable private directory (`mkdir -m 700`, then `chmod 700`
+if inherited ACLs require it); tests and capture helpers honour it rather than
+requiring `/tmp`. Proposal fixtures create their own 0700 session authorities,
+so a shared/setgid checkout does not require stripping its ACLs. Tests needing
+POSIX multiprocessing semaphores probe `multiprocessing.Lock()` and skip only
+on `PermissionError`; the capture publisher race uses semaphore-free pipes.
+`requirements-dev.txt` pins the
 complete Linux dependency set; there is no `uv sync` or editable-install step.
 
 ### Built-in YAML fallback
@@ -101,6 +107,13 @@ some need CDN access, or headed Chrome for real browser zoom.
   Playwright-managed Chromium, then an installed Chrome or Chromium.
 - The legacy `OKF_BROWSER_TEST_OPT_OUT=1` opt-out still works, but conflicts
   with `OKF_REQUIRE_BROWSER=1`.
+- Chrome's Unix socket path is limited to 107 bytes. Before collection, conftest
+  relocates an overlong, shared or setgid effective `TMPDIR` to a short private
+  directory under the resolved `.shared-cache`, the virtualenv's parent, or
+  writable `/tmp`.
+  If none fits, it fails early with a request for a short writable `TMPDIR`.
+  The directory is removed after the test session; do not use a symlink to a
+  long path as a workaround (Chrome resolves it).
 - The shared server fixture prints startup logs on failure and cleans up with
   a bounded terminate-then-kill.
 - Use marker selection for core runs. A test that starts Playwright or
@@ -120,8 +133,12 @@ Automated browser checks run on Chromium only, driven by Playwright 1.58.0.
   `OKF_TEST_HEADED_ZOOM=1` runs the `HEADED_ZOOM_TESTS` in
   `tests/test_ui_reflow_nojs_remediation.py` with
   `OKF_CAPTURE_REAL_BROWSER_ZOOM=1`, pressing Ctrl+plus through `xdotool`, so
-  they need `DISPLAY` and `xdotool` (see `tests/browser_zoom.py`). They are not
-  part of CI.
+  they need X11 `DISPLAY` and `xdotool` (see `tests/browser_zoom.py`). With no
+  display and no `xvfb-run`, only these seven proofs skip, with an explicit
+  environment reason (even in the required-browser lane). If Xvfb is installed,
+  prefer `OKF_TEST_HEADED_ZOOM=1 xvfb-run -a python -m pytest -q
+  tests/test_ui_reflow_nojs_remediation.py`. Wayland alone cannot drive the
+  X11 keyboard driver. They are not part of CI.
 - Text-only zoom and custom browser font sizes are not tested.
 - Accessibility semantics are checked against Playwright's ARIA snapshot and
   Chromium's accessibility tree. No screen reader has been run, so spoken
