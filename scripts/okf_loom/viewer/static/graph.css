@@ -276,6 +276,10 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-topbar__controls>*,body.okf-
   box-shadow: var(--shadow-pop);
   font-size: var(--okf-text-sm);
 }
+/* Open, the list is the reader's current surface: it sits above the zoom
+ * cluster (25) and the docked viewport bar (26) instead of under them, so
+ * its rows, ring and clicks are never intercepted by Zoom in. */
+.okf-node-index[open] { z-index: 27; }
 .okf-node-index > summary {
   cursor: pointer;
   font-size: 13px;
@@ -1771,8 +1775,6 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom { z-index: 40 !im
   visibility: hidden;
 }
 .okf-graph-zoom button[data-tooltip]:is(:hover, :focus-visible)::after { opacity: 1; visibility: visible; }
-
-.okf-node-index__item.is-active::before { content: "Active · "; font-weight: 700; }
 
 @media (max-width: 640px) {
   .okf-graph-zoom button[data-tooltip]::after { display: none; }

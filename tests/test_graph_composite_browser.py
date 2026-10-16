@@ -455,6 +455,37 @@ def test_selected_concept_body_keeps_ledger_prose_and_contained_code(page, docs_
     assert seen["chip"] and seen["underline"] == "underline", seen
 
 
+@pytest.mark.parametrize("height", [900, 800])
+def test_open_concept_list_keeps_rows_steady_and_above_zoom(page, docs_server_url: str, height: int) -> None:
+    """D2-004/D2-005: moving the active option keeps every row one line
+    (the 2px bar marks it, no squeezed "Active ·" column), and the open
+    list is hit-tested above the zoom cluster that overlaps its lower end."""
+    page.set_viewport_size({"width": 1440 if height == 900 else 1280, "height": height})
+    page.goto(docs_server_url + "/__graph", wait_until="domcontentloaded")
+    page.wait_for_function("() => window.__okfLoomGraph?.layoutStats?.lastAppliedSeq >= 1")
+    page.locator(".okf-node-index summary").click()
+    concepts = page.get_by_role("listbox", name="Graph concepts")
+    concepts.focus()
+    page.keyboard.press("ArrowDown")
+    page.keyboard.press("ArrowDown")
+    seen = page.evaluate("""() => {
+      const list = document.querySelector('.okf-node-index__list');
+      const items = [...list.querySelectorAll('[role="option"]')];
+      const active = list.querySelector('.is-active'), plain = items.find(i => i !== active);
+      const lr = list.getBoundingClientRect();
+      const hits = [...document.querySelectorAll('#okf-graph > .okf-graph-zoom button')].map(b => b.getBoundingClientRect())
+        .filter(b => b.left < lr.right && lr.left < b.right && b.top < lr.bottom && lr.top < b.bottom)
+        .map(b => { const el = document.elementFromPoint((Math.max(b.left, lr.left) + Math.min(b.right, lr.right)) / 2,
+                                                         (Math.max(b.top, lr.top) + Math.min(b.bottom, lr.bottom)) / 2);
+                    return !!(el && el.closest('.okf-node-index')); });
+      return {activeH: active.getBoundingClientRect().height, plainH: plain.getBoundingClientRect().height,
+              before: getComputedStyle(active, '::before').content, bar: getComputedStyle(active).borderInlineStartWidth, hits};
+    }""")
+    assert seen["activeH"] == seen["plainH"] and seen["before"] in ("none", "normal"), seen
+    assert seen["bar"] == "2px", seen
+    assert all(seen["hits"]), seen
+
+
 def test_graph_settings_disclosure_matches_its_sibling_summaries(page, docs_server_url: str) -> None:
     """Graph settings opens like Explore with lenses: the native marker on
     the left in body type, not a hidden marker with a trailing glyph; the

@@ -21,6 +21,9 @@ follow [Semantic Versioning](https://semver.org/). The product version
 - A concept selected in the graph details pane (and every single-file document)
   keeps the Ledger prose styles: padded, scrollable code wells, inline-code chips,
   underlined prose links, task lists and blockquotes.
+- The graph's All concepts list keeps the active row on one line (its 2px bar
+  marks it; the wrapping "Active ·" prefix is gone) and, open, sits above the zoom
+  controls instead of under them.
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
   including source derivations; the full/tool graph projection is unchanged.
 - Missing or malformed embedded search evidence in single-file exports settles as
