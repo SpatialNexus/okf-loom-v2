@@ -464,7 +464,7 @@ def test_find_in_graph_band_stays_put_while_typing(page, docs_server_url: str, w
     idle = page.evaluate(_FIND_BAND_JS)
     # The heading shares the field's centre line on the route's gutter.
     assert abs((idle["heading"]["y"] + idle["heading"]["h"] / 2) - (idle["input"]["y"] + idle["input"]["h"] / 2)) <= 1, idle
-    assert idle["heading"]["x"] == idle["band"]["x"] + (20 if width > 900 else 12), idle
+    assert idle["heading"]["x"] == idle["band"]["x"] + 20 == idle["title"]["x"] + 20, idle
     for query in ["spec", "zzqqXX", "a deliberately long query that runs well past the end of the field"]:
         search.fill(query)
         page.wait_for_function("q => document.querySelector('.okf-graph-search-status').textContent !== '' && window.__okfLoomGraph.getState", arg=query)
@@ -610,6 +610,28 @@ def test_action_bar_keeps_clear_of_the_selection_and_canvas_chrome(page, docs_se
     expect(show_all).to_be_visible()
     line = show_all.evaluate("b => parseFloat(getComputedStyle(b).lineHeight) || parseFloat(getComputedStyle(b).fontSize) * 1.3")
     assert show_all.evaluate("b => b.getBoundingClientRect().height") < 2 * line + 12
+
+
+_HEADER_JS = """() => { const r = s => { const b = document.querySelector(s).getBoundingClientRect();
+    return [Math.round(b.left), Math.round(b.top), Math.round(b.height)]; };
+  return {brand: r('.okf-shell__brand'), search: r('.okf-shell form[role=search]'),
+          index: r('.okf-shell [data-okf-shell-item="index"]'), graph: r('.okf-shell [data-okf-shell-item="graph"]')}; }"""
+
+
+@pytest.mark.parametrize("width", [641, 768, 1024])
+def test_graph_route_header_keeps_the_shared_shell_geometry(page, docs_server_url: str, width: int) -> None:
+    """T1-007: switching from a document to the graph route does not move the
+    global controls: same inline gutter, same row tops, same item positions."""
+    page.set_viewport_size({"width": width, "height": 900})
+    page.goto(docs_server_url + "/how-to/archive_threads", wait_until="domcontentloaded")
+    page.wait_for_function("() => document.documentElement.classList.contains('okf-theme-ready')")
+    page.wait_for_timeout(300)
+    document = page.evaluate(_HEADER_JS)
+    _open(page, docs_server_url, width)
+    page.wait_for_timeout(300)
+    graph = page.evaluate(_HEADER_JS)
+    # The current destination is set bold, so its neighbour may sit 1px over.
+    assert all(abs(a - b) <= 1 for key in document for a, b in zip(document[key], graph[key])), (document, graph)
 
 
 def test_single_file_short_canvas_keeps_zoom_clear_of_concept_index(tmp_path, page) -> None:

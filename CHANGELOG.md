@@ -30,6 +30,8 @@ follow [Semantic Versioning](https://semver.org/). The product version
 - The graph's floating action bar is placed clear of the selected concept, its
   name and the canvas controls; the docked bar at 641–900px no longer covers the
   zoom column, and the focus bar keeps "Show all" on one line (D2-015).
+- Opening Graph at 641–1100px no longer moves the top bar: the graph route keeps
+  the shared shell's 20px gutter, row tops and destination spacing (T1-007).
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
   including source derivations; the full/tool graph projection is unchanged.
 - Missing or malformed embedded search evidence in single-file exports settles as

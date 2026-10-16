@@ -56,7 +56,7 @@
   }
   .okf-viewer--graph .okf-topbar__brand,
   .okf-viewer--graph .okf-topbar__controls { min-width: 0; }
-  .okf-viewer--graph .okf-topbar__controls { justify-content: end; flex-wrap: wrap; gap: 8px; overflow: visible; }
+  .okf-viewer--graph .okf-topbar__controls { justify-content: end; flex-wrap: wrap; gap: 4px; overflow: visible; }
   .okf-viewer--graph .okf-studio-bar { grid-column: 1 / -1; width: 100%; display: flex; flex-wrap: wrap; gap: 8px; }
   .okf-viewer--graph .okf-studio-bar__group { min-width: 0; flex-wrap: wrap; gap: 8px; }
   .okf-viewer--graph .okf-presence { max-width: min(46ch, 100%); }
@@ -1254,7 +1254,9 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
 }
 
 @media (max-width: 900px) {
-  .okf-viewer--graph .okf-topbar { height: auto; min-height: var(--okf-topbar-h); padding: var(--okf-space-2) var(--okf-space-3); flex-wrap: wrap; align-items: center; }
+  /* The shared shell's 20px gutter and flush top, as on document routes
+   * (T1-007); the compact shell block owns <=640px. */
+  .okf-viewer--graph .okf-topbar { height: auto; min-height: var(--okf-topbar-h); padding: 0 20px; flex-wrap: wrap; align-items: center; }
   .okf-viewer--graph .okf-topbar__controls { flex: 1 1 100%; width: 100%; }
   /* Pane tabs: graph.js shows them up to 900px (isCompactGraphViewport), so
    * their Ledger look and pressed state cover that whole range, not only
@@ -1913,10 +1915,6 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
     gap: var(--okf-space-1);
   }
   .okf-viewer--graph .okf-global-nav > * { min-width: 44px; min-height: 44px; }
-  .okf-viewer--graph .okf-global-nav .okf-btn { padding-inline: var(--okf-space-2); }
-  .okf-viewer--graph .okf-graph-tools {
-    padding-inline: var(--okf-space-3);
-  }
   .okf-graph-tools__filter { flex: 1 1 10rem; }
   .okf-graph-tools__reset { flex: 0 1 auto; min-width: 44px; }
   .okf-viewer--graph .okf-graph-mobile-nav {
@@ -2066,7 +2064,7 @@ html:not([data-okf-js="1"]) body:not([data-okf-js="1"]).okf-viewer--graph .okf-g
 @media (min-width: 641px) and (max-width: 1100px) {
   .okf-viewer--graph > .okf-shell {
     display: grid !important; grid-template-columns: minmax(0,1fr) !important;
-    height: auto !important; gap: 8px !important; padding-block: 8px !important;
+    height: auto !important; gap: 8px !important; padding-block: 0 !important;
   }
   .okf-viewer--graph > .okf-shell > .okf-shell__brand {
     grid-column: 1 !important; grid-row: 1 !important;
