@@ -973,7 +973,7 @@ def test_static_search_page_loads_client_side_searcher(
     # The script tag must be properly formed (not inside a comment).
     import re
     script_match = re.search(
-        r'<script\s+src="[^"]*static-search\.js"[^>]*></script>', html
+        r'<script\s+src="[^"]*portable-page\.js" data-okf-runtime="static-search\.js"[^>]*></script>', html
     )
     assert script_match, (
         "static __search.html missing valid <script> tag for static-search.js"

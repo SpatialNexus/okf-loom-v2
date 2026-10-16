@@ -6806,6 +6806,11 @@ def _render_search_page(
             f'<script src="{static_prefix}/static-search.js" defer></script>'
         )
 
+    if mode == "static":
+        js_link = js_link.replace(
+            f'<script src="{static_prefix}/static-search.js" defer></script>',
+            f'<script src="{static_prefix}/portable-page.js" data-okf-runtime="static-search.js" defer></script>')
+
     # P2-61: shared topbar nav. Search page lives at the bundle root, so
     # the form posts back to itself and Graph/Index are root-relative.
     root_prefix_for_nav = "/" if mode in ("serve", "spa") else "./"
@@ -7002,6 +7007,10 @@ def _render_graph_page(
         f'<script src="{static_prefix}/graph.js" defer></script>\n'
         f'<script src="{static_prefix}/renderers.js" defer></script>'
     )
+    if mode == "static":
+        graph_js = graph_js.replace(
+            f'<script src="{static_prefix}/graph.js" defer></script>',
+            f'<script src="{static_prefix}/portable-page.js" data-okf-runtime="graph.js" defer></script>')
     shell_html = _application_shell_html(
         name=name,
         bundle_href=back_link,

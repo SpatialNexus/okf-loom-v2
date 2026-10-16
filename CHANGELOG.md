@@ -10,6 +10,8 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Static Graph and Search pages opened from disk show one server-required
+  explanation instead of contradictory fetch errors and impossible retry controls.
 - Opening a single-file Index concept resets only its detail pane and focuses
   without scrolling the graph workspace or hiding its top bar.
 - Portable builds use the configured viewer title consistently across Index,

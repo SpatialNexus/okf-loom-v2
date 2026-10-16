@@ -3100,6 +3100,42 @@ def test_static_portable_modes_context_and_fail_closed_url(static_url: str, page
     expect(page.locator("#okf-search-query")).to_be_focused()
 
 
+@pytest.mark.parametrize("assets", ["cdn", "offline"])
+@pytest.mark.parametrize("route", ["__graph.html", "__search.html?q=theme"])
+def test_static_file_pages_explain_the_web_server_requirement(
+    tmp_path: Path, page, assets: str, route: str,
+) -> None:
+    """Disk pages have one actionable state, no doomed data fetch, and honest nav."""
+    from okf_loom import Bundle
+    from okf_loom.render import build_site
+
+    out = tmp_path / "static"
+    build_site(Bundle.load(DEMO_BUNDLE), out, target="static", assets=assets)
+    requests, errors = [], []
+    page.on("request", lambda request: requests.append(request.url))
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    filename, _, query = route.partition("?")
+    page.goto((out / filename).as_uri() + ("?" + query if query else ""), wait_until="load")
+    note = page.locator(".okf-portable-server-note")
+    expect(note).to_have_count(1)
+    expect(note).to_be_visible()
+    expect(note).to_contain_text("Graph and Search cannot load their data")
+    expect(note).to_contain_text("python -m http.server")
+    expect(note).to_contain_text("Index and documents also work directly from disk")
+    expect(page.locator(".okf-graph-loading--error, .okf-search-error")).to_have_count(0)
+    expect(page.get_by_role("button", name="Retry", exact=True)).to_have_count(0)
+    expect(page.locator(".okf-static-viewer-note")).to_have_count(0)
+    assert page.locator("body").get_attribute("data-okf-capture-ready") == "unavailable"
+    assert not any("/__data/" in url for url in requests), requests
+    assert not errors, errors
+    if assets == "offline":
+        assert not any(url.startswith(("http:", "https:")) for url in requests), requests
+    note.get_by_role("link", name="Browse the concept index").click()
+    expect(page.locator(".okf-card").first).to_be_visible()
+    page.locator(".okf-card a.okf-card__link").first.click()
+    expect(page.locator(".okf-page__body")).to_be_visible()
+
+
 def test_static_provider_setup_failure_publishes_explicit_error(static_url: str, page) -> None:
     page.route(
         "**/passages-manifest.json",
