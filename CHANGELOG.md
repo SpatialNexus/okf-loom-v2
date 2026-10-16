@@ -20,6 +20,8 @@ follow [Semantic Versioning](https://semver.org/). The product version
   "rev section-" on every page, and no revision when there is none.
 - The top-bar Index link is marked as the current page only on the bundle index,
   not on documents, the log or section indexes.
+- Studio change toasts use the singular for one ("1 change", not "1 changes"), and
+  "Undo all (N)" counts the same changes as the summary ("Undo 4 of 5" when some can't be undone).
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
   including source derivations; the full/tool graph projection is unchanged.
 - Missing or malformed embedded search evidence in single-file exports settles as

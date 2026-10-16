@@ -2229,6 +2229,50 @@ def test_conflict_modal_copy_and_button_hierarchy(server_url: str, page) -> None
     )
 
 
+def test_burst_toast_counts_read_grammatically_and_match_the_undo_button(server_url: str, page) -> None:
+    """D1-018 / M1-016: the toast read "7 text edits, 1 changes to 5 concepts
+    · Undo all (6)": plural nouns for a count of one, and a button that
+    counted undo targets while the summary counted changes. A count of one is
+    singular, and the coalesced button names the changes it reverts ("Undo 4
+    of 5" when one of them cannot be undone)."""
+    _install_error_trap(page)
+    page.goto(f"{server_url}/tables/orders", wait_until="load")
+    _wait_for_studio(page)
+    result = page.evaluate(
+        """async () => {
+            const hub = window.okfLoomLive;
+            const at = () => new Date().toISOString();
+            const read = async () => {
+                await new Promise(r => setTimeout(r, 700));
+                const toasts = document.querySelectorAll('.okf-toast');
+                const toast = toasts[toasts.length - 1];
+                return toast ? { text: toast.textContent.replace(/\\s+/g, ' ').trim(),
+                    actions: Array.from(toast.querySelectorAll('.okf-toast__action')).map(b => b.textContent.trim()) } : null;
+            };
+            hub.emit('activity', { id: 'plural-1', actor: 'agent', action: 'add_link',
+                ids: ['tables/orders'], ts: at() });
+            hub.emit('activity', { id: 'plural-2', actor: 'agent', action: 'mystery_op',
+                ids: ['tables/orders'], ts: at() });
+            const singular = await read();
+            for (let i = 0; i < 4; i++) {
+                hub.emit('activity', { id: 'mixed-undo-' + i, actor: 'agent', action: 'replace_text',
+                    ids: ['tables/orders'], undoable: true, ts: at() });
+            }
+            hub.emit('activity', { id: 'mixed-undo-x', actor: 'agent', action: 'replace_text',
+                ids: ['tables/customers'], undoable: false, ts: at() });
+            const partial = await read();
+            return { singular, partial };
+        }"""
+    )
+    assert result["singular"], result
+    assert "Agent added 1 link, 1 change to " in result["singular"]["text"], result
+    assert "1 changes" not in result["singular"]["text"] and "1 links" not in result["singular"]["text"]
+    assert result["partial"], result
+    assert "added 5 text edits to 2 concepts" in result["partial"]["text"], result
+    assert result["partial"]["actions"] == ["Undo 4 of 5"], result
+    _assert_no_page_errors(page)
+
+
 def test_burst_toast_caps_inline_undo_buttons(server_url: str, page) -> None:
     """A burst of > 3 undoable groups collapses to a single 'Undo all (N)'
     button instead of rendering one button per group (CRI2-005). A toast is
@@ -2651,12 +2695,13 @@ def test_seeded_undo_all_mixed_group_and_standalone_restores_pre_burst_bytes(
     assert touched["tables/orders"].read_text(encoding="utf-8") != originals["tables/orders"]
 
     # Four undoable targets (standalone orders, the group, datasets,
-    # services) exceed the inline cap -> one coalesced "Undo all (4)".
-    _seeded_toast_action(page, "Undo all (4)")
+    # services) exceed the inline cap -> one coalesced button. It counts the
+    # five CHANGES it reverts, like the toast's summary line (D1-018/M1-016).
+    _seeded_toast_action(page, "Undo all (5)")
     clicked = page.evaluate(
         """() => {
             const btn = Array.from(document.querySelectorAll('.okf-toast .okf-toast__action'))
-                .find((b) => b.textContent.trim() === 'Undo all (4)');
+                .find((b) => b.textContent.trim() === 'Undo all (5)');
             if (!btn) return { missing: true };
             btn.click();
             return { disabled: btn.disabled };
@@ -2683,7 +2728,7 @@ def test_seeded_undo_all_mixed_group_and_standalone_restores_pre_burst_bytes(
     for cid, path in touched.items():
         assert path.read_text(encoding="utf-8") == originals[cid], cid
     success = page.locator('.okf-toast[data-tone="success"]',
-                           has_text="Undid 4 change(s)")
+                           has_text="Undid 5 change(s)")
     expect(success.first).to_be_visible()
     _assert_no_page_errors(page)
 

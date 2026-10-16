@@ -7882,7 +7882,10 @@
   async function runUndoBatch(jobs, btn, opts) {
     const label = (opts && opts.label) || "Undo";
     Btn.busy(btn);
-    let restored = 0, restoredFiles = 0, already = 0, partial = 0;
+    // restoredChanges weighs each job by the changes it reverts (a group job
+    // carries its member count), so a clean batch reports the same number
+    // its "Undo all (N)" button named (D1-018 / M1-016).
+    let restored = 0, restoredFiles = 0, already = 0, partial = 0, restoredChanges = 0;
     const failures = [];
     const partialNotes = [];
     try {
@@ -7914,6 +7917,7 @@
             partialNotes.push(detail);
           } else if (data && data.ok) {
             restored += 1;
+            restoredChanges += job.changes || 1;
             restoredFiles += data.restored || 1;
           } else {
             failures.push(detail);
@@ -7958,7 +7962,7 @@
       } else if (already && !restored) {
         toast("Nothing to undo — all " + already + " targets were already undone.", { tone: "success" });
       } else {
-        toast("Undid " + restored + " change(s)."
+        toast("Undid " + restoredChanges + " change(s)."
           + (already ? " (" + already + " already undone)" : ""), { tone: "success" });
       }
     } finally {
@@ -10803,6 +10807,17 @@
     }) : [];
     var undoableStandalone = EDIT ? standalone.filter(function (a) { return a.undoable; }) : [];
     var totalUndoable = undoableGroupIds.length + undoableStandalone.length;
+    // D1-018 / M1-016: the coalesced button counts CHANGES, like the summary
+    // line beside it and like "Undo group (N)" (a group undo reverts all its
+    // members); counting undo targets read "8 changes · Undo all (6)".
+    // When some changes cannot be undone the label says how many can.
+    var undoableChanges = 0;
+    batch.forEach(function (a) {
+      if (a && (a.group_id ? undoableGroupIds.indexOf(a.group_id) >= 0 : undoableStandalone.indexOf(a) >= 0)) undoableChanges += 1;
+    });
+    var undoAllLabel = undoableChanges === batch.length
+      ? "Undo all (" + undoableChanges + ")"
+      : "Undo " + undoableChanges + " of " + batch.length;
     function appendUndoButton(label, handler) {
       var link = el("button", { type: "button", class: "okf-toast__action", text: label });
       link.addEventListener("click", function (e) {
@@ -10834,13 +10849,13 @@
           if (batchGroupsCollected[a.group_id]) return;
           if (undoableGroupIds.indexOf(a.group_id) < 0) return;
           batchGroupsCollected[a.group_id] = true;
-          batchJobs.push({ groupId: a.group_id });
+          batchJobs.push({ groupId: a.group_id, changes: byGroup[a.group_id].length });
         } else {
           batchJobs.push(undoTargetFor(a));
         }
       });
-      appendUndoButton("Undo all (" + totalUndoable + ")", function (btn) {
-        runUndoBatch(batchJobs, btn, { label: "Undo all (" + totalUndoable + ")" })
+      appendUndoButton(undoAllLabel, function (btn) {
+        runUndoBatch(batchJobs, btn, { label: undoAllLabel })
           .catch(function (e) { console.error("[okf-studio] batch undo failed:", e); });
       });
     } else {
@@ -10917,15 +10932,16 @@
       const hv = humanVerb(v, verbCounts[v]);
       return hv.count + " " + hv.noun;
     });
-    const targetText = targets.length === 1
-      ? (" to " + titleFor(targets[0]))
+    const targetText = !targets.length ? ""
+      : targets.length === 1 ? (" to " + titleFor(targets[0]))
       : (" to " + targets.length + " concepts");
     return actor + " added " + parts.join(", ") + targetText;
   }
   // Map raw op ids to human verb + noun forms. The shape is:
   //   {phrase: "<past-tense verb>", noun: "<plural noun>", prep: "to", count: N}
   // `phrase` is used in the singular case ("Agent added a link"),
-  // `noun` is used in the collapsed multi case ("3 links"), and `prep`
+  // `noun` is used in the collapsed multi case ("3 links"; a count of one
+  // takes the singular, "1 change", never "1 changes"), and `prep`
   // joins the singular phrase to its target ("edited text in Orders").
   // Unknown ops fall back to "changed"/"changes" so we never surface a
   // raw snake_case token to the user (fit-and-finish rule).
@@ -10949,7 +10965,10 @@
       auto_repair:        { phrase: "auto-repaired",    noun: "repairs"  },
     };
     const entry = map[action] || { phrase: "made a change", noun: "changes" };
-    return { phrase: entry.phrase, noun: entry.noun, prep: entry.prep || "to", count: count };
+    // Every plural above ends in "s" or "ies".
+    const noun = count !== 1 ? entry.noun
+      : /ies$/.test(entry.noun) ? entry.noun.slice(0, -3) + "y" : entry.noun.replace(/s$/, "");
+    return { phrase: entry.phrase, noun: noun, prep: entry.prep || "to", count: count };
   }
   function verbLabel(verb, count) {
     // Crude pluralisation good enough for the known action set.
