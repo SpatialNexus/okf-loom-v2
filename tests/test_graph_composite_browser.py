@@ -391,6 +391,58 @@ def test_canvas_labels_rerasterise_after_window_resize(page, docs_server_url: st
     assert not distorted, distorted
 
 
+# Painted label overprints: pairs of visible node labels (inked text box) and
+# bundled-relationship count chips (whole chip) that overlap on the canvas.
+_LABEL_OVERPRINT_JS = """() => {
+  const cy = window.__okfLoomGraph.cy;
+  const O = {includeNodes: false, includeEdges: false, includeLabels: true, includeOverlays: false};
+  const shown = e => e.visible() && !!e.style('label') && Number(e.style('text-opacity')) > 0
+    && Number(e.style('opacity')) > 0.5;
+  const box = (e, inset) => { const b = e.boundingBox(O);
+    return {id: e.isNode() ? e.data('label') : 'chip ' + e.id(), x1: b.x1 + inset, y1: b.y1 + inset, x2: b.x2 - inset, y2: b.y2 - inset}; };
+  const boxes = cy.nodes().filter(shown).map(n => box(n, 6))
+    .concat(cy.edges('.okf-multi-edge').filter(shown).map(e => box(e, 1)));
+  const hits = [];
+  for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+    const a = boxes[i], b = boxes[j];
+    if (a.x1 < b.x2 && b.x1 < a.x2 && a.y1 < b.y2 && b.y1 < a.y2) hits.push([a.id, b.id]);
+  }
+  return hits;
+}"""
+
+
+def test_selected_label_takes_precedence_and_overprints_are_culled(page, docs_server_url: str) -> None:
+    """D2-006: the selected concept's name sits above its own incident edges
+    on an opaque --surface plate and shows its full title; lower-priority
+    labels and count chips that would overprint another label are hidden,
+    at fit zoom and zoomed in."""
+    _open(page, docs_server_url, 1440)
+    page.locator('.okf-lens-summary__row[data-target="reference/cli"]').first.click()
+    page.wait_for_function("() => window.__okfLoomGraph.cy.$(':selected').id() === 'reference/cli'")
+    page.wait_for_timeout(600)
+    selected = page.evaluate("""() => {
+      const cy = window.__okfLoomGraph.cy, n = cy.$(':selected');
+      const probe = document.createElement('canvas').getContext('2d');
+      const norm = c => { probe.fillStyle = '#000'; probe.fillStyle = c; return probe.fillStyle; };
+      const surface = norm(getComputedStyle(document.documentElement).getPropertyValue('--surface').trim());
+      return {plate: norm(n.style('text-background-color')), surface, opacity: Number(n.style('text-background-opacity')),
+              depth: n.style('z-compound-depth'), width: parseFloat(n.style('text-max-width')),
+              culled: n.hasClass('okf-label-culled'), incident: n.connectedEdges('.okf-incident').length,
+              incidentDepth: n.connectedEdges('.okf-incident').first().style('z-compound-depth')};
+    }""")
+    assert selected["plate"] == selected["surface"] and selected["opacity"] == 1, selected
+    # The name draws above its fan of incident edges, which stay below nodes.
+    assert selected["depth"] == "top" and selected["incident"] > 10 and selected["incidentDepth"] != "top", selected
+    assert selected["width"] >= 200 and not selected["culled"], selected
+    assert page.evaluate(_LABEL_OVERPRINT_JS) == []
+    for _ in range(2):
+        page.get_by_role("button", name="Zoom in").click()
+        page.wait_for_timeout(400)
+    page.wait_for_timeout(400)
+    assert page.evaluate(_LABEL_OVERPRINT_JS) == []
+    assert not page.evaluate("() => window.__okfLoomGraph.cy.$(':selected').hasClass('okf-label-culled')")
+
+
 def test_single_file_short_canvas_keeps_zoom_clear_of_concept_index(tmp_path, page) -> None:
     """With the Search & context drawer open the single-file canvas is short:
     the zoom controls become a bottom-left row and never cover All concepts;

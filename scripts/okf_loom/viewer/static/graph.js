@@ -47,13 +47,14 @@
   //   select      --accent            the selected node's 4px stroke / edge
   //   cue         --text              path, search and bridge marks (ink)
   //   raised      --surface-2         neutral hub / hover / focus halos
+  //   surface     --surface           the selected/hovered label's plate
   //   chip        --bg-2              count-chip fill
   //   warn/error/info --status-*      status markers: strokes and glyphs only
   var GRAPH_TOKENS = {
     canvas: "--graph-bg", node: "--graph-node", nodeIcon: "--graph-node-icon",
     nodeBorder: "--border-strong", nodeText: "--graph-label", halo: "--graph-halo",
     edge: "--graph-edge", edgeLabel: "--text-2", select: "--accent", cue: "--text",
-    muted: "--text-3", raised: "--surface-2", chip: "--bg-2",
+    muted: "--text-3", raised: "--surface-2", surface: "--surface", chip: "--bg-2",
     warn: "--status-warn", error: "--status-error", info: "--status-info"
   };
   // Last-resort values (Bone) for an embedder that loads graph.js without the
@@ -61,7 +62,7 @@
   var GRAPH_TOKEN_FALLBACK = {
     canvas: "#f6f3ed", node: "#d2cabd", nodeIcon: "#1d1a16", nodeBorder: "#b0a696",
     nodeText: "#1d1a16", halo: "#f6f3ed", edge: "#a39a8b", edgeLabel: "#575047",
-    select: "#a3573a", cue: "#1d1a16", muted: "#6a6258", raised: "#e3ddd2",
+    select: "#a3573a", cue: "#1d1a16", muted: "#6a6258", raised: "#e3ddd2", surface: "#fbf9f5",
     chip: "#eae5dc", warn: "#7f5410", error: "#9e2f2a", info: "#36597e"
   };
 
@@ -1826,6 +1827,32 @@
       };
     }
 
+      // Label precedence (D2-006). The selected, hovered or toured concept's
+      // name is the one the reader is looking at: its node joins the top
+      // layer (above its own incident edges and every neighbour), its label
+      // sits on an opaque --surface plate with a hairline --border-strong rule
+      // and shows more of the title. Every other label yields to it through
+      // cullOverlappingLabels(), which hides (never moves) the lower-priority
+      // label or count chip in an overlap. Culled text keeps its geometry, so
+      // fitting and hit-testing do not change when a label is culled.
+      var LABEL_PRECEDENCE = "node:selected, node.okf-hover, node.okf-tour-target";
+      var LABEL_CULLED = "node.okf-label-culled, edge.okf-label-culled";
+      var LABEL_CULLED_STYLE = { "text-opacity": 0, "text-background-opacity": 0, "text-outline-opacity": 0, "text-border-opacity": 0 };
+      var PRECEDENCE_LABEL_WIDTH = 220;
+      function labelPlateStyle(pal) {
+        return {
+          "color": pal.nodeText, "text-background-color": pal.surface, "text-background-opacity": 1,
+          "text-background-padding": 3, "text-border-width": 1, "text-border-color": pal.nodeBorder,
+          "text-border-opacity": 1, "text-max-width": PRECEDENCE_LABEL_WIDTH,
+          "z-compound-depth": "top", "z-index": 40
+        };
+      }
+      // Cytoscape's cascade is last-rule-wins, so every pass that appends a
+      // base "node" label rule re-appends these after it.
+      function labelPrecedenceRules(style, pal) {
+        return style.selector(LABEL_PRECEDENCE).style(labelPlateStyle(pal)).selector(LABEL_CULLED).style(LABEL_CULLED_STYLE);
+      }
+
       // Compute the initial (default-preset) grouping so the first layout is
       // already grouped-by-type rather than a flat hairball.
       applyGrouping();
@@ -1999,14 +2026,16 @@
           } },
           // P1 edge highlight: edges incident to the selected node pop above
           // the de-emphasized default edge noise. Restores full opacity + a
-          // modest width bump. z-compound-depth top keeps incident edges above
-          // non-incident ones so they are never visually buried. The colour
-          // is left to the base edge / relation encoding — this is a
-          // PROMINENCE cue, not a new colour variable.
+          // modest width bump. A raised z-index keeps incident edges above
+          // non-incident ones so they are never visually buried, while edges
+          // still pass BEHIND every node and label (a top-layer fan of
+          // incident edges used to strike through the names it connects).
+          // The colour is left to the base edge / relation encoding — this
+          // is a PROMINENCE cue, not a new colour variable.
           { selector: "edge.okf-incident", style: {
               "opacity": 1,
               "width": 3,
-              "z-compound-depth": "top",
+              "z-index": 10,
           } },
           // P1 progressive disclosure: non-backbone edges are display:none so
           // they are excluded from BOTH rendering AND layout (cleaner initial
@@ -2136,6 +2165,9 @@
         // The selected node's 4px accent stroke wins over every state cue
         // above (path, search, bridge, orphan, presence).
         { selector: "node:selected", style: { "border-width": 4, "border-style": "solid", "border-color": INITIAL_GRAPH_PALETTE.select } },
+        // Label precedence and culling (labelPrecedenceRules owns both).
+        { selector: LABEL_PRECEDENCE, style: labelPlateStyle(INITIAL_GRAPH_PALETTE) },
+        { selector: LABEL_CULLED, style: LABEL_CULLED_STYLE },
       ],
       // The deterministic circle/sparse/mobile seed below replaces ALL node
       // positions before runLayoutNow(). Do not compute a discarded grid (and
@@ -2233,22 +2265,19 @@
       var pal = graphPalette();
       // Commit the complete label palette once, not a whole-graph style pass
       // for each selector. Stateful cues still follow these base rules.
-      cy.style().selector("node").style({
+      labelPrecedenceRules(cy.style().selector("node").style({
         "color": pal.nodeText,
         "border-color": pal.nodeBorder,
         // Ledger labels: --graph-label on a --graph-halo outline in every
         // palette. Light palettes need nothing more; on the dark palettes
         // light labels crossing light edges also get a square --graph-halo
         // plate at 0.85 so they stay crisp at high spread. The selected,
-        // hovered or toured node's name gets an opaque plate (below).
+        // hovered or toured node's name gets an opaque --surface plate
+        // (labelPrecedenceRules, appended last).
         "text-outline-color": pal.halo,
         "text-outline-width": 2,
         "text-background-color": pal.edgeLabelBg,
         "text-background-opacity": pal.dark ? 0.85 : 0
-      }).selector("node:selected, node.okf-hover, node.okf-tour-target").style({
-        "color": pal.nodeText,
-        "text-background-color": pal.edgeLabelBg,
-        "text-background-opacity": 1
       }).selector("node.okf-hover-dim, node.dim").style({
         "color": pal.nodeText,
         "text-background-color": pal.edgeLabelBg
@@ -2263,7 +2292,7 @@
       })
       // Typed edges carry their (lens) colour in data(relColor); restore the
       // mapping a forced-colours pass replaced with a system colour.
-      .selector("edge.okf-rel-edge").style({ "line-color": "data(relColor)", "target-arrow-color": "data(relColor)" }).update();
+      .selector("edge.okf-rel-edge").style({ "line-color": "data(relColor)", "target-arrow-color": "data(relColor)" }), pal).update();
       syncStatefulGraphColours(pal);
     }
       if(reducedMotionQuery){var syncGraphMotion=function(){try{cy.style().selector("node.okf-hover").style("transition-duration",REDUCED_MOTION?"0ms":"120ms").update();}catch(e){}};if(reducedMotionQuery.addEventListener)reducedMotionQuery.addEventListener("change",syncGraphMotion);else if(reducedMotionQuery.addListener)reducedMotionQuery.addListener(syncGraphMotion);}
@@ -2320,7 +2349,7 @@
             "background-color": sys.canvas, "background-opacity": 1, "shape": forcedNodeShape,
             "border-color": sys.text, "border-opacity": 1, "border-width": forcedNodeBorderWidth, "border-style": forcedNodeBorderStyle,
             "color": sys.text, "text-outline-color": sys.canvas, "text-outline-width": 2, "text-outline-opacity": 1,
-            "text-background-color": sys.canvas, "text-background-opacity": 1,
+            "text-background-color": sys.canvas, "text-background-opacity": 1, "text-border-color": sys.text,
             "underlay-color": sys.canvas, "underlay-opacity": 0, "outline-width": 0, "opacity": 1
           })
           .selector("node.okf-forced.okf-orphan").style({ "border-style": "dashed" })
@@ -2348,6 +2377,9 @@
           .selector("edge.okf-forced:selected").style({
             "line-color": sys.highlight, "target-arrow-color": sys.highlight, "line-style": "dashed", "line-dash-pattern": [12, 4], "width": 6
           })
+          // A culled label stays hidden: the system plates above would
+          // otherwise paint an empty box where the text yielded.
+          .selector("node.okf-forced.okf-label-culled, edge.okf-forced.okf-label-culled").style(LABEL_CULLED_STYLE)
           .update();
         forcedRulesEnd = cy.style().length;
         forcedRulesKey = key;
@@ -2890,6 +2922,7 @@
         });
       });
       applyEdgeLabels();
+      scheduleLabelCull();
       updateLegend();
       updateNodeIndexSwatches();
       // Phase 3: orphan shelf is a deterministic derivation from degreeOf,
@@ -2956,6 +2989,77 @@
         });
       }
 
+    // Label culling (D2-006). Labels claim their painted box (plate and
+    // halo included) in priority order and a label or count chip that would
+    // overprint an already claimed box is hidden for now:
+    //   3  the selected, hovered or toured concept (the reader's focus)
+    //   2  focus root, search hits and path stops (explicit reader cues)
+    //   1  every other concept, busiest first (degree, then id)
+    //   -  bundled-relationship count chips (the bundle list keeps the count)
+    //   0  dimmed concepts (filtered, faded by hover/path/search)
+    // Label sizes are model units, so overlap does not change with zoom:
+    // the pass reruns when positions, classes or label styles change, never
+    // per zoom frame. Culling only toggles text opacity, never geometry.
+    var labelCullFrame = 0;
+    function scheduleLabelCull() {
+      if (labelCullFrame) return;
+      labelCullFrame = window.requestAnimationFrame(function () {
+        labelCullFrame = 0;
+        if (!cy.destroyed()) cullOverlappingLabels();
+      });
+    }
+    var LABEL_BOX = { includeNodes: false, includeEdges: false, includeLabels: true, includeOverlays: false };
+    function labelPriority(n) {
+      if (n.selected() || n.hasClass("okf-hover") || n.hasClass("okf-tour-target")) return 3;
+      if (n.hasClass("dim") || n.hasClass("okf-hover-dim") || n.hasClass("okf-path-dim") || n.hasClass("okf-search-nonmatch")) return 0;
+      if (n.hasClass("okf-focus-root") || n.hasClass("okf-search-match") || n.hasClass("okf-path")) return 2;
+      return 1;
+    }
+    function cullOverlappingLabels() {
+      var CELL = 96, grid = {}, culled = {};
+      function visit(b, fn) {
+        for (var gx = Math.floor(b.x1 / CELL); gx <= Math.floor(b.x2 / CELL); gx++)
+          for (var gy = Math.floor(b.y1 / CELL); gy <= Math.floor(b.y2 / CELL); gy++)
+            if (fn(gx + ":" + gy)) return true;
+        return false;
+      }
+      function claim(ele) {
+        var bb = ele.boundingBox(LABEL_BOX);
+        if (!(bb.w > 0 && bb.h > 0)) return;
+        // Cytoscape's node label box adds the halo, plate padding and margins
+        // (about 6 units around 13px text); touching halos are not an
+        // overprint, so only the inked text box claims space. A count chip's
+        // opaque plate is what overprints, so it claims its whole box.
+        var inset = ele.isNode() ? 6 : 1;
+        var b = { x1: bb.x1 + inset, y1: bb.y1 + inset, x2: bb.x2 - inset, y2: bb.y2 - inset };
+        if (b.x2 <= b.x1 || b.y2 <= b.y1) b = { x1: bb.x1, y1: bb.y1, x2: bb.x2, y2: bb.y2 };
+        var hit = visit(b, function (key) {
+          var list = grid[key];
+          if (!list) return false;
+          for (var i = 0; i < list.length; i++) {
+            var o = list[i];
+            if (b.x1 < o.x2 && o.x1 < b.x2 && b.y1 < o.y2 && o.y1 < b.y2) return true;
+          }
+          return false;
+        });
+        if (hit) { culled[ele.id()] = true; return; }
+        visit(b, function (key) { (grid[key] || (grid[key] = [])).push(b); return false; });
+      }
+      var labelled = cy.nodes(":visible").filter(function (n) { return !!n.style("label"); }).toArray();
+      labelled = labelled.map(function (n) { return { n: n, p: labelPriority(n), d: degreeOf[n.id()] || 0, id: n.id() }; });
+      labelled.sort(function (a, b) { return (b.p - a.p) || (b.d - a.d) || (a.id < b.id ? -1 : (a.id > b.id ? 1 : 0)); });
+      var chips = cy.edges(".okf-multi-edge:visible").toArray();
+      var i = 0;
+      for (; i < labelled.length && labelled[i].p > 0; i++) claim(labelled[i].n);
+      chips.forEach(claim);
+      for (; i < labelled.length; i++) claim(labelled[i].n);
+      cy.batch(function () {
+        cy.elements(".okf-label-culled").forEach(function (ele) { if (!culled[ele.id()]) ele.removeClass("okf-label-culled"); });
+        Object.keys(culled).forEach(function (id) { cy.getElementById(id).addClass("okf-label-culled"); });
+      });
+    }
+    cy.on("position add remove", scheduleLabelCull);
+
     // Ids within `depth` hops of `root`, over the CURRENTLY-rendered graph
     // (LOD-hidden neighbours are out of scope; documented in the status line).
     function neighborhoodIds(root, depth) {
@@ -3011,6 +3115,7 @@
           if (fr && fr.length) fr.addClass("okf-focus-root");
         }
       });
+      scheduleLabelCull();
     }
 
     // ---- P1 Progressive disclosure: edge elision --------------------------
@@ -3052,6 +3157,7 @@
       });
       updateDensityIndicator();
       updateStatus();
+      scheduleLabelCull();
     }
 
     // Debounced, stale-safe layout rerun. The latest control values always
@@ -3363,8 +3469,8 @@
       var spanX=Math.max(72,targetW-nodeFootprint),spanY=Math.max(90,targetH-labelFootprint);
       var spacingX=columns>1?spanX/(columns-1):0,spacingY=rows>1?spanY/(rows-1):0;
       mobileLabelWidth=Math.max(52,Math.min(150,spacingX-12));
-      cy.style().selector("node").style("text-max-width",mobileLabelWidth).update();
-      refreshLabelBounds();
+      cy.style().selector("node").style("text-max-width",mobileLabelWidth).selector(LABEL_PRECEDENCE).style("text-max-width",Math.max(PRECEDENCE_LABEL_WIDTH,mobileLabelWidth)).update();
+      refreshLabelBounds();scheduleLabelCull();
       // Degree first puts hubs centrally; alternating row direction shortens
       // common neighbour routes and deterministically reduces grid crossings.
       var ordered=nodes.toArray().sort(function(a,b){var d=(degreeOf[b.id()]||0)-(degreeOf[a.id()]||0);return d||String(a.id()).localeCompare(String(b.id()));});
@@ -3382,7 +3488,7 @@
     // re-cache the stale dimensions.
     function refreshLabelBounds(){var nodes=cy.nodes();if(nodes.length)nodes.boundingBox({includeLabels:true,useCache:false});}
     var readableStyleKey=null;
-    function syncMobileReadableStyle(){var mobile=isMobileGraphViewport(),key=(mobile?"m":"d")+mobileLabelWidth;if(key===readableStyleKey)return;readableStyleKey=key;cy.style().selector("node").style({"font-size":mobile?25:13,"font-weight":mobile?700:600,"line-height":mobile?1.2:1,"min-zoomed-font-size":mobile?10:6,"width":mobile?"mapData(vizSize, 24, 80, 36, 54)":"data(vizSize)","height":mobile?"mapData(vizSize, 24, 80, 36, 54)":"data(vizSize)","text-wrap":"ellipsis","text-max-width":mobile?mobileLabelWidth:90,"text-justification":"center"}).update();refreshLabelBounds();}
+    function syncMobileReadableStyle(){var mobile=isMobileGraphViewport(),key=(mobile?"m":"d")+mobileLabelWidth;if(key===readableStyleKey)return;readableStyleKey=key;cy.style().selector("node").style({"font-size":mobile?25:13,"font-weight":mobile?700:600,"line-height":mobile?1.2:1,"min-zoomed-font-size":mobile?10:6,"width":mobile?"mapData(vizSize, 24, 80, 36, 54)":"data(vizSize)","height":mobile?"mapData(vizSize, 24, 80, 36, 54)":"data(vizSize)","text-wrap":"ellipsis","text-max-width":mobile?mobileLabelWidth:90,"text-justification":"center"}).selector(LABEL_PRECEDENCE).style("text-max-width",Math.max(PRECEDENCE_LABEL_WIDTH,mobileLabelWidth)).update();refreshLabelBounds();scheduleLabelCull();}
     function applyInitialSparseSeed(){
       var nodes=cy.nodes().filter(function(n){return !n.hasClass("dim");});
       if(isMobileGraphViewport()||nodes.length<2||nodes.length>12||controlState.preset!=="map"||controlState.lens!=="map")return;
@@ -4435,7 +4541,7 @@
     window.addEventListener("pagehide", function () { if (canvasSizeObserver) canvasSizeObserver.disconnect(); if (graphResizeTimer) cancelAnimationFrame(graphResizeTimer); });
     window.addEventListener("pageshow", function (event) { if (event.persisted && canvasSizeObserver) canvasSizeObserver.observe(container); });
     function syncInteractionIndex(){var list=document.getElementById("okf-node-index-list"),activeOption=null;Array.prototype.forEach.call(document.querySelectorAll("#okf-node-index-list .okf-node-index__item"),function(b){var active=b.dataset.target===interactionState.active,selected=b.dataset.target===interactionState.selected;b.classList.toggle("is-active",active);b.setAttribute("aria-selected",selected?"true":"false");if(active)activeOption=b;});if(list&&activeOption)list.setAttribute("aria-activedescendant",activeOption.id);}
-    function renderInteraction(pos){syncActionBarOwner();applyFilters();applyEdgeLabels();applyEdgeElision();renderRelationshipProjection();if(activeBundleEdgeId&&!bundlePanel.hidden){var activeEdge=cy.getElementById(activeBundleEdgeId);if(activeEdge&&activeEdge.length)renderBundleDetail(activeEdge,{focusPanel:false});}syncInteractionIndex();cy.edges().removeClass("okf-unrelated");if(interactionState.selected){var selectedNode=cy.getElementById(interactionState.selected);if(selectedNode.length)cy.edges().not(selectedNode.connectedEdges()).addClass("okf-unrelated");}cy.elements().removeClass("okf-hover-dim");cy.nodes().removeClass("okf-hover");if(interactionState.hovered){var n=cy.getElementById(interactionState.hovered);if(n.length){cy.elements().not(n.closedNeighborhood()).addClass("okf-hover-dim");n.addClass("okf-hover");showHoverTip(n,pos||n.renderedPosition());}}actionBar.hidden=!interactionState.selected;isolateAction.textContent=interactionState.isolated?"Show all":"Hide others";positionActionBar();focusBar.hidden=!(controlState.focusEnabled&&focusRoot);container.classList.toggle("okf-graph-focus-active",!focusBar.hidden);if(!focusBar.hidden){focusCrumb.textContent="Exploring neighborhood around "+((nodeIndex[focusRoot]&&nodeIndex[focusRoot].label)||focusRoot);focusDepth.value=String(controlState.focusDepth);}publishInteractionSnapshot("render");}
+    function renderInteraction(pos){syncActionBarOwner();applyFilters();applyEdgeLabels();applyEdgeElision();renderRelationshipProjection();if(activeBundleEdgeId&&!bundlePanel.hidden){var activeEdge=cy.getElementById(activeBundleEdgeId);if(activeEdge&&activeEdge.length)renderBundleDetail(activeEdge,{focusPanel:false});}syncInteractionIndex();cy.edges().removeClass("okf-unrelated");if(interactionState.selected){var selectedNode=cy.getElementById(interactionState.selected);if(selectedNode.length)cy.edges().not(selectedNode.connectedEdges()).addClass("okf-unrelated");}cy.elements().removeClass("okf-hover-dim");cy.nodes().removeClass("okf-hover");if(interactionState.hovered){var n=cy.getElementById(interactionState.hovered);if(n.length){cy.elements().not(n.closedNeighborhood()).addClass("okf-hover-dim");n.addClass("okf-hover");showHoverTip(n,pos||n.renderedPosition());}}actionBar.hidden=!interactionState.selected;isolateAction.textContent=interactionState.isolated?"Show all":"Hide others";positionActionBar();focusBar.hidden=!(controlState.focusEnabled&&focusRoot);container.classList.toggle("okf-graph-focus-active",!focusBar.hidden);if(!focusBar.hidden){focusCrumb.textContent="Exploring neighborhood around "+((nodeIndex[focusRoot]&&nodeIndex[focusRoot].label)||focusRoot);focusDepth.value=String(controlState.focusDepth);}scheduleLabelCull();publishInteractionSnapshot("render");}
     function restoreInvokerFocus(){var id=interactionState.focusInvoker,target=null,list=document.getElementById("okf-node-index-list");Array.prototype.some.call(document.querySelectorAll("#okf-node-index-list .okf-node-index__item"),function(option){if(option.dataset.target===id){target=option;return true;}return false;});if(id)dispatchInteraction({type:"ACTIVE",id:id,quietUrl:true,source:"neighborhood-restore"});if(target&&target.offsetParent!==null&&list){list.setAttribute("aria-activedescendant",target.id);list.focus();}else canvasProxy.focus();}
     function captureFocusOrigin(id){if(!interactionState.priorLens){var pan=cy.pan();interactionState.priorLens=controlState.lens!=="focus"?controlState.lens:"map";interactionState.priorViewport={zoom:cy.zoom(),pan:{x:pan.x,y:pan.y}};}interactionState.focusInvoker=id||interactionState.focusInvoker;}
     function activateFocusLens(source){captureFocusOrigin(interactionState.selected);if(interactionState.selected)enterFocus(interactionState.selected,source);else{applyLens("focus");renderInteraction();writeInteractionUrl("push");}}

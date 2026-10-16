@@ -850,6 +850,7 @@ _FORCED_CANVAS_AUDIT_JS = """() => {
     strokeWidth: parseFloat(n.style('border-width')), strokeStyle: n.style('border-style'),
     shape: n.style('shape'), label: rgb(n.style('color')),
     plate: rgb(n.style('text-background-color')), plateOpacity: Number(n.style('text-background-opacity')),
+    culled: n.hasClass('okf-label-culled'), textOpacity: Number(n.style('text-opacity')),
     halo: rgb(n.style('text-outline-color')), opacity: Number(n.style('opacity')),
     glyphInk: inkOf(n.data('iconUrl'), 'stroke'),
     brokenInk: inkOf(n.data('brokenBadgeUrl'), 'stroke').concat(inkOf(n.data('brokenBadgeUrl'), 'fill')),
@@ -882,7 +883,10 @@ def _assert_system_canvas(audit) -> None:
     assert sys["canvas"] != sys["text"], sys
     for n in audit["nodes"]:
         assert n["fill"] == sys["canvas"], n
-        assert n["plate"] == sys["canvas"] and n["plateOpacity"] == 1, n
+        # A label culled under a higher-priority one hides its text and its
+        # plate together; every painted label sits on an opaque Canvas plate.
+        assert n["plate"] == sys["canvas"], n
+        assert (n["plateOpacity"], n["textOpacity"]) == ((0, 0) if n["culled"] else (1, 1)), n
         assert n["halo"] == sys["canvas"] and n["opacity"] == 1, n
         assert n["glyphInk"] == [sys["text"]], n
         assert set(n["brokenInk"]) <= {sys["canvas"], sys["text"]}, n

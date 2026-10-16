@@ -12,6 +12,10 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 - Graph node labels are no longer stretched or squashed after resizing the window
   across 900px; labels re-rasterise at the new size like a fresh load (D2-017).
+- Graph labels no longer overprint: the selected, hovered or toured concept's
+  full title draws above its edges on a `--surface` plate, incident edges pass
+  behind names, and lower-priority labels and count chips that would collide
+  are hidden (D2-006).
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
   including source derivations; the full/tool graph projection is unchanged.
 - Missing or malformed embedded search evidence in single-file exports settles as
