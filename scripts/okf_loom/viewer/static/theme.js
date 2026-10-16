@@ -147,6 +147,9 @@
   //  * whether this session may comment (the same rule as studio.js
   //    CAN_COMMENT), so the reserved index feedback slot takes the read-only
   //    geometry before first paint (shell.css);
+  //  * the launcher's idle authority word (the same rule as studio.js EDIT /
+  //    CAN_COMMENT), so the reserved top-bar Studio slot takes exactly the
+  //    width of the label Studio will mount (shell.css);
   //  * a module that never executes (blocked, failed fetch, early error)
   //    publishes no status. Deferred modules run before DOMContentLoaded, so a
   //    bootstrap with no status by then is a terminal load failure. Publish it
@@ -157,6 +160,10 @@
     if (boot) {
       var canComment = boot.comment === true || (boot.comment === undefined && boot.edit !== false);
       try { root.setAttribute("data-okf-studio-comment", canComment ? "1" : "0"); } catch (e) {}
+      try {
+        root.setAttribute("data-okf-studio-authority",
+          boot.edit !== false ? "edit" : canComment ? "comment" : "read");
+      } catch (e) {}
     }
     function publishLoadFailure() {
       if (window.okfStudioReadiness || root.hasAttribute("data-okf-studio-status")) return;
