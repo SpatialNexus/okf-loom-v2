@@ -3445,6 +3445,7 @@ def render_single_file(
           .replace("__DATA_ATTRS__", data_attrs)
         .replace("__NOJS_RELATIONSHIPS__", nojs_relationships)
         .replace("__SINGLE_INDEX_CONCEPTS__", single_index_concepts)
+        .replace("__SEARCH_TYPE_CHIPS__", _search_type_chips_html(bundle))
         .replace("__GRAPH_THUMBNAIL__", _graph_thumbnail_html(data, "#okf-graph"))
         .replace("/*__VIEWER_CSS__*/", css)
         .replace("__THEME_CONFIG__", _theme_config_html(configured_theme))
@@ -4182,6 +4183,15 @@ def _type_icons_block() -> str:
             + payload + '</script>\n'
         )
     return _TYPE_ICONS_BLOCK_CACHE
+
+
+def _search_type_chips_html(bundle: Bundle) -> str:
+    """Trusted, inert chips let portable rows clone the server's type anatomy."""
+    return '<template id="okf-search-type-chips">' + ''.join(
+        f'<span class="okf-search-result__type" data-type="{_esc_attr_qs(ctype)}">'
+        f'{type_icon_svg(ctype, size=14, cls="okf-type-icon")} {_esc(ctype)}</span>'
+        for ctype in sorted({c.type for c in bundle.concepts.values() if c.type})
+    ) + '</template>'
 
 
 def _ledger_fonts_head(static_prefix: str, *, mode: str) -> str:
@@ -6899,7 +6909,7 @@ def _render_search_page(
           .replace("__SHELL_CSS_LINK__", shell_css_link)
           .replace("__THEME_CONFIG__", _theme_config_html(configured_theme))
           .replace("__THEME_HEAD_JS__", head_theme_js)
-        .replace("__WIKI_JS_LINK__", _type_icons_block() + js_link)
+        .replace("__WIKI_JS_LINK__", _search_type_chips_html(bundle) + _type_icons_block() + js_link)
         .replace("__RENDERERS_JS_LINK__", renderers_link)
         .replace("__NAV_HTML__", nav_html)
         .replace("__APPLICATION_SHELL__", shell_html)

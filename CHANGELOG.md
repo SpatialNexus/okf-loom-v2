@@ -10,6 +10,9 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Portable results retain the query in both search fields even while loading
+  or unavailable, and use the same type chips, concept ids, source paths and
+  context-action wording as live results (D3-008, D3-013).
 - Search modes read as single-choice Ledger segments with whole-label focus
   and a 2px selected state bar, retaining native radio keyboard behavior (D2-024).
 - Search discloses reached result limits and offers relevant, evenly spaced

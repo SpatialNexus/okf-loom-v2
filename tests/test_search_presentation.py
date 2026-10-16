@@ -314,6 +314,13 @@ def test_portable_adapters_render_shared_results_with_capability_actions(
             expect(scope.get_by_role("radio", name=label)).to_have_count(1)
 
         expect(results).to_have_count(5)
+        first_meta = results.first.locator(".okf-search-result__meta")
+        expect(first_meta.locator(".okf-search-result__type svg")).to_have_count(1)
+        assert ".md" not in first_meta.inner_text()
+        if surface == "static":
+            expect(page.locator('.okf-topbar input[name="q"]')).to_have_value("needle")
+            expect(results.first.locator(".okf-copy-scope code").first).to_have_text(re.compile(r"guide-\d\.md"))
+            expect(page.locator(".okf-page-context > details > summary")).to_have_text("Build context pack for first 5 results")
         # Every displayed result is a node the shared renderer returned.
         assert results.evaluate_all(
             "items => items.every(item => window.__okfSharedNodes.has(item))")

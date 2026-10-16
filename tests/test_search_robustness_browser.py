@@ -332,6 +332,14 @@ def test_search_limit_notice_and_empty_actions(live_url: str, static_url: str, p
     expect(page.locator(".okf-search-empty").get_by_role("link", name="Clear filters")).to_be_visible()
 
 
+def test_portable_unavailable_search_still_echoes_query_in_both_fields(static_url: str, page) -> None:
+    page.route("**/__data/passages-manifest.json", lambda route: route.fulfill(status=503, body="unavailable"))
+    page.goto(static_url + "/__search.html?q=orders")
+    expect(page.locator("body")).to_have_attribute("data-okf-capture-ready", "unavailable")
+    expect(page.locator("#okf-search-query")).to_have_value("orders")
+    expect(page.locator('.okf-topbar input[name="q"]')).to_have_value("orders")
+
+
 def test_portable_search_verifies_evidence_on_plain_http_nonlocalhost(static_url: str, page) -> None:
     # Transport stays on our owned loopback server, but the browser evaluates
     # the document and its scripts as an ordinary, non-secure LAN origin.
