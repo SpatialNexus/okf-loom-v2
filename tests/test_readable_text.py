@@ -15,6 +15,8 @@ VECTORS = [
     ("## **Heading**\n> 1. [a link](/a(b).md) and ![image](x)\n- [x] ~~old~~ __new__ snake_case_names", "Heading a link and image old new snake_case_names"),
     ("```python\nprint('hello')\n```", "print('hello')"),
     ("`__init__` and \\*literal\\*", "__init__ and *literal*"),
+    ("Run `scripts/okf-loom info <bundle>` first; `<details>` is literal.", "Run scripts/okf-loom info <bundle> first; <details> is literal."),
+    ("Keep `[label](target)` and `<!-- literal -->` as code.", "Keep [label](target) and <!-- literal --> as code."),
     ("Every `scripts/okf-loom` subcommand &amp; **flag**.", "Every scripts/okf-loom subcommand & flag."),
     ('<img src=x onerror=alert(1)> <script>evil()</script> &lt;svg onload=x&gt;', 'evil() <svg onload=x>'),
     ("[reference][id] <!-- hidden -->[^note] &mdash; &#x1f600;", "reference — 😀"),

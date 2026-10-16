@@ -27,6 +27,7 @@ def readable_text(markdown: str | None) -> str:
     text = re.sub(r"^[ \t]{0,3}(?:>[ \t]?)+", "", text, flags=re.M)
     text = re.sub(r"^[ \t]{0,3}#{1,6}[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$", r"\1", text, flags=re.M)
     text = re.sub(r"^[ \t]*(?:[-*+]|\d{1,9}[.)])[ \t]+(?:\[[ xX]\][ \t]+)?", "", text, flags=re.M)
+    text = re.sub(r"(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)", lambda m: stash(m[2]), text)
     text = re.sub(r"<!--[\s\S]*?-->", " ", text)
     text = re.sub(r"<((?:https?|mailto):[^<>\s]+)>", r"\1", text, flags=re.I)
     text = re.sub(r"</?[A-Za-z][\w:-]*(?:\s[^<>]*)?/?>", " ", text)
@@ -34,7 +35,6 @@ def readable_text(markdown: str | None) -> str:
     text = re.sub(r'''\[([^\]]+)\]\((?:[^()\s]|\([^()\s]*\))*(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)''', r"\1", text)
     text = re.sub(r"!?\[([^\]]+)\]\[[^\]]*\]", r"\1", text)
     text = re.sub(r"\[\^[^\]\s]+\]", "", text)
-    text = re.sub(r"(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)", lambda m: stash(m[2]), text)
     text = re.sub(r"(\*{1,3}|~~)(?=\S)([\s\S]*?\S)\1", r"\2", text)
     text = re.sub(r"(^|[^0-9A-Za-z_])(_{1,3})(?=\S)([\s\S]*?\S)\2(?![0-9A-Za-z_])", r"\1\3", text)
 

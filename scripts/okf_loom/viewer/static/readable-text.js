@@ -15,6 +15,7 @@
       .replace(/^[ \t]{0,3}(?:>[ \t]?)+/gm,"")
       .replace(/^[ \t]{0,3}#{1,6}[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/gm,"$1")
       .replace(/^[ \t]*(?:[-*+]|\d{1,9}[.)])[ \t]+(?:\[[ xX]\][ \t]+)?/gm,"")
+      .replace(/(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/g,function(_,ticks,code){return stash(code);})
       .replace(/<!--[\s\S]*?-->/g," ")
       .replace(/<((?:https?|mailto):[^<>\s]+)>/gi,"$1")
       .replace(/<\/?[A-Za-z][\w:-]*(?:\s[^<>]*)?\/?>/g," ")
@@ -22,7 +23,6 @@
       .replace(/\[([^\]]+)\]\((?:[^()\s]|\([^()\s]*\))*(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)/g,"$1")
       .replace(/!?\[([^\]]+)\]\[[^\]]*\]/g,"$1")
       .replace(/\[\^[^\]\s]+\]/g,"")
-      .replace(/(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/g,function(_,ticks,code){return stash(code);})
       .replace(/(\*{1,3}|~~)(?=\S)([\s\S]*?\S)\1/g,"$2")
       .replace(/(^|[^0-9A-Za-z_])(_{1,3})(?=\S)([\s\S]*?\S)\2(?![0-9A-Za-z_])/g,"$1$3")
       .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi,function(all,name){
