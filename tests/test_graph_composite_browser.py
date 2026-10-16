@@ -332,6 +332,65 @@ def test_graph_390_title_and_tools_share_the_pane_gutter(page, docs_server_url: 
     assert edges["title"] == edges["tools"] == edges["tabs"] == 12, edges
 
 
+# Ink extent (height, width) of each labelled node's painted label on the node
+# layer, keyed by node id. Label ink is the dark --graph-label; edges and
+# halos are lighter, so a dark-pixel box is the rasterised text itself.
+_LABEL_INK_JS = """(ids) => {
+  const cy = window.__okfLoomGraph.cy;
+  const canvas = cy.container().querySelector('canvas[data-id="layer2-node"]');
+  const ctx = canvas.getContext('2d', {willReadFrequently: true});
+  const ratio = canvas.width / canvas.clientWidth, out = {};
+  const nodes = ids ? cy.collection(ids.map(id => cy.getElementById(id)))
+    : cy.nodes(':visible').filter(n => n.style('label') && String(n.data('label') || '').length > 6);
+  nodes.forEach(n => {
+    const bb = n.renderedBoundingBox({includeNodes: false, includeEdges: false, includeLabels: true});
+    const x0 = Math.round(bb.x1 * ratio), y0 = Math.round(bb.y1 * ratio);
+    const w = Math.round(bb.w * ratio), h = Math.round(bb.h * ratio);
+    if (w < 4 || h < 4 || x0 < 0 || y0 < 0 || x0 + w > canvas.width || y0 + h > canvas.height) return;
+    const px = ctx.getImageData(x0, y0, w, h).data;
+    let top = h, bottom = -1, left = w, right = -1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (px[i + 3] > 200 && px[i] + px[i + 1] + px[i + 2] < 330) {
+        top = Math.min(top, y); bottom = Math.max(bottom, y); left = Math.min(left, x); right = Math.max(right, x);
+      }
+    }
+    if (bottom >= 0) out[n.id()] = [bottom - top + 1, right - left + 1];
+  });
+  return out;
+}"""
+
+
+def test_canvas_labels_rerasterise_after_window_resize(page, docs_server_url: str) -> None:
+    """D2-017: crossing the 900px readable-label switch and back leaves every
+    node label painted exactly like a fresh load at the same size.
+
+    Cytoscape rasterised the first label texture under the new label style
+    against the label box cached for the old one, so after 1440 -> 900 ->
+    1440 -> 1280 the 13px labels were squashed into the 25px plate (and
+    stretched the other way at 900) until the next restyle.
+    """
+    _open(page, docs_server_url, 1280)
+    page.wait_for_timeout(1200)
+    fresh_zoom = page.evaluate("() => window.__okfLoomGraph.cy.zoom()")
+    fresh = page.evaluate(_LABEL_INK_JS, None)
+    assert len(fresh) >= 4, fresh
+    for width, height, size in [(1440, 900, "13px"), (900, 567, "25px"), (1440, 900, "13px"), (1280, 900, "13px")]:
+        page.set_viewport_size({"width": width, "height": height})
+        page.wait_for_function(
+            "size => window.__okfLoomGraph.cy.nodes().first().style('font-size') === size", arg=size)
+        page.wait_for_timeout(600)
+    page.wait_for_function("z => Math.abs(window.__okfLoomGraph.cy.zoom() - z) < 1e-6", arg=fresh_zoom)
+    page.wait_for_timeout(400)
+    resized = page.evaluate(_LABEL_INK_JS, list(fresh))
+    assert set(resized) == set(fresh), (fresh, resized)
+    # Sub-pixel placement moves an edge by a pixel at most; a stale texture
+    # squashed the 13px ink to about 0.7 of its height.
+    distorted = {nid: (fresh[nid], resized[nid]) for nid in fresh
+                 if abs(resized[nid][0] - fresh[nid][0]) > 1 or abs(resized[nid][1] - fresh[nid][1]) > 3}
+    assert not distorted, distorted
+
+
 def test_single_file_short_canvas_keeps_zoom_clear_of_concept_index(tmp_path, page) -> None:
     """With the Search & context drawer open the single-file canvas is short:
     the zoom controls become a bottom-left row and never cover All concepts;

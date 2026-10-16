@@ -3364,12 +3364,25 @@
       var spacingX=columns>1?spanX/(columns-1):0,spacingY=rows>1?spanY/(rows-1):0;
       mobileLabelWidth=Math.max(52,Math.min(150,spacingX-12));
       cy.style().selector("node").style("text-max-width",mobileLabelWidth).update();
+      refreshLabelBounds();
       // Degree first puts hubs centrally; alternating row direction shortens
       // common neighbour routes and deterministically reduces grid crossings.
       var ordered=nodes.toArray().sort(function(a,b){var d=(degreeOf[b.id()]||0)-(degreeOf[a.id()]||0);return d||String(a.id()).localeCompare(String(b.id()));});
       cy.batch(function(){ordered.forEach(function(node,index){var row=Math.floor(index/columns),raw=index%columns,count=Math.min(columns,ordered.length-row*columns),slot=count===3?[0,2,1][raw]:raw,col=row%2?count-1-slot:slot;node.position({x:(col-(count-1)/2)*spacingX,y:(row-(rows-1)/2)*spacingY});});});
     }
-    function syncMobileReadableStyle(){var mobile=isMobileGraphViewport();cy.style().selector("node").style({"font-size":mobile?25:13,"font-weight":mobile?700:600,"line-height":mobile?1.2:1,"min-zoomed-font-size":mobile?10:6,"width":mobile?"mapData(vizSize, 24, 80, 36, 54)":"data(vizSize)","height":mobile?"mapData(vizSize, 24, 80, 36, 54)":"data(vizSize)","text-wrap":"ellipsis","text-max-width":mobile?mobileLabelWidth:90,"text-justification":"center"}).update();}
+    // Cytoscape rasterises a label texture under its new style key on the
+    // first frame after a label restyle, but sizes it from the label bounds
+    // cached under the OLD style until something asks for the bounding box.
+    // A window resize across the 900px readable-label switch therefore baked
+    // the 25px plate box into the 13px texture (and back), stretching every
+    // label until the next restyle. Recompute the bounds synchronously after
+    // each label-dimension restyle so the first texture uses the new box.
+    // useCache:false matters: the renderer only learns the labels are dirty
+    // when it flushes before the next frame, so a cached read here would
+    // re-cache the stale dimensions.
+    function refreshLabelBounds(){var nodes=cy.nodes();if(nodes.length)nodes.boundingBox({includeLabels:true,useCache:false});}
+    var readableStyleKey=null;
+    function syncMobileReadableStyle(){var mobile=isMobileGraphViewport(),key=(mobile?"m":"d")+mobileLabelWidth;if(key===readableStyleKey)return;readableStyleKey=key;cy.style().selector("node").style({"font-size":mobile?25:13,"font-weight":mobile?700:600,"line-height":mobile?1.2:1,"min-zoomed-font-size":mobile?10:6,"width":mobile?"mapData(vizSize, 24, 80, 36, 54)":"data(vizSize)","height":mobile?"mapData(vizSize, 24, 80, 36, 54)":"data(vizSize)","text-wrap":"ellipsis","text-max-width":mobile?mobileLabelWidth:90,"text-justification":"center"}).update();refreshLabelBounds();}
     function applyInitialSparseSeed(){
       var nodes=cy.nodes().filter(function(n){return !n.hasClass("dim");});
       if(isMobileGraphViewport()||nodes.length<2||nodes.length>12||controlState.preset!=="map"||controlState.lens!=="map")return;
