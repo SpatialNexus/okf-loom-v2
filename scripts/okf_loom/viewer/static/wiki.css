@@ -3529,6 +3529,11 @@ body:has(.okf-graph-loading--error) .okf-cytoscape-fallback-actions { display: f
   .okf-tablewrap__cue { background: none; }
   .okf-tablewrap__cue--right { border-right: 2px solid CanvasText; }
   .okf-tablewrap__cue--left { border-left: 2px solid CanvasText; }
+  /* Sections menu cue: forced colours draw a transparent edge, so the
+   * resting edges become Canvas and only an edge with more is CanvasText. */
+  .okf-outline-jump__panel .okf-onthispage__nav { border-block-color: Canvas; }
+  .okf-outline-jump__panel[data-okf-more-above] .okf-onthispage__nav { border-top-color: CanvasText; }
+  .okf-outline-jump__panel[data-okf-more-below] .okf-onthispage__nav { border-bottom-color: CanvasText; }
   .okf-graph-thumb svg,
   .okf-graph-nojs__export .okf-graph-export { border: 1px solid CanvasText; background: Canvas; }
   .okf-graph-thumb__edges line { stroke: CanvasText; }
