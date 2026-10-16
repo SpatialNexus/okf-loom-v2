@@ -27,6 +27,9 @@ follow [Semantic Versioning](https://semver.org/). The product version
   (D2-008, D2-010).
 - Graph hub halos end above the hub's label and fade with their node in
   search, filter and hover states (D2-014).
+- The graph's floating action bar is placed clear of the selected concept, its
+  name and the canvas controls; the docked bar at 641–900px no longer covers the
+  zoom column, and the focus bar keeps "Show all" on one line (D2-015).
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
   including source derivations; the full/tool graph projection is unchanged.
 - Missing or malformed embedded search evidence in single-file exports settles as

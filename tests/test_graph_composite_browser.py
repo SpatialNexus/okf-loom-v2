@@ -581,6 +581,37 @@ def test_hub_halo_clears_its_label_and_fades_with_its_node(page, docs_server_url
     assert faded and all(halo <= node for halo, node in faded), faded
 
 
+@pytest.mark.parametrize("width,target", [(1440, "reference/cli"), (1280, "reference/spec")])
+def test_action_bar_keeps_clear_of_the_selection_and_canvas_chrome(page, docs_server_url: str, width: int, target: str) -> None:
+    """D2-015: the floating action bar never covers the selected concept or
+    its name, the concept list or the zoom column; the focus bar keeps its
+    buttons on one line."""
+    _open(page, docs_server_url, width)
+    page.evaluate("t => window.__okfLoomGraph.interaction.dispatch({type: 'SELECT', id: t})", target)
+    page.wait_for_function("() => !document.querySelector('.okf-graph-actions').hidden")
+    page.wait_for_timeout(300)
+    geometry = page.evaluate("""() => {
+      const c = document.getElementById('okf-graph').getBoundingClientRect(), cy = window.__okfLoomGraph.cy, n = cy.$(':selected');
+      const box = r => ({x1: r.left, y1: r.top, x2: r.right, y2: r.bottom});
+      // The painted disc and name (the node's bounds-expansion is invisible).
+      const p = n.renderedPosition(), r = n.renderedOuterWidth() / 2;
+      const name = n.renderedBoundingBox({includeNodes: false, includeEdges: false, includeLabels: true});
+      const node = {x1: Math.min(p.x - r, name.x1), y1: p.y - r, x2: Math.max(p.x + r, name.x2), y2: name.y2};
+      return {bar: box(document.querySelector('.okf-graph-actions').getBoundingClientRect()),
+              selection: {x1: c.left + node.x1, y1: c.top + node.y1, x2: c.left + node.x2, y2: c.top + node.y2},
+              chrome: [...document.querySelectorAll('#okf-graph .okf-node-index > summary, #okf-graph .okf-graph-zoom')]
+                .map(e => box(e.getBoundingClientRect())).filter(r => r.x2 > r.x1)};
+    }""")
+    hit = lambda a, b: a["x1"] < b["x2"] and b["x1"] < a["x2"] and a["y1"] < b["y2"] and b["y1"] < a["y2"]
+    assert not hit(geometry["bar"], geometry["selection"]), geometry
+    assert not any(hit(geometry["bar"], r) for r in geometry["chrome"]), geometry
+    page.locator(".okf-graph-actions").get_by_role("button", name="Explore neighborhood").click()
+    show_all = page.locator(".okf-graph-focusbar").get_by_role("button", name="Show all")
+    expect(show_all).to_be_visible()
+    line = show_all.evaluate("b => parseFloat(getComputedStyle(b).lineHeight) || parseFloat(getComputedStyle(b).fontSize) * 1.3")
+    assert show_all.evaluate("b => b.getBoundingClientRect().height") < 2 * line + 12
+
+
 def test_single_file_short_canvas_keeps_zoom_clear_of_concept_index(tmp_path, page) -> None:
     """With the Search & context drawer open the single-file canvas is short:
     the zoom controls become a bottom-left row and never cover All concepts;

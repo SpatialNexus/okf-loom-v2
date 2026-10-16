@@ -4572,8 +4572,23 @@
     // canvas's right edge it used to be clamped back over the node, so the
     // second click pressed "Explore neighborhood" instead. Prefer the right
     // (the long-standing spot), then the left, then below, then above.
-    function positionActionBar(){var n=interactionState.selected&&cy.getElementById(interactionState.selected);if(!n||!n.length||actionBar.hidden)return;var p=n.renderedPosition(),w=actionBar.offsetWidth,h=actionBar.offsetHeight,W=container.clientWidth,H=container.clientHeight;var off=Math.max(22,Math.max(n.renderedOuterWidth(),n.renderedOuterHeight())/2+8);var left=p.x+off,top=p.y-h/2;if(p.x+off+w>W-8){if(p.x-off-w>=8)left=p.x-off-w;else if(p.y+off+h<=H-8){left=p.x-w/2;top=p.y+off;}else if(p.y-off-h>=8){left=p.x-w/2;top=p.y-off-h;}}actionBar.style.left=Math.max(8,Math.min(W-w-8,left))+"px";actionBar.style.top=Math.max(8,Math.min(H-h-8,top))+"px";}
-    cy.on("pan zoom position",positionActionBar);window.addEventListener("resize",function(){syncActionBarOwner();positionActionBar();});
+    // The floating action bar sits where it hides the least (D2-015): never
+    // over the selected concept or its name, never over the other canvas
+    // chrome (concept list, focus bar, zoom column, minimap), and over as
+    // few nearby concepts as possible. Candidates are tried above, right,
+    // left and below the name; a placement that is still clear is kept while
+    // the reader pans so the bar does not hop between sides.
+    var actionBarSide=null;
+    function positionActionBar(){var n=interactionState.selected&&cy.getElementById(interactionState.selected);if(!n||!n.length||actionBar.hidden||actionBar.parentNode!==container)return;var p=n.renderedPosition(),w=actionBar.offsetWidth,h=actionBar.offsetHeight,W=container.clientWidth,H=container.clientHeight;var off=Math.max(22,Math.max(n.renderedOuterWidth(),n.renderedOuterHeight())/2+8);
+      var name=n.renderedBoundingBox({includeNodes:false,includeEdges:false,includeLabels:true}),below=Math.max(p.y+off,name.y2+8);
+      var c=container.getBoundingClientRect(),chrome=[];Array.prototype.forEach.call(container.querySelectorAll(".okf-node-index > summary, .okf-graph-focusbar:not([hidden]), .okf-graph-zoom, .okf-graph-minimap:not([hidden]), .okf-graph-legend:not([hidden])"),function(el){var r=el.getBoundingClientRect();if(r.width&&r.height)chrome.push({x1:r.left-c.left-4,y1:r.top-c.top-4,x2:r.right-c.left+4,y2:r.bottom-c.top+4});});
+      var near=[],reach=Math.max(w,h)+off+40;cy.nodes(":visible").forEach(function(m){if(m.same(n))return;var q=m.renderedPosition();if(Math.abs(q.x-p.x)>reach+w||Math.abs(q.y-p.y)>reach+h)return;near.push(m.renderedBoundingBox({includeLabels:!m.hasClass("okf-label-culled"),includeEdges:false,includeOverlays:false}));});
+      function hits(a,b){return a.x1<b.x2&&b.x1<a.x2&&a.y1<b.y2&&b.y1<a.y2;}
+      var own={x1:Math.min(p.x-off,name.x1),y1:p.y-off,x2:Math.max(p.x+off,name.x2),y2:name.y2};
+      var candidates=[["above",p.x-w/2,p.y-off-h],["right",p.x+off,p.y-h/2],["left",p.x-off-w,p.y-h/2],["below",p.x-w/2,below],["above-right",p.x-off,p.y-off-h],["above-left",p.x+off-w,p.y-off-h],["below-right",p.x-off,below],["below-left",p.x+off-w,below]],best=null;
+      candidates.forEach(function(cand,order){var left=Math.max(8,Math.min(W-w-8,cand[1])),top=Math.max(8,Math.min(H-h-8,cand[2])),box={x1:left,y1:top,x2:left+w,y2:top+h};var score=(hits(box,own)?1000:0)+chrome.filter(function(r){return hits(box,r);}).length*100+near.filter(function(r){return hits(box,r);}).length*10+order+(left!==cand[1]||top!==cand[2]?5:0);if(cand[0]===actionBarSide&&score<100)score-=20;if(!best||score<best.score)best={side:cand[0],left:left,top:top,score:score};});
+      actionBarSide=best.side;actionBar.dataset.side=best.side;actionBar.style.left=best.left+"px";actionBar.style.top=best.top+"px";}
+    var actionBarFrame=0;cy.on("pan zoom position",function(){if(actionBarFrame||actionBar.hidden)return;actionBarFrame=requestAnimationFrame(function(){actionBarFrame=0;if(!cy.destroyed())positionActionBar();});});window.addEventListener("resize",function(){syncActionBarOwner();positionActionBar();});
     var graphResizeTimer=null,userViewportInteracted=false;
     ["wheel","pointerdown","touchstart"].forEach(function(name){container.addEventListener(name,function(event){if(event.isTrusted&&(event.target.tagName==="CANVAS"||event.target===canvasProxy))userViewportInteracted=true;},{passive:true});});
     function refitGraphViewport(){if(graphResizeTimer)cancelAnimationFrame(graphResizeTimer);graphResizeTimer=requestAnimationFrame(function(){graphResizeTimer=null;if(graphPageActive&&layoutSettled&&container.offsetWidth&&container.offsetHeight){cy.resize();if(!userViewportInteracted){cancelPendingViewportRestore();syncMobileReadableStyle();compactMobileSmallGraph();overlayAwareFit();}positionActionBar();syncMinimap();}});}
