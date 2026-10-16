@@ -109,6 +109,28 @@ follow [Semantic Versioning](https://semver.org/). The product version
 - Skip links and sortable table heads show one focus ring that hugs the control.
 - Document pages draw one hairline between the metadata strip and the tools and
   no blank bands or doubled rules at the page foot.
+- Graph node labels are no longer stretched or squashed after resizing the window
+  across 900px; labels re-rasterise at the new size like a fresh load (D2-017).
+- Graph labels no longer overprint: the selected, hovered or toured concept's
+  full title draws above its edges on a `--surface` plate, incident edges pass
+  behind names, and lower-priority labels and count chips that would collide
+  are hidden (D2-006).
+- Find in graph is one stable row on the route's 20px gutter: typing no longer
+  grows the band or moves the canvas, Clear sits inside the field (the native
+  cancel glyph is gone), the status quotes the query as typed, and the field is
+  labelled once (D2-007, T1-007).
+- The graph's edge key lists real relation types (link, references, …) in their
+  canvas line style, and edges are dashed by relation type rather than by link
+  anchor text. Show relationship labels names only the selected or hovered
+  concept's relationships, in muted ink, without recolouring the edges
+  (D2-008, D2-010).
+- Graph hub halos end above the hub's label and fade with their node in
+  search, filter and hover states (D2-014).
+- The graph's floating action bar is placed clear of the selected concept, its
+  name and the canvas controls; the docked bar at 641–900px no longer covers the
+  zoom column, and the focus bar keeps "Show all" on one line (D2-015).
+- Opening Graph at 641–1100px no longer moves the top bar: the graph route keeps
+  the shared shell's 20px gutter, row tops and destination spacing (T1-007).
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
   including source derivations; the full/tool graph projection is unchanged.
 - Missing or malformed embedded search evidence in single-file exports settles as

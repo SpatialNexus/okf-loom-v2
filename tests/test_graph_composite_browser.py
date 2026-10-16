@@ -628,6 +628,308 @@ def test_single_file_graph_focus_ring_is_inset_and_mode_word_is_not_a_tab_stop(t
     assert ring["offset"] <= -ring["width"], ring
 
 
+# Ink extent (height, width) of each labelled node's painted label on the node
+# layer, keyed by node id. Label ink is the dark --graph-label; edges and
+# halos are lighter, so a dark-pixel box is the rasterised text itself.
+_LABEL_INK_JS = """(ids) => {
+  const cy = window.__okfLoomGraph.cy;
+  const canvas = cy.container().querySelector('canvas[data-id="layer2-node"]');
+  const ctx = canvas.getContext('2d', {willReadFrequently: true});
+  const ratio = canvas.width / canvas.clientWidth, out = {};
+  const nodes = ids ? cy.collection(ids.map(id => cy.getElementById(id)))
+    : cy.nodes(':visible').filter(n => n.style('label') && String(n.data('label') || '').length > 6);
+  nodes.forEach(n => {
+    const bb = n.renderedBoundingBox({includeNodes: false, includeEdges: false, includeLabels: true});
+    const x0 = Math.round(bb.x1 * ratio), y0 = Math.round(bb.y1 * ratio);
+    const w = Math.round(bb.w * ratio), h = Math.round(bb.h * ratio);
+    if (w < 4 || h < 4 || x0 < 0 || y0 < 0 || x0 + w > canvas.width || y0 + h > canvas.height) return;
+    const px = ctx.getImageData(x0, y0, w, h).data;
+    let top = h, bottom = -1, left = w, right = -1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (px[i + 3] > 200 && px[i] + px[i + 1] + px[i + 2] < 330) {
+        top = Math.min(top, y); bottom = Math.max(bottom, y); left = Math.min(left, x); right = Math.max(right, x);
+      }
+    }
+    if (bottom >= 0) out[n.id()] = [bottom - top + 1, right - left + 1];
+  });
+  return out;
+}"""
+
+
+def test_canvas_labels_rerasterise_after_window_resize(page, docs_server_url: str) -> None:
+    """D2-017: crossing the 900px readable-label switch and back leaves every
+    node label painted exactly like a fresh load at the same size.
+
+    Cytoscape rasterised the first label texture under the new label style
+    against the label box cached for the old one, so after 1440 -> 900 ->
+    1440 -> 1280 the 13px labels were squashed into the 25px plate (and
+    stretched the other way at 900) until the next restyle.
+    """
+    _open(page, docs_server_url, 1280)
+    page.wait_for_timeout(1200)
+    fresh_zoom = page.evaluate("() => window.__okfLoomGraph.cy.zoom()")
+    fresh = page.evaluate(_LABEL_INK_JS, None)
+    assert len(fresh) >= 4, fresh
+    for width, height, size in [(1440, 900, "13px"), (900, 567, "25px"), (1440, 900, "13px"), (1280, 900, "13px")]:
+        page.set_viewport_size({"width": width, "height": height})
+        page.wait_for_function(
+            "size => window.__okfLoomGraph.cy.nodes().first().style('font-size') === size", arg=size)
+        page.wait_for_timeout(600)
+    page.wait_for_function("z => Math.abs(window.__okfLoomGraph.cy.zoom() - z) < 1e-6", arg=fresh_zoom)
+    page.wait_for_timeout(400)
+    resized = page.evaluate(_LABEL_INK_JS, list(fresh))
+    assert set(resized) == set(fresh), (fresh, resized)
+    # Sub-pixel placement moves an edge by a pixel at most; a stale texture
+    # squashed the 13px ink to about 0.7 of its height.
+    distorted = {nid: (fresh[nid], resized[nid]) for nid in fresh
+                 if abs(resized[nid][0] - fresh[nid][0]) > 1 or abs(resized[nid][1] - fresh[nid][1]) > 3}
+    assert not distorted, distorted
+
+
+# Painted label overprints: pairs of visible node labels (inked text box) and
+# bundled-relationship count chips (whole chip) that overlap on the canvas.
+_LABEL_OVERPRINT_JS = """() => {
+  const cy = window.__okfLoomGraph.cy;
+  const O = {includeNodes: false, includeEdges: false, includeLabels: true, includeOverlays: false};
+  const shown = e => e.visible() && !!e.style('label') && Number(e.style('text-opacity')) > 0
+    && Number(e.style('opacity')) > 0.5;
+  const box = (e, inset) => { const b = e.boundingBox(O);
+    return {id: e.isNode() ? e.data('label') : 'chip ' + e.id(), x1: b.x1 + inset, y1: b.y1 + inset, x2: b.x2 - inset, y2: b.y2 - inset}; };
+  const boxes = cy.nodes().filter(shown).map(n => box(n, 6))
+    .concat(cy.edges('.okf-multi-edge').filter(shown).map(e => box(e, 1)));
+  const hits = [];
+  for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+    const a = boxes[i], b = boxes[j];
+    if (a.x1 < b.x2 && b.x1 < a.x2 && a.y1 < b.y2 && b.y1 < a.y2) hits.push([a.id, b.id]);
+  }
+  return hits;
+}"""
+
+
+def test_selected_label_takes_precedence_and_overprints_are_culled(page, docs_server_url: str) -> None:
+    """D2-006: the selected concept's name sits above its own incident edges
+    on an opaque --surface plate and shows its full title; lower-priority
+    labels and count chips that would overprint another label are hidden,
+    at fit zoom and zoomed in."""
+    _open(page, docs_server_url, 1440)
+    page.locator('.okf-lens-summary__row[data-target="reference/cli"]').first.click()
+    page.wait_for_function("() => window.__okfLoomGraph.cy.$(':selected').id() === 'reference/cli'")
+    page.wait_for_timeout(600)
+    selected = page.evaluate("""() => {
+      const cy = window.__okfLoomGraph.cy, n = cy.$(':selected');
+      const probe = document.createElement('canvas').getContext('2d');
+      const norm = c => { probe.fillStyle = '#000'; probe.fillStyle = c; return probe.fillStyle; };
+      const surface = norm(getComputedStyle(document.documentElement).getPropertyValue('--surface').trim());
+      return {plate: norm(n.style('text-background-color')), surface, opacity: Number(n.style('text-background-opacity')),
+              depth: n.style('z-compound-depth'), width: parseFloat(n.style('text-max-width')),
+              culled: n.hasClass('okf-label-culled'), incident: n.connectedEdges('.okf-incident').length,
+              incidentDepth: n.connectedEdges('.okf-incident').first().style('z-compound-depth')};
+    }""")
+    assert selected["plate"] == selected["surface"] and selected["opacity"] == 1, selected
+    # The name draws above its fan of incident edges, which stay below nodes.
+    assert selected["depth"] == "top" and selected["incident"] > 10 and selected["incidentDepth"] != "top", selected
+    assert selected["width"] >= 200 and not selected["culled"], selected
+    assert page.evaluate(_LABEL_OVERPRINT_JS) == []
+    for _ in range(2):
+        page.get_by_role("button", name="Zoom in").click()
+        page.wait_for_timeout(400)
+    page.wait_for_timeout(400)
+    assert page.evaluate(_LABEL_OVERPRINT_JS) == []
+    assert not page.evaluate("() => window.__okfLoomGraph.cy.$(':selected').hasClass('okf-label-culled')")
+
+
+_FIND_BAND_JS = """() => {
+  const rect = s => { const e = document.querySelector(s); const b = e.getBoundingClientRect();
+    return {x: b.left, y: b.top, w: b.width, h: b.height, r: b.right, b: b.bottom, visible: b.width > 0 && getComputedStyle(e).visibility !== 'hidden'}; };
+  const input = document.querySelector('#okf-search');
+  const status = document.querySelector('.okf-graph-search-status');
+  return {band: rect('.okf-graph-tools'), heading: rect('.okf-graph-tools > h2'), input: rect('#okf-search'),
+          clear: rect('.okf-graph-search-clear'), title: rect('.okf-graph-route-title'), canvas: rect('#okf-graph'),
+          status: status.textContent, statusCase: getComputedStyle(status).textTransform,
+          clearButtons: [...document.querySelectorAll('.okf-graph-tools button')].filter(b => b.offsetParent && /clear/i.test(b.textContent)).length};
+}"""
+
+
+@pytest.mark.parametrize("width", [900, 1440])
+def test_find_in_graph_band_stays_put_while_typing(page, docs_server_url: str, width: int) -> None:
+    """D2-007: typing in Find in graph never moves the band, heading or
+    canvas; there is one clear control; the status quotes the query as typed."""
+    _open(page, docs_server_url, width)
+    search = page.get_by_role("searchbox", name="Search graph concepts")
+    idle = page.evaluate(_FIND_BAND_JS)
+    # The heading shares the field's centre line on the route's gutter.
+    assert abs((idle["heading"]["y"] + idle["heading"]["h"] / 2) - (idle["input"]["y"] + idle["input"]["h"] / 2)) <= 1, idle
+    assert idle["heading"]["x"] == idle["band"]["x"] + 20 == idle["title"]["x"] + 20, idle
+    for query in ["spec", "zzqqXX", "a deliberately long query that runs well past the end of the field"]:
+        search.fill(query)
+        page.wait_for_function("q => document.querySelector('.okf-graph-search-status').textContent !== '' && window.__okfLoomGraph.getState", arg=query)
+        page.wait_for_timeout(250)
+        typed = page.evaluate(_FIND_BAND_JS)
+        for part in ("band", "heading", "input", "title", "canvas"):
+            assert typed[part] == idle[part], (query, part, idle[part], typed[part])
+        assert typed["clearButtons"] == 1, typed
+        clear, field = typed["clear"], typed["input"]
+        assert field["x"] < clear["x"] and clear["r"] <= field["r"] and clear["y"] >= field["y"] and clear["b"] <= field["b"], typed
+        assert typed["statusCase"] == "none", typed
+        if query == "zzqqXX":
+            assert typed["status"] == "No concepts match \u201czzqqXX\u201d", typed
+    # Chrome paints its own cancel glyph in a hovered search field with a
+    # value; the field's end must look the same with that glyph suppressed.
+    search.fill("spec")
+    search.hover()
+    page.wait_for_timeout(200)
+    field = page.evaluate(_FIND_BAND_JS)["input"]
+    end = {"x": field["x"] + field["w"] / 2, "y": field["y"] + 1, "width": field["w"] / 2 - 1, "height": field["h"] - 2}
+    painted = page.screenshot(clip=end)
+    page.add_style_tag(content="#okf-search::-webkit-search-cancel-button{display:none!important}")
+    page.wait_for_timeout(100)
+    assert page.screenshot(clip=end) == painted, "native search cancel button still paints beside Clear"
+    page.get_by_role("button", name="Clear", exact=True).click()
+    expect(search).to_have_value("")
+    expect(search).to_be_focused()
+    assert page.evaluate(_FIND_BAND_JS)["band"] == idle["band"]
+
+
+def test_relation_legend_lists_relation_types_in_their_canvas_line_style(page, docs_server_url: str) -> None:
+    """D2-008: the Edge: relation type key lists canonical relation types (the
+    same values as the relationship filter chips), never link anchor text or
+    paths, and each row's line matches how the canvas draws that type."""
+    _open(page, docs_server_url, 1440)
+    key = page.evaluate("""() => {
+      const cy = window.__okfLoomGraph.cy;
+      const typeOf = e => { const p = e.data('primary_relation') || (e.data('relations') || [])[0]; return p ? p.type : ''; };
+      const drawn = {};
+      cy.edges().forEach(e => { const t = typeOf(e); drawn[t] = drawn[t] || {count: 0, dashed: 0};
+        drawn[t].count++; if (e.style('line-style') !== 'solid') drawn[t].dashed++; });
+      const title = [...document.querySelectorAll('.okf-graph-legend__title')].find(t => t.textContent === 'Edge: relation type');
+      const rows = [];
+      for (let el = title && title.nextElementSibling; el && el.classList.contains('okf-graph-legend__item'); el = el.nextElementSibling) {
+        const line = el.querySelector('.okf-graph-legend__line');
+        rows.push({text: el.textContent, line: line ? getComputedStyle(line).borderTopStyle : null});
+      }
+      const chips = [...document.querySelectorAll('[aria-label="Relationship filters"] [data-filter-value]')].map(c => c.dataset.filterValue);
+      return {drawn, rows, chips};
+    }""")
+    rows = [row for row in key["rows"] if row["line"]]
+    assert rows and rows[0]["text"] == "link", key
+    assert len(rows) == min(10, len(key["drawn"])), key
+    for row in rows:
+        assert row["text"] in key["drawn"] and row["text"] in key["chips"], (row, key)
+        assert "/" not in row["text"] and " " not in row["text"], row
+        drawn = key["drawn"][row["text"]]
+        # Plain links draw solid; every typed relation draws dashed.
+        if row["text"] == "link":
+            assert row["line"] == "solid" and drawn["dashed"] == 0, (row, drawn)
+        else:
+            assert row["line"] in ("dashed", "dotted") and drawn["dashed"] == drawn["count"], (row, drawn)
+    counts = [key["drawn"][row["text"]]["count"] for row in rows]
+    assert counts == sorted(counts, reverse=True), rows
+
+
+_REL_LABELS_JS = """(owner) => {
+  const cy = window.__okfLoomGraph.cy;
+  const probe = document.createElement('canvas').getContext('2d');
+  const norm = c => { probe.fillStyle = '#000'; probe.fillStyle = c; return probe.fillStyle; };
+  const shown = cy.edges('.okf-show-label');
+  const incident = owner ? cy.getElementById(owner).connectedEdges().filter(e => !!e.data('label')) : cy.collection();
+  return {shown: shown.map(e => e.id()).sort(), incident: incident.map(e => e.id()).sort(),
+          ink: shown.length ? norm(shown.first().style('color')) : null,
+          weight: shown.length ? shown.first().style('font-weight') : null,
+          muted: norm(getComputedStyle(document.documentElement).getPropertyValue('--text-3').trim()),
+          hues: [...new Set(cy.edges().map(e => norm(e.style('line-color'))))].length};
+}"""
+
+
+def test_relationship_labels_name_only_the_focused_neighbourhood(page, docs_server_url: str) -> None:
+    """D2-010: Show relationship labels reveals every relationship as a quiet
+    line; text appears only on the selected or hovered concept's edges, in
+    the muted ink, and the edges keep the single neutral Ledger hue."""
+    _open(page, docs_server_url, 1440)
+    page.locator(".okf-signal__advanced > summary").click()
+    page.get_by_label("Show relationship labels").check()
+    page.wait_for_function("() => window.__okfLoomGraph.cy.edges('.okf-edge-elided').length === 0")
+    page.wait_for_timeout(300)
+    idle = page.evaluate(_REL_LABELS_JS, None)
+    assert idle["shown"] == [] and idle["hues"] == 1, idle
+    page.evaluate("() => window.__okfLoomGraph.interaction.dispatch({type: 'SELECT', id: 'reference/cli'})")
+    page.wait_for_timeout(400)
+    selected = page.evaluate(_REL_LABELS_JS, "reference/cli")
+    assert selected["shown"] and selected["shown"] == selected["incident"], selected
+    assert selected["ink"] == selected["muted"] and selected["weight"] == "500", selected
+    assert selected["hues"] == 1, selected
+
+
+def test_hub_halo_clears_its_label_and_fades_with_its_node(page, docs_server_url: str) -> None:
+    """D2-014: the hub halo ends above the hub's label and fades with the
+    node when a search or filter ghosts it."""
+    _open(page, docs_server_url, 1440)
+    hubs = page.evaluate("""() => window.__okfLoomGraph.cy.nodes('.okf-hub').map(n => {
+      const label = n.boundingBox({includeNodes: false, includeEdges: false, includeLabels: true});
+      return {halo: n.position('y') + n.height() / 2 + parseFloat(n.style('underlay-padding')),
+              text: label.y1 + 6, opacity: Number(n.style('underlay-opacity'))}; })""")
+    assert hubs and all(h["halo"] <= h["text"] and h["opacity"] == 1 for h in hubs), hubs
+    page.get_by_role("searchbox", name="Search graph concepts").fill("zzqqxx")
+    page.wait_for_function("() => window.__okfLoomGraph.cy.nodes('.okf-search-nonmatch').length > 0")
+    page.wait_for_timeout(200)
+    faded = page.evaluate("""() => window.__okfLoomGraph.cy.nodes('.okf-hub').map(n =>
+      [Number(n.style('underlay-opacity')), Number(n.style('opacity'))])""")
+    assert faded and all(halo <= node for halo, node in faded), faded
+
+
+@pytest.mark.parametrize("width,target", [(1440, "reference/cli"), (1280, "reference/spec")])
+def test_action_bar_keeps_clear_of_the_selection_and_canvas_chrome(page, docs_server_url: str, width: int, target: str) -> None:
+    """D2-015: the floating action bar never covers the selected concept or
+    its name, the concept list or the zoom column; the focus bar keeps its
+    buttons on one line."""
+    _open(page, docs_server_url, width)
+    page.evaluate("t => window.__okfLoomGraph.interaction.dispatch({type: 'SELECT', id: t})", target)
+    page.wait_for_function("() => !document.querySelector('.okf-graph-actions').hidden")
+    page.wait_for_timeout(300)
+    geometry = page.evaluate("""() => {
+      const c = document.getElementById('okf-graph').getBoundingClientRect(), cy = window.__okfLoomGraph.cy, n = cy.$(':selected');
+      const box = r => ({x1: r.left, y1: r.top, x2: r.right, y2: r.bottom});
+      // The painted disc and name (the node's bounds-expansion is invisible).
+      const p = n.renderedPosition(), r = n.renderedOuterWidth() / 2;
+      const name = n.renderedBoundingBox({includeNodes: false, includeEdges: false, includeLabels: true});
+      const node = {x1: Math.min(p.x - r, name.x1), y1: p.y - r, x2: Math.max(p.x + r, name.x2), y2: name.y2};
+      return {bar: box(document.querySelector('.okf-graph-actions').getBoundingClientRect()),
+              selection: {x1: c.left + node.x1, y1: c.top + node.y1, x2: c.left + node.x2, y2: c.top + node.y2},
+              chrome: [...document.querySelectorAll('#okf-graph .okf-node-index > summary, #okf-graph .okf-graph-zoom')]
+                .map(e => box(e.getBoundingClientRect())).filter(r => r.x2 > r.x1)};
+    }""")
+    hit = lambda a, b: a["x1"] < b["x2"] and b["x1"] < a["x2"] and a["y1"] < b["y2"] and b["y1"] < a["y2"]
+    assert not hit(geometry["bar"], geometry["selection"]), geometry
+    assert not any(hit(geometry["bar"], r) for r in geometry["chrome"]), geometry
+    page.locator(".okf-graph-actions").get_by_role("button", name="Explore neighborhood").click()
+    show_all = page.locator(".okf-graph-focusbar").get_by_role("button", name="Show all")
+    expect(show_all).to_be_visible()
+    line = show_all.evaluate("b => parseFloat(getComputedStyle(b).lineHeight) || parseFloat(getComputedStyle(b).fontSize) * 1.3")
+    assert show_all.evaluate("b => b.getBoundingClientRect().height") < 2 * line + 12
+
+
+_HEADER_JS = """() => { const r = s => { const b = document.querySelector(s).getBoundingClientRect();
+    return [Math.round(b.left), Math.round(b.top), Math.round(b.height)]; };
+  return {brand: r('.okf-shell__brand'), search: r('.okf-shell form[role=search]'),
+          index: r('.okf-shell [data-okf-shell-item="index"]'), graph: r('.okf-shell [data-okf-shell-item="graph"]')}; }"""
+
+
+@pytest.mark.parametrize("width", [641, 768, 1024])
+def test_graph_route_header_keeps_the_shared_shell_geometry(page, docs_server_url: str, width: int) -> None:
+    """T1-007: switching from a document to the graph route does not move the
+    global controls: same inline gutter, same row tops, same item positions."""
+    page.set_viewport_size({"width": width, "height": 900})
+    page.goto(docs_server_url + "/how-to/archive_threads", wait_until="domcontentloaded")
+    page.wait_for_function("() => document.documentElement.classList.contains('okf-theme-ready')")
+    page.wait_for_timeout(300)
+    document = page.evaluate(_HEADER_JS)
+    _open(page, docs_server_url, width)
+    page.wait_for_timeout(300)
+    graph = page.evaluate(_HEADER_JS)
+    # The current destination is set bold, so its neighbour may sit 1px over.
+    assert all(abs(a - b) <= 1 for key in document for a, b in zip(document[key], graph[key])), (document, graph)
+
+
 def test_single_file_short_canvas_keeps_zoom_clear_of_concept_index(tmp_path, page) -> None:
     """With the Search & context drawer open the single-file canvas is short:
     the zoom controls become a bottom-left row and never cover All concepts;

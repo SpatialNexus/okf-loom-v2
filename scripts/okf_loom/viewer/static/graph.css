@@ -56,7 +56,7 @@
   }
   .okf-viewer--graph .okf-topbar__brand,
   .okf-viewer--graph .okf-topbar__controls { min-width: 0; }
-  .okf-viewer--graph .okf-topbar__controls { justify-content: end; flex-wrap: wrap; gap: 8px; overflow: visible; }
+  .okf-viewer--graph .okf-topbar__controls { justify-content: end; flex-wrap: wrap; gap: 4px; overflow: visible; }
   .okf-viewer--graph .okf-studio-bar { grid-column: 1 / -1; width: 100%; display: flex; flex-wrap: wrap; gap: 8px; }
   .okf-viewer--graph .okf-studio-bar__group { min-width: 0; flex-wrap: wrap; gap: 8px; }
   .okf-viewer--graph .okf-presence { max-width: min(46ch, 100%); }
@@ -983,7 +983,7 @@ summary + .okf-lens-summary__verdict + .okf-lens-summary__row { border-top: 1px 
   .okf-detail__header > .okf-graph-actions button:first-child { display: none; }
 }
 .okf-graph-focusbar{position:absolute;top:56px;left:50%;z-index:31;display:flex;align-items:center;gap:var(--okf-space-2);max-width:calc(100% - 32px);padding:6px 8px;background:var(--okf-bg-elev);border:0;border-radius:0;box-shadow:var(--shadow-pop);font-size:var(--okf-text-sm);transform:translateX(-50%)}
-.okf-graph-focusbar[hidden]{display:none}.okf-graph-focusbar label{display:flex;align-items:center;gap:4px;white-space:nowrap}.okf-graph-focusbar button{min-height:32px;color:var(--okf-fg);background:var(--okf-bg-elev);border:1px solid var(--okf-border-strong);border-radius:0}
+.okf-graph-focusbar[hidden]{display:none}.okf-graph-focusbar label{display:flex;align-items:center;gap:4px;white-space:nowrap}.okf-graph-focusbar button{flex:none;min-height:32px;white-space:nowrap;color:var(--okf-fg);background:var(--okf-bg-elev);border:1px solid var(--okf-border-strong);border-radius:0}
 .okf-detail-path{margin:0 0 var(--okf-space-4);padding:var(--okf-space-3) 0;border-block:1px solid var(--okf-border)}.okf-detail-path h3,.okf-detail-path p{margin-block:0 var(--okf-space-2)}
 .okf-detail-path__chain{display:flex;align-items:center;gap:var(--okf-space-2);padding:0;margin:0 0 var(--okf-space-3);list-style:none;overflow-x:auto}.okf-detail-path__chain li{display:flex;align-items:center;gap:var(--okf-space-2)}
 .okf-detail-path__node{color:var(--okf-accent);background:transparent;border:0;padding:4px;font-weight:700;cursor:pointer}.okf-detail-path__relation{display:inline-flex;padding:2px 6px;background:var(--okf-bg-inset);border-radius:0;color:var(--okf-fg-muted);font-size:var(--okf-text-xs);white-space:nowrap}.okf-detail-path__relation--reverse{border:1px dashed var(--okf-border-strong);color:var(--okf-fg)}
@@ -1034,8 +1034,8 @@ summary + .okf-lens-summary__verdict + .okf-lens-summary__row { border-top: 1px 
 .okf-viewport-icon{width:20px;height:20px;display:block}.okf-graph-zoom button.is-running .okf-viewport-icon{animation:okf-viewport-spin .8s linear infinite}.okf-graph-zoom button.is-failed{border-width:2px;border-color:var(--okf-error);color:var(--okf-error)}@keyframes okf-viewport-spin{to{transform:rotate(360deg)}}
 .okf-viewport-label{display:none}
 .okf-graph-minimap{position:absolute;right:58px;bottom:14px;z-index:24;width:160px;height:116px;background:var(--okf-bg-elev);border:0;border-radius:0;box-shadow:var(--shadow-pop);overflow:hidden;pointer-events:none}.okf-graph-minimap[hidden]{display:none}.okf-graph-minimap>span{display:block;height:16px;padding-inline:5px;font-family:var(--font-label);font-size:var(--label-size);font-weight:var(--label-weight);letter-spacing:var(--label-track);text-transform:uppercase;line-height:16px;color:var(--label-color);background:var(--okf-bg-inset);border-bottom:1px solid var(--okf-border)}.okf-graph-minimap canvas{display:block;width:160px;height:100px}
-.okf-graph-search-status{margin-inline-start:6px;color:var(--okf-fg-muted);font-size:var(--okf-text-xs)}.okf-viewer--graph .okf-graph-search-status:empty{display:none}.okf-graph-search-clear{min-height:32px;margin-inline-start:4px;background:transparent;color:var(--okf-accent);border:0;cursor:pointer}.okf-graph-search-clear[hidden]{display:none}
-@media(max-width:640px){html,body,.okf-viewer--graph,.okf-layout,.okf-layout>.okf-graph,.okf-layout>.okf-detail{box-sizing:border-box;max-width:100%;min-width:0;overflow-x:hidden}.okf-graph-zoom{right:8px;bottom:8px}.okf-graph-zoom button,.okf-filter-chips button,.okf-graph-search-clear{min-width:44px;min-height:44px}.okf-graph-minimap{right:60px;bottom:8px;width:120px;height:92px}.okf-graph-minimap canvas{width:120px;height:76px}.okf-signal__seg{grid-template-columns:1fr}.okf-lens-choice{grid-template-columns:44px minmax(0,1fr)}.okf-lens-preview{width:44px;height:32px}.okf-filter-chip-group{max-width:100%}.okf-filter-chip{min-width:0;overflow-wrap:anywhere}.okf-filter-showall{min-width:88px}.okf-graph-focusbar{top:8px;max-width:calc(100% - 16px)}.okf-graph-actions{max-width:calc(100% - 16px)}.okf-detail-relationships__list{display:grid;grid-template-columns:minmax(0,1fr);width:100%;overflow-x:visible;overscroll-behavior-inline:auto}.okf-detail-relationships__list li{width:100%;max-width:100%;flex:none}.okf-detail-relationships__list button{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:break-word}}
+.okf-graph-search-status{flex:1 1 0;min-width:0;max-width:32rem;overflow:hidden;color:var(--okf-fg-muted);font-size:var(--okf-text-xs);white-space:nowrap;text-overflow:ellipsis}.okf-mobile-secondary__controls .okf-graph-search-status:empty{display:none}.okf-graph-search-field{position:relative}.okf-graph-search-field:has(>.okf-graph-search-clear:not([hidden])) input{padding-inline-end:64px}.okf-graph-search-field input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none;display:none}.okf-graph-tools .okf-graph-search-field>.okf-graph-search-clear{position:absolute;inset-inline-end:1px;bottom:0;width:auto;min-width:44px;max-width:none;height:var(--okf-graph-field-h);min-height:0;margin:0;padding:0 10px;background:transparent;color:var(--text-2);border:0;border-radius:0;font:inherit;font-size:var(--okf-text-xs);cursor:pointer}.okf-graph-search-clear:hover{color:var(--text);text-decoration:underline}.okf-graph-search-clear:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}.okf-graph-search-clear[hidden]{display:none}
+@media(max-width:640px){html,body,.okf-viewer--graph,.okf-layout,.okf-layout>.okf-graph,.okf-layout>.okf-detail{box-sizing:border-box;max-width:100%;min-width:0;overflow-x:hidden}.okf-graph-zoom{right:8px;bottom:8px}.okf-graph-zoom button,.okf-filter-chips button{min-width:44px;min-height:44px}.okf-graph-minimap{right:60px;bottom:8px;width:120px;height:92px}.okf-graph-minimap canvas{width:120px;height:76px}.okf-signal__seg{grid-template-columns:1fr}.okf-lens-choice{grid-template-columns:44px minmax(0,1fr)}.okf-lens-preview{width:44px;height:32px}.okf-filter-chip-group{max-width:100%}.okf-filter-chip{min-width:0;overflow-wrap:anywhere}.okf-filter-showall{min-width:88px}.okf-graph-focusbar{top:8px;max-width:calc(100% - 16px)}.okf-graph-actions{max-width:calc(100% - 16px)}.okf-detail-relationships__list{display:grid;grid-template-columns:minmax(0,1fr);width:100%;overflow-x:visible;overscroll-behavior-inline:auto}.okf-detail-relationships__list li{width:100%;max-width:100%;flex:none}.okf-detail-relationships__list button{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:break-word}}
 @media(max-width:360px){.okf-detail-relationships__list li{grid-template-columns:minmax(0,1fr)}.okf-detail-relationships__key{margin-top:4px}.okf-detail-relationships__key:first-child{margin-top:0}}
 .okf-graph-viewport-toolbar{display:none}
 @media(forced-colors:active){.okf-graph-minimap{border:1px solid CanvasText;background:Canvas}.okf-graph-minimap>span{color:CanvasText;background:Canvas;border-bottom-color:CanvasText}.okf-filter-chip,.okf-filter-solo,.okf-filter-showall,.okf-lens-preview{forced-color-adjust:auto;border:2px solid CanvasText}.okf-filter-chip.is-off{border-style:dashed}.okf-filter-chip.is-off::after{content:" · off"}.okf-filter-chip[aria-pressed=true]{outline:3px double Highlight;box-shadow:none}.okf-lens-preview line,.okf-lens-preview circle,.okf-preview-arrow,.okf-preview-hull,.okf-preview-ring{stroke:CanvasText!important}.okf-lens-preview circle{fill:Canvas!important}.okf-node-index__item.is-active{outline:3px dotted Highlight;outline-offset:-3px}.okf-detail-path__message::before{content:"Highlighted path: ";font-weight:700}.okf-graph-canvas-proxy:focus-visible{outline:4px double Highlight}}
@@ -1321,7 +1321,9 @@ summary + .okf-lens-summary__verdict + .okf-lens-summary__row { border-top: 1px 
 }
 
 @media (max-width: 900px) {
-  .okf-viewer--graph .okf-topbar { height: auto; min-height: var(--okf-topbar-h); padding: var(--okf-space-2) var(--okf-space-3); flex-wrap: wrap; align-items: center; }
+  /* The shared shell's 20px gutter and flush top, as on document routes
+   * (T1-007); the compact shell block owns <=640px. */
+  .okf-viewer--graph .okf-topbar { height: auto; min-height: var(--okf-topbar-h); padding: 0 20px; flex-wrap: wrap; align-items: center; }
   .okf-viewer--graph .okf-topbar__controls { flex: 1 1 100%; width: 100%; }
   /* Pane tabs: graph.js shows them up to 900px (isCompactGraphViewport), so
    * their Ledger look and pressed state cover that whole range, not only
@@ -1768,12 +1770,11 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom { z-index: 40 !im
 /* F06/F07/F16: composite alternatives, progressive identity labels, and a
  * conventional named viewport toolbar.  Options remain programmatically
  * focusable for compatibility, but only each listbox participates in Tab. */
-/* Find in graph: the heading sits on the field's centre line; the field's
- * own label is a mono micro-label above it. */
+/* Find in graph: one row. The heading names the region and sits on the
+ * field's centre line; the field carries its own accessible name. */
 .okf-viewer--graph .okf-graph-tools > h2 {
   display: flex;
   align-items: center;
-  align-self: end;
   min-height: var(--okf-graph-field-h);
   margin: 0;
   font-family: var(--font-body);
@@ -1924,12 +1925,13 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
 }
 .okf-viewer--graph .okf-graph-tools {
   display: flex;
-  align-items: end;
+  align-items: center;
   flex-wrap: wrap;
   gap: 6px var(--okf-space-4);
   width: 100%;
   min-width: 0;
-  padding: 10px max(var(--okf-space-4), calc((100vw - var(--okf-page-maxw, 1320px)) / 2)) 12px;
+  /* The band shares the route title's 20px gutter at every desktop width. */
+  padding: 10px 20px;
   border-bottom: 1px solid var(--okf-border);
   background: var(--okf-bg-inset);
 }
@@ -2006,11 +2008,6 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
     gap: var(--okf-space-1);
   }
   .okf-viewer--graph .okf-global-nav > * { min-width: 44px; min-height: 44px; }
-  .okf-viewer--graph .okf-global-nav .okf-btn { padding-inline: var(--okf-space-2); }
-  .okf-viewer--graph .okf-graph-tools {
-    padding-inline: var(--okf-space-3);
-  }
-  .okf-graph-tools__search { flex-basis: 100%; }
   .okf-graph-tools__filter { flex: 1 1 10rem; }
   .okf-graph-tools__reset { flex: 0 1 auto; min-width: 44px; }
   .okf-viewer--graph .okf-graph-mobile-nav {
@@ -2065,7 +2062,8 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
   .okf-viewer--graph .okf-layout[data-mobile-pane="concepts"] .okf-node-index__list { max-height: none; }
   .okf-viewer--graph .okf-graph-actions {
     left: 8px !important;
-    right: 8px !important;
+    /* Clear of the 44px zoom column on the canvas's right edge. */
+    right: 60px !important;
     top: auto !important;
     bottom: 64px !important;
     max-width: none !important;
@@ -2166,7 +2164,7 @@ html:not([data-okf-js="1"]) body:not([data-okf-js="1"]).okf-viewer--graph .okf-g
 @media (min-width: 641px) and (max-width: 1100px) {
   .okf-viewer--graph > .okf-shell {
     display: grid !important; grid-template-columns: minmax(0,1fr) !important;
-    height: auto !important; gap: 8px !important; padding-block: 8px !important;
+    height: auto !important; gap: 8px !important; padding-block: 0 !important;
   }
   .okf-viewer--graph > .okf-shell > .okf-shell__brand {
     grid-column: 1 !important; grid-row: 1 !important;

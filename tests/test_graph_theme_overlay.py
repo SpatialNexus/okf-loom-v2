@@ -161,7 +161,8 @@ def _graph_theme_snapshot(page):
           const hover = first('node.okf-hover');
           const hub = first('node.okf-hub');
           const selected = first('node:selected');
-          const path = first('edge.okf-path');
+          // Prefer the traced typed relation: the path's ink must win over its hue.
+          const path = cy.edges('.okf-path.okf-rel-edge').length ? first('edge.okf-path.okf-rel-edge') : first('edge.okf-path');
           const multi = first('edge.okf-multi-edge');
           const plain = cy.edges().not('.okf-path').not(':selected').first();
           const canvas = document.querySelector('.okf-graph-minimap canvas');
@@ -213,7 +214,10 @@ def test_graph_theme_event_repaints_every_stateful_cue_and_minimap(
         """() => {
           const G = window.__okfLoomGraph;
           const cy = G.cy;
-          const typed = cy.edges().filter(e => !!e.data('label')).first();
+          // A typed relation (primary type other than a plain link, D2-008)
+          // with no reverse edge, so the traced path is that relation.
+          const typed = cy.edges('.okf-rel-edge').filter(e => cy.edges().filter(o =>
+            o.source().same(e.target()) && o.target().same(e.source())).empty()).first();
           const start = typed.source().id();
           const end = typed.target().id();
           G.interaction.dispatch({type: 'SELECT', id: start, source: 'test', quietUrl: true});
@@ -850,6 +854,7 @@ _FORCED_CANVAS_AUDIT_JS = """() => {
     strokeWidth: parseFloat(n.style('border-width')), strokeStyle: n.style('border-style'),
     shape: n.style('shape'), label: rgb(n.style('color')),
     plate: rgb(n.style('text-background-color')), plateOpacity: Number(n.style('text-background-opacity')),
+    culled: n.hasClass('okf-label-culled'), textOpacity: Number(n.style('text-opacity')),
     halo: rgb(n.style('text-outline-color')), opacity: Number(n.style('opacity')),
     glyphInk: inkOf(n.data('iconUrl'), 'stroke'),
     brokenInk: inkOf(n.data('brokenBadgeUrl'), 'stroke').concat(inkOf(n.data('brokenBadgeUrl'), 'fill')),
@@ -882,7 +887,10 @@ def _assert_system_canvas(audit) -> None:
     assert sys["canvas"] != sys["text"], sys
     for n in audit["nodes"]:
         assert n["fill"] == sys["canvas"], n
-        assert n["plate"] == sys["canvas"] and n["plateOpacity"] == 1, n
+        # A label culled under a higher-priority one hides its text and its
+        # plate together; every painted label sits on an opaque Canvas plate.
+        assert n["plate"] == sys["canvas"], n
+        assert (n["plateOpacity"], n["textOpacity"]) == ((0, 0) if n["culled"] else (1, 1)), n
         assert n["halo"] == sys["canvas"] and n["opacity"] == 1, n
         assert n["glyphInk"] == [sys["text"]], n
         assert set(n["brokenInk"]) <= {sys["canvas"], sys["text"]}, n

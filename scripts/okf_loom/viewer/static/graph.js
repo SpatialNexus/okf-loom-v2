@@ -43,25 +43,26 @@
   //   nodeText    --graph-label       node label ink
   //   halo        --graph-halo        label halo and relationship-label plate
   //   edge        --graph-edge        edge line and arrowhead
-  //   edgeLabel   --text-2            relationship label ink (AA on the halo)
+  //   edgeLabel   --text-3            muted relationship label ink (AA on the halo)
   //   select      --accent            the selected node's 4px stroke / edge
   //   cue         --text              path, search and bridge marks (ink)
   //   raised      --surface-2         neutral hub / hover / focus halos
+  //   surface     --surface           the selected/hovered label's plate
   //   chip        --bg-2              count-chip fill
   //   warn/error/info --status-*      status markers: strokes and glyphs only
   var GRAPH_TOKENS = {
     canvas: "--graph-bg", node: "--graph-node", nodeIcon: "--graph-node-icon",
     nodeBorder: "--border-strong", nodeText: "--graph-label", halo: "--graph-halo",
-    edge: "--graph-edge", edgeLabel: "--text-2", select: "--accent", cue: "--text",
-    muted: "--text-3", raised: "--surface-2", chip: "--bg-2",
+    edge: "--graph-edge", edgeLabel: "--text-3", select: "--accent", cue: "--text",
+    muted: "--text-3", raised: "--surface-2", surface: "--surface", chip: "--bg-2",
     warn: "--status-warn", error: "--status-error", info: "--status-info"
   };
   // Last-resort values (Bone) for an embedder that loads graph.js without the
   // Ledger stylesheet; every viewer surface resolves the tokens above.
   var GRAPH_TOKEN_FALLBACK = {
     canvas: "#f6f3ed", node: "#d2cabd", nodeIcon: "#1d1a16", nodeBorder: "#b0a696",
-    nodeText: "#1d1a16", halo: "#f6f3ed", edge: "#a39a8b", edgeLabel: "#575047",
-    select: "#a3573a", cue: "#1d1a16", muted: "#6a6258", raised: "#e3ddd2",
+    nodeText: "#1d1a16", halo: "#f6f3ed", edge: "#a39a8b", edgeLabel: "#675f55",
+    select: "#a3573a", cue: "#1d1a16", muted: "#6a6258", raised: "#e3ddd2", surface: "#fbf9f5",
     chip: "#eae5dc", warn: "#7f5410", error: "#9e2f2a", info: "#36597e"
   };
 
@@ -1251,6 +1252,13 @@
       data.bundleLabel=data.multiplicity>1?String(data.multiplicity):"";
       return data;
     }
+    // The relation type an edge is drawn as: its primary relation's canonical
+    // type (an untyped legacy edge falls back to its label). Body links are
+    // type "link" and draw as the plain solid edge; every other type is a
+    // typed relation that carries a dash (and, under the Relations intent, a
+    // muted hue). Anchor text never keys the encoding.
+    function edgePrimaryType(data){var relations=Array.isArray(data.relations)?data.relations:[],primary=data.primary_relation||relations[Number(data.primary_relation_index)||0]||relations[0];return primary&&primary.type?String(primary.type):String(data.label||"");}
+    function isTypedRelation(type){return !!type&&type!=="link";}
     function edgeRelations(edge){var relations=edge.data("relations");return Array.isArray(relations)&&relations.length?relations:[{id:edge.id()+"__relation",type:edge.data("label")||"link",label:edge.data("label")||"related",kind:edge.data("label")?"relation":"body_link",direction:"outgoing",source:edge.data("source"),target:edge.data("target")}];}
     // Relationship filters intentionally use one normalized dimension:
     // canonical relation `type`. Labels remain explanatory legend/detail text.
@@ -1320,8 +1328,9 @@
     (function () {
       var counts = {};
       bundle.edges.forEach(function (e) {
+        var primaryType = edgePrimaryType(e.data);
+        if (primaryType && !relationLabelSet[primaryType]) { relationLabelSet[primaryType] = true; relationLabelList.push(primaryType); }
         (e.data.relations || []).forEach(function(relation){
-          [relation.type,relation.label].forEach(function(value){if(value&&!relationLabelSet[value]){relationLabelSet[value]=true;relationLabelList.push(value);}});
           [e.data.source, e.data.target].forEach(function (nid) {
             incidentLabeled[nid] = (incidentLabeled[nid] || 0) + 1;
             counts[nid] = counts[nid] || {};
@@ -1403,7 +1412,7 @@
       incidentLabeled = {}; nodeRelLabel = {}; relationLabelSet = {}; relationLabelList = [];
       var counts = {};
       candidate.edges.forEach(function (e) {
-        var d=e.data||{}, label=d.label;
+        var d=e.data||{}, label=edgePrimaryType(d);
         if (!label) return;
         if (!relationLabelSet[label]) { relationLabelSet[label]=true; relationLabelList.push(label); }
         [d.source,d.target].forEach(function (id) {
@@ -1820,6 +1829,32 @@
       };
     }
 
+      // Label precedence (D2-006). The selected, hovered or toured concept's
+      // name is the one the reader is looking at: its node joins the top
+      // layer (above its own incident edges and every neighbour), its label
+      // sits on an opaque --surface plate with a hairline --border-strong rule
+      // and shows more of the title. Every other label yields to it through
+      // cullOverlappingLabels(), which hides (never moves) the lower-priority
+      // label or count chip in an overlap. Culled text keeps its geometry, so
+      // fitting and hit-testing do not change when a label is culled.
+      var LABEL_PRECEDENCE = "node:selected, node.okf-hover, node.okf-tour-target";
+      var LABEL_CULLED = "node.okf-label-culled, edge.okf-label-culled";
+      var LABEL_CULLED_STYLE = { "text-opacity": 0, "text-background-opacity": 0, "text-outline-opacity": 0, "text-border-opacity": 0 };
+      var PRECEDENCE_LABEL_WIDTH = 220;
+      function labelPlateStyle(pal) {
+        return {
+          "color": pal.nodeText, "text-background-color": pal.surface, "text-background-opacity": 1,
+          "text-background-padding": 3, "text-border-width": 1, "text-border-color": pal.nodeBorder,
+          "text-border-opacity": 1, "text-max-width": PRECEDENCE_LABEL_WIDTH,
+          "z-compound-depth": "top", "z-index": 40
+        };
+      }
+      // Cytoscape's cascade is last-rule-wins, so every pass that appends a
+      // base "node" label rule re-appends these after it.
+      function labelPrecedenceRules(style, pal) {
+        return style.selector(LABEL_PRECEDENCE).style(labelPlateStyle(pal)).selector(LABEL_CULLED).style(LABEL_CULLED_STYLE);
+      }
+
       // Compute the initial (default-preset) grouping so the first layout is
       // already grouped-by-type rather than a flat hairball.
       applyGrouping();
@@ -1951,8 +1986,11 @@
             // instead of rendering as faint noise; they return on zoom-in. This
             // preserves Relations/Focus semantics (labels are still emitted via
             // .okf-show-label) and only changes WHEN they paint.
+            // D2-010: relationship labels are secondary text, so they read
+            // in the muted --text-3 ink at a regular weight (still AA on the
+            // 0.9 halo plate in every palette).
             "font-size": 11,
-            "font-weight": 600,
+            "font-weight": 500,
               "color": INITIAL_GRAPH_PALETTE.edgeLabel,
               "font-family": INITIAL_GRAPH_PALETTE.font,
             "text-rotation": "autorotate",
@@ -1993,14 +2031,16 @@
           } },
           // P1 edge highlight: edges incident to the selected node pop above
           // the de-emphasized default edge noise. Restores full opacity + a
-          // modest width bump. z-compound-depth top keeps incident edges above
-          // non-incident ones so they are never visually buried. The colour
-          // is left to the base edge / relation encoding — this is a
-          // PROMINENCE cue, not a new colour variable.
+          // modest width bump. A raised z-index keeps incident edges above
+          // non-incident ones so they are never visually buried, while edges
+          // still pass BEHIND every node and label (a top-layer fan of
+          // incident edges used to strike through the names it connects).
+          // The colour is left to the base edge / relation encoding — this
+          // is a PROMINENCE cue, not a new colour variable.
           { selector: "edge.okf-incident", style: {
               "opacity": 1,
               "width": 3,
-              "z-compound-depth": "top",
+              "z-index": 10,
           } },
           // P1 progressive disclosure: non-backbone edges are display:none so
           // they are excluded from BOTH rendering AND layout (cleaner initial
@@ -2027,11 +2067,13 @@
         // accent); non-colour-only cue (size/icon still carry identity), and
         // it composes with .okf-bridge / .okf-focus-root / .okf-presence-halo
         // (those set their own underlay/border and win on z-index). Computed
-        // deterministically by degree rank (see applyVisualEncoding).
+        // deterministically by degree rank (see applyVisualEncoding). The
+        // 3px padding keeps the square above the label, which starts 4px
+        // below the disc (a 7px halo cut through the first letters).
         { selector: "node.okf-hub", style: {
                 "underlay-color": INITIAL_GRAPH_PALETTE.raised,
             "underlay-opacity": 1,
-            "underlay-padding": 7,
+            "underlay-padding": 3,
             "underlay-corner-radius": 0,
         } },
         // Phase 3: broken-link indicator. Nodes whose outgoing links
@@ -2075,6 +2117,9 @@
             "underlay-opacity": 1,
             "underlay-padding": 6,
         } },
+        // The hovered directional edge dashes so its flow reads (path and
+        // selected edges below keep their solid stroke).
+        { selector: "edge.okf-edge-flow", style: { "line-style": "dashed" } },
         { selector: "edge.okf-path", style: {
               "line-color": INITIAL_GRAPH_PALETTE.cue,
               "target-arrow-color": INITIAL_GRAPH_PALETTE.cue,
@@ -2116,6 +2161,13 @@
         } },
         // Non-neighbour dim during focus is stronger (~12%); reviewer asked ≤30%.
         { selector: ".dim", style: { opacity: 0.12 } },
+        // A node's opacity does not reach its underlay, so the structural
+        // hub and bridge halos fade with their faded node explicitly instead
+        // of leaving solid squares on a ghosted canvas (D2-014). The
+        // strongest fade is last, so it wins when fades combine.
+        { selector: "node.okf-hub.okf-search-nonmatch, node.okf-bridge.okf-search-nonmatch", style: { "underlay-opacity": 0.25 } },
+        { selector: "node.okf-hub.okf-hover-dim, node.okf-bridge.okf-hover-dim", style: { "underlay-opacity": 0.18 } },
+        { selector: "node.okf-hub.dim, node.okf-hub.okf-path-dim, node.okf-bridge.dim, node.okf-bridge.okf-path-dim", style: { "underlay-opacity": 0.12 } },
         // iter1 CRI-004: presence halo. When the agent's presence.focus
         // points at a concept, graph.js adds this class to that node so the
         // agent is spatially visible on the canvas, not just in the status
@@ -2130,6 +2182,9 @@
         // The selected node's 4px accent stroke wins over every state cue
         // above (path, search, bridge, orphan, presence).
         { selector: "node:selected", style: { "border-width": 4, "border-style": "solid", "border-color": INITIAL_GRAPH_PALETTE.select } },
+        // Label precedence and culling (labelPrecedenceRules owns both).
+        { selector: LABEL_PRECEDENCE, style: labelPlateStyle(INITIAL_GRAPH_PALETTE) },
+        { selector: LABEL_CULLED, style: LABEL_CULLED_STYLE },
       ],
       // The deterministic circle/sparse/mobile seed below replaces ALL node
       // positions before runLayoutNow(). Do not compute a discarded grid (and
@@ -2227,22 +2282,19 @@
       var pal = graphPalette();
       // Commit the complete label palette once, not a whole-graph style pass
       // for each selector. Stateful cues still follow these base rules.
-      cy.style().selector("node").style({
+      labelPrecedenceRules(cy.style().selector("node").style({
         "color": pal.nodeText,
         "border-color": pal.nodeBorder,
         // Ledger labels: --graph-label on a --graph-halo outline in every
         // palette. Light palettes need nothing more; on the dark palettes
         // light labels crossing light edges also get a square --graph-halo
         // plate at 0.85 so they stay crisp at high spread. The selected,
-        // hovered or toured node's name gets an opaque plate (below).
+        // hovered or toured node's name gets an opaque --surface plate
+        // (labelPrecedenceRules, appended last).
         "text-outline-color": pal.halo,
         "text-outline-width": 2,
         "text-background-color": pal.edgeLabelBg,
         "text-background-opacity": pal.dark ? 0.85 : 0
-      }).selector("node:selected, node.okf-hover, node.okf-tour-target").style({
-        "color": pal.nodeText,
-        "text-background-color": pal.edgeLabelBg,
-        "text-background-opacity": 1
       }).selector("node.okf-hover-dim, node.dim").style({
         "color": pal.nodeText,
         "text-background-color": pal.edgeLabelBg
@@ -2257,7 +2309,7 @@
       })
       // Typed edges carry their (lens) colour in data(relColor); restore the
       // mapping a forced-colours pass replaced with a system colour.
-      .selector("edge.okf-rel-edge").style({ "line-color": "data(relColor)", "target-arrow-color": "data(relColor)" }).update();
+      .selector("edge.okf-rel-edge").style({ "line-color": "data(relColor)", "target-arrow-color": "data(relColor)" }), pal).update();
       syncStatefulGraphColours(pal);
     }
       if(reducedMotionQuery){var syncGraphMotion=function(){try{cy.style().selector("node.okf-hover").style("transition-duration",REDUCED_MOTION?"0ms":"120ms").update();}catch(e){}};if(reducedMotionQuery.addEventListener)reducedMotionQuery.addEventListener("change",syncGraphMotion);else if(reducedMotionQuery.addListener)reducedMotionQuery.addListener(syncGraphMotion);}
@@ -2314,7 +2366,7 @@
             "background-color": sys.canvas, "background-opacity": 1, "shape": forcedNodeShape,
             "border-color": sys.text, "border-opacity": 1, "border-width": forcedNodeBorderWidth, "border-style": forcedNodeBorderStyle,
             "color": sys.text, "text-outline-color": sys.canvas, "text-outline-width": 2, "text-outline-opacity": 1,
-            "text-background-color": sys.canvas, "text-background-opacity": 1,
+            "text-background-color": sys.canvas, "text-background-opacity": 1, "text-border-color": sys.text,
             "underlay-color": sys.canvas, "underlay-opacity": 0, "outline-width": 0, "opacity": 1
           })
           .selector("node.okf-forced.okf-orphan").style({ "border-style": "dashed" })
@@ -2342,6 +2394,9 @@
           .selector("edge.okf-forced:selected").style({
             "line-color": sys.highlight, "target-arrow-color": sys.highlight, "line-style": "dashed", "line-dash-pattern": [12, 4], "width": 6
           })
+          // A culled label stays hidden: the system plates above would
+          // otherwise paint an empty box where the text yielded.
+          .selector("node.okf-forced.okf-label-culled, edge.okf-forced.okf-label-culled").style(LABEL_CULLED_STYLE)
           .update();
         forcedRulesEnd = cy.style().length;
         forcedRulesKey = key;
@@ -2683,13 +2738,23 @@
       // otherwise the legend contradicts the canvas. Previously this was
       // gated on the Relations preset, which now disagrees with the
       // always-on encoding.
-      if (relationLabelList.length) {
+      // One row per relation type the canvas actually draws (each edge's
+      // primary type), busiest first, in that type's real line style: plain
+      // links solid, typed relations dashed (hued only under Relations).
+      var drawnTypes = {};
+      cy.edges().forEach(function (e) { var t = e.data("relType"); if (t) drawnTypes[t] = (drawnTypes[t] || 0) + 1; });
+      var drawnTypeList = Object.keys(drawnTypes).sort(function (a, b) { return (drawnTypes[b] - drawnTypes[a]) || (a < b ? -1 : (a > b ? 1 : 0)); });
+      if (drawnTypeList.length) {
         body.appendChild(legendTitle("Edge: relation type"));
-        relationLabelList.slice(0, 10).forEach(function (lab) {
-          body.appendChild(legendLineRow(relColor(lab, !!controlState.relationEdges), relDashClass(lab), lab));
+        drawnTypeList.slice(0, 10).forEach(function (type) {
+          var typed = isTypedRelation(type);
+          var row = legendLineRow(typed ? relColor(type, !!controlState.relationEdges) : graphPalette().edge, typed ? relDashClass(type) : "solid", type);
+          row.dataset.relationType = type;
+          body.appendChild(row);
         });
-        buildFilterChips(body,allRelationValues(),controlState.hiddenRelations,"Relationship");
+        if (drawnTypeList.length > 10) body.appendChild(legendRow("transparent", "+ " + (drawnTypeList.length - 10) + " more relation types"));
       }
+      if (relationLabelList.length) buildFilterChips(body,allRelationValues(),controlState.hiddenRelations,"Relationship");
       var hasBody = body.childNodes.length > 0;
       legend.hidden = !hasBody;
       if (!hasBody) { legend.classList.remove("okf-graph-legend--collapsed"); return; }
@@ -2874,16 +2939,18 @@
           // default Map lens without having to flip presets (the prior
           // gate was a reviewer-6 contradiction with the plan's "typed
           // edge get their hue/dash always" requirement).
-          var lab = e.data("label");
+          var relType = edgePrimaryType(e.data());
+          e.data("relType", relType);
           e.removeClass("okf-rel-edge okf-reld-1 okf-reld-2 okf-reld-3");
-          if (lab) {
-            e.data("relColor", relColor(lab, !!controlState.relationEdges));
+          if (isTypedRelation(relType)) {
+            e.data("relColor", relColor(relType, !!controlState.relationEdges));
             e.addClass("okf-rel-edge");
-            e.addClass(relDashClass(lab));
+            e.addClass(relDashClass(relType));
           }
         });
       });
       applyEdgeLabels();
+      scheduleLabelCull();
       updateLegend();
       updateNodeIndexSwatches();
       // Phase 3: orphan shelf is a deterministic derivation from degreeOf,
@@ -2927,10 +2994,19 @@
     // drops or the user zooms/selects in. The EXPLICIT Relations/Focus path
     // (showEdgeLabels) is untouched — that is deliberate "show the relationships"
     // intent and stays on the existing min-zoomed-font-size LOD.
+      // D2-010: relationship text is a neighbourhood reading aid, never a
+      // whole-map layer. With labels on (the setting, or a lens that asks
+      // for them) only the edges of the selected, hovered or focus-root
+      // concept carry text; every other edge stays a quiet line. Painting
+      // all of them at once was an unreadable pile of rotated anchor text.
       function applyEdgeLabels() {
         var selId = null;
         var sel = cy.nodes(":selected");
         if (sel && sel.length) selId = sel.id();
+        var labelOwners = {};
+        if (selId) labelOwners[selId] = true;
+        if (interactionState.hovered) labelOwners[interactionState.hovered] = true;
+        if (controlState.focusEnabled && focusRoot) labelOwners[focusRoot] = true;
         // Relationship text is an explicit Advanced choice. Selection still
         // emphasizes incident lines, but never silently turns labels on.
         // P1 edge highlight: toggle .okf-incident on edges touching the
@@ -2942,13 +3018,84 @@
             var incident = !!(selId && (e.source().id() === selId || e.target().id() === selId));
             e.toggleClass("okf-incident", incident);
             var show = false;
-            if (e.data("label")) {
-              if (controlState.showEdgeLabels && !FORCED_COLORS) show = true;
+            if (e.data("label") && controlState.showEdgeLabels && !FORCED_COLORS) {
+              show = !!(labelOwners[e.source().id()] || labelOwners[e.target().id()]);
             }
             e.toggleClass("okf-show-label", show);
           });
         });
       }
+
+    // Label culling (D2-006). Labels claim their painted box (plate and
+    // halo included) in priority order and a label or count chip that would
+    // overprint an already claimed box is hidden for now:
+    //   3  the selected, hovered or toured concept (the reader's focus)
+    //   2  focus root, search hits and path stops (explicit reader cues)
+    //   1  every other concept, busiest first (degree, then id)
+    //   -  bundled-relationship count chips (the bundle list keeps the count)
+    //   0  dimmed concepts (filtered, faded by hover/path/search)
+    // Label sizes are model units, so overlap does not change with zoom:
+    // the pass reruns when positions, classes or label styles change, never
+    // per zoom frame. Culling only toggles text opacity, never geometry.
+    var labelCullFrame = 0;
+    function scheduleLabelCull() {
+      if (labelCullFrame) return;
+      labelCullFrame = window.requestAnimationFrame(function () {
+        labelCullFrame = 0;
+        if (!cy.destroyed()) cullOverlappingLabels();
+      });
+    }
+    var LABEL_BOX = { includeNodes: false, includeEdges: false, includeLabels: true, includeOverlays: false };
+    function labelPriority(n) {
+      if (n.selected() || n.hasClass("okf-hover") || n.hasClass("okf-tour-target")) return 3;
+      if (n.hasClass("dim") || n.hasClass("okf-hover-dim") || n.hasClass("okf-path-dim") || n.hasClass("okf-search-nonmatch")) return 0;
+      if (n.hasClass("okf-focus-root") || n.hasClass("okf-search-match") || n.hasClass("okf-path")) return 2;
+      return 1;
+    }
+    function cullOverlappingLabels() {
+      var CELL = 96, grid = {}, culled = {};
+      function visit(b, fn) {
+        for (var gx = Math.floor(b.x1 / CELL); gx <= Math.floor(b.x2 / CELL); gx++)
+          for (var gy = Math.floor(b.y1 / CELL); gy <= Math.floor(b.y2 / CELL); gy++)
+            if (fn(gx + ":" + gy)) return true;
+        return false;
+      }
+      function claim(ele) {
+        var bb = ele.boundingBox(LABEL_BOX);
+        if (!(bb.w > 0 && bb.h > 0)) return;
+        // Cytoscape's node label box adds the halo, plate padding and margins
+        // (about 6 units around 13px text); touching halos are not an
+        // overprint, so only the inked text box claims space. A count chip's
+        // opaque plate is what overprints, so it claims its whole box.
+        var inset = ele.isNode() ? 6 : 1;
+        var b = { x1: bb.x1 + inset, y1: bb.y1 + inset, x2: bb.x2 - inset, y2: bb.y2 - inset };
+        if (b.x2 <= b.x1 || b.y2 <= b.y1) b = { x1: bb.x1, y1: bb.y1, x2: bb.x2, y2: bb.y2 };
+        var hit = visit(b, function (key) {
+          var list = grid[key];
+          if (!list) return false;
+          for (var i = 0; i < list.length; i++) {
+            var o = list[i];
+            if (b.x1 < o.x2 && o.x1 < b.x2 && b.y1 < o.y2 && o.y1 < b.y2) return true;
+          }
+          return false;
+        });
+        if (hit) { culled[ele.id()] = true; return; }
+        visit(b, function (key) { (grid[key] || (grid[key] = [])).push(b); return false; });
+      }
+      var labelled = cy.nodes(":visible").filter(function (n) { return !!n.style("label"); }).toArray();
+      labelled = labelled.map(function (n) { return { n: n, p: labelPriority(n), d: degreeOf[n.id()] || 0, id: n.id() }; });
+      labelled.sort(function (a, b) { return (b.p - a.p) || (b.d - a.d) || (a.id < b.id ? -1 : (a.id > b.id ? 1 : 0)); });
+      var chips = cy.edges(".okf-multi-edge:visible").toArray();
+      var i = 0;
+      for (; i < labelled.length && labelled[i].p > 0; i++) claim(labelled[i].n);
+      chips.forEach(claim);
+      for (; i < labelled.length; i++) claim(labelled[i].n);
+      cy.batch(function () {
+        cy.elements(".okf-label-culled").forEach(function (ele) { if (!culled[ele.id()]) ele.removeClass("okf-label-culled"); });
+        Object.keys(culled).forEach(function (id) { cy.getElementById(id).addClass("okf-label-culled"); });
+      });
+    }
+    cy.on("position add remove", scheduleLabelCull);
 
     // Ids within `depth` hops of `root`, over the CURRENTLY-rendered graph
     // (LOD-hidden neighbours are out of scope; documented in the status line).
@@ -3005,6 +3152,7 @@
           if (fr && fr.length) fr.addClass("okf-focus-root");
         }
       });
+      scheduleLabelCull();
     }
 
     // ---- P1 Progressive disclosure: edge elision --------------------------
@@ -3046,6 +3194,7 @@
       });
       updateDensityIndicator();
       updateStatus();
+      scheduleLabelCull();
     }
 
     // Debounced, stale-safe layout rerun. The latest control values always
@@ -3357,13 +3506,26 @@
       var spanX=Math.max(72,targetW-nodeFootprint),spanY=Math.max(90,targetH-labelFootprint);
       var spacingX=columns>1?spanX/(columns-1):0,spacingY=rows>1?spanY/(rows-1):0;
       mobileLabelWidth=Math.max(52,Math.min(150,spacingX-12));
-      cy.style().selector("node").style("text-max-width",mobileLabelWidth).update();
+      cy.style().selector("node").style("text-max-width",mobileLabelWidth).selector(LABEL_PRECEDENCE).style("text-max-width",Math.max(PRECEDENCE_LABEL_WIDTH,mobileLabelWidth)).update();
+      refreshLabelBounds();scheduleLabelCull();
       // Degree first puts hubs centrally; alternating row direction shortens
       // common neighbour routes and deterministically reduces grid crossings.
       var ordered=nodes.toArray().sort(function(a,b){var d=(degreeOf[b.id()]||0)-(degreeOf[a.id()]||0);return d||String(a.id()).localeCompare(String(b.id()));});
       cy.batch(function(){ordered.forEach(function(node,index){var row=Math.floor(index/columns),raw=index%columns,count=Math.min(columns,ordered.length-row*columns),slot=count===3?[0,2,1][raw]:raw,col=row%2?count-1-slot:slot;node.position({x:(col-(count-1)/2)*spacingX,y:(row-(rows-1)/2)*spacingY});});});
     }
-    function syncMobileReadableStyle(){var mobile=isMobileGraphViewport();cy.style().selector("node").style({"font-size":mobile?25:13,"font-weight":mobile?700:600,"line-height":mobile?1.2:1,"min-zoomed-font-size":mobile?10:6,"width":mobile?"mapData(vizSize, 24, 80, 36, 54)":"data(vizSize)","height":mobile?"mapData(vizSize, 24, 80, 36, 54)":"data(vizSize)","text-wrap":"ellipsis","text-max-width":mobile?mobileLabelWidth:90,"text-justification":"center"}).update();}
+    // Cytoscape rasterises a label texture under its new style key on the
+    // first frame after a label restyle, but sizes it from the label bounds
+    // cached under the OLD style until something asks for the bounding box.
+    // A window resize across the 900px readable-label switch therefore baked
+    // the 25px plate box into the 13px texture (and back), stretching every
+    // label until the next restyle. Recompute the bounds synchronously after
+    // each label-dimension restyle so the first texture uses the new box.
+    // useCache:false matters: the renderer only learns the labels are dirty
+    // when it flushes before the next frame, so a cached read here would
+    // re-cache the stale dimensions.
+    function refreshLabelBounds(){var nodes=cy.nodes();if(nodes.length)nodes.boundingBox({includeLabels:true,useCache:false});}
+    var readableStyleKey=null;
+    function syncMobileReadableStyle(){var mobile=isMobileGraphViewport(),key=(mobile?"m":"d")+mobileLabelWidth;if(key===readableStyleKey)return;readableStyleKey=key;cy.style().selector("node").style({"font-size":mobile?25:13,"font-weight":mobile?700:600,"line-height":mobile?1.2:1,"min-zoomed-font-size":mobile?10:6,"width":mobile?"mapData(vizSize, 24, 80, 36, 54)":"data(vizSize)","height":mobile?"mapData(vizSize, 24, 80, 36, 54)":"data(vizSize)","text-wrap":"ellipsis","text-max-width":mobile?mobileLabelWidth:90,"text-justification":"center"}).selector(LABEL_PRECEDENCE).style("text-max-width",Math.max(PRECEDENCE_LABEL_WIDTH,mobileLabelWidth)).update();refreshLabelBounds();scheduleLabelCull();}
     function applyInitialSparseSeed(){
       var nodes=cy.nodes().filter(function(n){return !n.hasClass("dim");});
       if(isMobileGraphViewport()||nodes.length<2||nodes.length>12||controlState.preset!=="map"||controlState.lens!=="map")return;
@@ -3646,7 +3808,7 @@
       [mobileOverviewStatus,densityIndicator].forEach(stampVisibilityProjection);
       mobileOverviewStatus.textContent=visibleEdges+" of "+cy.edges().length+" connection bundles · "+visibleRelationshipInstanceCount()+" of "+relationshipInstanceCount(cy.edges())+" relationship instances · select a concept to inspect its connections";mobileOverviewAll.hidden=false;mobileOverviewAll.textContent=controlState.relationshipDetailOptIn?"Show backbone":"Show all relationships";
       if (!densityIndicator) { updateStatus(); return; }
-      var detailInstruction = " · Graph settings → Show relationship labels reveals all relationships and their labels";
+      var detailInstruction = " · Graph settings → Show relationship labels reveals all relationships and names those of the selected or hovered concept";
       var tierCopy = densityTier === "full"
         ? "Local detail · " + visibleEdges + " of " + cy.edges().length + " relationships (connection bundles) · "+visibleRelationshipInstanceCount()+" relationship instances · node titles remain shortened; use Concepts for full titles" + detailInstruction
         : densityTier === "intermediate"
@@ -4268,7 +4430,9 @@
         markCustom(); applyGrouping(); applyVisualEncoding(); applyFilters(); updateLegend(); updateStatus(); scheduleLayout(false);
       });
         ui.relLabels = checkRow(vfs, "Show relationship labels", controlState.showEdgeLabels, function (c) {
-          controlState.showEdgeLabels = c; controlState.relationEdges = c;
+          // Labels and the complete relationship set only: hue stays the
+          // Relations lens's encoding, so the map keeps its muted palette.
+          controlState.showEdgeLabels = c;
           controlState.relationshipDetailOptIn = c;
            markCustom(); applyVisualEncoding(); applyEdgeLabels(); applyEdgeElision(); reconcileVisibleRelationshipProjection();
           // Cytoscape may defer style/class projection until the current event
@@ -4406,8 +4570,26 @@
     // canvas's right edge it used to be clamped back over the node, so the
     // second click pressed "Explore neighborhood" instead. Prefer the right
     // (the long-standing spot), then the left, then below, then above.
-    function positionActionBar(){var n=interactionState.selected&&cy.getElementById(interactionState.selected);if(!n||!n.length||actionBar.hidden)return;var p=n.renderedPosition(),w=actionBar.offsetWidth,h=actionBar.offsetHeight,W=container.clientWidth,H=container.clientHeight;var off=Math.max(22,Math.max(n.renderedOuterWidth(),n.renderedOuterHeight())/2+8);var left=p.x+off,top=p.y-h/2;if(p.x+off+w>W-8){if(p.x-off-w>=8)left=p.x-off-w;else if(p.y+off+h<=H-8){left=p.x-w/2;top=p.y+off;}else if(p.y-off-h>=8){left=p.x-w/2;top=p.y-off-h;}}actionBar.style.left=Math.max(8,Math.min(W-w-8,left))+"px";actionBar.style.top=Math.max(8,Math.min(H-h-8,top))+"px";}
-    cy.on("pan zoom position",positionActionBar);window.addEventListener("resize",function(){syncActionBarOwner();positionActionBar();});
+    // The floating action bar sits where it hides the least (D2-015): never
+    // over the selected concept or its name, never over the other canvas
+    // chrome (concept list, focus bar, zoom column, minimap), and over as
+    // few nearby concepts as possible. Candidates are tried above, right,
+    // left and below the name; a placement that is still clear is kept while
+    // the reader pans so the bar does not hop between sides.
+    var actionBarSide=null;
+    function positionActionBar(){var n=interactionState.selected&&cy.getElementById(interactionState.selected);if(!n||!n.length||actionBar.hidden||actionBar.parentNode!==container)return;var p=n.renderedPosition(),w=actionBar.offsetWidth,h=actionBar.offsetHeight,W=container.clientWidth,H=container.clientHeight;var off=Math.max(22,Math.max(n.renderedOuterWidth(),n.renderedOuterHeight())/2+8);
+      var name=n.renderedBoundingBox({includeNodes:false,includeEdges:false,includeLabels:true}),below=Math.max(p.y+off,name.y2+8);
+      var c=container.getBoundingClientRect(),chrome=[];Array.prototype.forEach.call(container.querySelectorAll(".okf-node-index > summary, .okf-graph-focusbar:not([hidden]), .okf-graph-zoom, .okf-graph-minimap:not([hidden]), .okf-graph-legend:not([hidden])"),function(el){var r=el.getBoundingClientRect();if(r.width&&r.height)chrome.push({x1:r.left-c.left-4,y1:r.top-c.top-4,x2:r.right-c.left+4,y2:r.bottom-c.top+4});});
+      var near=[],reach=Math.max(w,h)+off+40;cy.nodes(":visible").forEach(function(m){if(m.same(n))return;var q=m.renderedPosition();if(Math.abs(q.x-p.x)>reach+w||Math.abs(q.y-p.y)>reach+h)return;near.push(m.renderedBoundingBox({includeLabels:!m.hasClass("okf-label-culled"),includeEdges:false,includeOverlays:false}));});
+      function hits(a,b){return a.x1<b.x2&&b.x1<a.x2&&a.y1<b.y2&&b.y1<a.y2;}
+      var own={x1:Math.min(p.x-off,name.x1),y1:p.y-off,x2:Math.max(p.x+off,name.x2),y2:name.y2};
+      var candidates=[["above",p.x-w/2,p.y-off-h],["right",p.x+off,p.y-h/2],["left",p.x-off-w,p.y-h/2],["below",p.x-w/2,below],["above-right",p.x-off,p.y-off-h],["above-left",p.x+off-w,p.y-off-h],["below-right",p.x-off,below],["below-left",p.x+off-w,below]],best=null;
+      candidates.forEach(function(cand,order){var left=Math.max(8,Math.min(W-w-8,cand[1])),top=Math.max(8,Math.min(H-h-8,cand[2])),box={x1:left,y1:top,x2:left+w,y2:top+h};var score=(hits(box,own)?1000:0)+chrome.filter(function(r){return hits(box,r);}).length*100+near.filter(function(r){return hits(box,r);}).length*10+order+(left!==cand[1]||top!==cand[2]?5:0);if(cand[0]===actionBarSide&&score<100)score-=20;if(!best||score<best.score)best={side:cand[0],left:left,top:top,score:score};});
+      actionBarSide=best.side;actionBar.dataset.side=best.side;actionBar.style.left=best.left+"px";actionBar.style.top=best.top+"px";}
+    // The bar follows pan, zoom and its own concept at once; other concepts
+    // moving (a running layout fires one event per node) only change which
+    // side is clearest, so those re-placements coalesce to one per frame.
+    var actionBarFrame=0;cy.on("pan zoom",positionActionBar);cy.on("position",function(evt){if(actionBar.hidden)return;if(evt.target&&evt.target.id&&evt.target.id()===interactionState.selected){positionActionBar();return;}if(actionBarFrame)return;actionBarFrame=requestAnimationFrame(function(){actionBarFrame=0;if(!cy.destroyed())positionActionBar();});});window.addEventListener("resize",function(){syncActionBarOwner();positionActionBar();});
     var graphResizeTimer=null,userViewportInteracted=false;
     ["wheel","pointerdown","touchstart"].forEach(function(name){container.addEventListener(name,function(event){if(event.isTrusted&&(event.target.tagName==="CANVAS"||event.target===canvasProxy))userViewportInteracted=true;},{passive:true});});
     function refitGraphViewport(){if(graphResizeTimer)cancelAnimationFrame(graphResizeTimer);graphResizeTimer=requestAnimationFrame(function(){graphResizeTimer=null;if(graphPageActive&&layoutSettled&&container.offsetWidth&&container.offsetHeight){cy.resize();if(!userViewportInteracted){cancelPendingViewportRestore();syncMobileReadableStyle();compactMobileSmallGraph();overlayAwareFit();}positionActionBar();syncMinimap();}});}
@@ -4417,7 +4599,7 @@
     window.addEventListener("pagehide", function () { if (canvasSizeObserver) canvasSizeObserver.disconnect(); if (graphResizeTimer) cancelAnimationFrame(graphResizeTimer); });
     window.addEventListener("pageshow", function (event) { if (event.persisted && canvasSizeObserver) canvasSizeObserver.observe(container); });
     function syncInteractionIndex(){var list=document.getElementById("okf-node-index-list"),activeOption=null;Array.prototype.forEach.call(document.querySelectorAll("#okf-node-index-list .okf-node-index__item"),function(b){var active=b.dataset.target===interactionState.active,selected=b.dataset.target===interactionState.selected;b.classList.toggle("is-active",active);b.setAttribute("aria-selected",selected?"true":"false");if(active)activeOption=b;});if(list&&activeOption)list.setAttribute("aria-activedescendant",activeOption.id);}
-    function renderInteraction(pos){syncActionBarOwner();applyFilters();applyEdgeLabels();applyEdgeElision();renderRelationshipProjection();if(activeBundleEdgeId&&!bundlePanel.hidden){var activeEdge=cy.getElementById(activeBundleEdgeId);if(activeEdge&&activeEdge.length)renderBundleDetail(activeEdge,{focusPanel:false});}syncInteractionIndex();cy.edges().removeClass("okf-unrelated");if(interactionState.selected){var selectedNode=cy.getElementById(interactionState.selected);if(selectedNode.length)cy.edges().not(selectedNode.connectedEdges()).addClass("okf-unrelated");}cy.elements().removeClass("okf-hover-dim");cy.nodes().removeClass("okf-hover");if(interactionState.hovered){var n=cy.getElementById(interactionState.hovered);if(n.length){cy.elements().not(n.closedNeighborhood()).addClass("okf-hover-dim");n.addClass("okf-hover");showHoverTip(n,pos||n.renderedPosition());}}actionBar.hidden=!interactionState.selected;isolateAction.textContent=interactionState.isolated?"Show all":"Hide others";positionActionBar();focusBar.hidden=!(controlState.focusEnabled&&focusRoot);container.classList.toggle("okf-graph-focus-active",!focusBar.hidden);if(!focusBar.hidden){focusCrumb.textContent="Exploring neighborhood around "+((nodeIndex[focusRoot]&&nodeIndex[focusRoot].label)||focusRoot);focusDepth.value=String(controlState.focusDepth);}publishInteractionSnapshot("render");}
+    function renderInteraction(pos){syncActionBarOwner();applyFilters();applyEdgeLabels();applyEdgeElision();renderRelationshipProjection();if(activeBundleEdgeId&&!bundlePanel.hidden){var activeEdge=cy.getElementById(activeBundleEdgeId);if(activeEdge&&activeEdge.length)renderBundleDetail(activeEdge,{focusPanel:false});}syncInteractionIndex();cy.edges().removeClass("okf-unrelated");if(interactionState.selected){var selectedNode=cy.getElementById(interactionState.selected);if(selectedNode.length)cy.edges().not(selectedNode.connectedEdges()).addClass("okf-unrelated");}cy.elements().removeClass("okf-hover-dim");cy.nodes().removeClass("okf-hover");if(interactionState.hovered){var n=cy.getElementById(interactionState.hovered);if(n.length){cy.elements().not(n.closedNeighborhood()).addClass("okf-hover-dim");n.addClass("okf-hover");showHoverTip(n,pos||n.renderedPosition());}}actionBar.hidden=!interactionState.selected;isolateAction.textContent=interactionState.isolated?"Show all":"Hide others";positionActionBar();focusBar.hidden=!(controlState.focusEnabled&&focusRoot);container.classList.toggle("okf-graph-focus-active",!focusBar.hidden);if(!focusBar.hidden){focusCrumb.textContent="Exploring neighborhood around "+((nodeIndex[focusRoot]&&nodeIndex[focusRoot].label)||focusRoot);focusDepth.value=String(controlState.focusDepth);}scheduleLabelCull();publishInteractionSnapshot("render");}
     function restoreInvokerFocus(){var id=interactionState.focusInvoker,target=null,list=document.getElementById("okf-node-index-list");Array.prototype.some.call(document.querySelectorAll("#okf-node-index-list .okf-node-index__item"),function(option){if(option.dataset.target===id){target=option;return true;}return false;});if(id)dispatchInteraction({type:"ACTIVE",id:id,quietUrl:true,source:"neighborhood-restore"});if(target&&target.offsetParent!==null&&list){list.setAttribute("aria-activedescendant",target.id);list.focus();}else canvasProxy.focus();}
     function captureFocusOrigin(id){if(!interactionState.priorLens){var pan=cy.pan();interactionState.priorLens=controlState.lens!=="focus"?controlState.lens:"map";interactionState.priorViewport={zoom:cy.zoom(),pan:{x:pan.x,y:pan.y}};}interactionState.focusInvoker=id||interactionState.focusInvoker;}
     function activateFocusLens(source){captureFocusOrigin(interactionState.selected);if(interactionState.selected)enterFocus(interactionState.selected,source);else{applyLens("focus");renderInteraction();writeInteractionUrl("push");}}
@@ -4612,7 +4794,11 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
     function edgeFlowSet(){var active=cy.edges(":selected");if(edgeFlowHovered&&directionalEdge(edgeFlowHovered))active=active.union(edgeFlowHovered);return active.filter(function(e){return directionalEdge(e);});}
     function stopDirectionalEdgeFlow(){if(edgeFlowFrame){cancelAnimationFrame(edgeFlowFrame);edgeFlowFrame=0;}edgeFlowEpoch++;try{cy.edges().style("line-dash-offset",0);}catch(e){}document.body.removeAttribute("data-okf-edge-flow");}
     function tickDirectionalEdgeFlow(now,epoch){if(epoch!==edgeFlowEpoch||REDUCED_MOTION||edgeFlowLeaseToken||document.hidden)return stopDirectionalEdgeFlow();var edges=edgeFlowSet();if(!edges.length)return stopDirectionalEdgeFlow();edges.style("line-dash-offset",-Math.floor(now/32)%18);document.body.setAttribute("data-okf-edge-flow","active");edgeFlowFrame=requestAnimationFrame(function(next){tickDirectionalEdgeFlow(next,epoch);});}
-    function syncDirectionalEdgeFlow(){stopDirectionalEdgeFlow();if(!REDUCED_MOTION&&!edgeFlowLeaseToken&&edgeFlowSet().length){var epoch=edgeFlowEpoch;edgeFlowFrame=requestAnimationFrame(function(now){tickDirectionalEdgeFlow(now,epoch);});}}
+    // The hovered or selected directional edge is dashed while it is the
+    // flow target, so the moving dash shows direction (and, with reduced
+    // motion, the dash itself is the static cue). Plain links draw solid
+    // otherwise; typed relations keep their own dash pattern.
+    function syncDirectionalEdgeFlow(){stopDirectionalEdgeFlow();var flowing=edgeFlowSet();cy.edges(".okf-edge-flow").difference(flowing).removeClass("okf-edge-flow");flowing.addClass("okf-edge-flow");if(!REDUCED_MOTION&&!edgeFlowLeaseToken&&edgeFlowSet().length){var epoch=edgeFlowEpoch;edgeFlowFrame=requestAnimationFrame(function(now){tickDirectionalEdgeFlow(now,epoch);});}}
     function acquireDirectionalEdgeFlowLease(){var token="edge-flow-capture-"+(++edgeFlowLeaseGeneration);edgeFlowLeaseToken=token;stopDirectionalEdgeFlow();return token;}
     function releaseDirectionalEdgeFlowLease(token){if(token!==edgeFlowLeaseToken)return false;edgeFlowLeaseToken=null;if(!document.hidden)syncDirectionalEdgeFlow();return true;}
     function invalidateDirectionalEdgeFlowLease(){edgeFlowLeaseGeneration++;edgeFlowLeaseToken=null;stopDirectionalEdgeFlow();}
@@ -4819,13 +5005,17 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
 
     var searchInput = document.getElementById("okf-search");
     if (searchInput) {
-      var searchStatus=document.createElement("span");searchStatus.className="okf-graph-search-status";searchInput.insertAdjacentElement("afterend",searchStatus);
+      // Find in graph keeps one row: Clear sits inside the field's end edge
+      // and the match status follows the field (outside its label, so it
+      // reads the query as typed rather than in the label's eyebrow caps).
+      var searchField=searchInput.closest("label")||searchInput.parentNode;searchField.classList.add("okf-graph-search-field");
+      var searchStatus=document.createElement("span");searchStatus.className="okf-graph-search-status";searchField.insertAdjacentElement("afterend",searchStatus);
       var clearSearch=document.createElement("button");clearSearch.type="button";clearSearch.className="okf-graph-search-clear";clearSearch.textContent="Clear";clearSearch.hidden=true;searchInput.insertAdjacentElement("afterend",clearSearch);
       var searchTimer=null;
       function commitSearch() {
         searchTimer=null;
         dispatchInteraction({type:"FILTER_SEARCH",value:searchInput.value,quietUrl:true});
-        var matches=controlState.search?cy.nodes(".okf-search-match").length:cy.nodes().length,total=cy.nodes().length;searchStatus.textContent=controlState.search?(matches?matches+" of "+total+" concepts match":"No concepts match “"+searchInput.value.trim()+"”"):"";clearSearch.hidden=!controlState.search;
+        var matches=controlState.search?cy.nodes(".okf-search-match").length:cy.nodes().length,total=cy.nodes().length;searchStatus.textContent=controlState.search?(matches?matches+" of "+total+" concepts match":"No concepts match “"+searchInput.value.trim()+"”"):"";searchStatus.title=searchStatus.textContent;clearSearch.hidden=!controlState.search;
         updateStatus();
         syncMinimap();
       }
