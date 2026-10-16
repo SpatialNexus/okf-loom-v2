@@ -2527,6 +2527,24 @@ details.okf-frontmatter[open] { padding-bottom: var(--okf-space-2); }
   color: var(--input-text);
   font: 400 16px/1.25 var(--font-body);
 }
+/* Field clear: Chrome's stock search "x" is blue in Bone (a second accent)
+ * and a white glyph in the dark palettes. Where it is the field's only clear
+ * control it becomes a square glyph in palette ink; Find in graph has its own
+ * Clear button, so its native one goes. */
+:is(.okf-shell__search-form, .okf-search-query) input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  inline-size: 12px;
+  block-size: 12px;
+  margin-inline-start: 6px;
+  background: var(--text-2);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 2l8 8M10 2l-8 8' stroke='%23000' stroke-width='1.6'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 2l8 8M10 2l-8 8' stroke='%23000' stroke-width='1.6'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
+  cursor: pointer;
+}
+:is(.okf-shell__search-form, .okf-search-query) input[type="search"]::-webkit-search-cancel-button:hover { background: var(--text); }
+.okf-graph-tools__search input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
 .okf-search-submit {
   min-height: var(--ctl-h);
   margin-left: -1px;
@@ -3471,6 +3489,8 @@ body:has(.okf-graph-loading--error) .okf-cytoscape-fallback-actions { display: f
   /* The joined submit's inset ring sits on that Highlight fill: draw it in
    * the fill's ink, as outside forced colours. */
   .okf-search-query .okf-search-submit:focus-visible { outline: 2px solid HighlightText !important; }
+  /* The masked clear glyph is a background: keep it in system ink. */
+  :is(.okf-shell__search-form, .okf-search-query) input[type="search"]::-webkit-search-cancel-button { forced-color-adjust: none; background: CanvasText; }
   .okf-appearance__opt:has(> input:checked) { forced-color-adjust: none; background: Highlight; color: HighlightText; }
   .okf-appearance__opt:has(> input:checked) :is(.okf-appearance__label, .okf-appearance__sub, .okf-appearance__tag) { color: HighlightText; }
   .okf-appearance__swatch,

@@ -287,6 +287,53 @@ def test_joined_search_focus_ring_hugs_each_part_and_is_never_covered(
             browser.close()
 
 
+# Pixels at the field's clear-glyph end (inside the focus ring): how many are
+# a saturated stock blue, and how many are the palette's --text-2 ink.
+_CLEAR_END_PIXELS = """async ([png, box, ink]) => {
+  const img = new Image(); img.src = 'data:image/png;base64,' + png; await img.decode();
+  const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height;
+  const g = canvas.getContext('2d'); g.drawImage(img, 0, 0);
+  const x0 = Math.ceil(box.x + box.width - 40), y0 = Math.ceil(box.y + 4);
+  const data = g.getImageData(x0, y0, 34, Math.floor(box.height - 8)).data;
+  let blue = 0, inked = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const [r, gr, b] = [data[i], data[i + 1], data[i + 2]];
+    if (b - r > 60 && b > 150) blue++;
+    if (Math.abs(r - ink[0]) + Math.abs(gr - ink[1]) + Math.abs(b - ink[2]) < 60) inked++;
+  }
+  return {blue, inked};
+}"""
+
+
+@pytest.mark.parametrize("route,field,glyph", [
+    ("/tables/orders", ".okf-shell__search-form input", True),
+    ("/__search?q=checkout", "#okf-search-query", True),
+    ("/__graph", "#okf-search", False),
+])
+def test_search_field_clear_glyph_is_palette_ink_not_stock_blue(page, server_url, route, field, glyph):
+    """D1-003/M1-014/D2-013: Chrome's stock clear 'x' is a second, blue accent
+    in Bone. Fields without their own clear control show it in --text-2 ink
+    (it still clears); Find in graph, which has a Clear button, shows none."""
+    page.goto(server_url + route)
+    page.wait_for_function("() => document.documentElement.classList.contains('okf-theme-ready')")
+    assert page.evaluate("document.documentElement.dataset.theme") == "bone"
+    input_ = page.locator(field)
+    input_.click()
+    input_.fill("checkout")
+    input_.hover()
+    ink = page.evaluate("""() => { const n = document.createElement('i'); n.style.color = 'var(--text-2)';
+      document.body.append(n); const c = getComputedStyle(n).color; n.remove(); return c.match(/\\d+/g).slice(0, 3).map(Number); }""")
+    shot = base64.b64encode(page.screenshot()).decode()
+    end = page.evaluate(_CLEAR_END_PIXELS, [shot, input_.bounding_box(), ink])
+    assert end["blue"] == 0, end
+    assert (end["inked"] > 0) is glyph, end
+    if glyph:
+        box = input_.bounding_box()
+        pad = input_.evaluate("n => parseFloat(getComputedStyle(n).paddingRight)")
+        page.mouse.click(box["x"] + box["width"] - pad - 6, box["y"] + box["height"] / 2)
+        expect(input_).to_have_value("")
+
+
 _FIRST_PAINT_CLS = """(() => {
   const shifts = window.__okfPaintShifts = [];
   const record = entries => entries.forEach(entry => {
