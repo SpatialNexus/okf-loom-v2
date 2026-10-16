@@ -205,10 +205,13 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-topbar__controls>*,body.okf-
 .okf-mobile-presence { display: none; }
 @media (prefers-reduced-motion: reduce) { .okf-presence-ghost { transition: none; } }
 @media (max-width: 640px) {
-  .okf-mobile-presence { box-sizing: border-box; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; width: 100%; min-width: 0; padding: 7px 10px; border-bottom: 1px solid var(--okf-border); background: var(--okf-bg); color: var(--okf-fg); }
-  .okf-mobile-presence__text { display: grid; gap: 2px; min-width: 0; font-size: var(--okf-text-xs); font-weight: 700; overflow-wrap: anywhere; white-space: normal; }
-  .okf-mobile-presence__agent, .okf-mobile-presence__collaborators { display: block; }
-  .okf-mobile-presence__text::before { content: "◇"; margin-inline-end: 5px; }
+  /* One status line (two only when a long collaborator summary wraps) beside
+   * its button: the marker leads the agent fact instead of taking a row. */
+  .okf-mobile-presence { box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-width: 0; padding: 4px 10px; border-bottom: 1px solid var(--okf-border); background: var(--okf-bg); color: var(--okf-fg); }
+  .okf-mobile-presence__text { display: block; min-width: 0; font-size: var(--okf-text-xs); font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; white-space: normal; }
+  .okf-mobile-presence__agent, .okf-mobile-presence__collaborators { display: inline; }
+  .okf-mobile-presence__agent::before { content: "◇"; margin-inline-end: 5px; }
+  .okf-mobile-presence__collaborators::before { content: " · "; color: var(--okf-fg-muted); }
   .okf-mobile-presence button { flex: 0 0 auto; min-height: 44px; padding-inline: 10px; border: 1px solid var(--okf-border-strong); background: var(--okf-bg-elev); color: var(--okf-fg); font: inherit; font-weight: 700; }
   .okf-mobile-presence button:focus-visible { outline: 2px solid var(--okf-accent); outline-offset: 2px; }
 }
@@ -1313,8 +1316,8 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
    * (<=900px, isMobileGraphViewport): a labelled row along the canvas's
    * bottom edge, never a block below the full-height canvas. */
   .okf-graph-viewport-toolbar{box-sizing:border-box;position:absolute;left:0;right:0;bottom:0;z-index:26;display:block;width:100%;min-width:0;max-width:100%;padding:6px 8px;border-top:1px solid var(--okf-border);background:var(--okf-bg-elev);overflow:hidden}
-  .okf-graph-viewport-toolbar .okf-graph-zoom{position:static;display:grid;grid-template-columns:repeat(3,minmax(44px,1fr));gap:4px;width:100%;overflow:visible}
-  .okf-graph-viewport-toolbar .okf-graph-zoom button{width:100%;height:44px;min-width:0;padding:2px 4px;gap:4px;box-shadow:none;font-size:11px;font-weight:700;white-space:nowrap}
+  .okf-graph-viewport-toolbar .okf-graph-zoom{position:static;display:grid;grid-template-columns:repeat(6,minmax(44px,1fr));gap:4px;width:100%;overflow:visible}
+  .okf-graph-viewport-toolbar .okf-graph-zoom button{flex-direction:column;width:100%;height:44px;min-width:0;padding:2px 4px;gap:2px;box-shadow:none;font-size:10px;font-weight:700;line-height:1.1;white-space:nowrap}
   .okf-graph-viewport-toolbar .okf-viewport-icon{width:17px;height:17px;flex:0 0 auto}
   .okf-graph-viewport-toolbar .okf-viewport-label{display:inline;min-width:0;overflow:hidden;text-overflow:ellipsis}
   /* Mobile-open feedback loop: stack the panes in normal
@@ -1502,6 +1505,11 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
   .okf-layout[data-mobile-pane="graph"] > .okf-graph{height:50dvh;min-height:422px}
 }
 
+/* Six labelled actions in one row need ~375px ("Full screen" is 53px at
+ * 10px); narrower phones keep two rows of three. */
+@media (max-width: 374px) {
+  .okf-graph-viewport-toolbar .okf-graph-zoom { grid-template-columns: repeat(3,minmax(44px,1fr)); }
+}
 @media (max-width: 360px) {
   .okf-graph-tour__nav { grid-template-columns: repeat(3, minmax(0,1fr)); }
   .okf-graph-tour__dots { grid-column: 1 / -1; }
@@ -1522,10 +1530,6 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
 @media (min-width:641px){.okf-mobile-overview{display:none}}
 
 @media (max-width: 390px) {
-  /* Viewport actions are a single bottom dock on small phones.  Horizontal
-   * overflow is progressive rather than stealing a vertical strip from the
-   * graph; every native button keeps its 44px target. */
-  .okf-graph-viewport-toolbar .okf-graph-zoom { grid-template-columns: repeat(3,minmax(44px,1fr)); }
   .okf-graph-minimap { right: 8px; bottom: 60px; }
 }
 
@@ -1818,6 +1822,26 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
 }
 @media (max-width: 640px) {
   .okf-viewer--graph .okf-graph-route-title { padding: 4px var(--okf-space-3); font-size: var(--okf-text-base); }
+  /* Phone Find in graph is one row: the heading beside its field. The
+   * field's micro-label repeats its placeholder (the input is named by its
+   * aria-label), so it is visually hidden rather than costing a row. */
+  .okf-viewer--graph .okf-graph-tools { align-items: center; padding-block: 6px; }
+  .okf-viewer--graph .okf-graph-tools > h2 { flex: 0 0 auto; align-self: flex-start; }
+  .okf-viewer--graph .okf-graph-tools__search { flex: 1 1 9rem; }
+  .okf-viewer--graph .okf-graph-tools__search > span:first-child {
+    position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden;
+    clip-path: inset(50%); white-space: nowrap;
+  }
+}
+/* At <=340px the shell puts Appearance on its third row (order 2); the
+ * graph-owned rows graph.js docks in the top bar follow it instead of
+ * splitting the global controls. */
+@media (max-width: 340px) {
+  body.okf-viewer--graph .okf-shell > :is(.okf-mobile-presence, .okf-graph-mobile-nav, .okf-mobile-secondary) { order: 3; }
+}
+/* Arrow/Space/Enter instructions do not apply to touch-only devices. */
+@media (hover: none) and (pointer: coarse) {
+  .okf-node-index__hint { display: none; }
 }
 @media (min-width: 641px) {
   /* Unlike document pages, the graph is an application workspace: bound the
@@ -1985,8 +2009,6 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
     flex-wrap: wrap;
   }
   .okf-viewer--graph .okf-graph-focusbar { left: 8px; right: 8px; max-width: none; transform: none; flex-wrap: wrap; }
-  /* One row of viewport actions: the graph actions sit 64px above the edge. */
-  .okf-viewer--graph .okf-graph-viewport-toolbar .okf-graph-zoom { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
   .okf-viewer--graph .okf-graph-detail__body,
   .okf-viewer--graph .okf-graph-detail__body .okf-tablewrap { min-width: 0; max-width: 100%; overflow-x: auto; }
   .okf-viewer--graph .okf-graph-detail__body > .okf-content-scrollport { max-width: 100%; }

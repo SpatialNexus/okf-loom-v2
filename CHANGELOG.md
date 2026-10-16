@@ -12,6 +12,10 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 - Graph route at 641–899px: the Graph pane paints and stays one viewport tall
   (the page no longer grows without bound), with its zoom bar docked on screen.
+- Phone graph chrome is compact: one-line presence row (its button now reads
+  "Collaborators", not a second "Details"), a one-row Find in graph band and a
+  one-row labelled zoom dock from 375px; at 320px Appearance stays beside Studio
+  and touch-only devices drop the arrow-key hint.
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
   including source derivations; the full/tool graph projection is unchanged.
 - Missing or malformed embedded search evidence in single-file exports settles as

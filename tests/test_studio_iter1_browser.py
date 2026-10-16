@@ -4186,7 +4186,7 @@ def test_presence_two_viewers_render_remote_pointer_and_leave(
                 bar = b.locator(".okf-mobile-presence")
                 expect(bar).to_be_visible()
                 expect(bar.locator(".okf-mobile-presence__collaborators")).to_have_text(f"1 collaborator · {label_a} · upper left")
-                bar.get_by_role("button", name="Show collaborator details").click()
+                bar.get_by_role("button", name="Show collaborators").click()
             expect(b.locator(".okf-collaborators")).to_have_attribute("open", "")
             row = _browser_rows(b)
             expect(row).to_have_count(1)

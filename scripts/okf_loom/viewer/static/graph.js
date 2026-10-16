@@ -5705,7 +5705,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
     mobilePresenceBar.className = "okf-mobile-presence";
     mobilePresenceBar.setAttribute("aria-label", "Current collaborators");
     var mobilePresenceText = document.createElement("span"); mobilePresenceText.className = "okf-mobile-presence__text";
-    var mobilePresenceOpen = document.createElement("button"); mobilePresenceOpen.type = "button"; mobilePresenceOpen.textContent = "Details"; mobilePresenceOpen.setAttribute("aria-label", "Show collaborator details"); mobilePresenceOpen.setAttribute("aria-controls", collaboratorSection.id);
+    var mobilePresenceOpen = document.createElement("button"); mobilePresenceOpen.type = "button"; mobilePresenceOpen.textContent = "Collaborators"; mobilePresenceOpen.setAttribute("aria-label", "Show collaborators"); mobilePresenceOpen.setAttribute("aria-controls", collaboratorSection.id);
     mobilePresenceOpen.addEventListener("click", function () { collaboratorSection.open = true; var detailsTab=document.querySelector('[data-graph-pane="details"]'); if(detailsTab)detailsTab.click(); });
     mobilePresenceBar.appendChild(mobilePresenceText); mobilePresenceBar.appendChild(mobilePresenceOpen);
     if (paneNav && paneNav.parentNode && livePresenceHub) paneNav.parentNode.insertBefore(mobilePresenceBar, paneNav.nextSibling);

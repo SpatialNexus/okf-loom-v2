@@ -347,6 +347,58 @@ def test_coarse_pointer_graph_controls_are_44px_targets(page, docs_server_url: s
         context.close()
 
 
+_PHONE_CHROME_JS = """() => {
+  const rect = sel => { const el = document.querySelector(sel); return el && el.getBoundingClientRect(); };
+  const tools = rect('.okf-graph-tools'), heading = rect('.okf-graph-tools > h2'), field = rect('#okf-search');
+  const presence = rect('.okf-mobile-presence'), presenceButton = rect('.okf-mobile-presence button');
+  const dock = [...document.querySelectorAll('.okf-graph-viewport-toolbar button')].map(b => b.getBoundingClientRect());
+  const studio = rect('.okf-shell__studio-slot'), appearance = rect('.okf-shell__appearance'), tabs = rect('.okf-graph-mobile-nav');
+  return {inner: innerHeight, layoutTop: rect('.okf-layout').top, graphTop: rect('#okf-graph').top,
+          toolsHeight: tools.height, headingMid: heading.top + heading.height / 2, fieldMid: field.top + field.height / 2,
+          presenceHeight: presence.height, presenceButtonHeight: presenceButton.height,
+          presenceLabels: [...document.querySelectorAll('.okf-mobile-presence button, [data-graph-pane]')]
+            .map(b => b.textContent.trim()),
+          dockRows: new Set(dock.map(r => Math.round(r.top))).size,
+          studioTop: studio && studio.top, appearanceTop: appearance.top, tabsTop: tabs.top};
+}"""
+
+
+@pytest.mark.parametrize("size", [(390, 844), (320, 568)])
+def test_phone_graph_chrome_leaves_the_viewport_to_the_graph(page, docs_server_url: str, size) -> None:
+    """M1-002/M1-003/M1-004: the phone graph route's own rows stay compact:
+    the presence status is one row whose button is not a second "Details",
+    Find in graph is one row, the viewport actions are one dock row from
+    375px, Appearance stays with the shell above the graph rows at 320, and
+    the graph is on screen at load."""
+    width, height = size
+    context = page.context.browser.new_context(
+        viewport={"width": width, "height": height}, has_touch=True, is_mobile=True)
+    try:
+        phone = context.new_page()
+        phone.add_init_script("try { localStorage.setItem('okfGraphTourDone', '1'); } catch (e) {}")
+        phone.goto(docs_server_url + "/__graph", wait_until="domcontentloaded")
+        phone.wait_for_function("() => window.__okfLoomGraph?.layoutStats?.lastAppliedSeq >= 1")
+        phone.locator('[data-graph-pane="graph"]').click()
+        expect(phone.locator(".okf-mobile-presence__agent")).not_to_be_empty()
+        geo = phone.evaluate(_PHONE_CHROME_JS)
+        assert geo["presenceHeight"] <= geo["presenceButtonHeight"] + 10, geo
+        assert geo["presenceLabels"].count("Details") == 1, geo
+        assert abs(geo["headingMid"] - geo["fieldMid"]) <= 2 and geo["toolsHeight"] <= 70, geo
+        assert geo["graphTop"] <= geo["inner"] - 160, geo
+        if width >= 375:
+            assert geo["dockRows"] == 1, geo
+            assert geo["layoutTop"] <= 0.45 * geo["inner"], geo
+        else:
+            assert geo["appearanceTop"] == geo["studioTop"] and geo["appearanceTop"] < geo["tabsTop"], geo
+        hidden_label = phone.locator(".okf-graph-tools__search > span").first
+        assert hidden_label.evaluate("el => el.getBoundingClientRect().width") <= 1
+        phone.get_by_role("searchbox", name="Search graph concepts").fill("no-such-concept")
+        expect(phone.locator(".okf-graph-search-status")).not_to_be_empty()
+        assert phone.locator(".okf-graph-search-status").evaluate("el => el.getBoundingClientRect().width") > 1
+    finally:
+        context.close()
+
+
 def test_graph_settings_disclosure_matches_its_sibling_summaries(page, docs_server_url: str) -> None:
     """Graph settings opens like Explore with lenses: the native marker on
     the left in body type, not a hidden marker with a trailing glyph; the
