@@ -4478,11 +4478,11 @@ def _render_concept_page(
     # concept's normalized raw source (the canonical source the renderer
     # consumed) — never served disk bytes, never the corpus revision.
     from .annotations import concept_content_rev
+    content_rev = concept_content_rev(concept.raw_text.replace("\r\n", "\n"))
     template = template.replace(
         '</head>',
         _rendered_outline_script(
-            body_html, cid_str,
-            concept_content_rev(concept.raw_text.replace("\r\n", "\n")))
+            body_html, cid_str, content_rev)
         + '</head>', 1)
 
     # Ledger: content types are not colour-coded on the document surfaces.
@@ -4722,9 +4722,11 @@ def _render_concept_page(
     # prev/next follow.
     entity_chips_html = _render_entity_chips(concept, mode=mode, root_prefix=root_prefix)
     long_document = len(_ONTHISPAGE_HEADING_RE.findall(body_html)) >= 8
+    # D1-012: Document details names THIS document's content revision (the
+    # corpus revision is the same on every page).
     infobox_html = _render_infobox(
         concept,
-        revision=revision,
+        revision=content_rev,
         tags_html=tags_html,
         frontmatter_html=frontmatter_html,
         governed_html=governed_html,
@@ -5606,13 +5608,19 @@ def _render_infobox(
     beside its icon; no per-type colour is emitted.
     """
     icon = type_icon_svg(concept.type, size=16, cls="okf-type-icon")
-    rev_short = revision[:8] if revision else ""
+    # Revisions carry a scheme prefix ("section-retrieval-v1:<hash>"); the
+    # first 8 characters of the whole string were the prefix itself, the same
+    # "section-" on every page. Shorten the hash; no hash shows no revision.
+    rev_short = revision.rpartition(":")[2][:8] if revision else ""
+    rev_html = (
+        f'<span class="okf-infobox__rev" title="Content revision {_esc(revision)}">'
+        f'rev\u00a0{_esc(rev_short)}</span>'
+    ) if rev_short else ""
     summary = (
         f'<summary class="okf-infobox__summary">'
         f'<span class="okf-infobox__type">'
         f'{icon} {_esc(concept.type or "concept")}</span>'
-        f'<span class="okf-infobox__rev" title="Content revision {_esc(revision)}">'
-        f'rev\u00a0{_esc(rev_short)}</span>'
+        f'{rev_html}'
         f'</summary>'
     )
     body_parts: list[str] = []

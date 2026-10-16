@@ -3273,6 +3273,27 @@ def test_phase2_infobox_external_to_body(tmp_path: _Path) -> None:
     )
 
 
+def test_document_details_names_each_documents_short_content_revision(tmp_path: _Path) -> None:
+    """D1-012 / M1-013: the summary read "rev section-" on every page (the
+    first 8 characters of the corpus revision's scheme prefix). It now names
+    this document's own content revision, shortened to 8 hex characters."""
+    import hashlib
+    import re
+    sources = {
+        "a.md": "---\ntype: Table\ntitle: A\n---\nalpha\n",
+        "b.md": "---\ntype: Table\ntitle: B\n---\nbeta\n",
+    }
+    bundle = _build_bundle_with(tmp_path, sources)
+    for cid in ("a", "b"):
+        html = _render_concept_html(bundle, cid)
+        full = hashlib.sha256(sources[cid + ".md"].encode("utf-8")).hexdigest()
+        rev = re.search(r'class="okf-infobox__rev" title="Content revision ([^"]+)">rev\u00a0([^<]*)<', html)
+        assert rev, cid
+        assert rev.group(1) == full and rev.group(2) == full[:8], (cid, rev.groups())
+        assert f"<dt>Content revision</dt><dd><code>{full[:8]}</code></dd>" in html
+        assert "rev\u00a0section-" not in html
+
+
 def test_phase2_infobox_contains_tags_and_facts(tmp_path: _Path) -> None:
     """Phase 2: tags moved to the infobox; the frontmatter facts table
     (timestamp + extras) is in the infobox facts disclosure."""

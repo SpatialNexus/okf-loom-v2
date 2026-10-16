@@ -16,6 +16,8 @@ follow [Semantic Versioning](https://semver.org/). The product version
   beside an open Studio rail: below a 780px page the launcher shows only "Studio".
 - The single-row top bar keeps an even rhythm: the Studio launcher is exactly as wide
   as its idle label (no blank slot); longer statuses end in an ellipsis, so nothing moves.
+- Document details shows the document's own short content revision instead of
+  "rev section-" on every page, and no revision when there is none.
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
   including source derivations; the full/tool graph projection is unchanged.
 - Missing or malformed embedded search evidence in single-file exports settles as
