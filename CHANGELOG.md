@@ -11,7 +11,8 @@ follow [Semantic Versioning](https://semver.org/). The product version
 ### Fixed
 
 - Document view tabs no longer slide sideways while you scroll or switch views;
-  Sections keeps a fixed slot, and a focused tab's ring clears the top bar on phones.
+  Sections keeps a stable slot on the same row, and a focused tab's ring clears the
+  top bar on phones.
 - Sections (view-bar menu and the pinned phone row) follows the reading position
   after any jump, opens on the current section with a scroll cue, and no longer
   clips the last entry's focus ring.
@@ -26,7 +27,8 @@ follow [Semantic Versioning](https://semver.org/). The product version
 - Mono text (ids, paths, code) no longer shows Azeret Mono's fi ligature
   ("conf1g"); mono labels also keep tabular figures.
 - Table toolbars match their table's width; dates and other one-token cells stay
-  unbroken, and wide tables scroll in their wrapper on phones.
+  unbroken, and wide tables scroll in their wrapper on phones and in the graph
+  details pane.
 - Skip links and sortable table heads show one focus ring that hugs the control.
 - Document pages draw one hairline between the metadata strip and the tools and
   no blank bands or doubled rules at the page foot.
