@@ -3432,8 +3432,6 @@ body:has(.okf-graph-loading--error) .okf-cytoscape-fallback-actions { display: f
   .okf-search-table td::before { content: attr(data-label); color: var(--text-2); font: 400 11px/1.5 var(--font-mono); }
   .okf-graph-detail__body,
   .okf-graph-detail__body .okf-tablewrap { min-width: 0; max-width: 100%; overflow-x: auto; }
-  .okf-graph-detail__body .okf-table { width: 100%; min-width: 0; table-layout: fixed; }
-  .okf-graph-detail__body .okf-table :is(th, td) { min-width: 0; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
   /* On a phone the read-only note must not push the document out of the
    * first screen: the destination stays in the link's accessible name. */
   .okf-review__where,
