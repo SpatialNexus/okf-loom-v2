@@ -967,8 +967,8 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
 .okf-viewport-icon{width:20px;height:20px;display:block}.okf-graph-zoom button.is-running .okf-viewport-icon{animation:okf-viewport-spin .8s linear infinite}.okf-graph-zoom button.is-failed{border-width:2px;border-color:var(--okf-error);color:var(--okf-error)}@keyframes okf-viewport-spin{to{transform:rotate(360deg)}}
 .okf-viewport-label{display:none}
 .okf-graph-minimap{position:absolute;right:58px;bottom:14px;z-index:24;width:160px;height:116px;background:var(--okf-bg-elev);border:0;border-radius:0;box-shadow:var(--shadow-pop);overflow:hidden;pointer-events:none}.okf-graph-minimap[hidden]{display:none}.okf-graph-minimap>span{display:block;height:16px;padding-inline:5px;font-family:var(--font-label);font-size:var(--label-size);font-weight:var(--label-weight);letter-spacing:var(--label-track);text-transform:uppercase;line-height:16px;color:var(--label-color);background:var(--okf-bg-inset);border-bottom:1px solid var(--okf-border)}.okf-graph-minimap canvas{display:block;width:160px;height:100px}
-.okf-graph-search-status{margin-inline-start:6px;color:var(--okf-fg-muted);font-size:var(--okf-text-xs)}.okf-viewer--graph .okf-graph-search-status:empty{display:none}.okf-graph-search-clear{min-height:32px;margin-inline-start:4px;background:transparent;color:var(--okf-accent);border:0;cursor:pointer}.okf-graph-search-clear[hidden]{display:none}
-@media(max-width:640px){html,body,.okf-viewer--graph,.okf-layout,.okf-layout>.okf-graph,.okf-layout>.okf-detail{box-sizing:border-box;max-width:100%;min-width:0;overflow-x:hidden}.okf-graph-zoom{right:8px;bottom:8px}.okf-graph-zoom button,.okf-filter-chips button,.okf-graph-search-clear{min-width:44px;min-height:44px}.okf-graph-minimap{right:60px;bottom:8px;width:120px;height:92px}.okf-graph-minimap canvas{width:120px;height:76px}.okf-signal__seg{grid-template-columns:1fr}.okf-lens-choice{grid-template-columns:44px minmax(0,1fr)}.okf-lens-preview{width:44px;height:32px}.okf-filter-chip-group{max-width:100%}.okf-filter-chip{min-width:0;overflow-wrap:anywhere}.okf-filter-showall{min-width:88px}.okf-graph-focusbar{top:8px;max-width:calc(100% - 16px)}.okf-graph-actions{max-width:calc(100% - 16px)}.okf-detail-relationships__list{display:grid;grid-template-columns:minmax(0,1fr);width:100%;overflow-x:visible;overscroll-behavior-inline:auto}.okf-detail-relationships__list li{width:100%;max-width:100%;flex:none}.okf-detail-relationships__list button{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:break-word}}
+.okf-graph-search-status{flex:1 1 0;min-width:0;max-width:32rem;overflow:hidden;color:var(--okf-fg-muted);font-size:var(--okf-text-xs);white-space:nowrap;text-overflow:ellipsis}.okf-mobile-secondary__controls .okf-graph-search-status:empty{display:none}.okf-graph-search-field{position:relative}.okf-graph-search-field:has(>.okf-graph-search-clear:not([hidden])) input{padding-inline-end:64px}.okf-graph-search-field input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none;display:none}.okf-graph-tools .okf-graph-search-field>.okf-graph-search-clear{position:absolute;inset-inline-end:1px;bottom:0;width:auto;min-width:44px;max-width:none;height:var(--okf-graph-field-h);min-height:0;margin:0;padding:0 10px;background:transparent;color:var(--text-2);border:0;border-radius:0;font:inherit;font-size:var(--okf-text-xs);cursor:pointer}.okf-graph-search-clear:hover{color:var(--text);text-decoration:underline}.okf-graph-search-clear:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}.okf-graph-search-clear[hidden]{display:none}
+@media(max-width:640px){html,body,.okf-viewer--graph,.okf-layout,.okf-layout>.okf-graph,.okf-layout>.okf-detail{box-sizing:border-box;max-width:100%;min-width:0;overflow-x:hidden}.okf-graph-zoom{right:8px;bottom:8px}.okf-graph-zoom button,.okf-filter-chips button{min-width:44px;min-height:44px}.okf-graph-minimap{right:60px;bottom:8px;width:120px;height:92px}.okf-graph-minimap canvas{width:120px;height:76px}.okf-signal__seg{grid-template-columns:1fr}.okf-lens-choice{grid-template-columns:44px minmax(0,1fr)}.okf-lens-preview{width:44px;height:32px}.okf-filter-chip-group{max-width:100%}.okf-filter-chip{min-width:0;overflow-wrap:anywhere}.okf-filter-showall{min-width:88px}.okf-graph-focusbar{top:8px;max-width:calc(100% - 16px)}.okf-graph-actions{max-width:calc(100% - 16px)}.okf-detail-relationships__list{display:grid;grid-template-columns:minmax(0,1fr);width:100%;overflow-x:visible;overscroll-behavior-inline:auto}.okf-detail-relationships__list li{width:100%;max-width:100%;flex:none}.okf-detail-relationships__list button{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:break-word}}
 @media(max-width:360px){.okf-detail-relationships__list li{grid-template-columns:minmax(0,1fr)}.okf-detail-relationships__key{margin-top:4px}.okf-detail-relationships__key:first-child{margin-top:0}}
 .okf-graph-viewport-toolbar{display:none}
 @media(forced-colors:active){.okf-graph-minimap{border:1px solid CanvasText;background:Canvas}.okf-graph-minimap>span{color:CanvasText;background:Canvas;border-bottom-color:CanvasText}.okf-filter-chip,.okf-filter-solo,.okf-filter-showall,.okf-lens-preview{forced-color-adjust:auto;border:2px solid CanvasText}.okf-filter-chip.is-off{border-style:dashed}.okf-filter-chip.is-off::after{content:" · off"}.okf-filter-chip[aria-pressed=true]{outline:3px double Highlight;box-shadow:none}.okf-lens-preview line,.okf-lens-preview circle,.okf-preview-arrow,.okf-preview-hull,.okf-preview-ring{stroke:CanvasText!important}.okf-lens-preview circle{fill:Canvas!important}.okf-node-index__item.is-active{outline:3px dotted Highlight;outline-offset:-3px}.okf-detail-path__message::before{content:"Highlighted path: ";font-weight:700}.okf-graph-canvas-proxy:focus-visible{outline:4px double Highlight}}
@@ -1698,12 +1698,11 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom { z-index: 40 !im
 /* F06/F07/F16: composite alternatives, progressive identity labels, and a
  * conventional named viewport toolbar.  Options remain programmatically
  * focusable for compatibility, but only each listbox participates in Tab. */
-/* Find in graph: the heading sits on the field's centre line; the field's
- * own label is a mono micro-label above it. */
+/* Find in graph: one row. The heading names the region and sits on the
+ * field's centre line; the field carries its own accessible name. */
 .okf-viewer--graph .okf-graph-tools > h2 {
   display: flex;
   align-items: center;
-  align-self: end;
   min-height: var(--okf-graph-field-h);
   margin: 0;
   font-family: var(--font-body);
@@ -1831,12 +1830,13 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
 }
 .okf-viewer--graph .okf-graph-tools {
   display: flex;
-  align-items: end;
+  align-items: center;
   flex-wrap: wrap;
   gap: 6px var(--okf-space-4);
   width: 100%;
   min-width: 0;
-  padding: 10px max(var(--okf-space-4), calc((100vw - var(--okf-page-maxw, 1320px)) / 2)) 12px;
+  /* The band shares the route title's 20px gutter at every desktop width. */
+  padding: 10px 20px;
   border-bottom: 1px solid var(--okf-border);
   background: var(--okf-bg-inset);
 }
@@ -1917,7 +1917,6 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
   .okf-viewer--graph .okf-graph-tools {
     padding-inline: var(--okf-space-3);
   }
-  .okf-graph-tools__search { flex-basis: 100%; }
   .okf-graph-tools__filter { flex: 1 1 10rem; }
   .okf-graph-tools__reset { flex: 0 1 auto; min-width: 44px; }
   .okf-viewer--graph .okf-graph-mobile-nav {

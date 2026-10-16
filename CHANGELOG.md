@@ -16,6 +16,10 @@ follow [Semantic Versioning](https://semver.org/). The product version
   full title draws above its edges on a `--surface` plate, incident edges pass
   behind names, and lower-priority labels and count chips that would collide
   are hidden (D2-006).
+- Find in graph is one stable row on the route's 20px gutter: typing no longer
+  grows the band or moves the canvas, Clear sits inside the field (the native
+  cancel glyph is gone), the status quotes the query as typed, and the field is
+  labelled once (D2-007, T1-007).
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
   including source derivations; the full/tool graph projection is unchanged.
 - Missing or malformed embedded search evidence in single-file exports settles as

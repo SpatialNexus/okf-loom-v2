@@ -4943,13 +4943,17 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
 
     var searchInput = document.getElementById("okf-search");
     if (searchInput) {
-      var searchStatus=document.createElement("span");searchStatus.className="okf-graph-search-status";searchInput.insertAdjacentElement("afterend",searchStatus);
+      // Find in graph keeps one row: Clear sits inside the field's end edge
+      // and the match status follows the field (outside its label, so it
+      // reads the query as typed rather than in the label's eyebrow caps).
+      var searchField=searchInput.closest("label")||searchInput.parentNode;searchField.classList.add("okf-graph-search-field");
+      var searchStatus=document.createElement("span");searchStatus.className="okf-graph-search-status";searchField.insertAdjacentElement("afterend",searchStatus);
       var clearSearch=document.createElement("button");clearSearch.type="button";clearSearch.className="okf-graph-search-clear";clearSearch.textContent="Clear";clearSearch.hidden=true;searchInput.insertAdjacentElement("afterend",clearSearch);
       var searchTimer=null;
       function commitSearch() {
         searchTimer=null;
         dispatchInteraction({type:"FILTER_SEARCH",value:searchInput.value,quietUrl:true});
-        var matches=controlState.search?cy.nodes(".okf-search-match").length:cy.nodes().length,total=cy.nodes().length;searchStatus.textContent=controlState.search?(matches?matches+" of "+total+" concepts match":"No concepts match “"+searchInput.value.trim()+"”"):"";clearSearch.hidden=!controlState.search;
+        var matches=controlState.search?cy.nodes(".okf-search-match").length:cy.nodes().length,total=cy.nodes().length;searchStatus.textContent=controlState.search?(matches?matches+" of "+total+" concepts match":"No concepts match “"+searchInput.value.trim()+"”"):"";searchStatus.title=searchStatus.textContent;clearSearch.hidden=!controlState.search;
         updateStatus();
         syncMinimap();
       }

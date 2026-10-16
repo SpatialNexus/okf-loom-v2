@@ -443,6 +443,58 @@ def test_selected_label_takes_precedence_and_overprints_are_culled(page, docs_se
     assert not page.evaluate("() => window.__okfLoomGraph.cy.$(':selected').hasClass('okf-label-culled')")
 
 
+_FIND_BAND_JS = """() => {
+  const rect = s => { const e = document.querySelector(s); const b = e.getBoundingClientRect();
+    return {x: b.left, y: b.top, w: b.width, h: b.height, r: b.right, b: b.bottom, visible: b.width > 0 && getComputedStyle(e).visibility !== 'hidden'}; };
+  const input = document.querySelector('#okf-search');
+  const status = document.querySelector('.okf-graph-search-status');
+  return {band: rect('.okf-graph-tools'), heading: rect('.okf-graph-tools > h2'), input: rect('#okf-search'),
+          clear: rect('.okf-graph-search-clear'), title: rect('.okf-graph-route-title'), canvas: rect('#okf-graph'),
+          status: status.textContent, statusCase: getComputedStyle(status).textTransform,
+          clearButtons: [...document.querySelectorAll('.okf-graph-tools button')].filter(b => b.offsetParent && /clear/i.test(b.textContent)).length};
+}"""
+
+
+@pytest.mark.parametrize("width", [900, 1440])
+def test_find_in_graph_band_stays_put_while_typing(page, docs_server_url: str, width: int) -> None:
+    """D2-007: typing in Find in graph never moves the band, heading or
+    canvas; there is one clear control; the status quotes the query as typed."""
+    _open(page, docs_server_url, width)
+    search = page.get_by_role("searchbox", name="Search graph concepts")
+    idle = page.evaluate(_FIND_BAND_JS)
+    # The heading shares the field's centre line on the route's gutter.
+    assert abs((idle["heading"]["y"] + idle["heading"]["h"] / 2) - (idle["input"]["y"] + idle["input"]["h"] / 2)) <= 1, idle
+    assert idle["heading"]["x"] == idle["band"]["x"] + (20 if width > 900 else 12), idle
+    for query in ["spec", "zzqqXX", "a deliberately long query that runs well past the end of the field"]:
+        search.fill(query)
+        page.wait_for_function("q => document.querySelector('.okf-graph-search-status').textContent !== '' && window.__okfLoomGraph.getState", arg=query)
+        page.wait_for_timeout(250)
+        typed = page.evaluate(_FIND_BAND_JS)
+        for part in ("band", "heading", "input", "title", "canvas"):
+            assert typed[part] == idle[part], (query, part, idle[part], typed[part])
+        assert typed["clearButtons"] == 1, typed
+        clear, field = typed["clear"], typed["input"]
+        assert field["x"] < clear["x"] and clear["r"] <= field["r"] and clear["y"] >= field["y"] and clear["b"] <= field["b"], typed
+        assert typed["statusCase"] == "none", typed
+        if query == "zzqqXX":
+            assert typed["status"] == "No concepts match \u201czzqqXX\u201d", typed
+    # Chrome paints its own cancel glyph in a hovered search field with a
+    # value; the field's end must look the same with that glyph suppressed.
+    search.fill("spec")
+    search.hover()
+    page.wait_for_timeout(200)
+    field = page.evaluate(_FIND_BAND_JS)["input"]
+    end = {"x": field["x"] + field["w"] / 2, "y": field["y"] + 1, "width": field["w"] / 2 - 1, "height": field["h"] - 2}
+    painted = page.screenshot(clip=end)
+    page.add_style_tag(content="#okf-search::-webkit-search-cancel-button{display:none!important}")
+    page.wait_for_timeout(100)
+    assert page.screenshot(clip=end) == painted, "native search cancel button still paints beside Clear"
+    page.get_by_role("button", name="Clear", exact=True).click()
+    expect(search).to_have_value("")
+    expect(search).to_be_focused()
+    assert page.evaluate(_FIND_BAND_JS)["band"] == idle["band"]
+
+
 def test_single_file_short_canvas_keeps_zoom_clear_of_concept_index(tmp_path, page) -> None:
     """With the Search & context drawer open the single-file canvas is short:
     the zoom controls become a bottom-left row and never cover All concepts;
