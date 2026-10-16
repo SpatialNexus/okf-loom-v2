@@ -2864,7 +2864,8 @@ details.okf-frontmatter[open] { padding-bottom: var(--okf-space-2); }
 .okf-search-live__empty { padding: var(--okf-space-4) var(--okf-space-3); color: var(--text-2); font-size: var(--okf-text-sm); }
 
 /* F20 non-colour projections for structured alternatives. */
-.okf-search-live__option[aria-selected="true"]::before { content: "Selected · "; font-weight: 700; }
+/* aria-selected announces suggestion state without adding a grid row.
+ * Forced colours uses the inset double outline below, not generated text. */
 a[data-okf-broken]::after { content: " (broken link)"; font-size: var(--okf-text-xs); font-weight: 700; }
 [data-attention="pending"]::after { content: " · Needs attention"; font-weight: 700; }
 [data-attention="failure"]::after { content: " · Error"; font-weight: 700; }

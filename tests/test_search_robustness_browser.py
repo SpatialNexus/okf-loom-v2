@@ -215,6 +215,28 @@ def test_live_suggestion_evidence_reads_as_plain_text_around_the_highlighted_mat
     _assert_clean(page)
 
 
+@pytest.mark.parametrize("theme", ["bone", "slate"])
+@pytest.mark.parametrize("forced", [False, True], ids=["normal", "forced-colors"])
+def test_search_suggestion_selection_keeps_every_row_height(live_url: str, page, theme: str, forced: bool) -> None:
+    page.add_init_script(f"localStorage.setItem('okf-loom.appearance', '{theme}')")
+    if forced:
+        page.emulate_media(forced_colors="active")
+    page.goto(live_url + "/")
+    search = page.locator(".okf-shell__search-form input[name='q']")
+    search.fill("orders")
+    live = page.get_by_role("listbox", name="Search suggestions")
+    expect(live).to_be_visible()
+    options = live.get_by_role("option")
+    heights = options.evaluate_all("nodes => nodes.map(n => n.getBoundingClientRect().height)")
+    assert len(heights) > 1
+    for index in range(len(heights)):
+        search.press("ArrowDown")
+        expect(options.nth(index)).to_have_attribute("aria-selected", "true")
+        expect(search).to_have_attribute("aria-activedescendant", options.nth(index).get_attribute("id"))
+        assert options.evaluate_all("nodes => nodes.map(n => n.getBoundingClientRect().height)") == heights
+        assert options.nth(index).evaluate("n => getComputedStyle(n, '::before').content") in ("none", "normal")
+
+
 @pytest.mark.parametrize("query", QUERIES, ids=QUERY_IDS)
 def test_live_search_page_box_treats_metacharacters_as_text(live_url: str, page, query: str) -> None:
     page.goto(live_url + "/__search")
