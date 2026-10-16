@@ -306,6 +306,15 @@
   var graphTools=document.querySelector(".okf-graph-tools");
   var graphToolsHome=graphTools&&document.createComment("okf graph tools home");
   if(graphTools&&graphTools.parentNode)graphTools.parentNode.insertBefore(graphToolsHome,graphTools);
+  /* M1-002: on short coarse viewports (graph.css "short coarse" block) the
+     Find band and the phone presence row fold behind one Tools disclosure at
+     the end of the pane-tab row, so the canvas keeps the viewport. Elsewhere
+     CSS hides the toggle and the band is always shown. Opening it moves focus
+     to the search field, the band's first control. */
+  var graphToolsToggle=null;
+  function setGraphToolsOpen(open,focusField){document.body.toggleAttribute("data-okf-graph-tools-open",open);if(graphToolsToggle)graphToolsToggle.setAttribute("aria-expanded",open?"true":"false");if(open&&focusField){var field=document.getElementById("okf-search");if(field)field.focus({preventScroll:true});}}
+  function graphToolsFolded(){return !!(graphToolsToggle&&graphToolsToggle.offsetParent!==null&&!document.body.hasAttribute("data-okf-graph-tools-open"));}
+  if(paneNav&&graphTools&&!window.BUNDLE){if(!graphTools.id)graphTools.id="okf-graph-tools";graphToolsToggle=document.createElement("button");graphToolsToggle.type="button";graphToolsToggle.className="okf-graph-tools-toggle";graphToolsToggle.setAttribute("aria-expanded","false");graphToolsToggle.setAttribute("aria-controls",graphTools.id);graphToolsToggle.textContent="Tools";paneNav.appendChild(graphToolsToggle);graphToolsToggle.addEventListener("click",function(){setGraphToolsOpen(!document.body.hasAttribute("data-okf-graph-tools-open"),true);});}
     (function buildMobileSecondaryChrome(){var topbar=document.querySelector(".okf-topbar");if(!topbar||!graphTools)return;mobileSecondary=document.createElement("section");mobileSecondary.className="okf-mobile-secondary";mobileSecondary.setAttribute("aria-label","Graph tools and status");mobileSecondaryRow=document.createElement("div");mobileSecondaryRow.className="okf-mobile-secondary__summary";mobileSecondaryToggle=document.createElement("button");mobileSecondaryToggle.type="button";mobileSecondaryToggle.className="okf-mobile-secondary__toggle";mobileSecondaryToggle.setAttribute("aria-expanded","false");mobileSecondaryToggle.setAttribute("aria-controls","okf-mobile-secondary-controls");mobileSecondaryToggle.textContent="More tools";mobileSecondaryPanel=document.createElement("div");mobileSecondaryPanel.id="okf-mobile-secondary-controls";mobileSecondaryPanel.className="okf-mobile-secondary__controls";mobileSecondaryPanel.hidden=true;mobileSecondary.appendChild(mobileSecondaryRow);mobileSecondary.appendChild(mobileSecondaryPanel);topbar.appendChild(mobileSecondary);mobileSecondaryToggle.addEventListener("click",function(){var open=mobileSecondaryPanel.hidden;mobileSecondaryPanel.hidden=!open;mobileSecondaryToggle.setAttribute("aria-expanded",open?"true":"false");mobileSecondaryToggle.textContent=open?"Fewer tools":"More tools";});})();
   function syncCriticalMobileChrome(narrow){if(!mobileSecondaryRow)return;var focused=document.activeElement,moved=false,topbar=document.querySelector(".okf-topbar");function place(parent,node,before){if(!parent||!node)return;if(node.parentNode===parent&&node.nextSibling===before)return;parent.insertBefore(node,before);moved=true;}function placeAfter(anchor,node){if(!anchor||!anchor.parentNode||!node)return;if(node.parentNode===anchor.parentNode&&node.previousSibling===anchor)return;anchor.parentNode.insertBefore(node,anchor.nextSibling);moved=true;}if(narrow){/* Keep three explicit chrome layers in source and visual order: brand,
      pane tabs, then secondary utilities. Search/filter/reset remain available
@@ -3260,7 +3269,7 @@
       var densityR = rel(densityIndicator);
       if (densityR) ins.top = Math.max(ins.top, densityR.b + 10);
       var focusR=rel(typeof focusBar!=="undefined"?focusBar:null);if(focusR)ins.top=Math.max(ins.top,focusR.b+12);
-      var viewportR=rel(container.querySelector(".okf-graph-zoom"));if(viewportR){if(isMobileGraphViewport()&&cw<=390)ins.bottom=Math.max(ins.bottom,ch-viewportR.t+10);else ins.right=Math.max(ins.right,cw-viewportR.l+10);}
+      var viewportR=rel(container.querySelector(".okf-graph-zoom"));/* The docked viewport actions are a full-width bottom row at every compact width (landscape phones included), not a right-hand column. */if(viewportR){if(isMobileGraphViewport()&&(cw<=390||viewportR.r-viewportR.l>cw*0.6))ins.bottom=Math.max(ins.bottom,ch-viewportR.t+10);else ins.right=Math.max(ins.right,cw-viewportR.l+10);}
       var minimapR=rel(container.querySelector(".okf-graph-minimap"));if(minimapR)ins.right=Math.max(ins.right,cw-minimapR.l+10);
       // Phase 3: reserve bottom space for the labelled orphan shelf so the
       // fcose-tiled orphans do not underlap the shelf's bottom-edge chrome.
@@ -4918,7 +4927,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
         e.preventDefault(); cancelPendingViewportRestore();overlayAwareFit();
       } else if (e.key === "/") {
         var si = document.getElementById("okf-search");
-        if (si) { e.preventDefault(); si.focus(); }
+        if (si) { e.preventDefault(); if (graphToolsFolded()) setGraphToolsOpen(true, false); si.focus(); }
       } else if (e.key === "Escape") {
         e.preventDefault();
         clearLocalInteraction();
@@ -5893,12 +5902,16 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
     if (detailPane && livePresenceHub) detailPane.appendChild(collaboratorRegion);
     var mobilePresenceBar = document.createElement("aside");
     mobilePresenceBar.className = "okf-mobile-presence";
+    mobilePresenceBar.id = "okf-mobile-presence";
     mobilePresenceBar.setAttribute("aria-label", "Current collaborators");
     var mobilePresenceText = document.createElement("span"); mobilePresenceText.className = "okf-mobile-presence__text";
     var mobilePresenceOpen = document.createElement("button"); mobilePresenceOpen.type = "button"; mobilePresenceOpen.textContent = "Collaborators"; mobilePresenceOpen.setAttribute("aria-label", "Show collaborators"); mobilePresenceOpen.setAttribute("aria-controls", collaboratorSection.id);
     mobilePresenceOpen.addEventListener("click", function () { collaboratorSection.open = true; var detailsTab=document.querySelector('[data-graph-pane="details"]'); if(detailsTab)detailsTab.click(); });
     mobilePresenceBar.appendChild(mobilePresenceText); mobilePresenceBar.appendChild(mobilePresenceOpen);
-    if (paneNav && paneNav.parentNode && livePresenceHub) paneNav.parentNode.insertBefore(mobilePresenceBar, paneNav.nextSibling);
+    if (paneNav && paneNav.parentNode && livePresenceHub) {
+      paneNav.parentNode.insertBefore(mobilePresenceBar, paneNav.nextSibling);
+      if (graphToolsToggle) graphToolsToggle.setAttribute("aria-controls", graphToolsToggle.getAttribute("aria-controls") + " okf-mobile-presence");
+    }
     var ghostNodes = Object.create(null);
     var overflowGhost = null;
     var lastPresenceSnapshot = null, presenceRenderFrame = null;
@@ -6221,7 +6234,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
                 var deletedWasFocusRoot=controlState.focusEnabled&&focusRoot===selectedConceptId;
                 dispatchInteraction({type:"CLEAR",quietUrl:true});
                 if(deletedWasFocusRoot)reconcileDeletedFocus();
-                var survivor = document.getElementById("okf-search") || document.querySelector("[data-graph-pane]");
+                var survivor = (!graphToolsFolded() && document.getElementById("okf-search")) || document.querySelector("[data-graph-pane]");
                 if (survivor) survivor.focus();
               }
               if(interactionState.active&&!freshIds[interactionState.active]){interactionState.active=null;syncInteractionIndex();}
