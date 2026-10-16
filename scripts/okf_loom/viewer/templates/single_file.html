@@ -250,12 +250,18 @@ window.OKF_LOOM_INITIAL_LAYOUT = "__INITIAL_LAYOUT__";
     /* A plain container (the concept article) is not focusable on its own,
      * so focus() was a silent no-op and keyboard focus stayed on <body>. */
     if (target.tabIndex < 0 && !target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
-    target.scrollIntoView({block: "start"});
+    var detail = document.getElementById("okf-detail");
+    /* The workspace's panes, not every ancestor up to the window, own
+     * scrolling. Native scrollIntoView can move the whole viewport past
+     * the top bar when a long embedded article overflows the detail pane. */
+    if (detail && detail.contains(target)) detail.scrollTop = 0;
+    else if (!graph.contains(target)) target.scrollIntoView({block: "start"});
     target.focus({preventScroll: true});
   }
   function select(destination, focus, historyMode) {
     var graphSelected = destination !== "index";
     var conceptSelected = destination === "concept";
+    var leavingIndex = !index.hidden && graphSelected;
     index.hidden = graphSelected;
     graph.hidden = !graphSelected;
     /* The graph is a viewport-bound application workspace; the Index is an
@@ -263,6 +269,7 @@ window.OKF_LOOM_INITIAL_LAYOUT = "__INITIAL_LAYOUT__";
      * so every entry stays reachable by wheel, keyboard and touch. */
     document.body.dataset.okfSingleDestination = destination;
     if (tools) tools.hidden = !graphSelected;
+    if (leavingIndex) window.scrollTo({top: 0, left: 0, behavior: "instant"});
     if (graphSelected) {
       indexLink.removeAttribute("aria-current");
       graphLink.setAttribute("aria-current", "page");

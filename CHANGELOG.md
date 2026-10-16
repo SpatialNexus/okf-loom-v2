@@ -10,6 +10,8 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Opening a single-file Index concept resets only its detail pane and focuses
+  without scrolling the graph workspace or hiding its top bar.
 - Portable builds use the configured viewer title consistently across Index,
   documents, Graph, Search and the single-file viewer, without client-side renaming.
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,

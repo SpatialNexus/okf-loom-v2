@@ -4129,6 +4129,51 @@ def test_graph_detail_accessible_order_controls_and_focus_provenance(server_url:
     assert page.evaluate("() => document.activeElement.className") == focused_before
 
 
+@pytest.mark.parametrize("width,height", [(1440, 900), (1280, 800)])
+@pytest.mark.parametrize("theme", ["bone", "plum"])
+def test_single_file_index_navigation_scrolls_only_the_detail_pane(
+    tmp_path: Path, page, width: int, height: int, theme: str,
+) -> None:
+    """Pointer and keyboard Index opens keep chrome/canvas inside the viewport."""
+    from okf_loom import Bundle
+    from okf_loom.render import build_site
+
+    out = tmp_path / "single"
+    build_site(Bundle.load(DOCS_BUNDLE), out, target="single-file", assets="offline")
+    page.set_viewport_size({"width": width, "height": height})
+    page.add_init_script(f"localStorage.setItem('okf-loom.appearance', '{theme}')")
+    page.goto((out / "index.html").as_uri(), wait_until="load")
+    page.wait_for_function("() => !!window.__okfLoomGraph?.cy")
+    entry = page.locator('[data-okf-single-concept="how-to/archive_threads"]')
+    for activation in ("pointer", "keyboard"):
+        entry.scroll_into_view_if_needed()
+        assert page.evaluate("() => scrollY") > 0, "exercise the document-scrolled Index"
+        if activation == "keyboard":
+            entry.focus()
+            entry.press("Enter")
+        else:
+            entry.click()
+        expect(page.locator("#detail-content")).to_be_focused()
+        expect(page.locator("#detail-title")).to_have_text("Archive and resolve comment threads")
+        geometry = page.evaluate("""() => {
+          const pane=document.getElementById('okf-detail');
+          return {scrollY, top:document.querySelector('.okf-topbar').getBoundingClientRect().top,
+            graphBottom:document.getElementById('okf-graph').getBoundingClientRect().bottom,
+            paneBottom:pane.getBoundingClientRect().bottom, paneScroll:pane.scrollTop,
+            paneHeight:pane.clientHeight, contentHeight:pane.scrollHeight};
+        }""")
+        assert geometry["scrollY"] == geometry["top"] == geometry["paneScroll"] == 0, geometry
+        assert geometry["graphBottom"] <= height + 1, geometry
+        assert geometry["paneBottom"] <= height + 1, geometry
+        assert geometry["contentHeight"] > geometry["paneHeight"], geometry
+        page.locator("#okf-detail").evaluate("el => el.scrollTop = 400")
+        assert page.locator("#okf-detail").evaluate("el => el.scrollTop") > 0
+        assert page.evaluate("() => scrollY") == 0
+        page.go_back()
+        expect(page.locator("#okf-single-index")).to_be_visible()
+        expect(page.locator("#okf-main")).to_be_hidden()
+
+
 def test_single_file_graph_detail_hierarchy_and_keyboard_focus(tmp_path: Path, page) -> None:
     """The portable viewer uses the same detail order, naming, and focus contract."""
     from okf_loom import Bundle
