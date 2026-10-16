@@ -30,7 +30,6 @@ follow [Semantic Versioning](https://semver.org/). The product version
 - Skip links and sortable table heads show one focus ring that hugs the control.
 - Document pages draw one hairline between the metadata strip and the tools and
   no blank bands or doubled rules at the page foot.
-- Split view uses the page width beside Related instead of the reading column.
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
   including source derivations; the full/tool graph projection is unchanged.
 - Missing or malformed embedded search evidence in single-file exports settles as
