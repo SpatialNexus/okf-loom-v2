@@ -564,6 +564,23 @@ def test_relationship_labels_name_only_the_focused_neighbourhood(page, docs_serv
     assert selected["hues"] == 1, selected
 
 
+def test_hub_halo_clears_its_label_and_fades_with_its_node(page, docs_server_url: str) -> None:
+    """D2-014: the hub halo ends above the hub's label and fades with the
+    node when a search or filter ghosts it."""
+    _open(page, docs_server_url, 1440)
+    hubs = page.evaluate("""() => window.__okfLoomGraph.cy.nodes('.okf-hub').map(n => {
+      const label = n.boundingBox({includeNodes: false, includeEdges: false, includeLabels: true});
+      return {halo: n.position('y') + n.height() / 2 + parseFloat(n.style('underlay-padding')),
+              text: label.y1 + 6, opacity: Number(n.style('underlay-opacity'))}; })""")
+    assert hubs and all(h["halo"] <= h["text"] and h["opacity"] == 1 for h in hubs), hubs
+    page.get_by_role("searchbox", name="Search graph concepts").fill("zzqqxx")
+    page.wait_for_function("() => window.__okfLoomGraph.cy.nodes('.okf-search-nonmatch').length > 0")
+    page.wait_for_timeout(200)
+    faded = page.evaluate("""() => window.__okfLoomGraph.cy.nodes('.okf-hub').map(n =>
+      [Number(n.style('underlay-opacity')), Number(n.style('opacity'))])""")
+    assert faded and all(halo <= node for halo, node in faded), faded
+
+
 def test_single_file_short_canvas_keeps_zoom_clear_of_concept_index(tmp_path, page) -> None:
     """With the Search & context drawer open the single-file canvas is short:
     the zoom controls become a bottom-left row and never cover All concepts;

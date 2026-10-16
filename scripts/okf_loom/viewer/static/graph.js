@@ -2073,11 +2073,13 @@
         // accent); non-colour-only cue (size/icon still carry identity), and
         // it composes with .okf-bridge / .okf-focus-root / .okf-presence-halo
         // (those set their own underlay/border and win on z-index). Computed
-        // deterministically by degree rank (see applyVisualEncoding).
+        // deterministically by degree rank (see applyVisualEncoding). The
+        // 3px padding keeps the square above the label, which starts 4px
+        // below the disc (a 7px halo cut through the first letters).
         { selector: "node.okf-hub", style: {
                 "underlay-color": INITIAL_GRAPH_PALETTE.raised,
             "underlay-opacity": 1,
-            "underlay-padding": 7,
+            "underlay-padding": 3,
             "underlay-corner-radius": 0,
         } },
         // Phase 3: broken-link indicator. Nodes whose outgoing links
@@ -2162,6 +2164,13 @@
         } },
         // Non-neighbour dim during focus is stronger (~12%); reviewer asked ≤30%.
         { selector: ".dim", style: { opacity: 0.12 } },
+        // A node's opacity does not reach its underlay, so the structural
+        // hub and bridge halos fade with their faded node explicitly instead
+        // of leaving solid squares on a ghosted canvas (D2-014). The
+        // strongest fade is last, so it wins when fades combine.
+        { selector: "node.okf-hub.okf-search-nonmatch, node.okf-bridge.okf-search-nonmatch", style: { "underlay-opacity": 0.25 } },
+        { selector: "node.okf-hub.okf-hover-dim, node.okf-bridge.okf-hover-dim", style: { "underlay-opacity": 0.18 } },
+        { selector: "node.okf-hub.dim, node.okf-hub.okf-path-dim, node.okf-bridge.dim, node.okf-bridge.okf-path-dim", style: { "underlay-opacity": 0.12 } },
         // iter1 CRI-004: presence halo. When the agent's presence.focus
         // points at a concept, graph.js adds this class to that node so the
         // agent is spatially visible on the canvas, not just in the status
