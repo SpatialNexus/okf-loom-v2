@@ -7248,7 +7248,10 @@
       link.appendChild(time);
       li.appendChild(link); list.appendChild(li);
     });
-    rail.appendChild(list); hero.appendChild(rail);
+    // D1-013: the rail belongs to the left column, so it precedes the visual
+    // column (spotlight, graph preview) in DOM and Tab order, as rendered.
+    rail.appendChild(list);
+    hero.insertBefore(rail, hero.querySelector(":scope > .okf-hero__visual"));
     if (focusedConceptId) {
       const restored = rail.querySelector('li[data-concept-id="' + cssEscape(focusedConceptId) + '"] a');
       const cardFallback = document.querySelector('.okf-card[data-concept-id="' + cssEscape(focusedConceptId) + '"] a.okf-card__link');

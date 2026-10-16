@@ -1142,6 +1142,26 @@ def test_masthead_stays_one_row_beside_the_studio_rail_and_counts_do_not_move_it
     assert failures == []
 
 
+def test_home_recently_changed_precedes_the_spotlight_column_in_tab_order(page, server_url: str) -> None:
+    """D1-013: the recent rail sits in the left column but came after the
+    right-hand spotlight in the DOM, so Tab jumped right, then back left and
+    up. Server and live rails now precede the visual column."""
+    page.set_viewport_size({"width": 1440, "height": 900})
+    page.goto(server_url + "/")
+    page.wait_for_function("() => window.okfLoomStudio && window.okfLoomStudio.state.eventsReady")
+    page.evaluate("""() => window.okfLoomLive.emit('activity', {id: 'tab-order-1', event_id: 'tab-order-1',
+      type: 'activity', actor: 'agent', action: 'replace_text', ids: ['tables/orders'], ts: new Date().toISOString()})""")
+    page.wait_for_selector("#okf-recent-rail li a")
+    order = page.evaluate("""() => {
+      const rail = document.querySelector('#okf-recent-rail li a');
+      const spot = [...document.querySelectorAll('.okf-hero__visual a, .okf-hero__visual summary')][0];
+      const r = rail.getBoundingClientRect(), s = spot.getBoundingClientRect();
+      return {railFirst: !!(rail.compareDocumentPosition(spot) & Node.DOCUMENT_POSITION_FOLLOWING),
+        railLeft: r.right <= s.left};
+    }""")
+    assert order == {"railFirst": True, "railLeft": True}, order
+
+
 @pytest.mark.parametrize("width,rail", [(645, False), (660, False), (960, True)])
 def test_two_row_masthead_keeps_every_destination_on_its_second_row(
     page, server_url: str, width: int, rail: bool,
