@@ -634,40 +634,7 @@
   // pipes and tag-like HTML drop, and backslash escapes resolve. This is
   // presentation only; safety still comes from appendHighlighted building
   // text nodes (never innerHTML).
-  var ENTITY_TEXT = { amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", nbsp: " ", mdash: "\u2014", ndash: "\u2013", hellip: "\u2026" };
-  function readableExcerpt(markdown) {
-    var escaped = [];
-    var text = String(markdown || "")
-      .replace(/\\([!-\/:-@\[-`{-~])/g, function (_, ch) { escaped.push(ch); return "\uE000" + (escaped.length - 1) + "\uE001"; })
-      .replace(/^[ \t]{0,3}(?:`{3,}|~{3,})[^\n]*$/gm, " ")
-      .replace(/^[ \t]*\|?[ \t]*:?-{3,}:?[ \t]*(?:\|[ \t]*:?-{3,}:?[ \t]*)*\|?[ \t]*$/gm, " ")
-      .replace(/^[ \t]*\|(.*)\|[ \t]*$/gm, function (_, cells) {
-        return cells.split("|").map(function (c) { return c.trim(); }).filter(Boolean).join(" \u00b7 ");
-      })
-      .replace(/^[ \t]{0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/gm, " ")
-      .replace(/^[ \t]{0,3}(?:>[ \t]?)+/gm, "")
-      .replace(/^[ \t]{0,3}#{1,6}[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/gm, "$1")
-      .replace(/^[ \t]*(?:[-*+]|\d{1,9}[.)])[ \t]+(?:\[[ xX]\][ \t]+)?/gm, "")
-      .replace(/<!--[\s\S]*?-->/g, " ")
-      .replace(/<((?:https?|mailto):[^<>\s]+)>/gi, "$1")
-      .replace(/<\/?[A-Za-z][\w:-]*(?:\s[^<>]*)?\/?>/g, " ")
-      .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
-      .replace(/\[([^\]]+)\]\((?:[^()\s]|\([^()\s]*\))*(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)/g, "$1")
-      .replace(/!?\[([^\]]+)\]\[[^\]]*\]/g, "$1")
-      .replace(/\[\^[^\]\s]+\]/g, "")
-      .replace(/(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/g, "$2")
-      .replace(/(\*{1,3}|~~)(?=\S)([\s\S]*?\S)\1/g, "$2")
-      .replace(/(^|[^0-9A-Za-z_])(_{1,3})(?=\S)([\s\S]*?\S)\2(?![0-9A-Za-z_])/g, "$1$3")
-      .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, function (all, name) {
-        if (name.charAt(0) === "#") {
-          var code = name.charAt(1).toLowerCase() === "x" ? parseInt(name.slice(2), 16) : parseInt(name.slice(1), 10);
-          return code > 0 && code < 0x110000 ? String.fromCodePoint(code) : all;
-        }
-        return Object.prototype.hasOwnProperty.call(ENTITY_TEXT, name.toLowerCase()) ? ENTITY_TEXT[name.toLowerCase()] : all;
-      })
-      .replace(/\uE000(\d+)\uE001/g, function (_, i) { return escaped[Number(i)]; });
-    return text.replace(/\s+/g, " ").trim();
-  }
+  function readableExcerpt(markdown) { return window.okfReadableText(markdown); }
 
   // Keep the first matched term inside the short evidence line: when the
   // match sits past the visible budget, start the window a little before it
@@ -1470,7 +1437,7 @@
         if (typeof fm.description === "string" && fm.description) {
           var d = document.createElement("div");
           d.className = "okf-popover__body";
-          d.textContent = fm.description;
+          d.textContent = readableExcerpt(fm.description);
           p.appendChild(d);
         }
         // Link/relation counts (plan §3.4): internal body links and typed

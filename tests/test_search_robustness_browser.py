@@ -62,7 +62,7 @@ MARKDOWN_TERM = "zebrafinch"
 MARKDOWN_CONCEPT = """---
 type: Reference
 title: Ledger conventions
-description: How settled payments reach the ledger.
+description: Every `ledger-sync` and **settled** payment.
 ---
 
 # Ledger conventions
@@ -212,6 +212,28 @@ def test_live_suggestion_evidence_reads_as_plain_text_around_the_highlighted_mat
     expect(evidence.locator("mark")).to_be_in_viewport()
     assert page.locator(".okf-search-live img, .okf-search-live script").count() == 0
     assert page.evaluate("() => window.__okfXss") is None
+    _assert_clean(page)
+
+
+def test_search_preview_and_concept_summary_are_readable_but_copy_keeps_source(markdown_url: str, page) -> None:
+    page.goto(markdown_url + "/__search?q=" + MARKDOWN_TERM)
+    result = page.locator('.okf-search-result[data-concept-id="references/ledger_conventions"]')
+    preview = result.locator(".okf-search-snippet").first
+    expect(preview).to_be_visible()
+    assert "ledger-sync --zebrafinch with care and legacy strict rules" in preview.inner_text()
+    for syntax in ("**", "](", "`", "~~", "__strict", "<img", "onerror", ".md"):
+        assert syntax not in preview.inner_text()
+    source = result.locator("[data-copy-passage]").get_attribute("data-excerpt")
+    assert "**settled**" in source and "`ledger-sync --zebrafinch`" in source
+    result.locator(".okf-search-disclosure > summary").click()
+    raw = result.locator(".okf-search-source")
+    expect(raw).not_to_be_visible()
+    result.get_by_text("Exact Markdown source", exact=True).click()
+    expect(raw).to_have_text(source)
+    assert result.locator("img, script").count() == 0
+    page.goto(markdown_url + "/")
+    expect(page.locator('.okf-card[data-concept-id="references/ledger_conventions"] .okf-card__desc')).to_have_text(
+        "Every ledger-sync and settled payment.")
     _assert_clean(page)
 
 

@@ -122,7 +122,17 @@ ordinary source hashes, outline controls, and root Open retain their owners.
 Missing, stale, malformed, duplicate, or plugin-modified destinations fall back
 to root reading. See spec §9 for the optional transport and absence contract.
 
-### Capture readiness
+#### Reader-only text previews
+
+`viewer/text.py` and `viewer/static/readable-text.js` share a tested plain-text
+Markdown projection for summaries, descriptions and search previews. The browser
+helper is local and embedded in single-file output. Renderers escape its output
+or insert text nodes; it is never trusted HTML. Evidence disclosures offer a
+readable preview and a separate **Exact Markdown source** disclosure. Retrieval
+records, hash inputs, passage-copy payloads, citations and Context Packs retain
+the exact canonical source; never apply this projection to those boundaries.
+
+## Capture readiness
 
 The capture-readiness runtime owns semantic target/revision/layout readiness.
 Capture consumers apply one 30-second monotonic budget across navigation,

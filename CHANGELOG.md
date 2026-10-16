@@ -10,6 +10,10 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Search previews, evidence previews, graph descriptions and concept summaries
+  share a safe plain-text Markdown projection; exact source remains available
+  separately and copied passages/Context Packs are unchanged (D2-016, M1-015,
+  T1-011, D1-011).
 - Search result titles meet the 44px coarse-pointer target on tablets as well
   as phones (search portion of T1-006).
 - Portable search verifies the same SHA-256 evidence hashes on plain-HTTP LAN

@@ -167,6 +167,7 @@ def _portable_node(artifact: dict, program: str) -> dict:
     script = f"""
 const fs=require('fs'), crypto=require('crypto');
 global.window={{crypto:crypto.webcrypto,TextEncoder:global.TextEncoder}};
+eval(fs.readFileSync({json.dumps(str(_runtime_file('viewer','static','readable-text.js')))},'utf8'));
 eval(fs.readFileSync({json.dumps(str(_runtime_file('viewer','static','portable-retrieval.js')))},'utf8'));
 const artifact=JSON.parse(fs.readFileSync(0,'utf8'));
 (async()=>{{{program}}})().catch(e=>{{console.error(e.stack||e);process.exit(1);}});
@@ -1180,8 +1181,8 @@ def test_search_excerpt_presentation_is_plain_and_escaped(tmp_path: Path) -> Non
         html, re.DOTALL,
     ).group(1)
     assert "**bold**" not in presented and "[label](/a.md)" not in presented
-    assert "customer_id" in presented and "__init__" in presented
-    assert "&lt;img src=x onerror=alert(1)&gt;" in presented
+    assert "customer_id" in presented and "init" in presented
+    assert "&lt;img" not in presented and "onerror" not in presented
     assert "<img src=x" not in presented
     assert "<mark>needle</mark>" in presented
     assert 'data-excerpt="**bold** [label](/a.md) `customer_id` __init__ &lt;img' in html  # exact copy source retained
@@ -1267,7 +1268,7 @@ let asyncReject=false,syncThrow=false;try{const promise=window.okfPortableRetrie
         "inventory": True, "emoji4096": True, "emoji4097": True,
         "mapped": "bold** and [link](/target) &amp; `code`",
         "ambiguous": True, "asyncReject": True, "syncThrow": False,
-        "metadataRejected": True, "readable": "customer_id and __init__",
+        "metadataRejected": True, "readable": "customer_id and init",
     }
 
 

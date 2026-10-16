@@ -4549,7 +4549,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
       if (d.description) {
         var desc = document.createElement("div");
         desc.className = "okf-graph-tip__desc";
-        var text = String(d.description);
+        var text = window.okfReadableText(d.description);
         desc.textContent = text.length > 140 ? text.slice(0, 140) + "…" : text;
         tip.appendChild(desc);
       }
@@ -5127,7 +5127,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
       setText("detail-title", data.label || conceptId);
       var selectedStatus=document.querySelector(".okf-detail-selected-status");if(selectedStatus)selectedStatus.textContent="Selected: "+(data.label||conceptId);
       setText("detail-id", conceptId);
-      setText("detail-description", data.description || "Not set");
+      setText("detail-description", window.okfReadableText(data.description) || "Not set");
 
       // Resource.
       var resourceEl = document.getElementById("detail-resource");

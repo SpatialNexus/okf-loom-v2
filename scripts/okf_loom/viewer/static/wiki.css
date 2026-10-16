@@ -2574,7 +2574,7 @@ details.okf-frontmatter[open] { padding-bottom: var(--okf-space-2); }
 .okf-search-mode:has(input:disabled) { cursor: not-allowed; }
 .okf-context-scope-note { display: block; margin-top: var(--okf-space-2); color: var(--text-2); font-size: var(--okf-text-xs); }
 .okf-nojs-manual { display: none; }
-.okf-search-source { max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; }
+.okf-search-source { max-width: min(100%, 75ch); white-space: pre-wrap; overflow-wrap: anywhere; }
 .okf-search-filters { padding-top: var(--okf-space-2); border-top: 1px solid var(--border); }
 .okf-search-filters summary,
 .okf-page-context summary,

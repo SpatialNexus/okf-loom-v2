@@ -101,7 +101,7 @@ def test_search_uses_canonical_labels_compact_disclosure_and_action_ids(tmp_path
     assert 'data-search-action="copy-passage"' in article and '>Copy passage</button>' in article
     assert 'data-search-action="copy-concept-context"' in article and '>Copy concept context</button>' in article
     assert "Source:" in article and "Scope:" in article and "Estimated size:" in article
-    disclosure = re.search(r'<details class="okf-search-disclosure">(.*?)</details>', article, re.DOTALL).group(1)
+    disclosure = article.split('<details class="okf-search-disclosure">', 1)[1]
     assert "[guide-0.md#L9-L9]" in disclosure
     assert "Exact canonical source passage" in disclosure
     assert "title contains needle" in disclosure

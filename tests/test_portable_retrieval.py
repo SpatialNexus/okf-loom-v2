@@ -17,6 +17,7 @@ def _node(program: str, value):
 const fs = require('fs'), crypto = require('crypto');
 global.window = {TextEncoder: global.TextEncoder};
 // Instrument the private digest seam; no test-only public runtime API.
+eval(fs.readFileSync(process.argv[1].replace('portable-retrieval.js', 'readable-text.js'), 'utf8'));
 const source = fs.readFileSync(process.argv[1], 'utf8');
 if (!source.includes('window.okfPortableRetrieval={')) throw Error('missing export');
 eval(source.replace('window.okfPortableRetrieval={', 'window.testDigest=digestText;window.okfPortableRetrieval={'));
