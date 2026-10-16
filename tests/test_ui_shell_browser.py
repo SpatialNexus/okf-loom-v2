@@ -1024,8 +1024,9 @@ def test_route_links_expose_current_state_and_focus_visible_targets(page, server
     assert graph_focus["matches"], graph_focus
     assert heading.evaluate("el => getComputedStyle(el).outlineStyle !== 'none'")
 
+    # D1-017: a document is not the Index page; no destination claims it.
     page.goto(server_url + "/tables/orders")
-    assert page.locator('[data-okf-shell-item="index"] a').get_attribute("aria-current") == "page"
+    assert page.locator('.okf-shell [aria-current]').count() == 0
     assert page.locator(".okf-page__title").is_visible()
 
 
@@ -1287,6 +1288,82 @@ def test_masthead_stays_one_row_beside_the_studio_rail_and_counts_do_not_move_it
     for key in ("launcher", "searchLeft", "graphLeft"):
         assert full_idle[key] == full_pending[key], (key, full_pending, full_idle)
     assert failures == []
+
+
+def test_related_rail_titles_wrap_and_its_collapse_control_is_named(page, server_url: str) -> None:
+    """D1-009 / T1-010: rail titles were ellipsised (full text only in a
+    hover tooltip, unreadable on touch) and the collapse control was a bare
+    "-" named "Collapse". Titles now wrap; the panel title is a disclosure
+    button named "Related" whose aria-expanded tracks the panel."""
+    page.set_viewport_size({"width": 1024, "height": 900})
+    page.goto(server_url + "/tables/orders")
+    page.wait_for_function("() => window.okfLoomStudio && window.okfLoomStudio.state.eventsReady")
+    toggle = page.locator(".okf-sidebar-panel__toggle").first
+    expect(toggle).to_have_accessible_name("Related")
+    expect(toggle).to_have_attribute("aria-expanded", "true")
+    body = page.locator("#" + toggle.get_attribute("aria-controls"))
+    expect(body).to_be_visible()
+    page.evaluate("""() => document.querySelector('.okf-local-graph__label').textContent =
+      'A deliberately long related concept title that cannot fit on one rail line'""")
+    clipped = page.evaluate("""() => [...document.querySelectorAll('.okf-local-graph__label')]
+      .filter(l => l.getClientRects().length && l.scrollWidth > l.clientWidth + 1).map(l => l.textContent)""")
+    assert clipped == [], clipped
+    assert page.evaluate("document.querySelector('.okf-local-graph__label').getBoundingClientRect().height") > 30
+    toggle.click()
+    expect(toggle).to_have_attribute("aria-expanded", "false")
+    expect(body).to_be_hidden()
+    toggle.press("Enter")
+    expect(toggle).to_have_attribute("aria-expanded", "true")
+    expect(body).to_be_visible()
+
+
+def test_home_recently_changed_precedes_the_spotlight_column_in_tab_order(page, server_url: str) -> None:
+    """D1-013: the recent rail sits in the left column but came after the
+    right-hand spotlight in the DOM, so Tab jumped right, then back left and
+    up. Server and live rails now precede the visual column."""
+    page.set_viewport_size({"width": 1440, "height": 900})
+    page.goto(server_url + "/")
+    page.wait_for_function("() => window.okfLoomStudio && window.okfLoomStudio.state.eventsReady")
+    page.evaluate("""() => window.okfLoomLive.emit('activity', {id: 'tab-order-1', event_id: 'tab-order-1',
+      type: 'activity', actor: 'agent', action: 'replace_text', ids: ['tables/orders'], ts: new Date().toISOString()})""")
+    page.wait_for_selector("#okf-recent-rail li a")
+    order = page.evaluate("""() => {
+      const rail = document.querySelector('#okf-recent-rail li a');
+      const spot = [...document.querySelectorAll('.okf-hero__visual a, .okf-hero__visual summary')][0];
+      const r = rail.getBoundingClientRect(), s = spot.getBoundingClientRect();
+      return {railFirst: !!(rail.compareDocumentPosition(spot) & Node.DOCUMENT_POSITION_FOLLOWING),
+        railLeft: r.right <= s.left};
+    }""")
+    assert order == {"railFirst": True, "railLeft": True}, order
+
+
+@pytest.mark.parametrize("width,rail", [(645, False), (660, False), (960, True)])
+def test_two_row_masthead_keeps_every_destination_on_its_second_row(
+    page, server_url: str, width: int, rail: bool,
+) -> None:
+    """T1-004: at 645-660px, and at 960px beside the Studio rail (a 640px
+    page), Appearance wrapped onto a third top-bar row. Narrow two-row pages
+    consolidate the launcher to its action label (the name keeps the status)
+    so brand / destinations stay two rows."""
+    page.set_viewport_size({"width": width, "height": 900})
+    page.goto(server_url + "/tables/orders")
+    page.wait_for_function("() => window.okfLoomStudio && window.okfLoomStudio.state.eventsReady")
+    launcher = page.locator(".okf-studio-launcher")
+    if rail:
+        launcher.click()
+        page.locator("#okf-panel").get_by_role("button", name="Comments").click()
+        page.wait_for_function("() => document.body.classList.contains('okf-panel-rail')")
+    page.evaluate("() => document.fonts.ready")
+    geometry = page.evaluate(_MASTHEAD_GEOMETRY)
+    assert geometry["rail"] is rail, geometry
+    assert not geometry["sharesRow"], geometry
+    assert geometry["itemRows"] == 1, geometry
+    assert geometry["overflow"] <= 0, geometry
+    expect(launcher).to_have_accessible_name(re.compile(r"^Studio\s+·\s+Editable$"))
+    page.evaluate("window.okfLoomLive.emit('activity',{event_id:'two-row-1',type:'activity',action:'update',ts:new Date().toISOString()})")
+    expect(launcher).to_have_attribute("data-attention", "pending")
+    expect(launcher).to_have_accessible_name(re.compile(r"^Studio\s+·\s+1 change\s+·\s+Needs attention$"))
+    assert page.evaluate(_MASTHEAD_GEOMETRY)["itemRows"] == 1
 
 
 # Records every text the launcher summary ever shows, from the moment Studio
@@ -2358,6 +2435,43 @@ def test_wide_and_graph_chrome_keep_their_sticky_layout(page, server_url: str) -
     page.wait_for_function("() => window.__okfLoomGraph && window.__okfLoomGraph.layoutStats.lastAppliedSeq >= 1")
     assert page.evaluate("document.documentElement.hasAttribute('data-okf-chrome')") is False
     assert page.evaluate("getComputedStyle(document.querySelector('.okf-topbar')).transform") == "none"
+
+
+@pytest.mark.parametrize("coarse", [True, False])
+def test_landscape_phone_chrome_scrolls_away_only_on_coarse_pointers(server_url: str, coarse: bool) -> None:
+    """M1-008: a landscape phone (844x390) kept 145px of sticky chrome. Short
+    coarse viewports share the phone scroll-away contract; a short mouse
+    window keeps the ordinary sticky desktop chrome."""
+    with sync_playwright() as playwright:
+        browser, context = _phone_page(playwright, 844, 390, coarse)
+        try:
+            page = context.new_page()
+            page.goto(server_url + "/tables/orders")
+            _wait_live_document(page)
+            at_top = page.evaluate(_CHROME_GEOMETRY)
+            assert at_top["state"] == ("revealed" if coarse else None), at_top
+            _scroll(page, 300)
+            _scroll(page, 300)
+            _settle(page)
+            down = page.evaluate(_CHROME_GEOMETRY)
+            if not coarse:
+                assert down["state"] is None and down["top"]["top"] == 0, down
+                return
+            assert down["state"] == "compact", down
+            assert down["top"]["bottom"] <= 0, down
+            assert down["sticky"] <= 56, down
+            assert 0 <= down["jump"]["top"] <= 8, down
+            assert page.evaluate(_HITS, ['.okf-outline-jump__toggle']) == []
+            _scroll(page, -50)
+            _settle(page)
+            up = page.evaluate(_CHROME_GEOMETRY)
+            assert up["state"] == "revealed" and abs(up["top"]["top"]) < 0.5, up
+            assert abs(up["bar"]["top"] - up["top"]["bottom"]) < 1, up
+            assert page.evaluate(_HITS, _SHELL_CONTROLS + ['.okf-studio-launcher']) == []
+            assert up["overflow"] is False, up
+        finally:
+            context.close()
+            browser.close()
 
 
 @pytest.fixture(scope="module")

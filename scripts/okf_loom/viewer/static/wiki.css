@@ -1404,6 +1404,15 @@ sup.okf-footnote-ref { line-height: 0; }
   }
 }
 
+/* D1-016: a section index has no visual column (no spotlight or graph
+ * preview), so its authored body (lists, tables) takes the document lane
+ * instead of a 60ch track beside an empty one; paragraphs keep 60ch. */
+body.okf-viewer .okf-hero:not(:has(> .okf-hero__visual > *)) { display: block; }
+.okf-hero:not(:has(> .okf-hero__visual > *)) > .okf-index__intro { max-width: var(--doc-max); }
+/* On the title's left edge, as on documents (generic prose centres capped
+ * blocks); text keeps its prose measure, tables and code use the lane. */
+.okf-hero:not(:has(> .okf-hero__visual > *)) > .okf-index__intro > * { margin-inline: 0; }
+
 /* Corpus totals: the ledger's summary line — mono figures over micro-labels,
  * divided by hairlines between a strong rule above and a hairline below. */
 .okf-hero__stats {
@@ -1478,7 +1487,9 @@ sup.okf-footnote-ref { line-height: 0; }
 .okf-recent__time { color: var(--text-3); font: 400 11px/1.5 var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* 'New in' spotlight: a flat panel. Its CTA is the view's one filled
- * button; the secondary is outlined and the tertiary a plain link. */
+ * button; the secondary is outlined and the tertiary a plain link. The
+ * eyebrow and check marks stay neutral (D1-015): the accent is a mark,
+ * never decoration, and the CTA already carries it. */
 .okf-v2-spotlight {
   margin: 0 0 var(--okf-space-4);
   padding: 18px;
@@ -1490,8 +1501,8 @@ sup.okf-footnote-ref { line-height: 0; }
   display: inline-block;
   margin: 0 0 12px;
   padding: 2px 7px;
-  border: 1px solid var(--accent);
-  color: var(--accent-text);
+  border: 1px solid var(--border-strong);
+  color: var(--text-2);
   font: 700 var(--label-size)/1.4 var(--font-label);
   letter-spacing: var(--label-track);
   text-transform: uppercase;
@@ -1515,7 +1526,7 @@ sup.okf-footnote-ref { line-height: 0; }
   list-style: none;
 }
 .okf-v2-spotlight__features li { display: flex; align-items: flex-start; gap: var(--okf-space-2); color: var(--text); font-size: 13px; line-height: 1.4; }
-.okf-v2-spotlight__check { flex: 0 0 auto; margin-top: 2px; color: var(--accent-text); }
+.okf-v2-spotlight__check { flex: 0 0 auto; margin-top: 2px; color: var(--text-3); }
 .okf-v2-spotlight__actions { display: flex; flex-direction: column; gap: 10px; }
 .okf-v2-spotlight__cta,
 .okf-v2-spotlight__secondary {
@@ -2398,15 +2409,33 @@ details.okf-frontmatter[open] { padding-bottom: var(--okf-space-2); }
   letter-spacing: var(--label-track);
   text-transform: uppercase;
 }
+/* The title is the disclosure button (studio.js): a chevron that points
+ * down while open and right while collapsed, then the label. */
 .okf-sidebar-panel__toggle {
-  padding: 2px 6px;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 2px 0;
   border: 0;
   background: transparent;
-  color: var(--text-3);
-  font: 400 var(--okf-text-sm)/1 var(--font-mono);
+  color: inherit;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
 }
-.okf-sidebar-panel__toggle:hover { color: var(--text); }
+.okf-sidebar-panel__toggle:hover .okf-sidebar-panel__title { color: var(--text); }
+.okf-sidebar-panel__chevron {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin: 0 2px 3px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+.okf-sidebar-panel__toggle[aria-expanded="false"] .okf-sidebar-panel__chevron { margin: 0 3px 0 1px; transform: rotate(-45deg); }
 .okf-sidebar-panel__body { padding: 0 12px 6px; font-size: var(--okf-text-sm); }
 .okf-sidebar-panel--collapsed .okf-sidebar-panel__body { display: none; }
 .okf-sidebar-panel--collapsed .okf-sidebar-panel__header { border-bottom: none; }
@@ -2480,7 +2509,9 @@ details.okf-frontmatter[open] { padding-bottom: var(--okf-space-2); }
 .okf-local-graph__node:last-child { border-bottom: 0; }
 .okf-local-graph__node:hover { background: transparent; color: var(--text); text-decoration: underline; }
 .okf-local-graph__swatch { display: inline-block; flex: none; width: 6px; height: 6px; background: var(--text-3); }
-.okf-local-graph__label { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* D1-009 / T1-010: titles wrap rather than end in an ellipsis whose full
+ * text lived only in a hover tooltip (unreadable on touch). */
+.okf-local-graph__label { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .okf-local-graph__empty { padding: var(--okf-space-2) 0; color: var(--text-2); font-size: var(--okf-text-sm); }
 
 /* ---- Search -------------------------------------------------------------------

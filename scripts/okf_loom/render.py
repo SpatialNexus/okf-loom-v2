@@ -4493,11 +4493,11 @@ def _render_concept_page(
     # concept's normalized raw source (the canonical source the renderer
     # consumed) — never served disk bytes, never the corpus revision.
     from .annotations import concept_content_rev
+    content_rev = concept_content_rev(concept.raw_text.replace("\r\n", "\n"))
     template = template.replace(
         '</head>',
         _rendered_outline_script(
-            body_html, cid_str,
-            concept_content_rev(concept.raw_text.replace("\r\n", "\n")))
+            body_html, cid_str, content_rev)
         + '</head>', 1)
 
     # Ledger: content types are not colour-coded on the document surfaces.
@@ -4622,7 +4622,9 @@ def _render_concept_page(
         search_href=f"{root_prefix}__search{'.html' if mode == 'static' else ''}",
         index_href=bundle_href,
         graph_href=f"{root_prefix}__graph{'.html' if mode == 'static' else ''}",
-        current="index",
+        # D1-017: a concept page is not the Index page, so no destination is
+        # announced as the current page (the breadcrumb carries location).
+        current=None,
         mode=mode,
         studio_available=studio_available,
         appearance_choice=configured_theme,
@@ -4738,9 +4740,11 @@ def _render_concept_page(
     # prev/next follow.
     entity_chips_html = _render_entity_chips(concept, mode=mode, root_prefix=root_prefix)
     long_document = len(_ONTHISPAGE_HEADING_RE.findall(body_html)) >= 8
+    # D1-012: Document details names THIS document's content revision (the
+    # corpus revision is the same on every page).
     infobox_html = _render_infobox(
         concept,
-        revision=revision,
+        revision=content_rev,
         tags_html=tags_html,
         frontmatter_html=frontmatter_html,
         governed_html=governed_html,
@@ -5622,13 +5626,19 @@ def _render_infobox(
     beside its icon; no per-type colour is emitted.
     """
     icon = type_icon_svg(concept.type, size=16, cls="okf-type-icon")
-    rev_short = revision[:8] if revision else ""
+    # Revisions carry a scheme prefix ("section-retrieval-v1:<hash>"); the
+    # first 8 characters of the whole string were the prefix itself, the same
+    # "section-" on every page. Shorten the hash; no hash shows no revision.
+    rev_short = revision.rpartition(":")[2][:8] if revision else ""
+    rev_html = (
+        f'<span class="okf-infobox__rev" title="Content revision {_esc(revision)}">'
+        f'rev\u00a0{_esc(rev_short)}</span>'
+    ) if rev_short else ""
     summary = (
         f'<summary class="okf-infobox__summary">'
         f'<span class="okf-infobox__type">'
         f'{icon} {_esc(concept.type or "concept")}</span>'
-        f'<span class="okf-infobox__rev" title="Content revision {_esc(revision)}">'
-        f'rev\u00a0{_esc(rev_short)}</span>'
+        f'{rev_html}'
         f'</summary>'
     )
     body_parts: list[str] = []
@@ -5850,7 +5860,7 @@ def render_reserved_document(document: str, body: str, *, mode: str,
     graph_href = f"{root_prefix}__graph{suffix}"
     shell_html = _application_shell_html(
         name=display, bundle_href=home, search_href=f"{root_prefix}__search{suffix}",
-        index_href=home, graph_href=graph_href, current="index", mode=mode,
+        index_href=home, graph_href=graph_href, current=None, mode=mode,
         studio_available=studio_available,
         appearance_choice=configured_theme,
     )
@@ -5935,9 +5945,20 @@ def _render_index_page(
     # container or delay the first browseable concept group.
     intro_remainder = ""
     title_anchor = ''
+    head_title = None
     if sub:
         title = f"{name} / {sub}"
         intro = normalize_document_links(markdown_to_html(index_file.body), sub + '/index.md', mode) if index_file else ''
+        # D1-016: a section index.md that opens with "# How-to guides" rendered
+        # a second, title-sized h1 under "<bundle> / how-to". As on the root
+        # index, the authored heading becomes the one page title.
+        authored_heading = re.match(r"\s*#\s+([^\n]+)\n", index_file.body) if index_file else None
+        if authored_heading:
+            title = authored_heading.group(1).strip()
+            head_title = f"{title} — {name}"
+            from .viewer.markdown import _slugify
+            title_anchor = ' id="' + _esc_attr_qs(_slugify(title)) + '"'
+            intro = re.sub(r'^\s*<h1\b[^>]*>.*?</h1>', '', intro, count=1, flags=re.DOTALL)
     else:
         title = name
         intro_md = ""
@@ -6329,7 +6350,9 @@ def _render_index_page(
         search_href=f"{root_prefix_for_nav}__search{'.html' if mode == 'static' else ''}",
         index_href=brand_href,
         graph_href=graph_link,
-        current="index",
+        # Index is the current page only on the bundle root index; a section
+        # index (/how-to/) links back to it (D1-017).
+        current=None if sub else "index",
         mode=mode,
         studio_available=studio_available,
         appearance_choice=configured_theme,
@@ -6340,7 +6363,7 @@ def _render_index_page(
         .replace("__LANG__", "en")
         .replace("__THEME_ATTR__", theme_attr)
         .replace("__DATA_ATTRS__", data_attrs)
-        .replace("__HEAD_TITLE__", _esc(title))
+        .replace("__HEAD_TITLE__", _esc(head_title or title))
         .replace("__BUNDLE_NAME__", _esc(name))
         .replace("__BRAND_HREF__", _esc_attr_qs(brand_href))
         .replace("__BRAND_ARIA_CURRENT__", brand_aria)

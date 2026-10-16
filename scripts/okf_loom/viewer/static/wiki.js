@@ -1607,20 +1607,22 @@
   }
 
   // ---- Scroll-away chrome on phones ------------------------------------
-  // At <=640px (sticky viewports) the top bar and the live document view bar
-  // under it cost a third to a half of the screen. While the reader scrolls
+  // At <=640px (sticky viewports), and on short coarse viewports such as a
+  // landscape phone (844x390: 145px of 390px), the top bar and the live
+  // document view bar under it cost a third to a half of the screen. While the reader scrolls
   // down past them they slide away and only the view bar's Sections row stays
   // pinned (nothing stays on pages without Sections); scrolling up, reaching
   // the top, keyboard focus in the chrome, an open overlay, or a capture
   // bring the whole chrome back. State lives on <html data-okf-chrome>;
   // shell.css owns the presentation (transforms only, so nothing shifts).
-  // Wider viewports never get the attribute, and the graph route keeps its
-  // own full-screen layout.
+  // Other viewports never get the attribute (the query must match
+  // shell.css), and the graph route keeps its own full-screen layout.
   (function scrollAwayChrome() {
     var shell = document.querySelector(".okf-topbar.okf-shell");
     if (!shell || !window.matchMedia || document.body.classList.contains("okf-viewer--graph")) return;
     var root = document.documentElement;
-    var query = window.matchMedia("(max-width: 640px) and (min-height: 481px)");
+    var query = window.matchMedia("(max-width: 640px) and (min-height: 481px), " +
+      "(min-width: 641px) and (max-height: 500px) and (pointer: coarse)");
     var GUTTER = 4;   // view-bar surface kept above the pinned Sections row
     var TRAVEL = 10;  // one-direction scroll distance before the state flips
     var state = "", lastY = 0, travel = 0, frame = 0, compactHeight = 0;

@@ -44,6 +44,24 @@ follow [Semantic Versioning](https://semver.org/). The product version
   mirrors using a bundled fallback only when WebCrypto is absent (D3-005).
 - Search suggestion selection keeps row heights stable while `aria-selected`
   and forced-colour outlines continue to announce the active option (D1-002, D3-006).
+- Landscape phones (short, coarse viewports such as 844x390) now scroll the top bar
+  and view tabs away while reading, like portrait phones; only the Sections row stays.
+- The two-row top bar no longer drops Appearance onto a third row at 641–665px or
+  beside an open Studio rail: below a 780px page the launcher shows only "Studio".
+- The single-row top bar keeps an even rhythm: the Studio launcher is exactly as wide
+  as its idle label (no blank slot); longer statuses end in an ellipsis, so nothing moves.
+- Document details shows the document's own short content revision instead of
+  "rev section-" on every page, and no revision when there is none.
+- The top-bar Index link is marked as the current page only on the bundle index,
+  not on documents, the log or section indexes.
+- Studio change toasts use the singular for one ("1 change", not "1 changes"), and
+  "Undo all (N)" counts the same changes as the summary ("Undo 4 of 5" when some can't be undone).
+- Home: "Recently changed" now comes before the spotlight in Tab order (left column first).
+- Home spotlight: the "New" badge and check marks are neutral; the accent stays on the one CTA.
+- Section indexes (e.g. /how-to/) use their authored heading as the single page title, and
+  their body sits on the title's edge in the document lane instead of a 60ch column.
+- Related rail titles wrap instead of being cut off, and the rail's collapse control is a
+  disclosure button named "Related" with a chevron and aria-expanded (was a bare "-").
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
   including source derivations; the full/tool graph projection is unchanged.
 - Missing or malformed embedded search evidence in single-file exports settles as
