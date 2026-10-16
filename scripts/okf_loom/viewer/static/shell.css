@@ -63,6 +63,11 @@
   cursor: pointer;
 }
 .okf-shell__search-form button:hover { background: var(--border); }
+/* The suggestions list (z-index 40) hangs flush under the field and its 1px
+ * pop frame would cover half of the inset ring's bottom line; the focused
+ * part paints above it (inside the bar's own stacking context). Geometry is
+ * the shared joined-search ring in wiki.css. */
+.okf-shell__search-form :is(input[type="search"], button[type="submit"]):focus-visible { z-index: 41; }
 /* The Studio launcher (studio.css owns its states) sits in the nav as one
  * more text destination; the appearance trigger shows the palette swatch. */
 body.okf-viewer .okf-shell .okf-studio-launcher {

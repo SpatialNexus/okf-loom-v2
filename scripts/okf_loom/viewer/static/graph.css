@@ -1876,7 +1876,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
   font-size: 13px;
 }
 .okf-viewer--graph .okf-graph-tools input::placeholder { color: var(--okf-fg-subtle); opacity: 1; }
-.okf-graph-tools input:focus-visible,
+/* The search field's inset ring is the shared joined-search rule (wiki.css). */
 .okf-graph-tools select:focus-visible { outline: 2px solid var(--okf-accent); outline-offset: 2px; }
 .okf-viewer--graph .okf-graph-tools__reset { min-height: var(--okf-graph-field-h); }
 .okf-viewer--graph .okf-global-nav { flex-wrap: wrap; min-width: 0; overflow: visible; }
