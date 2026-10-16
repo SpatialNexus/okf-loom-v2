@@ -181,6 +181,8 @@ def test_phone_attention_does_not_add_a_third_shell_row(page, server_url):
 
 
 def test_recent_pages_popover_is_anchored_below_the_search_field(page, server_url):
+    # The current page is intentionally excluded; populate another visit.
+    page.goto(server_url + '/tables/customers')
     page.goto(server_url + '/tables/orders')
     page.locator('.okf-shell__search-form input').focus()
     menu = page.locator('.okf-search-live')
