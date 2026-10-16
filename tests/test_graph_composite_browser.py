@@ -83,6 +83,53 @@ def test_graph_controls_reflow_without_clipping_at_acceptance_widths(page, serve
     assert geometry["toolbar"] > 0, geometry
 
 
+_TABLET_PANE_JS = """() => {
+  const cy = window.__okfLoomGraph && window.__okfLoomGraph.cy;
+  const graph = document.getElementById('okf-graph'), g = graph.getBoundingClientRect();
+  const layer = graph.querySelector('canvas[data-id="layer2-node"]');
+  let painted = 0;
+  if (layer && layer.width && layer.height) {
+    const px = layer.getContext('2d', {willReadFrequently: true})
+      .getImageData(0, 0, layer.width, layer.height).data;
+    for (let i = 3; i < px.length; i += 4 * 16) if (px[i] > 0) painted++;
+  }
+  const zoom = [...document.querySelectorAll('.okf-graph-zoom button')].filter(b => b.offsetParent !== null)
+    .map(b => b.getBoundingClientRect());
+  return {scroll: document.documentElement.scrollHeight, inner: innerHeight,
+          graphTop: g.top, graphBottom: g.bottom, graphHeight: g.height,
+          canvasHeight: layer ? layer.clientHeight : 0, painted,
+          onScreen: cy ? cy.nodes(':visible').filter(n => { const p = n.renderedPosition();
+            return p.x > 0 && p.x < g.width && p.y > 0 && p.y < g.height; }).length : 0,
+          zoomBottom: zoom.length ? Math.max(...zoom.map(r => r.bottom)) : null};
+}"""
+
+
+@pytest.mark.parametrize("width", [641, 768, 899])
+def test_tablet_graph_pane_is_viewport_bound_and_painted(page, docs_server_url: str, width: int) -> None:
+    """T1-002: between the phone (<=640) and desktop bounds the Graph pane
+    stayed blank while the auto-height page and the canvas resized each
+    other without bound. The page stays one viewport tall, the pane ends at
+    the viewport's bottom edge with its zoom controls on screen, and nodes
+    are painted inside it."""
+    page.set_viewport_size({"width": width, "height": 1024})
+    page.add_init_script("try { localStorage.setItem('okfGraphTourDone', '1'); } catch (e) {}")
+    page.goto(docs_server_url + "/__graph", wait_until="domcontentloaded")
+    page.wait_for_function("() => window.__okfLoomGraph?.layoutStats?.lastAppliedSeq >= 1")
+    page.get_by_role('navigation', name='Graph panes').get_by_role('button', name='Graph', exact=True).click()
+    page.wait_for_function("() => window.okfGraphCaptureState?.().layoutSettled")
+    page.wait_for_timeout(300)
+    first = page.evaluate(_TABLET_PANE_JS)
+    page.wait_for_timeout(1500)
+    later = page.evaluate(_TABLET_PANE_JS)
+    for sample in (first, later):
+        assert sample["scroll"] == sample["inner"], (first, later)
+        assert sample["graphBottom"] <= sample["inner"] + 1, (first, later)
+        assert sample["zoomBottom"] is not None and sample["zoomBottom"] <= sample["inner"], (first, later)
+    assert later["graphHeight"] == first["graphHeight"] and later["graphHeight"] > 300, (first, later)
+    assert abs(later["canvasHeight"] - later["graphHeight"]) <= 1, later
+    assert later["painted"] > 0 and later["onScreen"] > 0, later
+
+
 # Reads the painted node layer: for the largest badge-free round nodes, where
 # the type glyph's bounding box is centred, relative to the node centre and
 # as a fraction of the node radius. Glyphs are stroked in the palette's

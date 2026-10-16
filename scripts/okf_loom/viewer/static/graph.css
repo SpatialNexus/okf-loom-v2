@@ -1309,6 +1309,14 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
     -webkit-overflow-scrolling: touch;
   }
   .okf-node-index { width: min(220px, 70vw); top: 56px; }
+  /* graph.js docks the viewport actions in this bar at every compact width
+   * (<=900px, isMobileGraphViewport): a labelled row along the canvas's
+   * bottom edge, never a block below the full-height canvas. */
+  .okf-graph-viewport-toolbar{box-sizing:border-box;position:absolute;left:0;right:0;bottom:0;z-index:26;display:block;width:100%;min-width:0;max-width:100%;padding:6px 8px;border-top:1px solid var(--okf-border);background:var(--okf-bg-elev);overflow:hidden}
+  .okf-graph-viewport-toolbar .okf-graph-zoom{position:static;display:grid;grid-template-columns:repeat(3,minmax(44px,1fr));gap:4px;width:100%;overflow:visible}
+  .okf-graph-viewport-toolbar .okf-graph-zoom button{width:100%;height:44px;min-width:0;padding:2px 4px;gap:4px;box-shadow:none;font-size:11px;font-weight:700;white-space:nowrap}
+  .okf-graph-viewport-toolbar .okf-viewport-icon{width:17px;height:17px;flex:0 0 auto}
+  .okf-graph-viewport-toolbar .okf-viewport-label{display:inline;min-width:0;overflow:hidden;text-overflow:ellipsis}
   /* Mobile-open feedback loop: stack the panes in normal
    * flow so the page scrolls, give the graph a tall fixed viewport (76vh), and
    * let the detail panel flow at natural height below it. The open drawer is
@@ -1492,11 +1500,6 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
   .okf-layout[data-mobile-pane="details"] #detail-empty,
   .okf-layout[data-mobile-pane="details"] #detail-content { margin-top: var(--okf-space-3); }
   .okf-layout[data-mobile-pane="graph"] > .okf-graph{height:50dvh;min-height:422px}
-  .okf-graph-viewport-toolbar{box-sizing:border-box;position:absolute;left:0;right:0;bottom:0;z-index:26;display:block;width:100%;min-width:0;max-width:100%;padding:6px 8px;border-top:1px solid var(--okf-border);background:var(--okf-bg-elev);overflow:hidden}
-  .okf-graph-viewport-toolbar .okf-graph-zoom{position:static;display:grid;grid-template-columns:repeat(3,minmax(44px,1fr));gap:4px;width:100%;overflow:visible}
-  .okf-graph-viewport-toolbar .okf-graph-zoom button{width:100%;height:44px;min-width:0;padding:2px 4px;gap:4px;box-shadow:none;font-size:11px;font-weight:700;white-space:nowrap}
-  .okf-graph-viewport-toolbar .okf-viewport-icon{width:17px;height:17px;flex:0 0 auto}
-  .okf-graph-viewport-toolbar .okf-viewport-label{display:inline;min-width:0;overflow:hidden;text-overflow:ellipsis}
 }
 
 @media (max-width: 360px) {
@@ -1816,9 +1819,12 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
 @media (max-width: 640px) {
   .okf-viewer--graph .okf-graph-route-title { padding: 4px var(--okf-space-3); font-size: var(--okf-text-base); }
 }
-@media (min-width: 900px) {
-  /* Unlike document pages, the desktop graph is an application workspace:
-   * bound the shell to the viewport and keep canvas/detail overflow local. */
+@media (min-width: 641px) {
+  /* Unlike document pages, the graph is an application workspace: bound the
+   * shell to the viewport and keep canvas/detail overflow local.  This starts
+   * where the phone bound (<=640px) stops: with an auto-height body the
+   * 641-899px panes' height:100% resolves against content, and the canvas and
+   * its container resized each other without bound. */
   body.okf-viewer--graph {
     height: 100vh;
     min-height: 0;
@@ -1931,9 +1937,14 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
     background: var(--okf-bg-elev);
   }
   .okf-viewer--graph .okf-graph-mobile-nav button { min-height: 44px; min-width: 0; }
-  .okf-viewer--graph .okf-layout { display: block; min-height: 0; overflow: hidden; }
+  /* The pane tabs sit inside the layout above the active pane: a column flex
+   * gives the pane exactly the remainder, so the canvas's bottom toolbar is
+   * not pushed below the viewport by the tabs' height. */
+  .okf-viewer--graph .okf-layout { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .okf-viewer--graph .okf-layout > .okf-graph-mobile-nav { flex: 0 0 auto; }
   .okf-viewer--graph .okf-layout > .okf-graph {
     display: block;
+    flex: 1 1 0;
     width: 100%;
     height: min(68vh, 680px);
     min-height: 360px;
@@ -1942,6 +1953,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
   }
   .okf-viewer--graph .okf-layout > .okf-detail {
     display: none;
+    flex: 1 1 0;
     width: 100%;
     max-width: 100%;
     min-width: 0;
@@ -1973,8 +1985,8 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
     flex-wrap: wrap;
   }
   .okf-viewer--graph .okf-graph-focusbar { left: 8px; right: 8px; max-width: none; transform: none; flex-wrap: wrap; }
-  .okf-viewer--graph .okf-graph-viewport-toolbar { display: block; }
-  .okf-viewer--graph .okf-graph-viewport-toolbar .okf-graph-zoom { position: static; }
+  /* One row of viewport actions: the graph actions sit 64px above the edge. */
+  .okf-viewer--graph .okf-graph-viewport-toolbar .okf-graph-zoom { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
   .okf-viewer--graph .okf-graph-detail__body,
   .okf-viewer--graph .okf-graph-detail__body .okf-tablewrap { min-width: 0; max-width: 100%; overflow-x: auto; }
   .okf-viewer--graph .okf-graph-detail__body > .okf-content-scrollport { max-width: 100%; }
@@ -2125,8 +2137,8 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-shell__appearance > #okf-the
 }
 
 /* Single-file shares the graph body with its Index destination. The graph is
- * a viewport-bound application workspace (>= 900px and <= 640px both bound
- * the body and hide its overflow); the Index is an ordinary scrolling
+ * a viewport-bound application workspace (every width but short tablet
+ * viewports binds the body and hides its overflow); the Index is an ordinary scrolling
  * document, and inside that bound every entry below the fold was unreachable:
  * wheel, touch and Ctrl+End all left scrollY at 0. The destination owner in
  * single_file.html names the destination; the Index releases the bound. */
