@@ -956,8 +956,10 @@ details.okf-frontmatter td code { white-space: pre-wrap; word-break: break-word;
 .okf-prose del { color: var(--text-2); }
 .okf-prose img,
 .okf-page__body img { max-width: 100%; height: auto; }
-/* Heading deep-link anchors: invisible until heading hover or focus. */
-.okf-heading-anchor {
+/* Heading deep-link anchors: invisible until heading hover or focus. The
+ * element-qualified selector outranks `.okf-prose a`, so the mark stays a
+ * quiet glyph instead of an underlined accent link. */
+a.okf-heading-anchor {
   margin-left: var(--okf-space-2);
   color: var(--text-3);
   font-size: 0.8em;
@@ -3511,14 +3513,24 @@ body:has(.okf-graph-loading--error) .okf-cytoscape-fallback-actions { display: f
     .okf-breadcrumb a, .okf-conn__title, .okf-card__link, .okf-card__comments,
     .okf-v2-spotlight__tertiary, .okf-search-mode, .okf-search-disclosure > summary,
     .okf-page-context > details > summary, .okf-search-query input, .okf-search-submit,
-    .okf-brand-link, .okf-skip-link) {
+    .okf-brand-link, .okf-skip-link, .okf-metadata summary, .okf-entity-chip,
+    .okf-page__meta .okf-external, .okf-relation__target, .okf-document-end a) {
     min-height: 44px;
     min-inline-size: 44px;
   }
   :is(.okf-heading-anchor, .okf-breadcrumb a, .okf-conn__title, .okf-card__link,
     .okf-card__comments, .okf-v2-spotlight__tertiary, .okf-brand-link,
-    .okf-skip-link) { display: inline-flex; align-items: center; }
-  .okf-heading-anchor { opacity: 1; }
+    .okf-skip-link, .okf-document-end a) { display: inline-flex; align-items: center; }
+  /* A short crumb ("demo") centres in its 44px box, so the extra width is
+   * shared evenly instead of opening a hole before the next separator. */
+  .okf-breadcrumb a { justify-content: center; }
+  /* The 44px anchor box hangs into the line's margins (negative margins),
+   * so it neither inflates the heading's line nor wraps onto a line of its
+   * own after a long last word; the glyph keeps a 12px gap from the text. */
+  a.okf-heading-anchor { justify-content: center; margin: -8px -12px -8px -4px; opacity: 1; }
+  /* Table cells ignore min-height: the sortable head row takes the height. */
+  .okf-th-sortable { height: 44px; vertical-align: middle; }
+  .okf-metadata summary { padding-block: 12px; }
   .okf-type-nav__link,
   .okf-onthispage__link,
   .okf-recent__item,
