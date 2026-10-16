@@ -28,6 +28,10 @@ follow [Semantic Versioning](https://semver.org/). The product version
   Only buttons, Re-run layout is a labelled button, sliders and checkboxes are
   square ink controls (accent only on focus), and legend and filter buttons are
   44px targets on touch tablets.
+- The graph details pane reads as one column: no duplicate Themes heading, the
+  Collaborators disclosure and lens hint match their siblings, starting-point
+  counts stay on one line, tablet content shares one left edge, and a concept's
+  broken-link marker reads "! 4 broken" instead of a bare "!".
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
   including source derivations; the full/tool graph projection is unchanged.
 - Missing or malformed embedded search evidence in single-file exports settles as

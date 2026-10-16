@@ -4058,7 +4058,8 @@
           frag = el("details", { class: "okf-graph-theme-digest" });
           frag.appendChild(el("summary", {}, ["Themes in this graph"]));
         }
-        heading(lensKey === "themes" ? "Themes" : "Themes in this graph");
+        // Inside the disclosure its summary already names the section.
+        if (lensKey === "themes") heading("Themes");
         var top = com.list.slice(0, 6).filter(function (c) { return c.ids.length > 1; });
         var linked = {};
         cy.edges().forEach(function (e) {
@@ -4076,10 +4077,10 @@
         }
         var themes = com.list.filter(function (c) { return c.ids.length > 1; }).length;
         var bits = themes + " theme" + (themes === 1 ? "" : "s");
-        if (orphans.length) bits += " - " + orphans.length + " not yet linked";
+        if (orphans.length) bits += " \u2014 " + orphans.length + " not yet linked";
         if (gap) {
           var ga = nodeIndex[exemplar(gap[0])] || {}, gb = nodeIndex[exemplar(gap[1])] || {};
-          bits += " - the areas around \u201c" + (ga.label || "?") + "\u201d and \u201c" + (gb.label || "?") + "\u201d share no links";
+          bits += " \u2014 the areas around \u201c" + (ga.label || "?") + "\u201d and \u201c" + (gb.label || "?") + "\u201d share no links";
         }
         verdict(bits + ".");
         com.list.slice(0, 8).forEach(function (c) {
@@ -5397,7 +5398,10 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
           var warn = document.createElement("span");
           warn.className = "okf-node-index__warn";
           warn.setAttribute("aria-hidden", "true");
-          warn.textContent = "!";
+          // Visible meaning, not glyph + colour alone; the row's aria-label
+          // already carries the same phrase for assistive technology.
+          warn.textContent = unres + " broken";
+          warn.title = unres + " broken link" + (unres === 1 ? "" : "s");
           btn.appendChild(warn);
         }
         if (showComments) {

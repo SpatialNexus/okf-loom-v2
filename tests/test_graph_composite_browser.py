@@ -1,6 +1,8 @@
 """Browser proof for graph composite widgets and synchronized interaction state."""
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from browser_support import expect, reveal_control
@@ -532,6 +534,34 @@ def test_graph_settings_controls_are_ledger_controls(page, docs_server_url: str)
     assert seen["rerun"]["width"] < seen["rerun"]["pane"] / 2, seen
     for control in (seen["range"], seen["check"]):
         assert control["appearance"] == "none" and control["radius"] == "0px", seen
+
+
+def test_details_pane_reads_as_one_consistent_column(page, docs_server_url: str) -> None:
+    """D2-022/T1-008/T1-012: one heading per section, single-line count
+    figures in a narrow pane, one left rail for pane content at tablet
+    widths, and a broken-link marker that says what it marks."""
+    _open(page, docs_server_url, 901)
+    narrow = page.evaluate("""() => {
+      const notes = [...document.querySelectorAll('#detail-empty .okf-lens-summary__note')];
+      const digest = document.querySelector('.okf-graph-theme-digest');
+      return {wrapped: notes.filter(n => n.getClientRects().length !== 1 ||
+                n.getBoundingClientRect().height > parseFloat(getComputedStyle(n).lineHeight || '16') * 1.5).length,
+              notes: notes.length,
+              digestHeadings: digest ? digest.querySelectorAll('h2').length : null,
+              verdict: digest ? digest.querySelector('.okf-lens-summary__verdict').textContent : ''};
+    }""")
+    assert narrow["notes"] and narrow["wrapped"] == 0, narrow
+    assert narrow["digestHeadings"] == 0 and " - " not in narrow["verdict"], narrow
+    page.set_viewport_size({"width": 768, "height": 1024})
+    page.get_by_role('navigation', name='Graph panes').get_by_role('button', name='Details', exact=True).click()
+    rails = page.evaluate("""() => ['.okf-detail__empty > p', '#detail-empty .okf-lens-summary__title',
+        '.okf-signal__lenses > summary', '.okf-signal__advanced > summary', '.okf-signal__question']
+      .map(s => Math.round(document.querySelector(s).getBoundingClientRect().left))""")
+    assert len(set(rails)) == 1, rails
+    page.get_by_role('navigation', name='Graph panes').get_by_role('button', name='Concepts', exact=True).click()
+    warn = page.locator(".okf-node-index__warn").first
+    expect(warn).to_have_text(re.compile(r"^\d+ broken$"))
+    expect(warn).to_have_attribute("title", re.compile(r"^\d+ broken links?$"))
 
 
 def test_graph_settings_disclosure_matches_its_sibling_summaries(page, docs_server_url: str) -> None:
