@@ -2683,6 +2683,7 @@ details.okf-frontmatter[open] { padding-bottom: var(--okf-space-2); }
 .okf-search-mode input:focus-visible { outline: none; }
 @media (forced-colors: active) {
   .okf-search-mode:has(input:checked) { border-inline-start-color: Highlight; background: Canvas; color: CanvasText; forced-color-adjust: none; }
+  .okf-search-mode:has(input:checked) :is(span, small) { color: CanvasText; }
   .okf-search-mode:has(input:focus-visible) { outline-color: Highlight; }
 }
 .okf-search-mode span { display: grid; color: var(--text); font-size: 13px; font-weight: 600; }

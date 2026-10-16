@@ -410,8 +410,11 @@ def test_ledger_hover_press_and_breadcrumb_cues_remain_visible(open_page, theme)
     assert idle != hovered and hovered != pressed, (theme, idle, hovered, pressed)
 
 
-def test_search_modes_keep_native_keyboard_semantics_with_square_segments(open_page):
+@pytest.mark.parametrize('theme', ['bone', 'slate'])
+@pytest.mark.parametrize('color_scheme', ['light', 'dark'])
+def test_search_modes_keep_native_keyboard_semantics_with_square_segments(open_page, theme, color_scheme):
     page = open_page(SEARCH, DESKTOP)
+    _choose_appearance(page, theme)
     radios = page.locator('.okf-search-mode input')
     first = radios.first
     first.focus()
@@ -420,10 +423,15 @@ def test_search_modes_keep_native_keyboard_semantics_with_square_segments(open_p
     expect(radios.nth(1)).to_be_focused()
     assert first.evaluate("r => getComputedStyle(r).borderRadius") == '0px'
     assert page.locator('.okf-search-query input').bounding_box()['height'] == 32
-    page.emulate_media(forced_colors='active')
+    page.emulate_media(forced_colors='active', color_scheme=color_scheme)
     visible = radios.nth(1).evaluate("""r => { const s = getComputedStyle(r.closest('label'));
       return s.borderInlineStartWidth === '2px' && s.outlineStyle === 'solid' && s.outlineWidth === '2px'; }""")
     assert visible
+    colours = radios.nth(1).evaluate("""r => { const label = r.closest('label');
+      return {text: getComputedStyle(label).color,
+        children: [...label.querySelectorAll('span, small')].map(el => getComputedStyle(el).color)}; }""")
+    assert len(colours['children']) >= 2, colours
+    assert all(colour == colours['text'] for colour in colours['children']), colours
 
 
 def _settle(page) -> None:
