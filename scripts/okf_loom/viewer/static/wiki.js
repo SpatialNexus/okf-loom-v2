@@ -1399,7 +1399,37 @@
   // hover's response may render; hidePopover also invalidates in-flight
   // responses so a popover can't reappear after mouseout.
   var popoverSeq = 0;
-   function showPopover(target, x, y) {
+  // Place the card beside its link, never over it (WCAG 2.4.11: a focused
+  // link and its ring stay visible): below the link's box when it fits, else
+  // above, else to the right or left. The pointer only picks the horizontal
+  // start of a hover card. When no spot clears the link, a focus-opened card
+  // stays closed; a hover card is clamped into the viewport.
+  function placePopover(p, anchor, pointerX, byFocus) {
+    var GAP = 8, EDGE = 12;
+    var vw = window.innerWidth, vh = window.innerHeight;
+    // Measure at the origin: a fixed card near the right edge shrink-wraps.
+    p.style.left = "0px";
+    p.style.top = "0px";
+    var card = p.getBoundingClientRect();
+    var w = card.width, h = card.height;
+    var box = anchor.getBoundingClientRect();
+    function clampX(x) { return Math.max(EDGE, Math.min(x, vw - w - EDGE)); }
+    function clampY(y) { return Math.max(EDGE, Math.min(y, vh - h - EDGE)); }
+    var startX = clampX(typeof pointerX === "number" ? pointerX : box.left);
+    var spot = null;
+    if (box.bottom + GAP + h <= vh - EDGE) spot = { left: startX, top: box.bottom + GAP };
+    else if (box.top - GAP - h >= EDGE) spot = { left: startX, top: box.top - GAP - h };
+    else if (box.right + GAP + w <= vw - EDGE) spot = { left: box.right + GAP, top: clampY(box.top) };
+    else if (box.left - GAP - w >= EDGE) spot = { left: box.left - GAP - w, top: clampY(box.top) };
+    if (!spot) {
+      if (byFocus) { p.style.display = "none"; return; }
+      spot = { left: startX, top: clampY(box.bottom + GAP) };
+    }
+    p.style.left = spot.left + "px";
+    p.style.top = spot.top + "px";
+  }
+
+   function showPopover(target, anchor, pointerX, byFocus) {
     var seq = ++popoverSeq;
     // /__raw/<id> is the body only (no frontmatter), so a preview built from
     // it showed the id as the title and a generic type. /__data/summary is
@@ -1460,12 +1490,7 @@
           p.appendChild(row);
         }
         p.style.display = "block";
-        // Position near cursor (or focus point), clamped to viewport.
-        var rect = p.getBoundingClientRect();
-        var px = Math.min((x || 12) + 12, window.innerWidth - rect.width - 12);
-        var py = Math.min((y || 12) + 12, window.innerHeight - rect.height - 12);
-        p.style.left = Math.max(12, px) + "px";
-        p.style.top = Math.max(12, py) + "px";
+        placePopover(p, anchor, pointerX, byFocus);
       })
       .catch(function () {});
   }
@@ -1475,7 +1500,7 @@
     if (popover) popover.style.display = "none";
   }
 
-  function scheduleShow(target, x, y) {
+  function scheduleShow(target, anchor, pointerX, byFocus) {
     if (popoverTimer) clearTimeout(popoverTimer);
     // Phase 2 P1 race fix (cache-invalidation-invariants): a NEW hover must
     // invalidate any EARLIER hover's in-flight fetch IMMEDIATELY — before this
@@ -1491,7 +1516,7 @@
     popoverSeq++;
     var delay = REDUCED_MOTION ? 0 : 200;   // P2-70: ~200ms (was 350ms)
     popoverTimer = setTimeout(function () {
-      showPopover(target, x, y);
+      showPopover(target, anchor, pointerX, byFocus);
     }, delay);
   }
   function cancelShow() {
@@ -1524,13 +1549,12 @@
       if (hoverBoundLinks.has(a)) return;
       hoverBoundLinks.add(a);
       a.addEventListener("mouseenter", function (e) {
-        scheduleShow(target, e.clientX, e.clientY);
+        scheduleShow(target, a, e.clientX, false);
       });
       a.addEventListener("mouseleave", cancelShow);
       // Keyboard parity (P2-70): focus shows, blur hides.
-      a.addEventListener("focus", function (e) {
-        var rect = a.getBoundingClientRect();
-        scheduleShow(target, rect.left, rect.bottom);
+      a.addEventListener("focus", function () {
+        scheduleShow(target, a, null, true);
       });
       a.addEventListener("blur", cancelShow);
     });

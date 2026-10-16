@@ -169,9 +169,12 @@ def test_type_colours_are_not_cancelled_with_important(name: str) -> None:
     assert not re.search(r"\[style\*=", css)
     for d in _decls(name):
         if "!important" in d.value:
+            # font-feature-settings: the `font` shorthand resets it, so the
+            # document's ligature/figure setting is carried with one important
+            # inherit (T1-003); it never carries a colour.
             assert d.prop in {"display", "outline", "animation", "transition", "grid-template-columns",
                               "max-width", "grid-column", "grid-row", "position", "max-height",
-                              "overflow"}, f"{name}:{d.line} {d.prop}: {d.value}"
+                              "overflow", "font-feature-settings"}, f"{name}:{d.line} {d.prop}: {d.value}"
 
 
 def test_no_removed_theme_modifiers_remain() -> None:

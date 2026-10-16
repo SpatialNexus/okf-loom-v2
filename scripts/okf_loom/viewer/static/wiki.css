@@ -536,7 +536,10 @@ body {
    * stack so multilingual aliases and bodies render real glyphs. */
   font-family: var(--font-body), "Noto Sans CJK SC", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  font-feature-settings: var(--font-features);
+  /* Ligatures off by default: Azeret Mono's fi ligature turns "config" into
+   * "conf1g" in ids, paths and code. Prose turns them back on for its
+   * Public Sans text only (see .okf-prose). */
+  font-feature-settings: var(--font-features), "liga" 0, "calt" 0;
   font-size: var(--fs-base);
   line-height: var(--lh-base);
   color: var(--text);
@@ -545,6 +548,13 @@ body {
   scrollbar-color: var(--border-strong) var(--bg);
   -webkit-font-smoothing: antialiased;
 }
+/* The `font` shorthand resets font-feature-settings, so the body's value
+ * never reached the many mono labels set with `font: ... var(--font-mono)`
+ * (they rendered the fi ligature and lost tabular figures). Every element
+ * inherits the setting; only the prose owners (.okf-prose) change it. */
+body *,
+body *::before,
+body *::after { font-feature-settings: inherit !important; }
 ::selection { background: var(--selection); color: var(--text); }
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
@@ -584,7 +594,10 @@ hr { border: 0; border-top: 1px solid var(--border); margin: var(--okf-space-4) 
   text-decoration: none;
   transition: top 0.12s ease;
 }
-.okf-skip-link:focus { top: var(--okf-space-2); outline: 3px solid var(--focus); outline-offset: 1px; }
+/* The 2px focus-colour border IS the ring (the link only shows while
+ * focused); the outline is drawn exactly over it, so one frame hugs the
+ * link instead of two concentric ones. */
+.okf-skip-link:focus { top: var(--okf-space-2); outline: 2px solid var(--focus); outline-offset: -2px; }
 
 /* ---- Focus ------------------------------------------------------------------
  * Without explicit :focus-visible styles, styled controls suppress the native
@@ -902,9 +915,11 @@ details.okf-frontmatter td code { white-space: pre-wrap; word-break: break-word;
 .okf-prose {
   color: var(--text);
   font-size: var(--prose-size);
+  font-feature-settings: var(--font-features) !important;
   line-height: 1.72;
   word-wrap: break-word;
 }
+.okf-prose :is(code, kbd, samp, pre, time) { font-feature-settings: var(--font-features), "liga" 0, "calt" 0 !important; }
 /* The body container is unconstrained: the measure applies to its PROSE
  * children, so wide blocks can use the column while text stays readable. */
 .okf-page__body { max-width: none; }
@@ -967,8 +982,10 @@ details.okf-frontmatter td code { white-space: pre-wrap; word-break: break-word;
 .okf-prose del { color: var(--text-2); }
 .okf-prose img,
 .okf-page__body img { max-width: 100%; height: auto; }
-/* Heading deep-link anchors: invisible until heading hover or focus. */
-.okf-heading-anchor {
+/* Heading deep-link anchors: invisible until heading hover or focus. The
+ * element-qualified selector outranks `.okf-prose a`, so the mark stays a
+ * quiet glyph instead of an underlined accent link. */
+a.okf-heading-anchor {
   margin-left: var(--okf-space-2);
   color: var(--text-3);
   font-size: 0.8em;
@@ -1112,9 +1129,11 @@ pre code.hljs { display: block; overflow-x: auto; }
   border-spacing: 0;
   font-size: 0.88em;
 }
+/* A 4px start inset gives the sortable head's inset focus ring room, so it
+ * never runs through the first letter of a flush-left column. */
 .okf-table th,
 .okf-table td {
-  padding: 8px 14px 8px 0;
+  padding: 8px 14px 8px 4px;
   border: 0;
   border-bottom: 1px solid var(--border);
   background: transparent;
@@ -1131,6 +1150,10 @@ pre code.hljs { display: block; overflow-x: auto; }
   letter-spacing: var(--label-track);
   text-transform: uppercase;
 }
+/* One-token cells (dates, numbers, ids, paths) never split at a hyphen or
+ * slash; a table too wide for its column scrolls in its wrapper instead
+ * (renderers.js marks them). */
+.okf-table td.okf-cell-atomic { white-space: nowrap; }
 .okf-table tbody tr:last-child td { border-bottom: 0; }
 .okf-table tbody tr:hover td { background: var(--surface-2); }
 .okf-table td code { font-size: 11.5px; }
@@ -1146,7 +1169,9 @@ pre code.hljs { display: block; overflow-x: auto; }
  * so the cues stay pinned to the visible edges at every scroll offset. */
 .okf-tablewrap-frame { position: relative; max-width: 100%; margin: 16px 0 0; }
 .okf-tablewrap { position: relative; max-width: 100%; margin: 0; overflow-x: auto; }
-.okf-tablewrap--fit { overflow-x: visible; }
+/* A table that fits sizes its wrapper, so the filter/count/Copy CSV toolbar
+ * spans the table it controls rather than the whole column. */
+.okf-tablewrap--fit { width: fit-content; overflow-x: visible; }
 .okf-tablewrap .okf-table { margin: 0; }
 .okf-table--enhanced { display: table; overflow-x: visible; }
 /* Scroll cues: a flat canvas strip with a 2px strong rule on whichever side
@@ -1826,6 +1851,8 @@ body.okf-viewer .okf-hero:not(:has(> .okf-hero__visual > *)) { display: block; }
   padding-top: var(--okf-space-4);
   border-top: 1px solid var(--border);
 }
+/* Studio's Related panel draws its own 2px top rule: no second rule above it. */
+.okf-page__sidebar:has(> .okf-sidebar-panel) { border-top: 0; }
 @media (min-width: 901px) {
   .okf-page:not([data-okf-related="below"]) {
     grid-template-columns: minmax(0, var(--okf-article-maxw)) minmax(180px, 210px);
@@ -1855,11 +1882,15 @@ body.okf-viewer .okf-hero:not(:has(> .okf-hero__visual > *)) { display: block; }
 /* View tabs (Rendered / Source / Split / Focus view). Studio mounts the bar
  * (studio.css owns its stickiness); Ledger draws text tabs on the band: the
  * selected view is bold with a 2px accent underline. Wrap and Focus are
- * modifier toggles, marked neutrally, so accent only means "current view". */
+ * modifier toggles, marked neutrally, so accent only means "current view".
+ * The tabs anchor to the start of the bar, so neither the Wrap toggle
+ * appearing nor the Sections label changing ever moves them; the 4px top
+ * gutter keeps their outset focus ring clear of the sticky top bar. */
 body.okf-viewer .okf-concept-viewbar {
+  justify-content: flex-start;
   gap: 18px;
   min-height: 48px;
-  padding: 0 20px;
+  padding: 4px 20px 0;
   border-bottom: 1px solid var(--border);
   background: var(--bg-2);
 }
@@ -2023,6 +2054,9 @@ body.okf-viewer .okf-viewswitch__btn:is(.okf-source-wrap, .okf-focus-toggle)[ari
   padding: 10px 18px 12px;
   border-block: 1px solid var(--border);
 }
+/* Directly under the metadata strip, the strip's bottom rule is the tools'
+ * top edge: one hairline, not two parallel ones 14px apart. */
+:has(> .okf-metadata:last-child) + .okf-document-tools { margin-top: 0; border-top: 0; }
 .okf-document-tools > .okf-onthispage { border: 0; }
 .okf-onthispage { display: block; margin: 0; padding: 0; border: 0; background: transparent; }
 .okf-onthispage[hidden] { display: none; }
@@ -2074,7 +2108,9 @@ body.okf-viewer .okf-viewswitch__btn:is(.okf-source-wrap, .okf-focus-toggle)[ari
   text-decoration: none;
 }
 .okf-onthispage__link:hover { color: var(--text); text-decoration: underline; }
-.okf-onthispage__link:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+/* Inset ring: the lists scroll, and an outset ring on the first or last
+ * entry would be clipped by the scroller's edge. */
+.okf-onthispage__link:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 /* Current section (document-outline.js; aria-current="location" is the
  * machine-readable signal, this is its visible counterpart). */
 .okf-onthispage__link.is-active { border-left-color: var(--accent); color: var(--text); font-weight: 600; }
@@ -2117,10 +2153,13 @@ body.okf-viewer .okf-viewswitch__btn:is(.okf-source-wrap, .okf-focus-toggle)[ari
 .okf-portable-server-note h2 { color: var(--status-info); }
 
 /* "Sections" in the view bar (document-outline.js): one restrained jump
- * control driven by the same heading state as the outline disclosure. */
-.okf-outline-jump { position: relative; display: flex; min-width: 0; max-width: 100%; margin-left: var(--okf-space-3); }
+ * control driven by the same heading state as the outline disclosure. It
+ * keeps a slot at the end of the bar sized by the bar, never by its label
+ * (which truncates inside): 20rem where there is room, down to 12rem so it
+ * stays on the tabs' row in narrow bars (641px, or beside the Studio rail). */
+.okf-outline-jump { position: relative; display: flex; flex: 1 1 12rem; min-width: 0; max-width: min(20rem, 100%); margin-left: auto; }
 .okf-outline-jump[hidden] { display: none; }
-.okf-outline-jump__toggle { gap: var(--okf-space-2); min-width: 0; max-width: 100%; overflow: hidden; }
+.okf-outline-jump__toggle { flex: 1 1 auto; justify-content: flex-start; gap: var(--okf-space-2); min-width: 0; max-width: 100%; overflow: hidden; }
 .okf-outline-jump__toggle > :not(.okf-outline-jump__current) { flex: none; }
 .okf-outline-jump__current {
   min-width: 0;
@@ -2136,17 +2175,30 @@ body.okf-viewer .okf-viewswitch__btn:is(.okf-source-wrap, .okf-focus-toggle)[ari
   top: calc(100% + 6px);
   right: 0;
   z-index: 60;
+  display: flex;
+  flex-direction: column;
   min-width: 15rem;
   max-width: min(24rem, calc(100vw - 1.5rem));
   max-height: min(60vh, 30rem);
   padding: var(--okf-space-2);
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  overflow: hidden;
   border: 0;
   background: var(--surface);
   box-shadow: var(--shadow-pop);
 }
-.okf-outline-jump__panel .okf-onthispage__nav { padding: 0; }
+.okf-outline-jump__panel[hidden] { display: none; }
+/* The list is the panel's one scroller. Scroll cue: a 2px strong rule on
+ * whichever edge still has sections beyond it (document-outline.js). */
+.okf-outline-jump__panel .okf-onthispage__nav {
+  min-height: 0;
+  max-height: none;
+  padding: 0;
+  overscroll-behavior: contain;
+  border-block: 2px solid transparent;
+}
+.okf-outline-jump__panel .okf-onthispage__list { margin: 0; }
+.okf-outline-jump__panel[data-okf-more-above] .okf-onthispage__nav { border-top-color: var(--border-strong); }
+.okf-outline-jump__panel[data-okf-more-below] .okf-onthispage__nav { border-bottom-color: var(--border-strong); }
 
 /* ---- Reading lane --------------------------------------------------------------
  * Workspace vs lane: the document body / Source / Split region always takes
@@ -2342,13 +2394,13 @@ details.okf-frontmatter[open] { padding-bottom: var(--okf-space-2); }
   letter-spacing: var(--label-track);
   text-transform: uppercase;
 }
+/* The pager's outlined cards carry their own edges, so the band adds no
+ * rule of its own above them (it doubled the connections' last rule). */
 .okf-prevnext {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--okf-space-3);
   margin: var(--okf-space-6) 0;
-  padding-top: var(--okf-space-4);
-  border-top: 1px solid var(--border);
 }
 .okf-prevnext__link {
   display: flex;
@@ -3332,6 +3384,8 @@ body:has(.okf-graph-loading--error) .okf-cytoscape-fallback-actions { display: f
   .okf-page__title { font-size: clamp(1.5rem, 5vw, 1.875rem); line-height: 1.15; }
   .okf-prevnext { grid-template-columns: 1fr; }
   .okf-prevnext__next { text-align: left; }
+  /* Stacked, the empty slot only reserved a blank card-sized band. */
+  .okf-prevnext__placeholder { display: none; }
   .okf-stat { margin-right: 14px; padding-right: 14px; }
   /* The inventory ruler collapses to one stacked column: title, id,
    * summary, signals. The group head keeps its label and count. */
@@ -3372,8 +3426,13 @@ body:has(.okf-graph-loading--error) .okf-cytoscape-fallback-actions { display: f
    * scroll-away chrome (shell.css) keeps pinned while reading. Tighter tab
    * spacing keeps Rendered / Source / Split and Focus view on one row down
    * to 320px. */
+  /* Phone tables scroll in their wrapper instead of squeezing every column
+   * to its longest word: heads stay on one line, text cells keep a
+   * readable minimum measure (one-token cells are already unbroken). */
+  .okf-table th { white-space: nowrap; }
+  .okf-table td:not(.okf-cell-atomic) { min-width: 7rem; }
   body.okf-viewer .okf-concept-viewbar { gap: 4px 12px; padding-inline: 12px; }
-  body.okf-viewer .okf-concept-viewbar > .okf-outline-jump { flex: 1 0 100%; }
+  body.okf-viewer .okf-concept-viewbar > .okf-outline-jump { flex: 1 0 100%; max-width: none; }
   body.okf-viewer .okf-viewswitch { gap: 12px; }
   body.okf-viewer .okf-viewswitch__btn:is(.okf-source-wrap, .okf-focus-toggle) { padding-left: 12px; }
   /* "Wrap lines" shows as "Wrap"; the full name stays in the button. */
@@ -3438,8 +3497,6 @@ body:has(.okf-graph-loading--error) .okf-cytoscape-fallback-actions { display: f
   .okf-search-table td::before { content: attr(data-label); color: var(--text-2); font: 400 11px/1.5 var(--font-mono); }
   .okf-graph-detail__body,
   .okf-graph-detail__body .okf-tablewrap { min-width: 0; max-width: 100%; overflow-x: auto; }
-  .okf-graph-detail__body .okf-table { width: 100%; min-width: 0; table-layout: fixed; }
-  .okf-graph-detail__body .okf-table :is(th, td) { min-width: 0; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
   /* On a phone the read-only note must not push the document out of the
    * first screen: the destination stays in the link's accessible name. */
   .okf-review__where,
@@ -3533,6 +3590,11 @@ body:has(.okf-graph-loading--error) .okf-cytoscape-fallback-actions { display: f
   .okf-tablewrap__cue { background: none; }
   .okf-tablewrap__cue--right { border-right: 2px solid CanvasText; }
   .okf-tablewrap__cue--left { border-left: 2px solid CanvasText; }
+  /* Sections menu cue: forced colours draw a transparent edge, so the
+   * resting edges become Canvas and only an edge with more is CanvasText. */
+  .okf-outline-jump__panel .okf-onthispage__nav { border-block-color: Canvas; }
+  .okf-outline-jump__panel[data-okf-more-above] .okf-onthispage__nav { border-top-color: CanvasText; }
+  .okf-outline-jump__panel[data-okf-more-below] .okf-onthispage__nav { border-bottom-color: CanvasText; }
   .okf-graph-thumb svg,
   .okf-graph-nojs__export .okf-graph-export { border: 1px solid CanvasText; background: Canvas; }
   .okf-graph-thumb__edges line { stroke: CanvasText; }
@@ -3563,14 +3625,24 @@ body:has(.okf-graph-loading--error) .okf-cytoscape-fallback-actions { display: f
     .okf-v2-spotlight__tertiary, .okf-search-mode, .okf-search-disclosure > summary,
     .okf-page-context > details > summary, .okf-search-query input, .okf-search-submit,
     .okf-brand-link, .okf-skip-link, .okf-search-result h3 > a,
-    .okf-search-raw-source > summary) {
+    .okf-search-raw-source > summary, .okf-metadata summary, .okf-entity-chip,
+    .okf-page__meta .okf-external, .okf-relation__target, .okf-document-end a) {
     min-height: 44px;
     min-inline-size: 44px;
   }
   :is(.okf-heading-anchor, .okf-breadcrumb a, .okf-conn__title, .okf-card__link,
     .okf-card__comments, .okf-v2-spotlight__tertiary, .okf-brand-link,
-    .okf-skip-link, .okf-search-result h3 > a) { display: inline-flex; align-items: center; }
-  .okf-heading-anchor { opacity: 1; }
+    .okf-skip-link, .okf-search-result h3 > a, .okf-document-end a) { display: inline-flex; align-items: center; }
+  /* A short crumb ("demo") centres in its 44px box, so the extra width is
+   * shared evenly instead of opening a hole before the next separator. */
+  .okf-breadcrumb a { justify-content: center; }
+  /* The 44px anchor box hangs into the line's margins (negative margins),
+   * so it neither inflates the heading's line nor wraps onto a line of its
+   * own after a long last word; the glyph keeps a 12px gap from the text. */
+  a.okf-heading-anchor { justify-content: center; margin: -8px -12px -8px -4px; opacity: 1; }
+  /* Table cells ignore min-height: the sortable head row takes the height. */
+  .okf-th-sortable { height: 44px; vertical-align: middle; }
+  .okf-metadata summary { padding-block: 12px; }
   .okf-type-nav__link,
   .okf-onthispage__link,
   .okf-recent__item,

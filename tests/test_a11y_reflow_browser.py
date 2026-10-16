@@ -121,6 +121,7 @@ _SHELL_TARGETS = ['.okf-brand-link', '.okf-skip-link']
 @pytest.mark.parametrize('route,selectors', [
     (CONCEPT, ['.okf-sidebar-panel__toggle', '.okf-heading-anchor', '.okf-breadcrumb a',
                '.okf-conn__title', '.okf-viewswitch__btn', '.okf-onthispage__filter',
+               '.okf-th-sortable', '.okf-entity-chip', '.okf-document-end a',
                '.okf-toast__action', '.okf-toast__close', *_SHELL_TARGETS]),
     (INDEX, ['.okf-card__link', '.okf-card__comments', '.okf-v2-spotlight__tertiary', *_SHELL_TARGETS]),
     (SEARCH, ['.okf-search-mode', '.okf-search-disclosure > summary',
