@@ -23,6 +23,27 @@ follow [Semantic Versioning](https://semver.org/). The product version
   without scrolling the graph workspace or hiding its top bar.
 - Portable builds use the configured viewer title consistently across Index,
   documents, Graph, Search and the single-file viewer, without client-side renaming.
+- Portable results retain the query in both search fields even while loading
+  or unavailable, and use the same type chips, concept ids, source paths and
+  context-action wording as live results (D3-008, D3-013).
+- Search modes read as single-choice Ledger segments with whole-label focus
+  and a 2px selected state bar, retaining native radio keyboard behavior (D2-024).
+- Search discloses reached result limits and offers relevant, evenly spaced
+  empty-state actions instead of clearing nonexistent filters (D2-019, D2-020).
+- Search and suggestion highlighting marks whole query terms, not fragments
+  inside identifiers or English stop words (D2-018).
+- Suggestions show an explicit no-match message, omit the current page from
+  Recent pages, stay closed for empty history, and have one bottom edge (D1-004).
+- Search previews, evidence previews, graph descriptions and concept summaries
+  share a safe plain-text Markdown projection; exact source remains available
+  separately and copied passages/Context Packs are unchanged (D2-016, M1-015,
+  T1-011, D1-011).
+- Search result titles meet the 44px coarse-pointer target on tablets as well
+  as phones (search portion of T1-006).
+- Portable search verifies the same SHA-256 evidence hashes on plain-HTTP LAN
+  mirrors using a bundled fallback only when WebCrypto is absent (D3-005).
+- Search suggestion selection keeps row heights stable while `aria-selected`
+  and forced-colour outlines continue to announce the active option (D1-002, D3-006).
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
   including source derivations; the full/tool graph projection is unchanged.
 - Missing or malformed embedded search evidence in single-file exports settles as

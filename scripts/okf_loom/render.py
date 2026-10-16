@@ -49,6 +49,7 @@ from urllib.parse import quote as _url_quote, urlencode, unquote as _url_unquote
 from pathlib import Path
 from typing import Any
 
+from .viewer.text import readable_text
 from .aliases import alias_labels
 from .metadata import effective_instant_key, parse_instant
 from .viewer.metadata import (FIELDS as METADATA_FIELDS, render_metadata, join_source_footnotes,
@@ -2673,7 +2674,7 @@ def _render_not_found_page(*, name: str, path: str, config: dict[str, Any],
         f'<p>The requested page <code>/{_esc(path)}</code> is not available.</p>'
         '<p class="okf-notfound__actions"><a class="okf-btn" href="/">Home · Browse the index</a> '
         '<a class="okf-btn" href="/__search">Search this bundle</a></p>'
-        '</main><script src="/__static/wiki.js" defer></script></body></html>'
+        '</main><script src="/__static/readable-text.js" defer></script><script src="/__static/wiki.js" defer></script></body></html>'
     )
 
 
@@ -2789,7 +2790,7 @@ def render_feedback_import_page(*, name: str, config: dict[str, Any], availabili
         '</ul>\n</section>\n'
         '<div id="okf-fbi-live" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>\n'
         '</div>\n</main>\n'
-        '<script src="/__static/wiki.js" defer></script>\n'
+        '<script src="/__static/readable-text.js" defer></script><script src="/__static/wiki.js" defer></script>\n'
         '<script src="/__static/feedback-import.js" defer></script>\n'
         '</body>\n</html>\n'
     )
@@ -3347,7 +3348,7 @@ def render_single_file(
         + ' data-okf-single-concept="' + _esc("/".join(cid)) + '">'
         + '<strong>' + _esc(concept.title) + '</strong></a>'
         + '<span>' + _esc(concept.type or "Concept") + ' · ' + _esc("/".join(cid)) + '</span>'
-        + ('<p>' + _esc(concept.description) + '</p>' if concept.description else '')
+        + ('<p>' + _esc(readable_text(concept.description)) + '</p>' if concept.description else '')
         + '</li>'
         for cid, concept in sorted(bundle.concepts.items())
     )
@@ -3402,6 +3403,7 @@ def render_single_file(
     # search.js are preserved unchanged.
     theme_js = load_static("theme.js", bundle)
     js = (load_static("capture-readiness.js", bundle) + "\n" +
+          load_static("readable-text.js", bundle) + "\n" +
           load_static("portable-retrieval.js", bundle) + "\n" +
           load_static("graph.js", bundle) + "\n" +
           load_static("document-outline.js", bundle) + "\n" +
@@ -3443,6 +3445,7 @@ def render_single_file(
           .replace("__DATA_ATTRS__", data_attrs)
         .replace("__NOJS_RELATIONSHIPS__", nojs_relationships)
         .replace("__SINGLE_INDEX_CONCEPTS__", single_index_concepts)
+        .replace("__SEARCH_TYPE_CHIPS__", _search_type_chips_html(bundle))
         .replace("__GRAPH_THUMBNAIL__", _graph_thumbnail_html(data, "#okf-graph"))
         .replace("/*__VIEWER_CSS__*/", css)
         .replace("__THEME_CONFIG__", _theme_config_html(configured_theme))
@@ -4185,6 +4188,15 @@ def _type_icons_block() -> str:
     return _TYPE_ICONS_BLOCK_CACHE
 
 
+def _search_type_chips_html(bundle: Bundle) -> str:
+    """Trusted, inert chips let portable rows clone the server's type anatomy."""
+    return '<template id="okf-search-type-chips">' + ''.join(
+        f'<span class="okf-search-result__type" data-type="{_esc_attr_qs(ctype)}">'
+        f'{type_icon_svg(ctype, size=14, cls="okf-type-icon")} {_esc(ctype)}</span>'
+        for ctype in sorted({c.type for c in bundle.concepts.values() if c.type})
+    ) + '</template>'
+
+
 def _ledger_fonts_head(static_prefix: str, *, mode: str) -> str:
     """Preload upright fonts on HTTP-only targets, never file-capable static pages."""
     from .viewer.vendor import LEDGER_FACES
@@ -4673,6 +4685,7 @@ def _render_concept_page(
     js_link = (
         f'<script src="{static_prefix}/capture-readiness.js" defer></script>\n'
         f'<script src="{static_prefix}/portable-retrieval.js" defer></script>\n'
+        f'<script src="{static_prefix}/readable-text.js" defer></script>\n'
         f'<script src="{static_prefix}/wiki.js" defer></script>'
     )
     document_outline_link = f'<script src="{static_prefix}/document-outline.js" defer></script>'
@@ -4794,7 +4807,7 @@ def _render_concept_page(
          .replace("__CONCEPT_SUBTITLE__", subtitle_html)
          .replace("__CONTEXT_ACTION_HTML__", context_action_html)
         .replace("__ENTITY_CHIPS_HTML__", entity_chips_html)
-        .replace("__CONCEPT_DESCRIPTION__", _esc(concept.description))
+        .replace("__CONCEPT_DESCRIPTION__", _esc(readable_text(concept.description)))
         .replace("__CONCEPT_RESOURCE__", resource_html)
         # Phase 2: tags moved to the infobox; the header meta row now holds
         # only the resource link. __CONCEPT_TAGS__ is kept as a no-op for
@@ -5888,6 +5901,7 @@ def render_reserved_document(document: str, body: str, *, mode: str,
         f'<div class="okf-prose okf-reserved__body">{heading}{rendered}</div>\n'
         '</article>\n</main>\n'
         f'<script src="{prefix}/capture-readiness.js" defer></script>\n'
+        f'<script src="{prefix}/readable-text.js" defer></script>\n'
         f'<script src="{prefix}/wiki.js" defer></script>\n'
         f'<script src="{prefix}/renderers.js" defer></script>\n'
         '</body>\n</html>\n'
@@ -6107,7 +6121,8 @@ def _render_index_page(
             # explanation/explanation/x.html from there).
             sub_source = tuple(sub.split("/")) + ("index",) if sub else None
             url = url_for_concept(c.id, mode, source_cid=sub_source)
-            desc = _esc(c.description[:140] + ("…" if len(c.description) > 140 else ""))
+            description = readable_text(c.description)
+            desc = _esc(description[:140] + ("…" if len(description) > 140 else ""))
             # Card footer: outgoing/incoming counts + first few tags.
             meta_bits: list[str] = []
             if graph is not None:
@@ -6277,6 +6292,7 @@ def _render_index_page(
         else f'<script src="{static_prefix}/theme.js"></script>'
     )
     js_link = (f'<script src="{static_prefix}/capture-readiness.js" defer></script>\n'
+               f'<script src="{static_prefix}/readable-text.js" defer></script>\n'
                f'<script src="{static_prefix}/wiki.js" defer></script>\n'
                f'<script src="{static_prefix}/index-browse.js" defer></script>')
     renderers_link = f'<script src="{static_prefix}/renderers.js" defer></script>'
@@ -6517,17 +6533,12 @@ def _render_search_page(
     error_values = dict(getattr(error, "fields", {}) or {})
     error_fields = set(error_values)
     def marked_excerpt(value: str) -> str:
-        value = re.sub(r"!\[([^\]]*)\]\([^)]*\)", r"\1", value)
-        value = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", value)
-        value = re.sub(r"^\s{0,3}(?:#{1,6}|[-*+] |>+)\s*", "", value, flags=re.MULTILINE)
-        value = re.sub(r"```[^\n]*\n?|~~~[^\n]*\n?|```|~~~", "", value)
-        value = re.sub(r"`([^`\n]+)`", r"\1", value)
-        value = re.sub(r"\*\*([^*]+)\*\*", r"\1", value)
-        value = re.sub(r"(^|\s)\*([^*\n]+)\*(?=\s|[.,;:!?]|$)", r"\1\2", value)
-        terms = list(dict.fromkeys(re.findall(r"[\w-]+", query, flags=re.UNICODE)))[:32]
+        value = readable_text(value)
+        from .search import tokenize
+        terms = list(dict.fromkeys(tokenize(query)))[:32]
         if not terms:
             return _esc(value)
-        pattern = re.compile("(" + "|".join(re.escape(term) for term in sorted(terms, key=len, reverse=True)) + ")", re.IGNORECASE)
+        pattern = re.compile(r"(?<!\w)(" + "|".join(re.escape(term) for term in sorted(terms, key=len, reverse=True)) + r")(?!\w)", re.IGNORECASE)
         return "".join(f"<mark>{_esc(part)}</mark>" if index % 2 else _esc(part)
                        for index, part in enumerate(pattern.split(value)))
 
@@ -6609,7 +6620,7 @@ def _render_search_page(
         f'{query_invalid}'
         'autocomplete="off"><button type="submit" class="okf-search-submit">Search</button></div>'
         f'{query_error_html}</div>'
-        '<fieldset id="okf-search-mode" class="okf-search-modes"><legend>How should results be matched?</legend>'
+        '<fieldset id="okf-search-mode" class="okf-search-modes"><legend>How should results be matched? Choose one.</legend>'
         f'{mode_controls}</fieldset></div>'
         f'<details class="okf-search-filters"{" open" if active_filters else ""}><summary>{filters_label}</summary>'
         f'<div class="okf-search-filter-grid">{filter_fields}</div>'
@@ -6642,7 +6653,7 @@ def _render_search_page(
             f'<span class="okf-search-result__type">'
             f'{icon} {_esc(ctype)}</span>' if ctype else ""
         )
-        heading_suffix = f' <span class="okf-muted">{_esc(passage.get("heading"))}</span>' if passage.get("heading") else ""
+        heading_suffix = f' <span class="okf-muted">{_esc(readable_text(passage.get("heading")))}</span>' if passage.get("heading") else ""
         citation = str(passage.get("citation") or "")
         path = str(passage.get("path") or cid)
         reasons = r.get("reasons") or []
@@ -6679,7 +6690,9 @@ def _render_search_page(
         exact_evidence = (
             '<section class="okf-search-exact" aria-label="Exact passage evidence">'
             '<h4>What does the source say?</h4>'
-            f'<pre class="okf-search-source" aria-label="Exact canonical source passage">{_esc(str(desc)[:2000])}</pre>'
+            f'{structured_excerpt(str(desc)[:2000])}'
+            '<details class="okf-search-raw-source"><summary>Exact Markdown source</summary>'
+            f'<pre class="okf-search-source" aria-label="Exact canonical source passage">{_esc(str(desc)[:2000])}</pre></details>'
             f'<p class="okf-search-evidence"><code class="okf-search-citation">{_esc(citation)}</code><span class="okf-search-path">{_esc(path)}</span></p>'
             '</section>' if has_passage else
             '<p class="okf-search-no-passage">No exact passage or line citation is available. This result is supported only by canonical graph metadata.</p>'
@@ -6749,7 +6762,12 @@ def _render_search_page(
                         f'<h3>Search request error</h3><p>{_esc(error.message)}</p><ul>{field_rows}</ul>'
                         f'<p><a class="okf-btn" href="{clear_href}">Start a new search</a> <a href="{back_link}">Browse the index</a></p></div>')
     elif result_parts:
-        results_html = '<ol class="okf-search-results-list">' + "\n".join(result_parts) + '</ol>'
+        cap_notice = ""
+        if len(results) >= req_limit:
+            guidance = ("Increase Result limit in Filters to check for more matches."
+                        if req_limit < 100 else "Narrow your query or filters to find other matches.")
+            cap_notice = f'<p class="okf-search-limit-notice" role="status">Result limit reached ({int(req_limit)}). {guidance}</p>'
+        results_html = cap_notice + '<ol class="okf-search-results-list">' + "\n".join(result_parts) + '</ol>'
     elif not query and not active_filters:
         # F7: the empty-query suggestion head follows the metadata owner's
         # effective change instant, not the raw legacy ``timestamp`` key.
@@ -6761,8 +6779,17 @@ def _render_search_page(
                         f'<section><h3>Browse</h3><p>{browse_types}</p><p>{browse_tags}</p></section>'
                         '<section><h3>Try a search</h3><p><a href="?q=architecture&amp;mode=hybrid">architecture</a> or <a href="?q=decision&amp;mode=semantic">meaning of a decision</a></p></section></div>')
     else:
-        results_html = (f'<div class="okf-search-empty"><h3>No matching passages</h3><p>No evidence matched “{_esc(query)}” with the current filters.</p>'
-                        f'<p><a class="okf-btn" href="{clear_href}?q={_esc_attr_qs(query)}">Clear filters</a> <a href="{back_link}">Browse the index</a></p></div>')
+        empty_message = (f'No evidence matched “{_esc(query)}”' if query else 'No evidence matched')
+        empty_message += (' with the current filters.' if active_filters else ' using this match mode.')
+        empty_actions = f'<a class="okf-btn" href="{back_link}">Browse the index</a>'
+        if active_filters:
+            reset_query = urlencode({"q": query, "mode": req_mode, "limit": req_limit})
+            empty_actions = f'<a class="okf-btn" href="{clear_href}?{_esc_attr_qs(reset_query)}">Clear filters</a>' + empty_actions
+        elif req_mode != "hybrid":
+            broaden_query = urlencode({"q": query, "mode": "hybrid", "limit": req_limit})
+            empty_actions = f'<a class="okf-btn" href="{clear_href}?{_esc_attr_qs(broaden_query)}">Try Best overall</a>' + empty_actions
+        results_html = (f'<div class="okf-search-empty"><h3>No matching passages</h3><p>{empty_message}</p>'
+                        f'<div class="okf-search-empty__actions">{empty_actions}</div></div>')
 
     theme_attr = ""
     configured_theme = _theme_preference(config)
@@ -6791,6 +6818,7 @@ def _render_search_page(
         else f'<script src="{static_prefix}/theme.js"></script>'
     )
     js_link = (f'<script src="{static_prefix}/capture-readiness.js" defer></script>\n'
+               f'<script src="{static_prefix}/readable-text.js" defer></script>\n'
                f'<script src="{static_prefix}/wiki.js" defer></script>')
     renderers_link = f'<script src="{static_prefix}/renderers.js" defer></script>'
     # Current spec §9: in static mode also load the client-side
@@ -6802,6 +6830,7 @@ def _render_search_page(
         js_link = (
               f'<script src="{static_prefix}/capture-readiness.js" defer></script>\n'
               f'<script src="{static_prefix}/portable-retrieval.js" defer></script>\n'
+            f'<script src="{static_prefix}/readable-text.js" defer></script>\n'
             f'<script src="{static_prefix}/wiki.js" defer></script>\n'
             f'<script src="{static_prefix}/static-search.js" defer></script>'
         )
@@ -6888,7 +6917,7 @@ def _render_search_page(
           .replace("__SHELL_CSS_LINK__", shell_css_link)
           .replace("__THEME_CONFIG__", _theme_config_html(configured_theme))
           .replace("__THEME_HEAD_JS__", head_theme_js)
-        .replace("__WIKI_JS_LINK__", _type_icons_block() + js_link)
+        .replace("__WIKI_JS_LINK__", _search_type_chips_html(bundle) + _type_icons_block() + js_link)
         .replace("__RENDERERS_JS_LINK__", renderers_link)
         .replace("__NAV_HTML__", nav_html)
         .replace("__APPLICATION_SHELL__", shell_html)
@@ -7001,6 +7030,7 @@ def _render_graph_page(
     # progressive renderers (mermaid/hljs/KaTeX). graph.js dispatches
     # okf-loom:bodyPatched after each showDetail() so renderers.js re-scans.
     graph_js = (
+          f'<script src="{static_prefix}/readable-text.js" defer></script>\n' +
           f'<script src="{static_prefix}/capture-readiness.js" defer></script>\n' +
           (f'<script src="{static_prefix}/portable-retrieval.js" defer></script>\n'
          if mode in ("static", "spa") else "") +

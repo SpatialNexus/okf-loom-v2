@@ -2589,33 +2589,23 @@ details.okf-frontmatter[open] { padding-bottom: var(--okf-space-2); }
   letter-spacing: var(--label-track);
   text-transform: uppercase;
 }
-.okf-search-mode { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; vertical-align: top; cursor: pointer; }
-.okf-search-mode input {
-  appearance: none;
-  display: grid;
-  place-items: center;
-  flex: none;
-  inline-size: 14px;
-  block-size: 14px;
-  margin: 0;
-  border: 1px solid var(--border-strong);
-  border-radius: 0;
-  background: var(--input-bg);
-  cursor: inherit;
-}
-.okf-search-mode input::before { content: ""; inline-size: 6px; block-size: 6px; }
-.okf-search-mode input:checked::before { background: var(--text); }
-.okf-search-mode input:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.okf-search-mode { position: relative; display: inline-flex; align-items: center; min-height: 40px; padding: 4px 8px; border-inline-start: 2px solid transparent; vertical-align: top; cursor: pointer; }
+/* Native radios keep one tab stop and arrow-key selection; their labels are
+ * the square Ledger segments, not checkbox-shaped replacement indicators. */
+.okf-search-mode input { position: absolute; inline-size: 1px; block-size: 1px; margin: 0; opacity: 0; border-radius: 0; }
+.okf-search-mode:has(input:checked) { border-inline-start-color: var(--accent); background: var(--surface-2); }
+.okf-search-mode:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: -2px; }
+.okf-search-mode input:focus-visible { outline: none; }
 @media (forced-colors: active) {
-  .okf-search-mode input { border-color: CanvasText; }
-  .okf-search-mode input:checked::before { background: CanvasText; forced-color-adjust: none; }
+  .okf-search-mode:has(input:checked) { border-inline-start-color: Highlight; background: Canvas; color: CanvasText; forced-color-adjust: none; }
+  .okf-search-mode:has(input:focus-visible) { outline-color: Highlight; }
 }
 .okf-search-mode span { display: grid; color: var(--text); font-size: 13px; font-weight: 600; }
 .okf-search-mode small { max-width: 11rem; color: var(--text-2); font-size: 11px; font-weight: 400; line-height: 1.2; }
 .okf-search-mode:has(input:disabled) { cursor: not-allowed; }
 .okf-context-scope-note { display: block; margin-top: var(--okf-space-2); color: var(--text-2); font-size: var(--okf-text-xs); }
 .okf-nojs-manual { display: none; }
-.okf-search-source { max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; }
+.okf-search-source { max-width: min(100%, 75ch); white-space: pre-wrap; overflow-wrap: anywhere; }
 .okf-search-filters { padding-top: var(--okf-space-2); border-top: 1px solid var(--border); }
 .okf-search-filters summary,
 .okf-page-context summary,
@@ -2715,19 +2705,18 @@ details.okf-frontmatter[open] { padding-bottom: var(--okf-space-2); }
   text-transform: uppercase;
 }
 .okf-search-result .okf-search-snippet {
-  display: -webkit-box;
+  display: block;
   max-width: 75ch;
   margin: var(--okf-space-1) 0;
   padding: 0;
-  overflow: hidden;
   border: 0;
   color: var(--text);
   font: 400 14px/1.55 var(--font-body);
   white-space: normal;
   overflow-wrap: anywhere;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
 }
+/* Only the result-row teaser is clamped; disclosed evidence stays readable. */
+.okf-search-result > .okf-search-snippet { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 4; -webkit-box-orient: vertical; }
 .okf-search-result .okf-search-snippet mark,
 .okf-search-snippet mark { background: transparent; color: var(--text); font-weight: 700; }
 .okf-search-evidence-summary { margin: var(--okf-space-1) 0 var(--okf-space-2); color: var(--text-3); font: var(--label-weight) var(--label-size)/1.4 var(--font-label); letter-spacing: var(--label-track); text-transform: uppercase; }
@@ -2762,6 +2751,8 @@ details.okf-frontmatter[open] { padding-bottom: var(--okf-space-2); }
 .okf-search-table tbody tr:last-child td { border-bottom: 0; }
 .okf-search-empty { padding: var(--okf-space-7) 0; color: var(--text-2); text-align: center; }
 .okf-search-empty h3 { color: var(--text); }
+.okf-search-empty__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--okf-space-3); margin-top: var(--okf-space-4); }
+.okf-search-limit-notice { color: var(--text-2); font-size: var(--okf-text-sm); }
 .okf-search-initial { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--okf-space-5); }
 .okf-search-initial section { border-top: 1px solid var(--border-strong); }
 .okf-search-initial h3 {
@@ -2864,6 +2855,7 @@ details.okf-frontmatter[open] { padding-bottom: var(--okf-space-2); }
   box-shadow: var(--shadow-pop);
 }
 .okf-search-live__option { display: grid; gap: 2px; padding: 8px 12px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.okf-search-live__option:last-child { border-bottom: 0; }
 .okf-search-live__option:hover { background: var(--surface-2); }
 .okf-search-live__option[aria-selected="true"] { background: var(--surface-2); color: var(--text); box-shadow: inset 2px 0 0 0 var(--accent); }
 .okf-search-live__head { display: flex; align-items: center; gap: var(--okf-space-2); min-width: 0; }
@@ -2905,7 +2897,8 @@ details.okf-frontmatter[open] { padding-bottom: var(--okf-space-2); }
 .okf-search-live__empty { padding: var(--okf-space-4) var(--okf-space-3); color: var(--text-2); font-size: var(--okf-text-sm); }
 
 /* F20 non-colour projections for structured alternatives. */
-.okf-search-live__option[aria-selected="true"]::before { content: "Selected · "; font-weight: 700; }
+/* aria-selected announces suggestion state without adding a grid row.
+ * Forced colours uses the inset double outline below, not generated text. */
 a[data-okf-broken]::after { content: " (broken link)"; font-size: var(--okf-text-xs); font-weight: 700; }
 [data-attention="pending"]::after { content: " · Needs attention"; font-weight: 700; }
 [data-attention="failure"]::after { content: " · Error"; font-weight: 700; }
@@ -3538,13 +3531,14 @@ body:has(.okf-graph-loading--error) .okf-cytoscape-fallback-actions { display: f
     .okf-breadcrumb a, .okf-conn__title, .okf-card__link, .okf-card__comments,
     .okf-v2-spotlight__tertiary, .okf-search-mode, .okf-search-disclosure > summary,
     .okf-page-context > details > summary, .okf-search-query input, .okf-search-submit,
-    .okf-brand-link, .okf-skip-link) {
+    .okf-brand-link, .okf-skip-link, .okf-search-result h3 > a,
+    .okf-search-raw-source > summary) {
     min-height: 44px;
     min-inline-size: 44px;
   }
   :is(.okf-heading-anchor, .okf-breadcrumb a, .okf-conn__title, .okf-card__link,
     .okf-card__comments, .okf-v2-spotlight__tertiary, .okf-brand-link,
-    .okf-skip-link) { display: inline-flex; align-items: center; }
+    .okf-skip-link, .okf-search-result h3 > a) { display: inline-flex; align-items: center; }
   .okf-heading-anchor { opacity: 1; }
   .okf-type-nav__link,
   .okf-onthispage__link,

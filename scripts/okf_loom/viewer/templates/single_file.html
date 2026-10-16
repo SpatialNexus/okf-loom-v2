@@ -70,7 +70,7 @@ __APPLICATION_SHELL__
   <form class="okf-single-search__form" role="search">
     <label class="okf-field" for="okf-single-query"><span>Search this bundle</span></label>
     <div class="okf-single-search__query"><input id="okf-single-query" name="q" type="search" maxlength="4096" autocomplete="off"><button type="submit" class="okf-search-submit">Search</button></div>
-    <fieldset class="okf-search-modes"><legend>How should results be matched?</legend>
+    <fieldset class="okf-search-modes"><legend>How should results be matched? Choose one.</legend>
       <label class="okf-search-mode"><input type="radio" name="mode" value="hybrid"> <span>Best overall</span></label>
       <label class="okf-search-mode"><input type="radio" name="mode" value="lexical" checked> <span>Exact wording</span></label>
       <label class="okf-search-mode"><input type="radio" name="mode" value="semantic"> <span>Similar meaning</span></label>
@@ -192,6 +192,7 @@ __APPLICATION_SHELL__
 <div id="okf-graph-copy-fallback" class="okf-copy-fallback okf-graph-copy-fallback" hidden><label for="okf-graph-copy-text">Copy neighbourhood manually</label><textarea id="okf-graph-copy-text" readonly rows="8"></textarea><button type="button" class="okf-btn" id="okf-graph-copy-select">Select all</button></div>
 <p id="okf-graph-copy-status" class="okf-visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
 
+__SEARCH_TYPE_CHIPS__
 <script>
 window.BUNDLE_NAME = __BUNDLE_NAME__;
 window.BUNDLE = __BUNDLE_DATA__;
