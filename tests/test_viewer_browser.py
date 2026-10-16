@@ -2528,6 +2528,23 @@ def test_link_preview_shows_the_target_concepts_title_type_and_counts(server_url
     expect(page.locator("#okf-popover .okf-popover__counts")).to_have_text("Links 4Relations 3")
 
 
+def test_mono_text_reads_letter_for_letter_while_prose_keeps_ligatures(server_url: str, page) -> None:
+    """T1-003: Azeret Mono's fi ligature read "config" as "conf1g". Every
+    mono run (code, code wells, the mono breadcrumb and ids) turns standard
+    and contextual ligatures off; prose Public Sans keeps them, and every
+    run keeps tabular figures."""
+    page.goto(f"{server_url}/tables/orders", wait_until="domcontentloaded")
+    page.locator("h1.okf-page__title").wait_for(state="visible")
+    features = page.evaluate("""() => {
+      const fs = (sel) => { const n = document.querySelector(sel); return n ? getComputedStyle(n).fontFeatureSettings : null; };
+      return {code: fs('.okf-page__body p code'), pre: fs('.okf-page__body pre'),
+              crumb: fs('.okf-breadcrumb'), cell: fs('.okf-page__body td code'), prose: fs('.okf-page__body p')};
+    }""")
+    for key in ("code", "pre", "crumb", "cell"):
+        assert '"liga" 0' in features[key] and '"calt" 0' in features[key] and '"tnum"' in features[key], features
+    assert '"liga" 0' not in features["prose"] and '"tnum"' in features["prose"], features
+
+
 def test_focus_opened_link_preview_never_covers_the_focused_link(server_url: str, page) -> None:
     """D1-007 (WCAG 2.4.11): a preview opened by keyboard focus sits beside
     its link: below it when the card fits, above it near the viewport

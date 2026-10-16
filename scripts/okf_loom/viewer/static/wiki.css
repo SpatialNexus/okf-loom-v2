@@ -536,7 +536,10 @@ body {
    * stack so multilingual aliases and bodies render real glyphs. */
   font-family: var(--font-body), "Noto Sans CJK SC", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  font-feature-settings: var(--font-features);
+  /* Ligatures off by default: Azeret Mono's fi ligature turns "config" into
+   * "conf1g" in ids, paths and code. Prose turns them back on for its
+   * Public Sans text only (see .okf-prose). */
+  font-feature-settings: var(--font-features), "liga" 0, "calt" 0;
   font-size: var(--fs-base);
   line-height: var(--lh-base);
   color: var(--text);
@@ -545,6 +548,13 @@ body {
   scrollbar-color: var(--border-strong) var(--bg);
   -webkit-font-smoothing: antialiased;
 }
+/* The `font` shorthand resets font-feature-settings, so the body's value
+ * never reached the many mono labels set with `font: ... var(--font-mono)`
+ * (they rendered the fi ligature and lost tabular figures). Every element
+ * inherits the setting; only the prose owners (.okf-prose) change it. */
+body *,
+body *::before,
+body *::after { font-feature-settings: inherit !important; }
 ::selection { background: var(--selection); color: var(--text); }
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
@@ -891,9 +901,11 @@ details.okf-frontmatter td code { white-space: pre-wrap; word-break: break-word;
 .okf-prose {
   color: var(--text);
   font-size: var(--prose-size);
+  font-feature-settings: var(--font-features) !important;
   line-height: 1.72;
   word-wrap: break-word;
 }
+.okf-prose :is(code, kbd, samp, pre, time) { font-feature-settings: var(--font-features), "liga" 0, "calt" 0 !important; }
 /* The body container is unconstrained: the measure applies to its PROSE
  * children, so wide blocks can use the column while text stays readable. */
 .okf-page__body { max-width: none; }
