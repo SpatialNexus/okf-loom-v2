@@ -11183,15 +11183,15 @@ def test_phase4_mobile_header_tabs_tools_mode_names_and_contrast(request,surface
     commands=page.get_by_role("button",name="Open the command palette (Control K)")
     if surface=="live":
         page.locator(".okf-studio-launcher").click();expect(commands).to_be_visible();commands.focus();expect(commands).to_be_focused();page.get_by_role("button",name="Close panel").click()
-    else:mode.focus();expect(mode).to_be_focused()
+    else:assert mode.evaluate("el=>el.tabIndex")<0  # D3-011: a status word is not a Tab stop
     expect(page.locator(".okf-mobile-secondary__controls")).to_be_hidden()
     assert page.evaluate('b=>{const r=b.getBoundingClientRect();return r.left>=-1&&r.right<=innerWidth+1}',find.element_handle())
     # Direct accessibility-tree proof: icon controls expose unique names; a
     # screenshot's repeated glyphs are not an accessible-name failure.
     names=page.locator(".okf-graph-zoom button").evaluate_all("bs=>bs.map(b=>b.getAttribute('aria-label'))")
     assert len(names)==6 and all(names) and len(set(names))==len(names)
-    assert page.locator(".okf-viewport-label").all_text_contents()==["Zoom in","Zoom out","Fit","Full screen","Reset","Overview","Layout"]
-    assert page.evaluate("()=>{const bs=[...document.querySelectorAll('.okf-graph-zoom button')],toolbar=document.querySelector('.okf-graph-zoom');return getComputedStyle(toolbar).gridTemplateColumns.split(' ').length===3&&bs.every(b=>{const r=b.getBoundingClientRect();return r.width>=44&&r.height>=44})}")
+    assert page.locator(".okf-viewport-label").all_text_contents()==["Zoom in","Zoom out","Fit","Full screen","Reset","Overview","Re-run layout"]
+    assert page.evaluate("()=>{const bs=[...document.querySelectorAll('.okf-graph-zoom button')],toolbar=document.querySelector('.okf-graph-zoom');return getComputedStyle(toolbar).gridTemplateColumns.split(' ').length===(innerWidth>=375?6:3)&&bs.every(b=>{const r=b.getBoundingClientRect();return r.width>=44&&r.height>=44})}")
     tree=page.locator(".okf-graph-zoom").aria_snapshot()
     assert all(name in tree for name in names),tree
     contrast=page.evaluate("""()=>{const e=window.__okfLoomGraph.cy.edges().first(),c=document.getElementById('okf-graph'),parse=s=>s.match(/[\\d.]+/g).slice(0,3).map(Number),lin=x=>(x/=255)<=.04045?x/12.92:((x+.055)/1.055)**2.4,L=s=>{const v=parse(s).map(lin);return .2126*v[0]+.7152*v[1]+.0722*v[2]},a=L(e.style('line-color')),b=L(getComputedStyle(c).backgroundColor);return {line:e.style('line-color'),background:getComputedStyle(c).backgroundColor,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05),arrow:e.style('target-arrow-color'),labels:e.style('label')}}""")

@@ -198,17 +198,22 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-topbar__controls>*,body.okf-
 .okf-collaborators { margin: 0; }
 .okf-collaborators__compact { margin: 0; color: var(--okf-fg); font-size: var(--okf-text-sm); font-weight: 650; overflow-wrap: anywhere; }
 .okf-collaborators__compact::before, .okf-collaborators__list li::before { content: "◇"; margin-inline-end: 5px; color: var(--okf-fg); }
-.okf-collaborators__title { min-height: 44px; padding-block: var(--okf-space-2); margin: 0; color: var(--label-color); font-family: var(--font-label); font-size: 11px; font-weight: var(--label-weight); text-transform: uppercase; letter-spacing: var(--label-track); cursor: pointer; }
+/* Same disclosure face as its pane siblings (Themes, Explore with lenses,
+ * Graph settings): native marker, body type, ink. */
+.okf-collaborators__title { min-height: 44px; padding-block: .65rem; margin: 0; color: var(--okf-fg); font-weight: 650; cursor: pointer; }
 .okf-collaborators__title:focus-visible { outline: 2px solid var(--okf-accent); outline-offset: 2px; }
 .okf-collaborators__list { display: grid; gap: 4px; padding: 0 0 var(--okf-space-2); margin: 0; list-style: none; color: var(--okf-fg-muted); font-size: var(--okf-text-sm); overflow-wrap: anywhere; }
 .okf-collaborators__list strong { color: var(--okf-fg); }
 .okf-mobile-presence { display: none; }
 @media (prefers-reduced-motion: reduce) { .okf-presence-ghost { transition: none; } }
 @media (max-width: 640px) {
-  .okf-mobile-presence { box-sizing: border-box; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; width: 100%; min-width: 0; padding: 7px 10px; border-bottom: 1px solid var(--okf-border); background: var(--okf-bg); color: var(--okf-fg); }
-  .okf-mobile-presence__text { display: grid; gap: 2px; min-width: 0; font-size: var(--okf-text-xs); font-weight: 700; overflow-wrap: anywhere; white-space: normal; }
-  .okf-mobile-presence__agent, .okf-mobile-presence__collaborators { display: block; }
-  .okf-mobile-presence__text::before { content: "◇"; margin-inline-end: 5px; }
+  /* One status line (two only when a long collaborator summary wraps) beside
+   * its button: the marker leads the agent fact instead of taking a row. */
+  .okf-mobile-presence { box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-width: 0; padding: 4px 10px; border-bottom: 1px solid var(--okf-border); background: var(--okf-bg); color: var(--okf-fg); }
+  .okf-mobile-presence__text { display: block; min-width: 0; font-size: var(--okf-text-xs); font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; white-space: normal; }
+  .okf-mobile-presence__agent, .okf-mobile-presence__collaborators { display: inline; }
+  .okf-mobile-presence__agent::before { content: "◇"; margin-inline-end: 5px; }
+  .okf-mobile-presence__collaborators::before { content: " · "; color: var(--okf-fg-muted); }
   .okf-mobile-presence button { flex: 0 0 auto; min-height: 44px; padding-inline: 10px; border: 1px solid var(--okf-border-strong); background: var(--okf-bg-elev); color: var(--okf-fg); font: inherit; font-weight: 700; }
   .okf-mobile-presence button:focus-visible { outline: 2px solid var(--okf-accent); outline-offset: 2px; }
 }
@@ -273,6 +278,10 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-topbar__controls>*,body.okf-
   box-shadow: var(--shadow-pop);
   font-size: var(--okf-text-sm);
 }
+/* Open, the list is the reader's current surface: it sits above the zoom
+ * cluster (25) and the docked viewport bar (26) instead of under them, so
+ * its rows, ring and clicks are never intercepted by Zoom in. */
+.okf-node-index[open] { z-index: 27; }
 .okf-node-index > summary {
   cursor: pointer;
   font-size: 13px;
@@ -447,15 +456,16 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-topbar__controls>*,body.okf-
   overflow-wrap: anywhere;
 }
 .okf-signal__advanced > summary:focus-visible { outline: 2px solid var(--okf-accent); outline-offset: 2px; }
+/* Graph settings flow in the detail pane's own scrollport: one scroll
+ * container per pane, and nothing clips a control's focus ring. */
 .okf-signal__body {
-  max-height: min(52vh, 440px);
-  overflow-y: auto;
+  container: okf-signal-body / inline-size;
   padding: var(--okf-space-2) 0 var(--okf-space-2);
   display: flex;
   flex-direction: column;
   gap: var(--okf-space-3);
 }
-.okf-signal__hint { margin: 0 0 var(--okf-space-1); }
+.okf-signal__hint { margin: 0 0 var(--okf-space-1); font-size: var(--okf-text-xs); }
 .okf-signal__group {
   border: 0;
   border-top: 1px solid var(--okf-border);
@@ -515,7 +525,21 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-topbar__controls>*,body.okf-
   outline-offset: 2px;
 }
 .okf-lens-choice{display:grid!important;grid-template-columns:60px minmax(0,1fr);grid-template-rows:auto auto;align-items:center;gap:2px var(--okf-space-2);min-height:52px;padding:5px 7px!important;text-align:left!important;border:1px solid var(--okf-border-strong);border-inline-start-width:2px;border-inline-start-color:transparent;border-radius:0!important}.okf-lens-choice .okf-lens-preview{grid-row:1/3;display:block;color:var(--okf-fg-muted);background:var(--okf-bg-inset);border:1px solid var(--okf-border);border-radius:0}.okf-lens-preview line{stroke:currentColor;stroke-width:1.8;opacity:.8}.okf-lens-preview circle{fill:currentColor;stroke:var(--okf-bg-elev);stroke-width:1.5}.okf-lens-preview .okf-preview-arrow{fill:none;stroke:currentColor;stroke-width:1.8}.okf-lens-preview .okf-preview-hull,.okf-lens-preview .okf-preview-ring{fill:none;stroke:currentColor;stroke-width:1.5;stroke-dasharray:3 2}.okf-lens-preview--bridges line:nth-of-type(2),.okf-lens-preview--bridges line:nth-of-type(3){stroke-width:4}.okf-lens-preview--recent line{stroke-dasharray:2 2}.okf-lens-choice b{display:block;font-size:var(--okf-text-sm);line-height:1.1}.okf-lens-choice small{display:block;font-size:.68rem;line-height:1.2;color:var(--okf-fg-muted);font-weight:500;overflow-wrap:anywhere}
-.okf-filter-chips{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}.okf-filter-chip-group{display:inline-flex;min-width:0}.okf-filter-chip,.okf-filter-solo,.okf-filter-showall{min-height:36px;padding:5px 10px;background:var(--okf-bg-elev);color:var(--okf-fg);border:1px solid var(--okf-border-strong);font:inherit;font-size:var(--okf-text-xs);font-weight:650;cursor:pointer}.okf-filter-chip{border-radius:0}.okf-filter-solo{border-left:0;border-radius:0;color:var(--okf-fg-muted);font-weight:500}.okf-filter-showall{flex-basis:100%;width:max-content;max-width:max-content;border-radius:0}.okf-filter-chip:hover,.okf-filter-solo:hover,.okf-filter-showall:hover{background:var(--okf-hover-fill)}.okf-filter-chip.is-off{border-style:dashed;text-decoration:line-through;text-decoration-thickness:2px;color:var(--okf-fg-subtle)}.okf-filter-chip.is-off::after{content:" · off";font-weight:500}.okf-filter-chip[aria-pressed=true]{background:transparent}.okf-filter-chips button:focus-visible{outline:2px solid var(--okf-accent);outline-offset:2px}
+.okf-filter-chips{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}.okf-filter-chip-group{display:inline-flex;min-width:0}.okf-filter-chip,.okf-filter-solo,.okf-filter-showall{min-height:36px;padding:5px 10px;background:var(--okf-bg-elev);color:var(--okf-fg);border:1px solid var(--okf-border-strong);font:inherit;font-size:var(--okf-text-xs);font-weight:650;cursor:pointer}.okf-filter-chip{border-radius:0}.okf-filter-solo{border-left:0;border-radius:0;color:var(--okf-fg-muted);font-weight:500}.okf-filter-showall{flex-basis:100%;width:max-content;max-width:max-content;border-radius:0}.okf-filter-chip:hover,.okf-filter-solo:hover,.okf-filter-showall:hover{background:var(--okf-hover-fill)}.okf-filter-chip.is-off{border-style:dashed;text-decoration:line-through;text-decoration-thickness:2px;color:var(--okf-fg-subtle)}.okf-filter-chip.is-off::after{content:" · off";font-weight:500}.okf-filter-chip[aria-pressed=true]{background:transparent}.okf-filter-chips button:focus-visible{position:relative;z-index:1;outline:2px solid var(--okf-accent);outline-offset:2px}.okf-filter-chip-group>button:focus-visible{outline-offset:0}
+/* Type filters: each chip and its Only button stay one joined pair, like the
+ * relationship chip groups. The legend contract keeps chips as direct
+ * siblings of their title (no wrapper), so a grid of pair columns, not a
+ * wrapping row, keeps an Only from starting the next line. */
+.okf-filter-chips[aria-label="Type filters"] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr) auto); gap: 8px 0; align-items: stretch; }
+.okf-filter-chips[aria-label="Type filters"] > :is(.okf-graph-legend__title, .okf-filter-showall) { grid-column: 1 / -1; }
+.okf-filter-chips[aria-label="Type filters"] > .okf-filter-chip:nth-of-type(4n+3) { margin-inline-start: 10px; }
+.okf-filter-chips[aria-label="Type filters"] > .okf-filter-chip { min-width: 0; overflow-wrap: break-word; text-align: start; }
+/* A narrow pane (e.g. the ~330px desktop pane at 901px) lists one pair per
+ * row rather than breaking type names mid-word. */
+@container okf-signal-body (max-width: 419px) {
+  .okf-filter-chips[aria-label="Type filters"] { grid-template-columns: minmax(0, 1fr) auto; }
+  .okf-filter-chips[aria-label="Type filters"] > .okf-filter-chip:nth-of-type(4n+3) { margin-inline-start: 0; }
+}
 .okf-signal__row {
   display: flex;
   flex-direction: column;
@@ -550,9 +574,47 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-topbar__controls>*,body.okf-
   font: 400 13px/1.25 var(--font-body);
   cursor: pointer;
 }
-.okf-signal input[type="range"] { accent-color: var(--okf-accent); }
-.okf-signal input[type="checkbox"],
-.okf-signal input[type="radio"] { accent-color: var(--okf-accent); }
+/* Ledger settings controls: ink on hairlines, square, no accent fill. The
+ * accent is reserved for the focus ring; forced colours restore the native
+ * controls (see the forced-colors block below). */
+.okf-signal input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  box-sizing: border-box; height: 24px; margin: 0; padding: 0;
+  background: transparent; cursor: pointer;
+}
+.okf-signal input[type="range"]::-webkit-slider-runnable-track { height: 2px; border: 0; border-radius: 0; background: var(--okf-border-strong); }
+.okf-signal input[type="range"]::-moz-range-track { height: 2px; border: 0; border-radius: 0; background: var(--okf-border-strong); }
+.okf-signal input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  box-sizing: border-box; width: 14px; height: 14px; margin-top: -6px;
+  border: 2px solid var(--okf-fg); border-radius: 0; background: var(--okf-bg-elev);
+}
+.okf-signal input[type="range"]::-moz-range-thumb {
+  box-sizing: border-box; width: 14px; height: 14px;
+  border: 2px solid var(--okf-fg); border-radius: 0; background: var(--okf-bg-elev);
+}
+.okf-signal input[type="range"]:hover::-webkit-slider-thumb { background: var(--okf-hover-fill); }
+.okf-signal input[type="range"]:hover::-moz-range-thumb { background: var(--okf-hover-fill); }
+.okf-signal input[type="range"]:disabled::-webkit-slider-thumb { border-color: var(--okf-fg-muted); background: var(--okf-bg-inset); }
+.okf-signal input[type="range"]:disabled::-moz-range-thumb { border-color: var(--okf-fg-muted); background: var(--okf-bg-inset); }
+.okf-signal input[type="checkbox"] {
+  -webkit-appearance: none; appearance: none;
+  box-sizing: border-box; display: inline-grid; place-content: center;
+  width: 16px; height: 16px; margin: 0;
+  border: 1px solid var(--input-border); border-radius: 0; background: var(--input-bg);
+  cursor: pointer;
+}
+.okf-signal input[type="checkbox"]::before {
+  content: ""; box-sizing: border-box; width: 9px; height: 5px;
+  border: solid var(--okf-fg); border-width: 0 0 2px 2px;
+  transform: translateY(-1px) rotate(-45deg); visibility: hidden;
+}
+.okf-signal input[type="checkbox"]:checked { border-color: var(--okf-fg); }
+.okf-signal input[type="checkbox"]:checked::before { visibility: visible; }
+.okf-signal input[type="checkbox"]:hover:not(:disabled) { background: var(--okf-hover-fill); }
+.okf-signal input[type="checkbox"]:disabled { border-color: var(--okf-fg-muted); background: var(--okf-bg-inset); }
+.okf-signal :is(input[type="range"], input[type="checkbox"]):focus-visible { outline: 2px solid var(--okf-accent); outline-offset: 2px; }
+.okf-signal input[type="radio"] { accent-color: var(--okf-fg); }
 .okf-signal__row--check input { flex: 0 0 auto; }
 .okf-signal__btn {
   align-self: flex-start;
@@ -640,7 +702,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-topbar__controls>*,body.okf-
 }
 .okf-lens-summary__title + .okf-lens-summary__row,
 .okf-lens-summary__verdict + .okf-lens-summary__row,
-summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summary__row { border-top: 1px solid var(--okf-border-strong); }
+summary + .okf-lens-summary__verdict + .okf-lens-summary__row { border-top: 1px solid var(--okf-border-strong); }
 .okf-lens-summary__row:hover { background: var(--okf-hover-fill); }
 .okf-lens-summary__row:active,
 .okf-lens-summary__row[aria-current="true"] { border-inline-start-color: var(--accent); }
@@ -673,15 +735,14 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
 .okf-lens-summary__note {
   position: relative;
   color: var(--okf-fg-subtle);
-  flex: 0 1 auto;
+  /* A short mono figure ("38 connections", "2y old"): one line, its own
+   * column; the label wraps (two-line clamp) instead. */
+  flex: 0 0 auto;
   min-width: 4rem;
-  max-width: 38%;
   text-align: right;
   font-family: var(--font-mono);
   font-size: 11px;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 .okf-lens-summary__hint { margin-top: var(--okf-space-3); font-size: var(--okf-text-xs); }
@@ -822,9 +883,11 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
+  gap: 4px;
   height: 16px;
+  padding: 0 4px;
   flex-shrink: 0;
+  white-space: nowrap;
   border: 1px solid var(--okf-error);
   border-radius: 0;
   background: transparent;
@@ -834,6 +897,7 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
   font-weight: 700;
   line-height: 1;
 }
+.okf-node-index__warn::before { content: "!"; }
 
 /* ---- Phase 3: tooltip broken-link warning row --------------------------- *
  * The hover tooltip's broken-link count row (mirrors the canvas underlay +
@@ -889,6 +953,10 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
 }
 .okf-graph-canvas-proxy{position:absolute;inset:8px;z-index:1;pointer-events:none;border:2px solid transparent;border-radius:0}
 .okf-graph-canvas-proxy:focus-visible{outline:3px solid var(--okf-focus-color);outline-offset:-3px}
+/* The graph region itself takes focus as a fragment/shell target (#okf-graph).
+ * It runs edge to edge, so an outward ring is clipped into a stray L; the
+ * ring is inset to hug the region, like the canvas proxy's. */
+#okf-graph:focus-visible{outline:2px solid var(--okf-accent);outline-offset:-2px}
 .okf-node-index__item.is-active{border-inline-start:2px solid var(--accent);font-weight:700}
 .okf-graph-actions{position:absolute;z-index:32;display:flex;gap:2px;max-width:calc(100% - 16px);padding:4px;background:var(--okf-bg-elev);border:0;border-radius:0;box-shadow:var(--shadow-pop)}
 .okf-graph-actions[hidden]{display:none}
@@ -1308,6 +1376,14 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
     -webkit-overflow-scrolling: touch;
   }
   .okf-node-index { width: min(220px, 70vw); top: 56px; }
+  /* graph.js docks the viewport actions in this bar at every compact width
+   * (<=900px, isMobileGraphViewport): a labelled row along the canvas's
+   * bottom edge, never a block below the full-height canvas. */
+  .okf-graph-viewport-toolbar{box-sizing:border-box;position:absolute;left:0;right:0;bottom:0;z-index:26;display:block;width:100%;min-width:0;max-width:100%;padding:6px 8px;border-top:1px solid var(--okf-border);background:var(--okf-bg-elev);overflow:hidden}
+  .okf-graph-viewport-toolbar .okf-graph-zoom{position:static;display:grid;grid-template-columns:repeat(6,minmax(44px,1fr));gap:4px;width:100%;overflow:visible}
+  .okf-graph-viewport-toolbar .okf-graph-zoom button{flex-direction:column;width:100%;height:44px;min-width:0;padding:2px 4px;gap:2px;box-shadow:none;font-size:10px;font-weight:700;line-height:1.1;white-space:nowrap}
+  .okf-graph-viewport-toolbar .okf-viewport-icon{width:17px;height:17px;flex:0 0 auto}
+  .okf-graph-viewport-toolbar .okf-viewport-label{display:inline;min-width:0;overflow:hidden;text-overflow:ellipsis}
   /* Mobile-open feedback loop: stack the panes in normal
    * flow so the page scrolls, give the graph a tall fixed viewport (76vh), and
    * let the detail panel flow at natural height below it. The open drawer is
@@ -1320,8 +1396,7 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
   /* The signal bar is in-flow at the top of the detail pane (which
    * stacks below the canvas on mobile) — no overlay geometry needed; just
    * relax the sticky inset to the pane's mobile padding. */
-  .okf-signal--bar { position: static; top: auto; z-index: auto; margin: 0 0 var(--okf-space-3); padding: var(--okf-space-2) var(--okf-space-3); box-shadow: none; }
-  .okf-signal__body { max-height: none; overflow: visible; }
+  .okf-signal--bar { position: static; top: auto; z-index: auto; margin: 0 0 var(--okf-space-3); padding: var(--okf-space-2) 0; box-shadow: none; }
   /* Stack the overlays so the collapsed Signal summary, node index, and LOD
    * pill never sit on top of each other. */
   .okf-graph-lod-pill { font-size: var(--okf-text-xs); padding: 4px 10px; top: 102px; }
@@ -1491,13 +1566,13 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
   .okf-layout[data-mobile-pane="details"] #detail-empty,
   .okf-layout[data-mobile-pane="details"] #detail-content { margin-top: var(--okf-space-3); }
   .okf-layout[data-mobile-pane="graph"] > .okf-graph{height:50dvh;min-height:422px}
-  .okf-graph-viewport-toolbar{box-sizing:border-box;position:absolute;left:0;right:0;bottom:0;z-index:26;display:block;width:100%;min-width:0;max-width:100%;padding:6px 8px;border-top:1px solid var(--okf-border);background:var(--okf-bg-elev);overflow:hidden}
-  .okf-graph-viewport-toolbar .okf-graph-zoom{position:static;display:grid;grid-template-columns:repeat(3,minmax(44px,1fr));gap:4px;width:100%;overflow:visible}
-  .okf-graph-viewport-toolbar .okf-graph-zoom button{width:100%;height:44px;min-width:0;padding:2px 4px;gap:4px;box-shadow:none;font-size:11px;font-weight:700;white-space:nowrap}
-  .okf-graph-viewport-toolbar .okf-viewport-icon{width:17px;height:17px;flex:0 0 auto}
-  .okf-graph-viewport-toolbar .okf-viewport-label{display:inline;min-width:0;overflow:hidden;text-overflow:ellipsis}
 }
 
+/* Six labelled actions in one row need ~375px ("Full screen" is 53px at
+ * 10px); narrower phones keep two rows of three. */
+@media (max-width: 374px) {
+  .okf-graph-viewport-toolbar .okf-graph-zoom { grid-template-columns: repeat(3,minmax(44px,1fr)); }
+}
 @media (max-width: 360px) {
   .okf-graph-tour__nav { grid-template-columns: repeat(3, minmax(0,1fr)); }
   .okf-graph-tour__dots { grid-column: 1 / -1; }
@@ -1518,10 +1593,6 @@ summary + .okf-lens-summary__title + .okf-lens-summary__verdict + .okf-lens-summ
 @media (min-width:641px){.okf-mobile-overview{display:none}}
 
 @media (max-width: 390px) {
-  /* Viewport actions are a single bottom dock on small phones.  Horizontal
-   * overflow is progressive rather than stealing a vertical strip from the
-   * graph; every native button keeps its 44px target. */
-  .okf-graph-viewport-toolbar .okf-graph-zoom { grid-template-columns: repeat(3,minmax(44px,1fr)); }
   .okf-graph-minimap { right: 8px; bottom: 60px; }
 }
 
@@ -1765,8 +1836,6 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom { z-index: 40 !im
 }
 .okf-graph-zoom button[data-tooltip]:is(:hover, :focus-visible)::after { opacity: 1; visibility: visible; }
 
-.okf-node-index__item.is-active::before { content: "Active · "; font-weight: 700; }
-
 @media (max-width: 640px) {
   .okf-graph-zoom button[data-tooltip]::after { display: none; }
 }
@@ -1776,7 +1845,9 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-graph-zoom { z-index: 40 !im
 @media (prefers-reduced-motion: reduce) {
   .okf-graph-zoom button[data-tooltip]::after { transition: none !important; }
 }
-.okf-graph-layout-settings > button { min-height: 44px; }
+.okf-graph-layout-settings > button { align-self: flex-start; min-height: 44px; }
+.okf-graph-layout-settings > button .okf-viewport-label { display: inline; }
+.okf-graph-layout-settings > button .okf-viewport-icon { width: 17px; height: 17px; flex: 0 0 auto; }
 
 @media (forced-colors: active) {
   .okf-node-index__list[role="listbox"]:focus-visible,
@@ -1814,10 +1885,33 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
 }
 @media (max-width: 640px) {
   .okf-viewer--graph .okf-graph-route-title { padding: 4px var(--okf-space-3); font-size: var(--okf-text-base); }
+  /* Phone Find in graph is one row: the heading beside its field. The
+   * field's micro-label repeats its placeholder (the input is named by its
+   * aria-label), so it is visually hidden rather than costing a row. */
+  .okf-viewer--graph .okf-graph-tools { align-items: center; padding-block: 6px; }
+  .okf-viewer--graph .okf-graph-tools > h2 { flex: 0 0 auto; align-self: flex-start; }
+  .okf-viewer--graph .okf-graph-tools__search { flex: 1 1 9rem; }
+  .okf-viewer--graph .okf-graph-tools__search > span:first-child {
+    position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden;
+    clip-path: inset(50%); white-space: nowrap;
+  }
 }
-@media (min-width: 900px) {
-  /* Unlike document pages, the desktop graph is an application workspace:
-   * bound the shell to the viewport and keep canvas/detail overflow local. */
+/* At <=340px the shell puts Appearance on its third row (order 2); the
+ * graph-owned rows graph.js docks in the top bar follow it instead of
+ * splitting the global controls. */
+@media (max-width: 340px) {
+  body.okf-viewer--graph .okf-shell > :is(.okf-mobile-presence, .okf-graph-mobile-nav, .okf-mobile-secondary) { order: 3; }
+}
+/* Arrow/Space/Enter instructions do not apply to touch-only devices. */
+@media (hover: none) and (pointer: coarse) {
+  .okf-node-index__hint { display: none; }
+}
+@media (min-width: 641px) {
+  /* Unlike document pages, the graph is an application workspace: bound the
+   * shell to the viewport and keep canvas/detail overflow local.  This starts
+   * where the phone bound (<=640px) stops: with an auto-height body the
+   * 641-899px panes' height:100% resolves against content, and the canvas and
+   * its container resized each other without bound. */
   body.okf-viewer--graph {
     height: 100vh;
     min-height: 0;
@@ -1930,9 +2024,14 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
     background: var(--okf-bg-elev);
   }
   .okf-viewer--graph .okf-graph-mobile-nav button { min-height: 44px; min-width: 0; }
-  .okf-viewer--graph .okf-layout { display: block; min-height: 0; overflow: hidden; }
+  /* The pane tabs sit inside the layout above the active pane: a column flex
+   * gives the pane exactly the remainder, so the canvas's bottom toolbar is
+   * not pushed below the viewport by the tabs' height. */
+  .okf-viewer--graph .okf-layout { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .okf-viewer--graph .okf-layout > .okf-graph-mobile-nav { flex: 0 0 auto; }
   .okf-viewer--graph .okf-layout > .okf-graph {
     display: block;
+    flex: 1 1 0;
     width: 100%;
     height: min(68vh, 680px);
     min-height: 360px;
@@ -1941,6 +2040,7 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
   }
   .okf-viewer--graph .okf-layout > .okf-detail {
     display: none;
+    flex: 1 1 0;
     width: 100%;
     max-width: 100%;
     min-width: 0;
@@ -1972,8 +2072,6 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
     flex-wrap: wrap;
   }
   .okf-viewer--graph .okf-graph-focusbar { left: 8px; right: 8px; max-width: none; transform: none; flex-wrap: wrap; }
-  .okf-viewer--graph .okf-graph-viewport-toolbar { display: block; }
-  .okf-viewer--graph .okf-graph-viewport-toolbar .okf-graph-zoom { position: static; }
   .okf-viewer--graph .okf-graph-detail__body,
   .okf-viewer--graph .okf-graph-detail__body .okf-tablewrap { min-width: 0; max-width: 100%; overflow-x: auto; }
   .okf-viewer--graph .okf-graph-detail__body > .okf-content-scrollport { max-width: 100%; }
@@ -1992,6 +2090,9 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
   /* Settings selects keep a system field outline and a Highlight focus ring. */
   .okf-signal__row select, .okf-graph-focusbar select { border: 1px solid ButtonText; background-color: Field; color: FieldText; }
   .okf-signal__row select:focus-visible, .okf-graph-focusbar select:focus-visible { outline: 2px solid Highlight; outline-offset: 2px; }
+  /* Sliders and checkboxes return to the native system controls. */
+  .okf-signal :is(input[type="range"], input[type="checkbox"]) { -webkit-appearance: auto; appearance: auto; }
+  .okf-signal :is(input[type="range"], input[type="checkbox"]):focus-visible { outline: 2px solid Highlight; outline-offset: 2px; }
   /* The selected lens must remain identifiable when accent/background colours
    * collapse to system colours.  The textual cue is intentionally present in
    * addition to the border, not a colour-only treatment. */
@@ -2124,8 +2225,8 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-shell__appearance > #okf-the
 }
 
 /* Single-file shares the graph body with its Index destination. The graph is
- * a viewport-bound application workspace (>= 900px and <= 640px both bound
- * the body and hide its overflow); the Index is an ordinary scrolling
+ * a viewport-bound application workspace (every width but short tablet
+ * viewports binds the body and hides its overflow); the Index is an ordinary scrolling
  * document, and inside that bound every entry below the fold was unreachable:
  * wheel, touch and Ctrl+End all left scrollY at 0. The destination owner in
  * single_file.html names the destination; the Index releases the bound. */
@@ -2152,7 +2253,12 @@ body.okf-viewer--graph.okf-viewer--singlefile[data-okf-single-destination="index
   .okf-signal__row--check,
   .okf-signal select,
   .okf-signal input[type="range"],
+  .okf-filter-chip,
+  .okf-filter-solo,
+  .okf-filter-showall,
+  button.okf-graph-legend__item,
   .okf-detail-body-retry { min-height: 44px; }
+  .okf-filter-solo,
   .okf-detail-body-retry { min-width: 44px; }
   .okf-edge-bundle-index summary { padding-block: 12px; }
 }

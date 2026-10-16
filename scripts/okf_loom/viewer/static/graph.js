@@ -335,7 +335,7 @@
   var MODE = (document.body && document.body.getAttribute("data-okf-mode")) || "serve";
   var IS_SINGLE = !!window.BUNDLE;
   var mobileModeIndicator=null,mobileModeHome=null;
-  if(mobileSecondaryRow){var brand=document.querySelector(".okf-topbar__brand"),studioSummarizesLive=MODE==="serve"&&document.querySelector('[data-okf-studio-capability="available"]');mobileModeIndicator=MODE==="serve"?liveStatus:null;if(!mobileModeIndicator&&!studioSummarizesLive){mobileModeIndicator=document.createElement("span");mobileModeIndicator.setAttribute("role","status");}if(mobileModeIndicator){mobileModeIndicator.tabIndex=0;mobileModeIndicator.textContent=IS_SINGLE?"Local":(MODE==="static"?"Static":"Live");mobileModeIndicator.classList.add("okf-mobile-mode");if(brand){brand.appendChild(mobileModeIndicator);mobileModeHome=document.createComment("okf mode home");brand.insertBefore(mobileModeHome,mobileModeIndicator);}}syncEffectiveViewport();}
+  if(mobileSecondaryRow){var brand=document.querySelector(".okf-topbar__brand"),studioSummarizesLive=MODE==="serve"&&document.querySelector('[data-okf-studio-capability="available"]');mobileModeIndicator=MODE==="serve"?liveStatus:null;if(!mobileModeIndicator&&!studioSummarizesLive){mobileModeIndicator=document.createElement("span");mobileModeIndicator.setAttribute("role","status");}if(mobileModeIndicator){/* A status word, not a control: no Tab stop (the serve live status keeps its own). */mobileModeIndicator.textContent=IS_SINGLE?"Local":(MODE==="static"?"Static":"Live");mobileModeIndicator.classList.add("okf-mobile-mode");if(brand){brand.appendChild(mobileModeIndicator);mobileModeHome=document.createComment("okf mode home");brand.insertBefore(mobileModeHome,mobileModeIndicator);}}syncEffectiveViewport();}
     var graphLayout = document.querySelector(".okf-layout");
     function isCompactGraphViewport(){return readLiveViewportWidth()<=900;}
   function setMobilePane(name, focusPane) {
@@ -4052,7 +4052,8 @@
           frag = el("details", { class: "okf-graph-theme-digest" });
           frag.appendChild(el("summary", {}, ["Themes in this graph"]));
         }
-        heading(lensKey === "themes" ? "Themes" : "Themes in this graph");
+        // Inside the disclosure its summary already names the section.
+        if (lensKey === "themes") heading("Themes");
         var top = com.list.slice(0, 6).filter(function (c) { return c.ids.length > 1; });
         var linked = {};
         cy.edges().forEach(function (e) {
@@ -4070,10 +4071,10 @@
         }
         var themes = com.list.filter(function (c) { return c.ids.length > 1; }).length;
         var bits = themes + " theme" + (themes === 1 ? "" : "s");
-        if (orphans.length) bits += " - " + orphans.length + " not yet linked";
+        if (orphans.length) bits += " \u2014 " + orphans.length + " not yet linked";
         if (gap) {
           var ga = nodeIndex[exemplar(gap[0])] || {}, gb = nodeIndex[exemplar(gap[1])] || {};
-          bits += " - the areas around \u201c" + (ga.label || "?") + "\u201d and \u201c" + (gb.label || "?") + "\u201d share no links";
+          bits += " \u2014 the areas around \u201c" + (ga.label || "?") + "\u201d and \u201c" + (gb.label || "?") + "\u201d share no links";
         }
         verdict(bits + ".");
         com.list.slice(0, 8).forEach(function (c) {
@@ -4843,7 +4844,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
     // lays out the same way on every load (the top Obsidian complaint was
     // position churn destroying spatial memory).
     buildSignalPanel();
-    if(ui.settingsBody){var layoutGroup=el("fieldset",{class:"okf-signal__group okf-graph-layout-settings"});layoutGroup.appendChild(el("legend",{},["Layout and relationship bundles"]));if(viewportRerunButton)layoutGroup.appendChild(viewportRerunButton);if(bundleIndex)layoutGroup.appendChild(bundleIndex);ui.settingsBody.appendChild(layoutGroup);}
+    if(ui.settingsBody){var layoutGroup=el("fieldset",{class:"okf-signal__group okf-graph-layout-settings"});layoutGroup.appendChild(el("legend",{},["Layout and relationship bundles"]));if(viewportRerunButton){/* In settings it is an ordinary labelled Ledger button, not a zoom-cluster icon. */viewportRerunButton.classList.add("okf-btn");var rerunLabel=viewportRerunButton.querySelector(".okf-viewport-label");if(rerunLabel)rerunLabel.textContent="Re-run layout";layoutGroup.appendChild(viewportRerunButton);}if(bundleIndex)layoutGroup.appendChild(bundleIndex);ui.settingsBody.appendChild(layoutGroup);}
     if (GRAPH_EMPTY) {
       applyVisualEncoding();
       applyFilters();
@@ -5183,7 +5184,9 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
         // anchor comments to the right concept when the user selects
         // text in the graph detail panel.
         bodyEl.setAttribute("data-concept-id", conceptId);
-        bodyEl.className = "okf-page__body okf-graph-detail__body";
+        // okf-prose owns the document's Ledger reading styles (code wells,
+        // inline code, prose links, task lists), as on the cited-document path.
+        bodyEl.className = "okf-prose okf-page__body okf-graph-detail__body";
         showSelectedBody(conceptId, bodyEl, metadataSlot);
       }
 
@@ -5389,7 +5392,10 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
           var warn = document.createElement("span");
           warn.className = "okf-node-index__warn";
           warn.setAttribute("aria-hidden", "true");
-          warn.textContent = "!";
+          // Visible meaning, not glyph + colour alone; the row's aria-label
+          // already carries the same phrase for assistive technology.
+          warn.textContent = unres + " broken";
+          warn.title = unres + " broken link" + (unres === 1 ? "" : "s");
           btn.appendChild(warn);
         }
         if (showComments) {
@@ -5699,7 +5705,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
     mobilePresenceBar.className = "okf-mobile-presence";
     mobilePresenceBar.setAttribute("aria-label", "Current collaborators");
     var mobilePresenceText = document.createElement("span"); mobilePresenceText.className = "okf-mobile-presence__text";
-    var mobilePresenceOpen = document.createElement("button"); mobilePresenceOpen.type = "button"; mobilePresenceOpen.textContent = "Details"; mobilePresenceOpen.setAttribute("aria-label", "Show collaborator details"); mobilePresenceOpen.setAttribute("aria-controls", collaboratorSection.id);
+    var mobilePresenceOpen = document.createElement("button"); mobilePresenceOpen.type = "button"; mobilePresenceOpen.textContent = "Collaborators"; mobilePresenceOpen.setAttribute("aria-label", "Show collaborators"); mobilePresenceOpen.setAttribute("aria-controls", collaboratorSection.id);
     mobilePresenceOpen.addEventListener("click", function () { collaboratorSection.open = true; var detailsTab=document.querySelector('[data-graph-pane="details"]'); if(detailsTab)detailsTab.click(); });
     mobilePresenceBar.appendChild(mobilePresenceText); mobilePresenceBar.appendChild(mobilePresenceOpen);
     if (paneNav && paneNav.parentNode && livePresenceHub) paneNav.parentNode.insertBefore(mobilePresenceBar, paneNav.nextSibling);

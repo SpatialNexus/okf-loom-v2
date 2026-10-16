@@ -62,6 +62,31 @@ follow [Semantic Versioning](https://semver.org/). The product version
   their body sits on the title's edge in the document lane instead of a 60ch column.
 - Related rail titles wrap instead of being cut off, and the rail's collapse control is a
   disclosure button named "Related" with a chevron and aria-expanded (was a bare "-").
+- Graph route at 641–899px: the Graph pane paints and stays one viewport tall
+  (the page no longer grows without bound), with its zoom bar docked on screen.
+- Phone graph chrome is compact: one-line presence row (its button now reads
+  "Collaborators", not a second "Details"), a one-row Find in graph band and a
+  one-row labelled zoom dock from 375px; at 320px Appearance stays beside Studio
+  and touch-only devices drop the arrow-key hint.
+- Graph settings flow in the details pane instead of a nested 440px scroller, and
+  a focused filter chip shows its whole focus ring beside its joined Only button.
+- A concept selected in the graph details pane (and every single-file document)
+  keeps the Ledger prose styles: padded, scrollable code wells, inline-code chips,
+  underlined prose links, task lists and blockquotes.
+- The graph's All concepts list keeps the active row on one line (its 2px bar
+  marks it; the wrapping "Active ·" prefix is gone) and, open, sits above the zoom
+  controls instead of under them.
+- Graph settings controls follow Ledger: type filter chips stay joined to their
+  Only buttons, Re-run layout is a labelled button, sliders and checkboxes are
+  square ink controls (accent only on focus), and legend and filter buttons are
+  44px targets on touch tablets.
+- The graph details pane reads as one column: no duplicate Themes heading, the
+  Collaborators disclosure and lens hint match their siblings, starting-point
+  counts stay on one line, tablet content shares one left edge, and a concept's
+  broken-link marker reads "! 4 broken" instead of a bare "!".
+- Focusing the graph region (single-file Graph, `#okf-graph`) draws an inset ring
+  that hugs it instead of a clipped L, and the Static/Local mode word is no
+  longer an empty Tab stop.
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
   including source derivations; the full/tool graph projection is unchanged.
 - Missing or malformed embedded search evidence in single-file exports settles as

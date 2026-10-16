@@ -1,6 +1,8 @@
 """Browser proof for graph composite widgets and synchronized interaction state."""
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from browser_support import expect, reveal_control
@@ -81,6 +83,53 @@ def test_graph_controls_reflow_without_clipping_at_acceptance_widths(page, serve
     )
     assert geometry["scroll"] <= geometry["client"] + 1, geometry
     assert geometry["toolbar"] > 0, geometry
+
+
+_TABLET_PANE_JS = """() => {
+  const cy = window.__okfLoomGraph && window.__okfLoomGraph.cy;
+  const graph = document.getElementById('okf-graph'), g = graph.getBoundingClientRect();
+  const layer = graph.querySelector('canvas[data-id="layer2-node"]');
+  let painted = 0;
+  if (layer && layer.width && layer.height) {
+    const px = layer.getContext('2d', {willReadFrequently: true})
+      .getImageData(0, 0, layer.width, layer.height).data;
+    for (let i = 3; i < px.length; i += 4 * 16) if (px[i] > 0) painted++;
+  }
+  const zoom = [...document.querySelectorAll('.okf-graph-zoom button')].filter(b => b.offsetParent !== null)
+    .map(b => b.getBoundingClientRect());
+  return {scroll: document.documentElement.scrollHeight, inner: innerHeight,
+          graphTop: g.top, graphBottom: g.bottom, graphHeight: g.height,
+          canvasHeight: layer ? layer.clientHeight : 0, painted,
+          onScreen: cy ? cy.nodes(':visible').filter(n => { const p = n.renderedPosition();
+            return p.x > 0 && p.x < g.width && p.y > 0 && p.y < g.height; }).length : 0,
+          zoomBottom: zoom.length ? Math.max(...zoom.map(r => r.bottom)) : null};
+}"""
+
+
+@pytest.mark.parametrize("width", [641, 768, 899])
+def test_tablet_graph_pane_is_viewport_bound_and_painted(page, docs_server_url: str, width: int) -> None:
+    """T1-002: between the phone (<=640) and desktop bounds the Graph pane
+    stayed blank while the auto-height page and the canvas resized each
+    other without bound. The page stays one viewport tall, the pane ends at
+    the viewport's bottom edge with its zoom controls on screen, and nodes
+    are painted inside it."""
+    page.set_viewport_size({"width": width, "height": 1024})
+    page.add_init_script("try { localStorage.setItem('okfGraphTourDone', '1'); } catch (e) {}")
+    page.goto(docs_server_url + "/__graph", wait_until="domcontentloaded")
+    page.wait_for_function("() => window.__okfLoomGraph?.layoutStats?.lastAppliedSeq >= 1")
+    page.get_by_role('navigation', name='Graph panes').get_by_role('button', name='Graph', exact=True).click()
+    page.wait_for_function("() => window.okfGraphCaptureState?.().layoutSettled")
+    page.wait_for_timeout(300)
+    first = page.evaluate(_TABLET_PANE_JS)
+    page.wait_for_timeout(1500)
+    later = page.evaluate(_TABLET_PANE_JS)
+    for sample in (first, later):
+        assert sample["scroll"] == sample["inner"], (first, later)
+        assert sample["graphBottom"] <= sample["inner"] + 1, (first, later)
+        assert sample["zoomBottom"] is not None and sample["zoomBottom"] <= sample["inner"], (first, later)
+    assert later["graphHeight"] == first["graphHeight"] and later["graphHeight"] > 300, (first, later)
+    assert abs(later["canvasHeight"] - later["graphHeight"]) <= 1, later
+    assert later["painted"] > 0 and later["onScreen"] > 0, later
 
 
 # Reads the painted node layer: for the largest badge-free round nodes, where
@@ -300,6 +349,221 @@ def test_coarse_pointer_graph_controls_are_44px_targets(page, docs_server_url: s
         context.close()
 
 
+_PHONE_CHROME_JS = """() => {
+  const rect = sel => { const el = document.querySelector(sel); return el && el.getBoundingClientRect(); };
+  const tools = rect('.okf-graph-tools'), heading = rect('.okf-graph-tools > h2'), field = rect('#okf-search');
+  const presence = rect('.okf-mobile-presence'), presenceButton = rect('.okf-mobile-presence button');
+  const dock = [...document.querySelectorAll('.okf-graph-viewport-toolbar button')].map(b => b.getBoundingClientRect());
+  const studio = rect('.okf-shell__studio-slot'), appearance = rect('.okf-shell__appearance'), tabs = rect('.okf-graph-mobile-nav');
+  return {inner: innerHeight, layoutTop: rect('.okf-layout').top, graphTop: rect('#okf-graph').top,
+          toolsHeight: tools.height, headingMid: heading.top + heading.height / 2, fieldMid: field.top + field.height / 2,
+          presenceHeight: presence.height, presenceButtonHeight: presenceButton.height,
+          presenceLabels: [...document.querySelectorAll('.okf-mobile-presence button, [data-graph-pane]')]
+            .map(b => b.textContent.trim()),
+          dockRows: new Set(dock.map(r => Math.round(r.top))).size,
+          studioTop: studio && studio.top, appearanceTop: appearance.top, tabsTop: tabs.top};
+}"""
+
+
+@pytest.mark.parametrize("size", [(390, 844), (320, 568)])
+def test_phone_graph_chrome_leaves_the_viewport_to_the_graph(page, docs_server_url: str, size) -> None:
+    """M1-002/M1-003/M1-004: the phone graph route's own rows stay compact:
+    the presence status is one row whose button is not a second "Details",
+    Find in graph is one row, the viewport actions are one dock row from
+    375px, Appearance stays with the shell above the graph rows at 320, and
+    the graph is on screen at load."""
+    width, height = size
+    context = page.context.browser.new_context(
+        viewport={"width": width, "height": height}, has_touch=True, is_mobile=True)
+    try:
+        phone = context.new_page()
+        phone.add_init_script("try { localStorage.setItem('okfGraphTourDone', '1'); } catch (e) {}")
+        phone.goto(docs_server_url + "/__graph", wait_until="domcontentloaded")
+        phone.wait_for_function("() => window.__okfLoomGraph?.layoutStats?.lastAppliedSeq >= 1")
+        phone.locator('[data-graph-pane="graph"]').click()
+        expect(phone.locator(".okf-mobile-presence__agent")).not_to_be_empty()
+        geo = phone.evaluate(_PHONE_CHROME_JS)
+        assert geo["presenceHeight"] <= geo["presenceButtonHeight"] + 10, geo
+        assert geo["presenceLabels"].count("Details") == 1, geo
+        assert abs(geo["headingMid"] - geo["fieldMid"]) <= 2 and geo["toolsHeight"] <= 70, geo
+        assert geo["graphTop"] <= geo["inner"] - 160, geo
+        if width >= 375:
+            assert geo["dockRows"] == 1, geo
+            assert geo["layoutTop"] <= 0.45 * geo["inner"], geo
+        else:
+            assert geo["appearanceTop"] == geo["studioTop"] and geo["appearanceTop"] < geo["tabsTop"], geo
+        hidden_label = phone.locator(".okf-graph-tools__search > span").first
+        assert hidden_label.evaluate("el => el.getBoundingClientRect().width") <= 1
+        phone.get_by_role("searchbox", name="Search graph concepts").fill("no-such-concept")
+        expect(phone.locator(".okf-graph-search-status")).not_to_be_empty()
+        assert phone.locator(".okf-graph-search-status").evaluate("el => el.getBoundingClientRect().width") > 1
+    finally:
+        context.close()
+
+
+def test_graph_settings_flow_in_the_pane_and_chip_rings_are_whole(page, docs_server_url: str) -> None:
+    """D2-002/D2-012: Graph settings have no nested scroller inside the
+    detail pane, and a keyboard-focused joined filter chip paints its whole
+    ring: no ancestor below the pane clips it and the joined Only button
+    does not paint over it."""
+    _open(page, docs_server_url, 1440)
+    page.locator(".okf-signal__advanced > summary").click()
+    chip = page.locator(".okf-filter-chip-group > .okf-filter-chip").first
+    chip.scroll_into_view_if_needed()
+    chip.focus()
+    page.keyboard.press("Shift+Tab")
+    page.keyboard.press("Tab")
+    seen = page.evaluate("""() => {
+      const body = document.querySelector('.okf-signal__body'), el = document.activeElement;
+      const clips = [];
+      for (let a = el.parentElement; a && !a.classList.contains('okf-detail'); a = a.parentElement) {
+        const cs = getComputedStyle(a);
+        if (cs.overflowX !== 'visible' || cs.overflowY !== 'visible') clips.push(a.className);
+      }
+      const solo = el.nextElementSibling, cs = getComputedStyle(el);
+      return {scroll: body.scrollHeight, client: body.clientHeight, focusVisible: el.matches(':focus-visible'),
+              isChip: el.classList.contains('okf-filter-chip'), clips, outline: cs.outlineStyle,
+              above: cs.position !== 'static' && Number(cs.zIndex) > (Number(getComputedStyle(solo).zIndex) || 0)};
+    }""")
+    assert seen["scroll"] == seen["client"], seen
+    assert seen["isChip"] and seen["focusVisible"] and seen["outline"] == "solid", seen
+    assert seen["clips"] == [] and seen["above"], seen
+
+
+def test_selected_concept_body_keeps_ledger_prose_and_contained_code(page, docs_server_url: str) -> None:
+    """D3-002/D2-003: the details pane renders a selected concept with the
+    document page's prose styles: padded code wells whose long lines scroll
+    inside their own scrollport, inline-code chips and underlined links."""
+    page.set_viewport_size({"width": 1440, "height": 900})
+    page.goto(docs_server_url + "/__graph?selected=reference/cli", wait_until="domcontentloaded")
+    page.wait_for_function("() => document.querySelector('#detail-body pre')")
+    seen = page.evaluate("""() => {
+      const body = document.getElementById('detail-body'), pane = document.getElementById('okf-detail');
+      const wells = [...body.querySelectorAll('pre')].map(pre => {
+        let port = pre.parentElement;
+        while (port !== body && getComputedStyle(port).overflowX === 'visible') port = port.parentElement;
+        const cs = getComputedStyle(pre);
+        return {pad: parseFloat(cs.paddingLeft), fill: cs.backgroundColor !== 'rgba(0, 0, 0, 0)',
+                contained: port !== body && port.getBoundingClientRect().right <= pane.getBoundingClientRect().right + 0.5,
+                scrolls: pre.scrollWidth <= port.clientWidth || port.scrollWidth > port.clientWidth};
+      });
+      const code = body.querySelector('p code'), link = body.querySelector('p a');
+      return {prose: body.classList.contains('okf-prose'), wells,
+              chip: code && getComputedStyle(code).backgroundColor !== 'rgba(0, 0, 0, 0)',
+              underline: link && getComputedStyle(link).textDecorationLine};
+    }""")
+    assert seen["prose"] and seen["wells"], seen
+    assert all(w["pad"] >= 12 and w["fill"] and w["contained"] and w["scrolls"] for w in seen["wells"]), seen
+    assert seen["chip"] and seen["underline"] == "underline", seen
+
+
+@pytest.mark.parametrize("height", [900, 800])
+def test_open_concept_list_keeps_rows_steady_and_above_zoom(page, docs_server_url: str, height: int) -> None:
+    """D2-004/D2-005: moving the active option keeps every row one line
+    (the 2px bar marks it, no squeezed "Active ·" column), and the open
+    list is hit-tested above the zoom cluster that overlaps its lower end."""
+    page.set_viewport_size({"width": 1440 if height == 900 else 1280, "height": height})
+    page.goto(docs_server_url + "/__graph", wait_until="domcontentloaded")
+    page.wait_for_function("() => window.__okfLoomGraph?.layoutStats?.lastAppliedSeq >= 1")
+    page.locator(".okf-node-index summary").click()
+    concepts = page.get_by_role("listbox", name="Graph concepts")
+    concepts.focus()
+    page.keyboard.press("ArrowDown")
+    page.keyboard.press("ArrowDown")
+    seen = page.evaluate("""() => {
+      const list = document.querySelector('.okf-node-index__list');
+      const items = [...list.querySelectorAll('[role="option"]')];
+      const active = list.querySelector('.is-active'), plain = items.find(i => i !== active);
+      const lr = list.getBoundingClientRect();
+      const hits = [...document.querySelectorAll('#okf-graph > .okf-graph-zoom button')].map(b => b.getBoundingClientRect())
+        .filter(b => b.left < lr.right && lr.left < b.right && b.top < lr.bottom && lr.top < b.bottom)
+        .map(b => { const el = document.elementFromPoint((Math.max(b.left, lr.left) + Math.min(b.right, lr.right)) / 2,
+                                                         (Math.max(b.top, lr.top) + Math.min(b.bottom, lr.bottom)) / 2);
+                    return !!(el && el.closest('.okf-node-index')); });
+      return {activeH: active.getBoundingClientRect().height, plainH: plain.getBoundingClientRect().height,
+              before: getComputedStyle(active, '::before').content, bar: getComputedStyle(active).borderInlineStartWidth, hits};
+    }""")
+    assert seen["activeH"] == seen["plainH"] and seen["before"] in ("none", "normal"), seen
+    assert seen["bar"] == "2px", seen
+    assert all(seen["hits"]), seen
+
+
+def test_tablet_touch_graph_settings_controls_are_44px_targets(page, docs_server_url: str) -> None:
+    """T1-006 (graph): on a coarse-pointer tablet with the desktop graph
+    layout, legend items and the filter chip, Only and Show all buttons
+    keep the 44px touch floor."""
+    context = page.context.browser.new_context(
+        viewport={"width": 1024, "height": 1366}, has_touch=True, is_mobile=True)
+    try:
+        tablet = context.new_page()
+        tablet.add_init_script("try { localStorage.setItem('okfGraphTourDone', '1'); } catch (e) {}")
+        tablet.goto(docs_server_url + "/__graph", wait_until="domcontentloaded")
+        tablet.wait_for_function("() => window.__okfLoomGraph?.layoutStats?.lastAppliedSeq >= 1")
+        tablet.evaluate("() => { document.querySelector('.okf-signal__advanced').open = true; }")
+        expect(tablet.locator(".okf-filter-solo").first).to_be_visible()
+        small = tablet.evaluate(_SMALL_TARGETS_JS, [
+            "button.okf-graph-legend__item", ".okf-filter-chip", ".okf-filter-solo", ".okf-filter-showall"])
+        assert small == [], small
+    finally:
+        context.close()
+
+
+def test_graph_settings_controls_are_ledger_controls(page, docs_server_url: str) -> None:
+    """D2-009/D2-011/D2-023: each type chip shares its row with its Only
+    button; Re-run layout is a labelled Ledger button; sliders and
+    checkboxes are square token-drawn controls, not accent-filled natives."""
+    _open(page, docs_server_url, 1440)
+    page.locator(".okf-signal__advanced > summary").click()
+    seen = page.evaluate("""() => {
+      const types = document.querySelector('.okf-filter-chips[aria-label="Type filters"]');
+      const pairs = [...types.querySelectorAll(':scope > .okf-filter-chip')].map(chip => {
+        const solo = chip.nextElementSibling, a = chip.getBoundingClientRect(), b = solo.getBoundingClientRect();
+        return solo.classList.contains('okf-filter-solo') && Math.abs(a.top - b.top) < 1 && Math.abs(a.right - b.left) < 1.5;
+      });
+      const rerun = document.querySelector('.okf-graph-layout-settings > button');
+      const label = rerun.querySelector('.okf-viewport-label');
+      const look = sel => { const el = document.querySelector(sel), cs = getComputedStyle(el);
+        return {appearance: cs.appearance, radius: cs.borderTopLeftRadius, accent: cs.accentColor}; };
+      return {pairs, rerun: {btn: rerun.classList.contains('okf-btn'), label: label.textContent,
+                             shown: label.getBoundingClientRect().width > 0, width: rerun.getBoundingClientRect().width,
+                             pane: rerun.parentElement.getBoundingClientRect().width},
+              range: look('.okf-signal input[type="range"]'), check: look('.okf-signal input[type="checkbox"]')};
+    }""")
+    assert seen["pairs"] and all(seen["pairs"]), seen
+    assert seen["rerun"]["btn"] and seen["rerun"]["label"] == "Re-run layout" and seen["rerun"]["shown"], seen
+    assert seen["rerun"]["width"] < seen["rerun"]["pane"] / 2, seen
+    for control in (seen["range"], seen["check"]):
+        assert control["appearance"] == "none" and control["radius"] == "0px", seen
+
+
+def test_details_pane_reads_as_one_consistent_column(page, docs_server_url: str) -> None:
+    """D2-022/T1-008/T1-012: one heading per section, single-line count
+    figures in a narrow pane, one left rail for pane content at tablet
+    widths, and a broken-link marker that says what it marks."""
+    _open(page, docs_server_url, 901)
+    narrow = page.evaluate("""() => {
+      const notes = [...document.querySelectorAll('#detail-empty .okf-lens-summary__note')];
+      const digest = document.querySelector('.okf-graph-theme-digest');
+      return {wrapped: notes.filter(n => n.getClientRects().length !== 1 ||
+                n.getBoundingClientRect().height > parseFloat(getComputedStyle(n).lineHeight || '16') * 1.5).length,
+              notes: notes.length,
+              digestHeadings: digest ? digest.querySelectorAll('h2').length : null,
+              verdict: digest ? digest.querySelector('.okf-lens-summary__verdict').textContent : ''};
+    }""")
+    assert narrow["notes"] and narrow["wrapped"] == 0, narrow
+    assert narrow["digestHeadings"] == 0 and " - " not in narrow["verdict"], narrow
+    page.set_viewport_size({"width": 768, "height": 1024})
+    page.get_by_role('navigation', name='Graph panes').get_by_role('button', name='Details', exact=True).click()
+    rails = page.evaluate("""() => ['.okf-detail__empty > p', '#detail-empty .okf-lens-summary__title',
+        '.okf-signal__lenses > summary', '.okf-signal__advanced > summary', '.okf-signal__question']
+      .map(s => Math.round(document.querySelector(s).getBoundingClientRect().left))""")
+    assert len(set(rails)) == 1, rails
+    page.get_by_role('navigation', name='Graph panes').get_by_role('button', name='Concepts', exact=True).click()
+    warn = page.locator(".okf-node-index__warn").first
+    expect(warn).to_have_text(re.compile(r"^\d+ broken$"))
+    expect(warn).to_have_attribute("title", re.compile(r"^\d+ broken links?$"))
+
+
 def test_graph_settings_disclosure_matches_its_sibling_summaries(page, docs_server_url: str) -> None:
     """Graph settings opens like Explore with lenses: the native marker on
     the left in body type, not a hidden marker with a trailing glyph; the
@@ -330,6 +594,38 @@ def test_graph_390_title_and_tools_share_the_pane_gutter(page, docs_server_url: 
     }""")
     # The pane-tab row's box edge is the shell gutter at this width.
     assert edges["title"] == edges["tools"] == edges["tabs"] == 12, edges
+
+
+def test_single_file_graph_focus_ring_is_inset_and_mode_word_is_not_a_tab_stop(tmp_path, page) -> None:
+    """D3-010/D3-011: keyboard Graph in the single-file top bar focuses the
+    edge-to-edge graph region with an inset ring (an outward one is clipped
+    into an L), and the "Local" mode word is a status, not a Tab stop."""
+    from okf_loom import Bundle
+    from okf_loom.render import render_single_file
+    from test_viewer_browser import DOCS_BUNDLE
+
+    out = tmp_path / "single.html"
+    render_single_file(Bundle.load(DOCS_BUNDLE), out)
+    page.set_viewport_size({"width": 1440, "height": 900})
+    page.add_init_script("try { localStorage.setItem('okfGraphTourDone', '1'); } catch (e) {}")
+    page.goto(out.as_uri(), wait_until="domcontentloaded")
+    page.wait_for_function("() => window.okfGraphCaptureState && window.okfGraphCaptureState().layoutSettled")
+    expect(page.locator(".okf-mobile-mode")).to_have_text("Local")
+    stops = []
+    for _ in range(12):
+        page.keyboard.press("Tab")
+        stops.append(page.evaluate("() => [document.activeElement.className, (document.activeElement.textContent || '').trim()]"))
+        if stops[-1][1] == "Graph":
+            break
+    assert stops[-1][1] == "Graph", stops
+    assert not any("okf-mobile-mode" in str(cls) for cls, _ in stops), stops
+    page.keyboard.press("Enter")
+    page.wait_for_function("() => document.activeElement && document.activeElement.id === 'okf-graph'")
+    ring = page.evaluate("""() => { const el = document.activeElement, cs = getComputedStyle(el);
+      return {visible: el.matches(':focus-visible'), style: cs.outlineStyle,
+              width: parseFloat(cs.outlineWidth), offset: parseFloat(cs.outlineOffset)}; }""")
+    assert ring["visible"] and ring["style"] == "solid" and ring["width"] >= 2, ring
+    assert ring["offset"] <= -ring["width"], ring
 
 
 def test_single_file_short_canvas_keeps_zoom_clear_of_concept_index(tmp_path, page) -> None:
