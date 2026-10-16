@@ -1848,6 +1848,16 @@ sup.okf-footnote-ref { line-height: 0; }
     padding-top: 0;
     border-top: 0;
   }
+  /* Split shows two panes side by side: the article takes the page width
+   * beside Related instead of keeping the 760px reading column, which left
+   * each pane ~370px wide between empty margins. */
+  .okf-page:not([data-okf-related="below"]):has(> .okf-page__main .okf-view[data-okf-view="split"]) {
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 210px);
+  }
+  .okf-page:has(> .okf-page__main .okf-view[data-okf-view="split"]) > .okf-page__main {
+    max-width: none;
+    --okf-lane: 100vw;
+  }
 }
 .okf-viewer--page,
 .okf-viewer--page #okf-main:not(.okf-page),
