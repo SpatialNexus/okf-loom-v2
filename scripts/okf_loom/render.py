@@ -6607,7 +6607,7 @@ def _render_search_page(
         f'{query_invalid}'
         'autocomplete="off"><button type="submit" class="okf-search-submit">Search</button></div>'
         f'{query_error_html}</div>'
-        '<fieldset id="okf-search-mode" class="okf-search-modes"><legend>How should results be matched?</legend>'
+        '<fieldset id="okf-search-mode" class="okf-search-modes"><legend>How should results be matched? Choose one.</legend>'
         f'{mode_controls}</fieldset></div>'
         f'<details class="okf-search-filters"{" open" if active_filters else ""}><summary>{filters_label}</summary>'
         f'<div class="okf-search-filter-grid">{filter_fields}</div>'

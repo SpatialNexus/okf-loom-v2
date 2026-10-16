@@ -2548,26 +2548,16 @@ details.okf-frontmatter[open] { padding-bottom: var(--okf-space-2); }
   letter-spacing: var(--label-track);
   text-transform: uppercase;
 }
-.okf-search-mode { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; vertical-align: top; cursor: pointer; }
-.okf-search-mode input {
-  appearance: none;
-  display: grid;
-  place-items: center;
-  flex: none;
-  inline-size: 14px;
-  block-size: 14px;
-  margin: 0;
-  border: 1px solid var(--border-strong);
-  border-radius: 0;
-  background: var(--input-bg);
-  cursor: inherit;
-}
-.okf-search-mode input::before { content: ""; inline-size: 6px; block-size: 6px; }
-.okf-search-mode input:checked::before { background: var(--text); }
-.okf-search-mode input:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.okf-search-mode { position: relative; display: inline-flex; align-items: center; min-height: 40px; padding: 4px 8px; border-inline-start: 2px solid transparent; vertical-align: top; cursor: pointer; }
+/* Native radios keep one tab stop and arrow-key selection; their labels are
+ * the square Ledger segments, not checkbox-shaped replacement indicators. */
+.okf-search-mode input { position: absolute; inline-size: 1px; block-size: 1px; margin: 0; opacity: 0; border-radius: 0; }
+.okf-search-mode:has(input:checked) { border-inline-start-color: var(--accent); background: var(--surface-2); }
+.okf-search-mode:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: -2px; }
+.okf-search-mode input:focus-visible { outline: none; }
 @media (forced-colors: active) {
-  .okf-search-mode input { border-color: CanvasText; }
-  .okf-search-mode input:checked::before { background: CanvasText; forced-color-adjust: none; }
+  .okf-search-mode:has(input:checked) { border-inline-start-color: Highlight; background: Canvas; color: CanvasText; forced-color-adjust: none; }
+  .okf-search-mode:has(input:focus-visible) { outline-color: Highlight; }
 }
 .okf-search-mode span { display: grid; color: var(--text); font-size: 13px; font-weight: 600; }
 .okf-search-mode small { max-width: 11rem; color: var(--text-2); font-size: 11px; font-weight: 400; line-height: 1.2; }

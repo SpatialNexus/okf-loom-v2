@@ -10,6 +10,8 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Search modes read as single-choice Ledger segments with whole-label focus
+  and a 2px selected state bar, retaining native radio keyboard behavior (D2-024).
 - Search discloses reached result limits and offers relevant, evenly spaced
   empty-state actions instead of clearing nonexistent filters (D2-019, D2-020).
 - Search and suggestion highlighting marks whole query terms, not fragments

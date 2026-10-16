@@ -409,7 +409,7 @@ def test_ledger_hover_press_and_breadcrumb_cues_remain_visible(open_page, theme)
     assert idle != hovered and hovered != pressed, (theme, idle, hovered, pressed)
 
 
-def test_search_modes_keep_native_keyboard_semantics_with_square_indicators(open_page):
+def test_search_modes_keep_native_keyboard_semantics_with_square_segments(open_page):
     page = open_page(SEARCH, DESKTOP)
     radios = page.locator('.okf-search-mode input')
     first = radios.first
@@ -420,8 +420,8 @@ def test_search_modes_keep_native_keyboard_semantics_with_square_indicators(open
     assert first.evaluate("r => getComputedStyle(r).borderRadius") == '0px'
     assert page.locator('.okf-search-query input').bounding_box()['height'] == 32
     page.emulate_media(forced_colors='active')
-    visible = radios.nth(1).evaluate("""r => { const s = getComputedStyle(r), dot = getComputedStyle(r, '::before');
-      return s.borderTopStyle === 'solid' && dot.backgroundColor !== s.backgroundColor; }""")
+    visible = radios.nth(1).evaluate("""r => { const s = getComputedStyle(r.closest('label'));
+      return s.borderInlineStartWidth === '2px' && s.outlineStyle === 'solid' && s.outlineWidth === '2px'; }""")
     assert visible
 
 
