@@ -46,14 +46,18 @@ def test_shared_shell_has_stable_order_and_one_active_destination(
     pages = {
         "index": output / "index.html",
         "concept": output / "tables" / "users.html",
+        "section-index": output / "tables" / "index.html",
         "search": output / "__search.html",
         "graph": output / "__graph.html",
     }
+    # D1-017: a concept page is no destination's page, so nothing is marked
+    # aria-current="page" there (Index used to be).
     expected_active = {
-        "index": "index",
-        "concept": "index",
-        "search": "search",
-        "graph": "graph",
+        "index": ["index"],
+        "concept": [],
+        "section-index": [],
+        "search": ["search"],
+        "graph": ["graph"],
     }
 
     for route, path in pages.items():
@@ -61,7 +65,7 @@ def test_shared_shell_has_stable_order_and_one_active_destination(
         assert [name for name, _ in probe.items] == [
             "bundle", "search", "index", "graph", "studio", "appearance",
         ], route
-        assert probe.current_links == [expected_active[route]], route
+        assert probe.current_links == expected_active[route], route
 
 
 def test_portable_shell_reserves_but_does_not_advertise_studio(

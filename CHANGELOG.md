@@ -18,6 +18,8 @@ follow [Semantic Versioning](https://semver.org/). The product version
   as its idle label (no blank slot); longer statuses end in an ellipsis, so nothing moves.
 - Document details shows the document's own short content revision instead of
   "rev section-" on every page, and no revision when there is none.
+- The top-bar Index link is marked as the current page only on the bundle index,
+  not on documents, the log or section indexes.
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
   including source derivations; the full/tool graph projection is unchanged.
 - Missing or malformed embedded search evidence in single-file exports settles as

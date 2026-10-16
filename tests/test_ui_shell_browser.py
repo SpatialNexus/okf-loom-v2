@@ -876,8 +876,9 @@ def test_route_links_expose_current_state_and_focus_visible_targets(page, server
     assert graph_focus["matches"], graph_focus
     assert heading.evaluate("el => getComputedStyle(el).outlineStyle !== 'none'")
 
+    # D1-017: a document is not the Index page; no destination claims it.
     page.goto(server_url + "/tables/orders")
-    assert page.locator('[data-okf-shell-item="index"] a').get_attribute("aria-current") == "page"
+    assert page.locator('.okf-shell [aria-current]').count() == 0
     assert page.locator(".okf-page__title").is_visible()
 
 

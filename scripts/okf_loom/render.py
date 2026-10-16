@@ -4607,7 +4607,9 @@ def _render_concept_page(
         search_href=f"{root_prefix}__search{'.html' if mode == 'static' else ''}",
         index_href=bundle_href,
         graph_href=f"{root_prefix}__graph{'.html' if mode == 'static' else ''}",
-        current="index",
+        # D1-017: a concept page is not the Index page, so no destination is
+        # announced as the current page (the breadcrumb carries location).
+        current=None,
         mode=mode,
         studio_available=studio_available,
         appearance_choice=configured_theme,
@@ -5842,7 +5844,7 @@ def render_reserved_document(document: str, body: str, *, mode: str,
     graph_href = f"{root_prefix}__graph{suffix}"
     shell_html = _application_shell_html(
         name=display, bundle_href=home, search_href=f"{root_prefix}__search{suffix}",
-        index_href=home, graph_href=graph_href, current="index", mode=mode,
+        index_href=home, graph_href=graph_href, current=None, mode=mode,
         studio_available=studio_available,
         appearance_choice=configured_theme,
     )
@@ -6318,7 +6320,9 @@ def _render_index_page(
         search_href=f"{root_prefix_for_nav}__search{'.html' if mode == 'static' else ''}",
         index_href=brand_href,
         graph_href=graph_link,
-        current="index",
+        # Index is the current page only on the bundle root index; a section
+        # index (/how-to/) links back to it (D1-017).
+        current=None if sub else "index",
         mode=mode,
         studio_available=studio_available,
         appearance_choice=configured_theme,
