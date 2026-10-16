@@ -1,6 +1,7 @@
 """Browser proof for the shared shell and consolidated Studio surface."""
 from __future__ import annotations
 
+import base64
 import contextlib
 import os
 import re
@@ -190,6 +191,100 @@ def test_recent_pages_popover_is_anchored_below_the_search_field(page, server_ur
     assert abs(popup['x'] - field['x']) < 1
     assert abs(popup['y'] - field['y'] - field['height']) < 1
     assert popup['width'] < 400
+
+
+# The focused part's ring: its box, the element painting the middle of each
+# side of the 2px band, and the band's colour sampled from a real screenshot
+# (hit-testing ignores the suggestions list's 1px pop frame; pixels do not).
+_FOCUS_RING = """el => {
+  const s = getComputedStyle(el), r = el.getBoundingClientRect();
+  const w = parseFloat(s.outlineWidth), off = parseFloat(s.outlineOffset);
+  const ring = {l: r.left - off - w, t: r.top - off - w, r: r.right + off + w, b: r.bottom + off + w};
+  const cx = (ring.l + ring.r) / 2, cy = (ring.t + ring.b) / 2;
+  const sides = {top: [cx, ring.t + w / 2], bottom: [cx, ring.b - w / 2],
+                 left: [ring.l + w / 2, cy], right: [ring.r - w / 2, cy]};
+  const painter = {};
+  for (const [side, [x, y]] of Object.entries(sides)) {
+    const hit = document.elementFromPoint(x, y);
+    painter[side] = hit === el ? 'self' : hit && hit.outerHTML.slice(0, 80);
+  }
+  return {style: s.outlineStyle, width: w, colour: s.outlineColor, ring, sides, painter,
+          rect: {l: r.left, t: r.top, r: r.right, b: r.bottom}};
+}"""
+
+_SAMPLE_PIXELS = """async ([png, sides]) => {
+  const img = new Image(); img.src = 'data:image/png;base64,' + png; await img.decode();
+  const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height;
+  const g = canvas.getContext('2d'); g.drawImage(img, 0, 0);
+  const out = {};
+  for (const [side, [x, y]] of Object.entries(sides)) out[side] = [...g.getImageData(Math.floor(x), Math.floor(y), 1, 1).data.slice(0, 3)];
+  return out;
+}"""
+
+
+def _assert_ring_hugs_and_shows(page, control, label: str) -> dict:
+    m = control.evaluate(_FOCUS_RING)
+    assert m['style'] == 'solid' and m['width'] == 2, (label, m)
+    # Inside the control's own box: never offset into the joined neighbour,
+    # the suggestions list or the bar's edge.
+    for side in ('l', 't'):
+        assert m['ring'][side] >= m['rect'][side] - 0.01, (label, side, m)
+    for side in ('r', 'b'):
+        assert m['ring'][side] <= m['rect'][side] + 0.01, (label, side, m)
+    assert set(m['painter'].values()) == {'self'}, (label, m['painter'])
+    shot = base64.b64encode(page.screenshot()).decode()
+    pixels = page.evaluate(_SAMPLE_PIXELS, [shot, m['sides']])
+    want = [int(v) for v in re.findall(r'\d+', m['colour'])[:3]]
+    for side, got in pixels.items():
+        assert max(abs(a - b) for a, b in zip(got, want)) <= 24, (label, side, got, m['colour'])
+    return m
+
+
+@pytest.mark.parametrize("route,field,button,width,coarse", [
+    ("/tables/orders", ".okf-shell__search-form input", ".okf-shell__search-submit", 1440, False),
+    ("/tables/orders", ".okf-shell__search-form input", ".okf-shell__search-submit", 390, True),
+    ("/__search?q=checkout", "#okf-search-query", ".okf-search-query .okf-search-submit", 1280, False),
+    ("/__search?q=checkout", "#okf-search-query", ".okf-search-query .okf-search-submit", 390, True),
+    ("/__graph", "#okf-search", None, 1440, False),
+])
+def test_joined_search_focus_ring_hugs_each_part_and_is_never_covered(
+        server_url, route, field, button, width, coarse):
+    """M1-001/D1-001/D2-001: a text field matches :focus-visible on pointer
+    focus too, so tap, click and Tab must all show one complete ring on the
+    focused part of the joined field+button, not an outset box half under the
+    button and the suggestions list; the button's ring is its own, never
+    doubled with the field's."""
+    with sync_playwright() as playwright:
+        browser = launch_chromium(playwright)
+        context = browser.new_context(viewport={"width": width, "height": 844 if coarse else 900},
+                                      is_mobile=coarse, has_touch=coarse)
+        try:
+            page = context.new_page()
+            errors = _install_error_probe(page)
+            page.goto(server_url + route)
+            page.wait_for_function("() => document.documentElement.classList.contains('okf-theme-ready')")
+            input_ = page.locator(field)
+            input_.tap() if coarse else input_.click()
+            expect(input_).to_be_focused()
+            if field.startswith(".okf-shell"):
+                # The Recent pages list opens flush under the field on focus.
+                expect(page.locator(".okf-search-live")).to_be_visible()
+            label = f"{route} {width} field pointer"
+            _assert_ring_hugs_and_shows(page, input_, label)
+            if button:
+                page.keyboard.press("Tab")
+                submit = page.locator(button)
+                expect(submit).to_be_focused()
+                _assert_ring_hugs_and_shows(page, submit, f"{route} {width} button keyboard")
+                assert input_.evaluate("n => getComputedStyle(n).outlineStyle") == "none"
+                page.keyboard.press("Shift+Tab")
+                expect(input_).to_be_focused()
+                _assert_ring_hugs_and_shows(page, input_, f"{route} {width} field keyboard")
+                assert submit.evaluate("n => getComputedStyle(n).outlineStyle") == "none"
+            assert not [e for e in errors if not e.startswith("requestfailed")], errors
+        finally:
+            context.close()
+            browser.close()
 
 
 _FIRST_PAINT_CLS = """(() => {

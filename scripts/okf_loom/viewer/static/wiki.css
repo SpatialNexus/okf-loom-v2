@@ -598,6 +598,17 @@ hr { border: 0; border-top: 1px solid var(--border); margin: var(--okf-space-4) 
 }
 a:focus-visible,
 summary:focus-visible { outline-offset: 1px; }
+/* Search fields and their joined Search buttons (top bar, the search page's
+ * query row, Find in graph): an outset ring would run under the neighbour
+ * that shares the border and under the suggestions list, leaving a detached
+ * bracket. Each part draws its ring inside its own border instead, lifted
+ * over the shared 1px edge, so it hugs the control and is never covered.
+ * Forced colours keep this geometry; only the colour becomes Highlight. */
+:is(.okf-shell__search-form, .okf-search-query, .okf-graph-tools__search) :is(input[type="search"], button[type="submit"]):focus-visible {
+  position: relative;
+  z-index: 1;
+  outline-offset: calc(-1 * var(--okf-focus-width));
+}
 
 /* ---- Links --------------------------------------------------------------------
  * Chrome links (top bar, chips, controls) rely on context; prose links stay
@@ -2529,6 +2540,10 @@ details.okf-frontmatter[open] { padding-bottom: var(--okf-space-2); }
   cursor: pointer;
 }
 .okf-search-submit:hover { border-color: var(--primary-hover-bg); background: var(--primary-hover-bg); }
+/* Joined to the query field its focus ring is inset (the joined-search rule),
+ * so it sits on the filled primary surface, where the accent would vanish:
+ * draw it in the fill's ink. */
+.okf-search-query .okf-search-submit:focus-visible { outline-color: var(--primary-text); }
 /* The six match modes form one tidy row: even column gap, radios centred on
  * their two-line labels, left-aligned on the query field's edge. */
 .okf-search-modes {
@@ -3427,6 +3442,8 @@ body:has(.okf-graph-loading--error) .okf-cytoscape-fallback-actions { display: f
  * colours, so every floating layer gets a real border and every state bar a
  * system-colour outline; colour-only cues gain shape. */
 @media (forced-colors: active) {
+  /* The joined search rings' inset offset (more specific) still applies here;
+   * only their colour becomes Highlight. */
   :focus-visible { outline: 2px solid Highlight !important; outline-offset: 2px; }
   :is(.okf-search-live__option[aria-selected="true"], [aria-current="page"], [aria-current="true"],
     .okf-onthispage__link.is-active, .okf-viewswitch__btn[aria-pressed="true"]) {
@@ -3451,6 +3468,9 @@ body:has(.okf-graph-loading--error) .okf-cytoscape-fallback-actions { display: f
   .okf-search-submit,
   .okf-search-live__option[aria-selected="true"],
   .okf-btn--primary { forced-color-adjust: none; border-color: Highlight; background: Highlight; color: HighlightText; }
+  /* The joined submit's inset ring sits on that Highlight fill: draw it in
+   * the fill's ink, as outside forced colours. */
+  .okf-search-query .okf-search-submit:focus-visible { outline: 2px solid HighlightText !important; }
   .okf-appearance__opt:has(> input:checked) { forced-color-adjust: none; background: Highlight; color: HighlightText; }
   .okf-appearance__opt:has(> input:checked) :is(.okf-appearance__label, .okf-appearance__sub, .okf-appearance__tag) { color: HighlightText; }
   .okf-appearance__swatch,

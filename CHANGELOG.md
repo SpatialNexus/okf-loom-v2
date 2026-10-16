@@ -10,6 +10,9 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Search fields (top bar, the search page, Find in graph) and their joined Search
+  buttons draw a complete inset focus ring that hugs the focused part, instead of an
+  outset box half hidden under the button and the suggestions list (also in forced colours).
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
   including source derivations; the full/tool graph projection is unchanged.
 - Missing or malformed embedded search evidence in single-file exports settles as
