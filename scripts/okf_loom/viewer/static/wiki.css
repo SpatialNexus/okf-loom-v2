@@ -3491,13 +3491,13 @@ body:has(.okf-graph-loading--error) .okf-cytoscape-fallback-actions { display: f
     .okf-breadcrumb a, .okf-conn__title, .okf-card__link, .okf-card__comments,
     .okf-v2-spotlight__tertiary, .okf-search-mode, .okf-search-disclosure > summary,
     .okf-page-context > details > summary, .okf-search-query input, .okf-search-submit,
-    .okf-brand-link, .okf-skip-link) {
+    .okf-brand-link, .okf-skip-link, .okf-search-result h3 > a) {
     min-height: 44px;
     min-inline-size: 44px;
   }
   :is(.okf-heading-anchor, .okf-breadcrumb a, .okf-conn__title, .okf-card__link,
     .okf-card__comments, .okf-v2-spotlight__tertiary, .okf-brand-link,
-    .okf-skip-link) { display: inline-flex; align-items: center; }
+    .okf-skip-link, .okf-search-result h3 > a) { display: inline-flex; align-items: center; }
   .okf-heading-anchor { opacity: 1; }
   .okf-type-nav__link,
   .okf-onthispage__link,

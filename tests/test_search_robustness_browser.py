@@ -258,6 +258,20 @@ def test_live_search_page_box_treats_metacharacters_as_text(live_url: str, page,
     _assert_clean(page)
 
 
+@pytest.mark.parametrize("width,height", [(768, 1024), (1024, 1366)])
+def test_search_result_title_is_a_44px_coarse_target(live_url: str, page, width: int, height: int) -> None:
+    context = page.context.browser.new_context(viewport={"width": width, "height": height}, has_touch=True)
+    try:
+        touch_page = context.new_page()
+        touch_page.goto(live_url + "/__search?q=orders")
+        title = touch_page.locator(".okf-search-result h3 > a").first
+        expect(title).to_be_visible()
+        box = title.bounding_box()
+        assert box["height"] >= 44 and box["width"] >= 44, box
+    finally:
+        context.close()
+
+
 def test_portable_search_verifies_evidence_on_plain_http_nonlocalhost(static_url: str, page) -> None:
     # Transport stays on our owned loopback server, but the browser evaluates
     # the document and its scripts as an ordinary, non-secure LAN origin.

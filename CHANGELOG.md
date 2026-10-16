@@ -10,6 +10,8 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Search result titles meet the 44px coarse-pointer target on tablets as well
+  as phones (search portion of T1-006).
 - Portable search verifies the same SHA-256 evidence hashes on plain-HTTP LAN
   mirrors using a bundled fallback only when WebCrypto is absent (D3-005).
 - Search suggestion selection keeps row heights stable while `aria-selected`
