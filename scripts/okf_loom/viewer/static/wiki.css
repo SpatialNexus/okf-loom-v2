@@ -618,9 +618,11 @@ summary:focus-visible { outline-offset: 1px; }
  * over the shared 1px edge, so it hugs the control and is never covered.
  * Forced colours keep this geometry; only the colour becomes Highlight. */
 :is(.okf-shell__search-form, .okf-search-query, .okf-graph-tools__search) :is(input[type="search"], button[type="submit"]):focus-visible {
+  outline-offset: calc(-1 * var(--okf-focus-width));
+}
+:is(.okf-shell__search-form, .okf-search-query) :is(input[type="search"], button[type="submit"]):focus-visible {
   position: relative;
   z-index: 1;
-  outline-offset: calc(-1 * var(--okf-focus-width));
 }
 
 /* ---- Links --------------------------------------------------------------------
