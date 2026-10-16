@@ -1886,16 +1886,9 @@ body.okf-viewer--graph[data-okf-narrow-reflow] #okf-appearance-menu { z-index: 6
 }
 @media (max-width: 640px) {
   .okf-viewer--graph .okf-graph-route-title { padding: 4px var(--okf-space-3); font-size: var(--okf-text-base); }
-  /* Phone Find in graph is one row: the heading beside its field. The
-   * field's micro-label repeats its placeholder (the input is named by its
-   * aria-label), so it is visually hidden rather than costing a row. */
   .okf-viewer--graph .okf-graph-tools { align-items: center; padding-block: 6px; }
   .okf-viewer--graph .okf-graph-tools > h2 { flex: 0 0 auto; align-self: flex-start; }
   .okf-viewer--graph .okf-graph-tools__search { flex: 1 1 9rem; }
-  .okf-viewer--graph .okf-graph-tools__search > span:first-child {
-    position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden;
-    clip-path: inset(50%); white-space: nowrap;
-  }
 }
 /* At <=340px the shell puts Appearance on its third row (order 2); the
  * graph-owned rows graph.js docks in the top bar follow it instead of
