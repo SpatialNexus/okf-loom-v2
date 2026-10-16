@@ -4849,7 +4849,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
     // lays out the same way on every load (the top Obsidian complaint was
     // position churn destroying spatial memory).
     buildSignalPanel();
-    if(ui.settingsBody){var layoutGroup=el("fieldset",{class:"okf-signal__group okf-graph-layout-settings"});layoutGroup.appendChild(el("legend",{},["Layout and relationship bundles"]));if(viewportRerunButton)layoutGroup.appendChild(viewportRerunButton);if(bundleIndex)layoutGroup.appendChild(bundleIndex);ui.settingsBody.appendChild(layoutGroup);}
+    if(ui.settingsBody){var layoutGroup=el("fieldset",{class:"okf-signal__group okf-graph-layout-settings"});layoutGroup.appendChild(el("legend",{},["Layout and relationship bundles"]));if(viewportRerunButton){/* In settings it is an ordinary labelled Ledger button, not a zoom-cluster icon. */viewportRerunButton.classList.add("okf-btn");var rerunLabel=viewportRerunButton.querySelector(".okf-viewport-label");if(rerunLabel)rerunLabel.textContent="Re-run layout";layoutGroup.appendChild(viewportRerunButton);}if(bundleIndex)layoutGroup.appendChild(bundleIndex);ui.settingsBody.appendChild(layoutGroup);}
     if (GRAPH_EMPTY) {
       applyVisualEncoding();
       applyFilters();

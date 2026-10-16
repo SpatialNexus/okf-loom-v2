@@ -486,6 +486,54 @@ def test_open_concept_list_keeps_rows_steady_and_above_zoom(page, docs_server_ur
     assert all(seen["hits"]), seen
 
 
+def test_tablet_touch_graph_settings_controls_are_44px_targets(page, docs_server_url: str) -> None:
+    """T1-006 (graph): on a coarse-pointer tablet with the desktop graph
+    layout, legend items and the filter chip, Only and Show all buttons
+    keep the 44px touch floor."""
+    context = page.context.browser.new_context(
+        viewport={"width": 1024, "height": 1366}, has_touch=True, is_mobile=True)
+    try:
+        tablet = context.new_page()
+        tablet.add_init_script("try { localStorage.setItem('okfGraphTourDone', '1'); } catch (e) {}")
+        tablet.goto(docs_server_url + "/__graph", wait_until="domcontentloaded")
+        tablet.wait_for_function("() => window.__okfLoomGraph?.layoutStats?.lastAppliedSeq >= 1")
+        tablet.evaluate("() => { document.querySelector('.okf-signal__advanced').open = true; }")
+        expect(tablet.locator(".okf-filter-solo").first).to_be_visible()
+        small = tablet.evaluate(_SMALL_TARGETS_JS, [
+            "button.okf-graph-legend__item", ".okf-filter-chip", ".okf-filter-solo", ".okf-filter-showall"])
+        assert small == [], small
+    finally:
+        context.close()
+
+
+def test_graph_settings_controls_are_ledger_controls(page, docs_server_url: str) -> None:
+    """D2-009/D2-011/D2-023: each type chip shares its row with its Only
+    button; Re-run layout is a labelled Ledger button; sliders and
+    checkboxes are square token-drawn controls, not accent-filled natives."""
+    _open(page, docs_server_url, 1440)
+    page.locator(".okf-signal__advanced > summary").click()
+    seen = page.evaluate("""() => {
+      const types = document.querySelector('.okf-filter-chips[aria-label="Type filters"]');
+      const pairs = [...types.querySelectorAll(':scope > .okf-filter-chip')].map(chip => {
+        const solo = chip.nextElementSibling, a = chip.getBoundingClientRect(), b = solo.getBoundingClientRect();
+        return solo.classList.contains('okf-filter-solo') && Math.abs(a.top - b.top) < 1 && Math.abs(a.right - b.left) < 1.5;
+      });
+      const rerun = document.querySelector('.okf-graph-layout-settings > button');
+      const label = rerun.querySelector('.okf-viewport-label');
+      const look = sel => { const el = document.querySelector(sel), cs = getComputedStyle(el);
+        return {appearance: cs.appearance, radius: cs.borderTopLeftRadius, accent: cs.accentColor}; };
+      return {pairs, rerun: {btn: rerun.classList.contains('okf-btn'), label: label.textContent,
+                             shown: label.getBoundingClientRect().width > 0, width: rerun.getBoundingClientRect().width,
+                             pane: rerun.parentElement.getBoundingClientRect().width},
+              range: look('.okf-signal input[type="range"]'), check: look('.okf-signal input[type="checkbox"]')};
+    }""")
+    assert seen["pairs"] and all(seen["pairs"]), seen
+    assert seen["rerun"]["btn"] and seen["rerun"]["label"] == "Re-run layout" and seen["rerun"]["shown"], seen
+    assert seen["rerun"]["width"] < seen["rerun"]["pane"] / 2, seen
+    for control in (seen["range"], seen["check"]):
+        assert control["appearance"] == "none" and control["radius"] == "0px", seen
+
+
 def test_graph_settings_disclosure_matches_its_sibling_summaries(page, docs_server_url: str) -> None:
     """Graph settings opens like Explore with lenses: the native marker on
     the left in body type, not a hidden marker with a trailing glyph; the

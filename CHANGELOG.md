@@ -24,6 +24,10 @@ follow [Semantic Versioning](https://semver.org/). The product version
 - The graph's All concepts list keeps the active row on one line (its 2px bar
   marks it; the wrapping "Active ·" prefix is gone) and, open, sits above the zoom
   controls instead of under them.
+- Graph settings controls follow Ledger: type filter chips stay joined to their
+  Only buttons, Re-run layout is a labelled button, sliders and checkboxes are
+  square ink controls (accent only on focus), and legend and filter buttons are
+  44px targets on touch tablets.
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
   including source derivations; the full/tool graph projection is unchanged.
 - Missing or malformed embedded search evidence in single-file exports settles as
