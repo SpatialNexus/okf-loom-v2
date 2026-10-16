@@ -1142,6 +1142,33 @@ def test_masthead_stays_one_row_beside_the_studio_rail_and_counts_do_not_move_it
     assert failures == []
 
 
+def test_related_rail_titles_wrap_and_its_collapse_control_is_named(page, server_url: str) -> None:
+    """D1-009 / T1-010: rail titles were ellipsised (full text only in a
+    hover tooltip, unreadable on touch) and the collapse control was a bare
+    "-" named "Collapse". Titles now wrap; the panel title is a disclosure
+    button named "Related" whose aria-expanded tracks the panel."""
+    page.set_viewport_size({"width": 1024, "height": 900})
+    page.goto(server_url + "/tables/orders")
+    page.wait_for_function("() => window.okfLoomStudio && window.okfLoomStudio.state.eventsReady")
+    toggle = page.locator(".okf-sidebar-panel__toggle").first
+    expect(toggle).to_have_accessible_name("Related")
+    expect(toggle).to_have_attribute("aria-expanded", "true")
+    body = page.locator("#" + toggle.get_attribute("aria-controls"))
+    expect(body).to_be_visible()
+    page.evaluate("""() => document.querySelector('.okf-local-graph__label').textContent =
+      'A deliberately long related concept title that cannot fit on one rail line'""")
+    clipped = page.evaluate("""() => [...document.querySelectorAll('.okf-local-graph__label')]
+      .filter(l => l.getClientRects().length && l.scrollWidth > l.clientWidth + 1).map(l => l.textContent)""")
+    assert clipped == [], clipped
+    assert page.evaluate("document.querySelector('.okf-local-graph__label').getBoundingClientRect().height") > 30
+    toggle.click()
+    expect(toggle).to_have_attribute("aria-expanded", "false")
+    expect(body).to_be_hidden()
+    toggle.press("Enter")
+    expect(toggle).to_have_attribute("aria-expanded", "true")
+    expect(body).to_be_visible()
+
+
 def test_home_recently_changed_precedes_the_spotlight_column_in_tab_order(page, server_url: str) -> None:
     """D1-013: the recent rail sits in the left column but came after the
     right-hand spotlight in the DOM, so Tab jumped right, then back left and

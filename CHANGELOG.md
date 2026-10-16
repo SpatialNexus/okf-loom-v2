@@ -26,6 +26,8 @@ follow [Semantic Versioning](https://semver.org/). The product version
 - Home spotlight: the "New" badge and check marks are neutral; the accent stays on the one CTA.
 - Section indexes (e.g. /how-to/) use their authored heading as the single page title, and
   their body sits on the title's edge in the document lane instead of a 60ch column.
+- Related rail titles wrap instead of being cut off, and the rail's collapse control is a
+  disclosure button named "Related" with a chevron and aria-expanded (was a bare "-").
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
   including source derivations; the full/tool graph projection is unchanged.
 - Missing or malformed embedded search evidence in single-file exports settles as

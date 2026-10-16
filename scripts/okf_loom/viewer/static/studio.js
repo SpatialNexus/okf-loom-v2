@@ -11492,24 +11492,30 @@
       draggable: "true",
     });
     var header = el("div", { class: "okf-sidebar-panel__header" });
+    var bodyId = "okf-sidebar-panel-body-" + String(panelId).replace(/[^a-zA-Z0-9_-]/g, "-");
+    // D1-009 / T1-010: the panel title IS the disclosure button (named
+    // "Related", state in aria-expanded), with a chevron in place of the
+    // former bare mono "-"/"+" that read as stray punctuation and whose
+    // accessible name ("Collapse") did not say what it collapsed.
     var toggle = el("button", {
       class: "okf-sidebar-panel__toggle",
       type: "button",
-      "aria-label": isCollapsed ? "Expand" : "Collapse",
-      text: isCollapsed ? "+" : "-",
-    });
+      "aria-expanded": isCollapsed ? "false" : "true",
+      "aria-controls": bodyId,
+    }, [
+      el("span", { class: "okf-sidebar-panel__chevron", "aria-hidden": "true" }),
+      el("span", { class: "okf-sidebar-panel__title", text: sidebarPanelTitle(panelId) }),
+    ]);
     toggle.addEventListener("click", function () {
       var p = panel.classList.toggle("okf-sidebar-panel--collapsed");
-      toggle.textContent = p ? "+" : "-";
-      toggle.setAttribute("aria-label", p ? "Expand" : "Collapse");
+      toggle.setAttribute("aria-expanded", p ? "false" : "true");
       sbState.collapsed[panelId] = p;
       saveSidebarState(sbState);
     });
     header.appendChild(toggle);
-    header.appendChild(el("span", { class: "okf-sidebar-panel__title", text: sidebarPanelTitle(panelId) }));
     panel.appendChild(header);
 
-    var body = el("div", { class: "okf-sidebar-panel__body" });
+    var body = el("div", { class: "okf-sidebar-panel__body", id: bodyId });
     if (panelId === "related") {
       // Move the actual DOM node to preserve event listeners on the
       // local graph pills (buttons that navigate to concepts).
