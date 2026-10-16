@@ -29,7 +29,7 @@
         terminalPhase: "graph-protocol", terminalMessage: "This site needs a web server." };
     };
   }
-  var heading = main.querySelector("h1");
+  var heading = main.querySelector(".okf-graph-route-title") || main.querySelector("h1");
   main.replaceChildren();
   if (heading) main.appendChild(heading);
   body.classList.remove("okf-viewer--graph");

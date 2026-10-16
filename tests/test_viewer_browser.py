@@ -3177,6 +3177,7 @@ def test_static_file_pages_explain_the_web_server_requirement(
     note = page.locator(".okf-portable-server-note")
     expect(note).to_have_count(1)
     expect(note).to_be_visible()
+    assert "without JavaScript" not in page.locator("#okf-main").inner_text()
     expect(note).to_contain_text("Graph and Search cannot load their data")
     expect(note).to_contain_text("python -m http.server")
     expect(note).to_contain_text("Index and documents also work directly from disk")
