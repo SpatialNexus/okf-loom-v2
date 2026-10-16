@@ -1829,6 +1829,8 @@ sup.okf-footnote-ref { line-height: 0; }
   padding-top: var(--okf-space-4);
   border-top: 1px solid var(--border);
 }
+/* Studio's Related panel draws its own 2px top rule: no second rule above it. */
+.okf-page__sidebar:has(> .okf-sidebar-panel) { border-top: 0; }
 @media (min-width: 901px) {
   .okf-page:not([data-okf-related="below"]) {
     grid-template-columns: minmax(0, var(--okf-article-maxw)) minmax(180px, 210px);
@@ -2030,6 +2032,9 @@ body.okf-viewer .okf-viewswitch__btn:is(.okf-source-wrap, .okf-focus-toggle)[ari
   padding: 10px 18px 12px;
   border-block: 1px solid var(--border);
 }
+/* Directly under the metadata strip, the strip's bottom rule is the tools'
+ * top edge: one hairline, not two parallel ones 14px apart. */
+:has(> .okf-metadata:last-child) + .okf-document-tools { margin-top: 0; border-top: 0; }
 .okf-document-tools > .okf-onthispage { border: 0; }
 .okf-onthispage { display: block; margin: 0; padding: 0; border: 0; background: transparent; }
 .okf-onthispage[hidden] { display: none; }
@@ -2358,13 +2363,13 @@ details.okf-frontmatter[open] { padding-bottom: var(--okf-space-2); }
   letter-spacing: var(--label-track);
   text-transform: uppercase;
 }
+/* The pager's outlined cards carry their own edges, so the band adds no
+ * rule of its own above them (it doubled the connections' last rule). */
 .okf-prevnext {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--okf-space-3);
   margin: var(--okf-space-6) 0;
-  padding-top: var(--okf-space-4);
-  border-top: 1px solid var(--border);
 }
 .okf-prevnext__link {
   display: flex;
@@ -3313,6 +3318,8 @@ body:has(.okf-graph-loading--error) .okf-cytoscape-fallback-actions { display: f
   .okf-page__title { font-size: clamp(1.5rem, 5vw, 1.875rem); line-height: 1.15; }
   .okf-prevnext { grid-template-columns: 1fr; }
   .okf-prevnext__next { text-align: left; }
+  /* Stacked, the empty slot only reserved a blank card-sized band. */
+  .okf-prevnext__placeholder { display: none; }
   .okf-stat { margin-right: 14px; padding-right: 14px; }
   /* The inventory ruler collapses to one stacked column: title, id,
    * summary, signals. The group head keeps its label and count. */
