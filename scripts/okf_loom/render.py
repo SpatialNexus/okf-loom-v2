@@ -3598,8 +3598,11 @@ def build_site(
         )
 
     from .config import OkfConfig
+    bundle_config = OkfConfig.load(bundle.root)
+    # Match serve's configured title before the legacy viewer-name/folder fallback.
+    name = name or bundle_config.viewer.title
     session_roots = (source / ".okf-loom/session",
-                     source / OkfConfig.load(bundle.root).studio.session_path)
+                     source / bundle_config.studio.session_path)
     publish_directory_modes = not any(destination.is_relative_to(path.resolve())
                                       for path in session_roots)
 

@@ -1823,6 +1823,35 @@ def test_phase2_search_live_grouping_and_recent(server_url: str, page) -> None:
             proc.kill(); proc.wait(timeout=5)
 
 
+@pytest.mark.parametrize("target", ["static", "spa", "single-file"])
+def test_portable_graph_keeps_the_rendered_brand(tmp_path: Path, page, target: str) -> None:
+    """Even a slug-shaped configured title is never renamed by graph boot."""
+    from okf_loom import Bundle
+    from okf_loom.render import build_site
+
+    bundle = copy_bundle(DEMO_BUNDLE, tmp_path / "bundle")
+    (bundle / "okf-loom.config.yaml").write_text(
+        "viewer:\n  title: configured-site\n", encoding="utf-8")
+    out = tmp_path / "output"
+    build_site(Bundle.load(bundle), out, target=target, assets="offline")
+    if target == "single-file":
+        page.goto((out / "index.html").as_uri(), wait_until="load")
+        page.wait_for_function("() => !!window.__okfLoomGraph?.cy")
+        expect(page.locator('.okf-topbar__brand strong')).to_have_text("configured-site")
+        assert page.title() == "configured-site"
+    else:
+        port = _free_port()
+        base = f"http://127.0.0.1:{port}"
+        with managed_server(
+            [sys.executable, "-m", "http.server", str(port), "--bind", "127.0.0.1",
+             "--directory", str(out)], base, tmp_path / "title-http.log",
+        ):
+            page.goto(base + "/__graph.html", wait_until="load")
+            page.wait_for_function("() => !!window.__okfLoomGraph?.cy")
+            expect(page.locator('.okf-topbar__brand strong')).to_have_text("configured-site")
+            assert page.title() == "Graph — configured-site"
+
+
 def test_static_recent_pages_navigate_to_html_concept(static_url: str, page) -> None:
     """P1 static/live URL parity (contract-runtime-parity): recent-page options
     in the topbar search combobox must build mode-aware URLs so a STATIC build

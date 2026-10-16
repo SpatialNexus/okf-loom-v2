@@ -385,6 +385,44 @@ def test_build_site_static_includes_graph_data(tiny_good_bundle: Path) -> None:
     assert len(data["nodes"]) == len(b.concepts)
 
 
+@pytest.mark.parametrize("target", ["static", "spa", "single-file"])
+@pytest.mark.parametrize("assets", ["cdn", "offline"])
+@pytest.mark.parametrize("override", [None, "Explicit & <site>"])
+def test_portable_pages_share_serves_configured_title(
+    tmp_path: Path, monkeypatch, target: str, assets: str, override: str | None,
+) -> None:
+    """Build resolves the same title as serve; --name still wins on every page."""
+    from html import unescape
+    from okf_loom import cli, server
+
+    root = tmp_path / "bundle"
+    (root / "guides").mkdir(parents=True)
+    (root / "okf-loom.config.yaml").write_text(
+        "viewer:\n  title: configured-site\n", encoding="utf-8")
+    (root / "index.md").write_text("Welcome.\n", encoding="utf-8")
+    (root / "guides" / "index.md").write_text("# Guides\n", encoding="utf-8")
+    (root / "guides" / "one.md").write_text(
+        "---\ntype: Guide\ntitle: One\n---\n# One\nText.\n", encoding="utf-8")
+    served = {}
+    monkeypatch.setattr(server, "run_server", lambda *args, **kwargs: served.update(kwargs))
+    assert cli.main(["serve", str(root), "--no-open", "--no-watch"]) == 0
+    assert served["name"] == "configured-site"
+    out = tmp_path / "output"
+    args = ["build", str(root), "--out", str(out), "--target", target, "--assets", assets]
+    if override:
+        args += ["--name", override]
+    assert cli.main(args) == 0
+    expected = override or served["name"]
+    pages = list(out.rglob("*.html"))
+    assert len(pages) == (1 if target == "single-file" else 5)
+    for page in pages:
+        html = page.read_text(encoding="utf-8")
+        brand = re.search(r'class="okf-brand-link"[^>]*><strong>(.*?)</strong>', html)
+        title = re.search(r'<title>(.*?)</title>', html)
+        assert brand and unescape(brand[1]) == expected, page
+        assert title and expected in unescape(title[1]), page
+
+
 def test_build_site_unknown_target_raises(tiny_good_bundle: Path) -> None:
     b = Bundle.load(tiny_good_bundle)
     with pytest.raises(ValueError, match="Unknown target"):

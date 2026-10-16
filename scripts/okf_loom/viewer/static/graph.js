@@ -924,12 +924,6 @@
         ? window.okfPortableRetrieval.parseSourceRevisions(
             (document.getElementById("okf-single-source-revisions") || {}).textContent || "")
         : null;
-      // Static/portable payloads historically carried the directory slug
-      // while serve mode received the configured display title.  Promote a
-      // slug to the same product-facing human form instead of exposing an
-      // implementation filename in one runtime only.
-      var brandTitle=document.querySelector(".okf-topbar__brand strong"),payloadName=String(bundle.name||"");
-      if(brandTitle&&/^[a-z0-9_-]+$/.test(payloadName)){brandTitle.textContent="OKF "+payloadName.replace(/[_-]+/g," ").replace(/\b\w/g,function(c){return c.toUpperCase();});}
       if (typeof window.cytoscape !== "function") {
         publishGraphCaptureReady("unavailable", true);
       window.okfGraphCaptureState = function () { return { initialized: true, nodeCount: 0, payloadNodeCount: Array.isArray(bundle.nodes) ? bundle.nodes.length : 0, layoutRequired: false, layoutSettled: true, layoutGeneration: 0, appliedLayoutGeneration: 0, terminalCode: "unavailable", terminalPhase: "graph-cytoscape" }; };
