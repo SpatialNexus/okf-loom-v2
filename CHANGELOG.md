@@ -10,6 +10,27 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Document view tabs no longer slide sideways while you scroll or switch views;
+  Sections keeps a fixed slot, and a focused tab's ring clears the top bar on phones.
+- Sections (view-bar menu and the pinned phone row) follows the reading position
+  after any jump, opens on the current section with a scroll cue, and no longer
+  clips the last entry's focus ring.
+- A link preview opened by keyboard focus is placed beside its link and never
+  covers it or its focus ring.
+- Document controls on touch screens are 44px targets (sortable table heads,
+  metadata summary, entity and source chips, relation rows, document-end links);
+  heading ¶ anchors stay quiet and on the heading's line, and short breadcrumb
+  segments no longer leave gaps.
+- Mermaid diagrams keep labels at about 12px or larger and scroll in their frame
+  instead of shrinking to fit; the palette swap stays atomic.
+- Mono text (ids, paths, code) no longer shows Azeret Mono's fi ligature
+  ("conf1g"); mono labels also keep tabular figures.
+- Table toolbars match their table's width; dates and other one-token cells stay
+  unbroken, and wide tables scroll in their wrapper on phones.
+- Skip links and sortable table heads show one focus ring that hugs the control.
+- Document pages draw one hairline between the metadata strip and the tools and
+  no blank bands or doubled rules at the page foot.
+- Split view uses the page width beside Related instead of the reading column.
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
   including source derivations; the full/tool graph projection is unchanged.
 - Missing or malformed embedded search evidence in single-file exports settles as
