@@ -594,7 +594,10 @@ hr { border: 0; border-top: 1px solid var(--border); margin: var(--okf-space-4) 
   text-decoration: none;
   transition: top 0.12s ease;
 }
-.okf-skip-link:focus { top: var(--okf-space-2); outline: 3px solid var(--focus); outline-offset: 1px; }
+/* The 2px focus-colour border IS the ring (the link only shows while
+ * focused); the outline is drawn exactly over it, so one frame hugs the
+ * link instead of two concentric ones. */
+.okf-skip-link:focus { top: var(--okf-space-2); outline: 2px solid var(--focus); outline-offset: -2px; }
 
 /* ---- Focus ------------------------------------------------------------------
  * Without explicit :focus-visible styles, styled controls suppress the native
@@ -1115,9 +1118,11 @@ pre code.hljs { display: block; overflow-x: auto; }
   border-spacing: 0;
   font-size: 0.88em;
 }
+/* A 4px start inset gives the sortable head's inset focus ring room, so it
+ * never runs through the first letter of a flush-left column. */
 .okf-table th,
 .okf-table td {
-  padding: 8px 14px 8px 0;
+  padding: 8px 14px 8px 4px;
   border: 0;
   border-bottom: 1px solid var(--border);
   background: transparent;
