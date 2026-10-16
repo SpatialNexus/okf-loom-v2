@@ -10,6 +10,8 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Search and suggestion highlighting marks whole query terms, not fragments
+  inside identifiers or English stop words (D2-018).
 - Suggestions show an explicit no-match message, omit the current page from
   Recent pages, stay closed for empty history, and have one bottom edge (D1-004).
 - Search previews, evidence previews, graph descriptions and concept summaries

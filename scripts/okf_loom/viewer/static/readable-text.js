@@ -32,5 +32,14 @@
       .replace(/\uE000(\d+)\uE001/g,function(all,i){return Number(i)<escaped.length?escaped[Number(i)]:all;});
     return text.replace(/\s+/g," ").trim();
   }
+  // Presentation follows retrieval's stop-word vocabulary, but never changes
+  // ranking: only complete Unicode word terms receive emphasis.
+  var STOPWORDS={};
+  "a an and are as at be been being but by for from had has have having he her here hers him his how i if in into is it its itself me more most my no nor not of off on once only or other our out over own same she so some such than that the their them then there these they this those through to too under until up very was we were what when where which while who whom why will with would you your yours about above after again against all because before below between during each few further do does did doing down can could should shall may might must also via per within without".split(" ").forEach(function(t){STOPWORDS[t]=true;});
+  window.okfHighlightPattern=function(query){
+    var terms=(String(query||"").toLowerCase().match(/[\p{L}\p{N}\p{M}_]+/gu)||[]).filter(function(t,i,all){return !STOPWORDS[t]&&all.indexOf(t)===i;}).slice(0,32);
+    if(!terms.length)return null;
+    return new RegExp("(?<![\\p{L}\\p{N}\\p{M}_])(?:"+terms.join("|")+")(?![\\p{L}\\p{N}\\p{M}_])","giu");
+  };
   window.okfReadableText=readableText;
 })();

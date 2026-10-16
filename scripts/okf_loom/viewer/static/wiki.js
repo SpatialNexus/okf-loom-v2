@@ -597,15 +597,7 @@
   // whole query-term words (>=2 chars) case-insensitively, bounded so a
   // tiny term can't mark tens of thousands of spans in a huge passage.
   function highlightPattern(query) {
-    var terms = (query || "")
-      .toLowerCase()
-      .split(/[^0-9a-z]+/i)
-      .filter(function (t) { return t.length >= 2; })
-      .slice(0, 8);
-    if (!terms.length) return null;
-    return new RegExp("(" + terms.map(function (t) {
-      return t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    }).join("|") + ")", "gi");
+    return window.okfHighlightPattern(query);
   }
 
   function appendHighlighted(parent, text, query) {

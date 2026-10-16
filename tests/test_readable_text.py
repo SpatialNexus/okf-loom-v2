@@ -27,6 +27,17 @@ def test_readable_text_is_plain_and_preserves_code(source, expected):
     assert readable_text(source) == expected
 
 
+def test_browser_highlights_only_complete_non_stopword_terms():
+    asset = Path(__file__).resolve().parents[1] / "scripts/okf_loom/viewer/static/readable-text.js"
+    result = subprocess.run(["node", "-e", """
+const fs=require('fs'); global.window={}; eval(fs.readFileSync(process.argv[1],'utf8'));
+const pattern=window.okfHighlightPattern('spec and the café snake_case');
+console.log(JSON.stringify('Special specification inspection spec SPEC and command the themes café cafés snake_case'.match(pattern)));
+""", str(asset)], text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == ["spec", "SPEC", "café", "snake_case"]
+
+
 def test_browser_projection_matches_python_vectors():
     asset = Path(__file__).resolve().parents[1] / "scripts/okf_loom/viewer/static/readable-text.js"
     result = subprocess.run(["node", "-e", """

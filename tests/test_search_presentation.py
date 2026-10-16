@@ -192,6 +192,15 @@ def test_search_advisory_lists_only_non_default_states(tmp_path: Path) -> None:
     assert "okf-search-advisory" not in live
 
 
+def test_search_marks_only_complete_non_stopword_terms(tmp_path: Path) -> None:
+    row = _result(0)
+    row["evidence"]["passage"]["excerpt"] = "Special specification inspection spec SPEC and command the themes café cafés snake_case"
+    html = _render_search_page(_bundle(tmp_path), mode="serve", name="Bundle", config={},
+                               query="spec and the café snake_case", results=[row])
+    preview = re.search(r'<blockquote class="okf-search-snippet okf-search-snippet--compact">(.*?)</blockquote>', html).group(1)
+    assert re.findall(r"<mark>(.*?)</mark>", preview) == ["spec", "SPEC", "café", "snake_case"]
+
+
 def test_passageless_result_is_honest_and_has_no_passage_action(tmp_path: Path) -> None:
     bundle = _bundle(tmp_path)
     html = _render_search_page(

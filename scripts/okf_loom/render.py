@@ -6521,10 +6521,11 @@ def _render_search_page(
     error_fields = set(error_values)
     def marked_excerpt(value: str) -> str:
         value = readable_text(value)
-        terms = list(dict.fromkeys(re.findall(r"[\w-]+", query, flags=re.UNICODE)))[:32]
+        from .search import tokenize
+        terms = list(dict.fromkeys(tokenize(query)))[:32]
         if not terms:
             return _esc(value)
-        pattern = re.compile("(" + "|".join(re.escape(term) for term in sorted(terms, key=len, reverse=True)) + ")", re.IGNORECASE)
+        pattern = re.compile(r"(?<!\w)(" + "|".join(re.escape(term) for term in sorted(terms, key=len, reverse=True)) + r")(?!\w)", re.IGNORECASE)
         return "".join(f"<mark>{_esc(part)}</mark>" if index % 2 else _esc(part)
                        for index, part in enumerate(pattern.split(value)))
 
