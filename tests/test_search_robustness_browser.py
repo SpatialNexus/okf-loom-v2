@@ -258,6 +258,21 @@ def test_live_search_page_box_treats_metacharacters_as_text(live_url: str, page,
     _assert_clean(page)
 
 
+def test_portable_search_verifies_evidence_on_plain_http_nonlocalhost(static_url: str, page) -> None:
+    # Transport stays on our owned loopback server, but the browser evaluates
+    # the document and its scripts as an ordinary, non-secure LAN origin.
+    origin = static_url.replace("127.0.0.1", "portable.test")
+    page.route(origin + "/**", lambda route: route.fulfill(
+        response=route.fetch(url=route.request.url.replace(origin, static_url))))
+    page.goto(origin + "/__search.html?q=orders")
+    expect(page.locator("body")).to_have_attribute("data-okf-capture-ready", "ready")
+    assert page.evaluate("() => isSecureContext") is False
+    assert page.evaluate("() => !!crypto.subtle") is False
+    expect(page.locator(".okf-search-result").first).to_be_visible()
+    assert page.evaluate("() => window.okfPortableProvider.passages.length") > 0
+    _assert_clean(page)
+
+
 @pytest.mark.parametrize("query", QUERIES, ids=QUERY_IDS)
 def test_static_search_page_box_treats_metacharacters_as_text(static_url: str, page, query: str) -> None:
     page.goto(static_url + "/__search.html")

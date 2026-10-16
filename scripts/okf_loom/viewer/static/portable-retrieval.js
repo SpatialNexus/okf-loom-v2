@@ -28,7 +28,50 @@
   function canonicalId(v){return typeof v==="string"&&/^[A-Za-z0-9_][A-Za-z0-9_.-]*(\/[A-Za-z0-9_][A-Za-z0-9_.-]*)*$/.test(v)&&!v.split("/").some(function(s){return s==="index"||s==="log"||s.indexOf("__")===0;});}
   function controls(v){return /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/.test(v);}
   function hex(buffer){return Array.prototype.map.call(new Uint8Array(buffer),function(b){return b.toString(16).padStart(2,"0");}).join("");}
-  function digestText(text){if(!window.crypto||!window.crypto.subtle||!window.TextEncoder)return Promise.reject(new Error("This browser cannot verify portable evidence integrity."));return window.crypto.subtle.digest("SHA-256",new TextEncoder().encode(text)).then(hex);}
+  // SHA-256 (FIPS 180-4), used only where WebCrypto is absent (e.g. LAN HTTP).
+  // This checks the same content hashes; it does not authenticate an HTTP site.
+  var SHA256_K=new Uint32Array([
+    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+  ]);
+  function rotateRight(v,n){return (v>>>n)|(v<<(32-n));}
+  function sha256(bytes){
+    var length=bytes.length,padded=new Uint8Array(Math.ceil((length+9)/64)*64),view=new DataView(padded.buffer);
+    padded.set(bytes);padded[length]=0x80;
+    view.setUint32(padded.length-8,Math.floor(length/0x20000000),false);
+    view.setUint32(padded.length-4,(length*8)>>>0,false);
+    var state=new Uint32Array([0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]),w=new Uint32Array(64);
+    for(var offset=0;offset<padded.length;offset+=64){
+      for(var i=0;i<16;i++)w[i]=view.getUint32(offset+i*4,false);
+      for(i=16;i<64;i++){
+        var x=w[i-15],y=w[i-2],s0=rotateRight(x,7)^rotateRight(x,18)^(x>>>3),s1=rotateRight(y,17)^rotateRight(y,19)^(y>>>10);
+        w[i]=(w[i-16]+s0+w[i-7]+s1)>>>0;
+      }
+      var a=state[0],b=state[1],c=state[2],d=state[3],e=state[4],f=state[5],g=state[6],h=state[7];
+      for(i=0;i<64;i++){
+        var sum1=rotateRight(e,6)^rotateRight(e,11)^rotateRight(e,25),ch=(e&f)^(~e&g);
+        var t1=(h+sum1+ch+SHA256_K[i]+w[i])>>>0;
+        var sum0=rotateRight(a,2)^rotateRight(a,13)^rotateRight(a,22),maj=(a&b)^(a&c)^(b&c),t2=(sum0+maj)>>>0;
+        h=g;g=f;f=e;e=(d+t1)>>>0;d=c;c=b;b=a;a=(t1+t2)>>>0;
+      }
+      [a,b,c,d,e,f,g,h].forEach(function(v,index){state[index]=(state[index]+v)>>>0;});
+    }
+    var digest=new DataView(new ArrayBuffer(32));
+    state.forEach(function(v,index){digest.setUint32(index*4,v,false);});
+    return hex(digest.buffer);
+  }
+  function digestText(text){return Promise.resolve().then(function(){
+    if(!window.TextEncoder)throw new Error("This browser cannot verify portable evidence integrity.");
+    var bytes=new TextEncoder().encode(text);
+    if(window.crypto&&window.crypto.subtle)return window.crypto.subtle.digest("SHA-256",bytes).then(hex);
+    return sha256(bytes);
+  });}
   function validManifest(m){
     if(!m||m.schema_version!==1||m.algorithm_version!=="section-retrieval-v1"||typeof m.bundle_revision!=="string"||!m.bundle_revision||cpLen(m.bundle_revision)>256||
        !Number.isInteger(m.passage_count)||m.passage_count<0||m.passage_count>1000000||!Number.isInteger(m.chunk_count)||m.chunk_count<0||m.chunk_count>10000||

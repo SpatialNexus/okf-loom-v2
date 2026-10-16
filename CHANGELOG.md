@@ -10,6 +10,8 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Portable search verifies the same SHA-256 evidence hashes on plain-HTTP LAN
+  mirrors using a bundled fallback only when WebCrypto is absent (D3-005).
 - Search suggestion selection keeps row heights stable while `aria-selected`
   and forced-colour outlines continue to announce the active option (D1-002, D3-006).
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
