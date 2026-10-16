@@ -2123,6 +2123,9 @@
             "underlay-opacity": 1,
             "underlay-padding": 6,
         } },
+        // The hovered directional edge dashes so its flow reads (path and
+        // selected edges below keep their solid stroke).
+        { selector: "edge.okf-edge-flow", style: { "line-style": "dashed" } },
         { selector: "edge.okf-path", style: {
               "line-color": INITIAL_GRAPH_PALETTE.cue,
               "target-arrow-color": INITIAL_GRAPH_PALETTE.cue,
@@ -4588,7 +4591,10 @@
       var candidates=[["above",p.x-w/2,p.y-off-h],["right",p.x+off,p.y-h/2],["left",p.x-off-w,p.y-h/2],["below",p.x-w/2,below],["above-right",p.x-off,p.y-off-h],["above-left",p.x+off-w,p.y-off-h],["below-right",p.x-off,below],["below-left",p.x+off-w,below]],best=null;
       candidates.forEach(function(cand,order){var left=Math.max(8,Math.min(W-w-8,cand[1])),top=Math.max(8,Math.min(H-h-8,cand[2])),box={x1:left,y1:top,x2:left+w,y2:top+h};var score=(hits(box,own)?1000:0)+chrome.filter(function(r){return hits(box,r);}).length*100+near.filter(function(r){return hits(box,r);}).length*10+order+(left!==cand[1]||top!==cand[2]?5:0);if(cand[0]===actionBarSide&&score<100)score-=20;if(!best||score<best.score)best={side:cand[0],left:left,top:top,score:score};});
       actionBarSide=best.side;actionBar.dataset.side=best.side;actionBar.style.left=best.left+"px";actionBar.style.top=best.top+"px";}
-    var actionBarFrame=0;cy.on("pan zoom position",function(){if(actionBarFrame||actionBar.hidden)return;actionBarFrame=requestAnimationFrame(function(){actionBarFrame=0;if(!cy.destroyed())positionActionBar();});});window.addEventListener("resize",function(){syncActionBarOwner();positionActionBar();});
+    // The bar follows pan, zoom and its own concept at once; other concepts
+    // moving (a running layout fires one event per node) only change which
+    // side is clearest, so those re-placements coalesce to one per frame.
+    var actionBarFrame=0;cy.on("pan zoom",positionActionBar);cy.on("position",function(evt){if(actionBar.hidden)return;if(evt.target&&evt.target.id&&evt.target.id()===interactionState.selected){positionActionBar();return;}if(actionBarFrame)return;actionBarFrame=requestAnimationFrame(function(){actionBarFrame=0;if(!cy.destroyed())positionActionBar();});});window.addEventListener("resize",function(){syncActionBarOwner();positionActionBar();});
     var graphResizeTimer=null,userViewportInteracted=false;
     ["wheel","pointerdown","touchstart"].forEach(function(name){container.addEventListener(name,function(event){if(event.isTrusted&&(event.target.tagName==="CANVAS"||event.target===canvasProxy))userViewportInteracted=true;},{passive:true});});
     function refitGraphViewport(){if(graphResizeTimer)cancelAnimationFrame(graphResizeTimer);graphResizeTimer=requestAnimationFrame(function(){graphResizeTimer=null;if(graphPageActive&&layoutSettled&&container.offsetWidth&&container.offsetHeight){cy.resize();if(!userViewportInteracted){cancelPendingViewportRestore();syncMobileReadableStyle();compactMobileSmallGraph();overlayAwareFit();}positionActionBar();syncMinimap();}});}
@@ -4793,7 +4799,11 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
     function edgeFlowSet(){var active=cy.edges(":selected");if(edgeFlowHovered&&directionalEdge(edgeFlowHovered))active=active.union(edgeFlowHovered);return active.filter(function(e){return directionalEdge(e);});}
     function stopDirectionalEdgeFlow(){if(edgeFlowFrame){cancelAnimationFrame(edgeFlowFrame);edgeFlowFrame=0;}edgeFlowEpoch++;try{cy.edges().style("line-dash-offset",0);}catch(e){}document.body.removeAttribute("data-okf-edge-flow");}
     function tickDirectionalEdgeFlow(now,epoch){if(epoch!==edgeFlowEpoch||REDUCED_MOTION||edgeFlowLeaseToken||document.hidden)return stopDirectionalEdgeFlow();var edges=edgeFlowSet();if(!edges.length)return stopDirectionalEdgeFlow();edges.style("line-dash-offset",-Math.floor(now/32)%18);document.body.setAttribute("data-okf-edge-flow","active");edgeFlowFrame=requestAnimationFrame(function(next){tickDirectionalEdgeFlow(next,epoch);});}
-    function syncDirectionalEdgeFlow(){stopDirectionalEdgeFlow();if(!REDUCED_MOTION&&!edgeFlowLeaseToken&&edgeFlowSet().length){var epoch=edgeFlowEpoch;edgeFlowFrame=requestAnimationFrame(function(now){tickDirectionalEdgeFlow(now,epoch);});}}
+    // The hovered or selected directional edge is dashed while it is the
+    // flow target, so the moving dash shows direction (and, with reduced
+    // motion, the dash itself is the static cue). Plain links draw solid
+    // otherwise; typed relations keep their own dash pattern.
+    function syncDirectionalEdgeFlow(){stopDirectionalEdgeFlow();var flowing=edgeFlowSet();cy.edges(".okf-edge-flow").difference(flowing).removeClass("okf-edge-flow");flowing.addClass("okf-edge-flow");if(!REDUCED_MOTION&&!edgeFlowLeaseToken&&edgeFlowSet().length){var epoch=edgeFlowEpoch;edgeFlowFrame=requestAnimationFrame(function(now){tickDirectionalEdgeFlow(now,epoch);});}}
     function acquireDirectionalEdgeFlowLease(){var token="edge-flow-capture-"+(++edgeFlowLeaseGeneration);edgeFlowLeaseToken=token;stopDirectionalEdgeFlow();return token;}
     function releaseDirectionalEdgeFlowLease(token){if(token!==edgeFlowLeaseToken)return false;edgeFlowLeaseToken=null;if(!document.hidden)syncDirectionalEdgeFlow();return true;}
     function invalidateDirectionalEdgeFlowLease(){edgeFlowLeaseGeneration++;edgeFlowLeaseToken=null;stopDirectionalEdgeFlow();}
