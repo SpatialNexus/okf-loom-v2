@@ -2212,6 +2212,43 @@ def test_wide_and_graph_chrome_keep_their_sticky_layout(page, server_url: str) -
     assert page.evaluate("getComputedStyle(document.querySelector('.okf-topbar')).transform") == "none"
 
 
+@pytest.mark.parametrize("coarse", [True, False])
+def test_landscape_phone_chrome_scrolls_away_only_on_coarse_pointers(server_url: str, coarse: bool) -> None:
+    """M1-008: a landscape phone (844x390) kept 145px of sticky chrome. Short
+    coarse viewports share the phone scroll-away contract; a short mouse
+    window keeps the ordinary sticky desktop chrome."""
+    with sync_playwright() as playwright:
+        browser, context = _phone_page(playwright, 844, 390, coarse)
+        try:
+            page = context.new_page()
+            page.goto(server_url + "/tables/orders")
+            _wait_live_document(page)
+            at_top = page.evaluate(_CHROME_GEOMETRY)
+            assert at_top["state"] == ("revealed" if coarse else None), at_top
+            _scroll(page, 300)
+            _scroll(page, 300)
+            _settle(page)
+            down = page.evaluate(_CHROME_GEOMETRY)
+            if not coarse:
+                assert down["state"] is None and down["top"]["top"] == 0, down
+                return
+            assert down["state"] == "compact", down
+            assert down["top"]["bottom"] <= 0, down
+            assert down["sticky"] <= 56, down
+            assert 0 <= down["jump"]["top"] <= 8, down
+            assert page.evaluate(_HITS, ['.okf-outline-jump__toggle']) == []
+            _scroll(page, -50)
+            _settle(page)
+            up = page.evaluate(_CHROME_GEOMETRY)
+            assert up["state"] == "revealed" and abs(up["top"]["top"]) < 0.5, up
+            assert abs(up["bar"]["top"] - up["top"]["bottom"]) < 1, up
+            assert page.evaluate(_HITS, _SHELL_CONTROLS + ['.okf-studio-launcher']) == []
+            assert up["overflow"] is False, up
+        finally:
+            context.close()
+            browser.close()
+
+
 @pytest.fixture(scope="module")
 def portable_sites(tmp_path_factory):
     """The demo bundle built as static and SPA sites, each served at its own root

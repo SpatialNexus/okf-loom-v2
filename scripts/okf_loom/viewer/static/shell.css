@@ -324,10 +324,12 @@ html[data-okf-js="1"][data-okf-studio-status="failed"] .okf-shell__studio-slot[d
 @media (max-width: 640px) and (max-height: 480px) {
   .okf-topbar.okf-shell { position: static; }
 }
-/* ---- Scroll-away chrome (<=640px, sticky viewports) ------------------
+/* ---- Scroll-away chrome (phones: <=640px sticky viewports, and short
+ * coarse viewports such as an 844x390 landscape phone) ------------------
  * On a phone the sticky top bar plus the document view bar cost a third to
- * a half of the screen. wiki.js owns the state on <html>:
- *   data-okf-chrome="revealed" | "compact"  (never set above 640px)
+ * a half of the screen (in landscape 145px of 390px). wiki.js owns the
+ * state on <html>, under the same media query as the rules below:
+ *   data-okf-chrome="revealed" | "compact"  (never set elsewhere)
  *   data-okf-chrome-motion                   (the change was scroll-driven)
  * and publishes the measured shifts --okf-chrome-shift-top / -bar. Compact
  * moves the top bar wholly above the viewport and the view bar up to its
@@ -338,7 +340,7 @@ html[data-okf-js="1"][data-okf-studio-status="failed"] .okf-shell__studio-slot[d
  * capture override compact synchronously and without a slide, so a focused
  * control is on screen before the browser scrolls to it. The graph route
  * keeps its own full-screen layout. */
-@media (max-width: 640px) and (min-height: 481px) {
+@media (max-width: 640px) and (min-height: 481px), (min-width: 641px) and (max-height: 500px) and (pointer: coarse) {
   html[data-okf-chrome="compact"]:not([data-okf-capture]):not(:has(.okf-shell :focus-visible, .okf-shell [aria-expanded="true"], .okf-concept-viewbar .okf-viewswitch :focus-visible)) body.okf-viewer:not(.okf-viewer--graph) .okf-topbar.okf-shell {
     transform: translateY(var(--okf-chrome-shift-top, -100%));
   }
@@ -346,7 +348,8 @@ html[data-okf-js="1"][data-okf-studio-status="failed"] .okf-shell__studio-slot[d
     transform: translateY(var(--okf-chrome-shift-bar, 0px));
   }
 }
-@media (max-width: 640px) and (min-height: 481px) and (prefers-reduced-motion: no-preference) {
+@media (max-width: 640px) and (min-height: 481px) and (prefers-reduced-motion: no-preference),
+  (min-width: 641px) and (max-height: 500px) and (pointer: coarse) and (prefers-reduced-motion: no-preference) {
   html[data-okf-chrome-motion]:not([data-okf-capture]):not(:has(.okf-shell :focus-visible, .okf-shell [aria-expanded="true"], .okf-concept-viewbar .okf-viewswitch :focus-visible)) body.okf-viewer:not(.okf-viewer--graph) :is(.okf-topbar.okf-shell, .okf-concept-viewbar) {
     transition: transform 180ms ease-out;
   }
