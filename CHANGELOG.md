@@ -10,6 +10,8 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Search discloses reached result limits and offers relevant, evenly spaced
+  empty-state actions instead of clearing nonexistent filters (D2-019, D2-020).
 - Search and suggestion highlighting marks whole query terms, not fragments
   inside identifiers or English stop words (D2-018).
 - Suggestions show an explicit no-match message, omit the current page from

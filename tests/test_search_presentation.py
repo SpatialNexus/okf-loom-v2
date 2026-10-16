@@ -192,6 +192,23 @@ def test_search_advisory_lists_only_non_default_states(tmp_path: Path) -> None:
     assert "okf-search-advisory" not in live
 
 
+def test_search_limit_notice_and_relevant_empty_actions(tmp_path: Path) -> None:
+    from okf_loom.retrieval import SearchRequest
+    bundle = _bundle(tmp_path)
+    limited = _render_search_page(bundle, mode="serve", name="Bundle", config={}, query="needle",
+                                  results=[_result(0)], request=SearchRequest(limit=1))
+    assert 'class="okf-search-limit-notice"' in limited
+    assert "Result limit reached (1). Increase Result limit in Filters" in limited
+    empty = _render_search_page(bundle, mode="serve", name="Bundle", config={}, query="zzqxv", results=[])
+    assert "Clear filters</a>" not in empty and "Try Best overall</a>" in empty
+    assert "with the current filters" not in empty
+    filtered = _render_search_page(bundle, mode="serve", name="Bundle", config={}, query="zzqxv", results=[],
+                                   request=SearchRequest(mode="semantic", tag="needle"))
+    assert "Clear filters</a>" in filtered and "with the current filters" in filtered
+    assert '?q=zzqxv&amp;mode=semantic&amp;limit=20' in filtered
+    assert 'class="okf-search-empty__actions"' in filtered
+
+
 def test_search_marks_only_complete_non_stopword_terms(tmp_path: Path) -> None:
     row = _result(0)
     row["evidence"]["passage"]["excerpt"] = "Special specification inspection spec SPEC and command the themes café cafés snake_case"

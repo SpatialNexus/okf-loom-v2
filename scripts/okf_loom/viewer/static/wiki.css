@@ -2721,6 +2721,8 @@ details.okf-frontmatter[open] { padding-bottom: var(--okf-space-2); }
 .okf-search-table tbody tr:last-child td { border-bottom: 0; }
 .okf-search-empty { padding: var(--okf-space-7) 0; color: var(--text-2); text-align: center; }
 .okf-search-empty h3 { color: var(--text); }
+.okf-search-empty__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--okf-space-3); margin-top: var(--okf-space-4); }
+.okf-search-limit-notice { color: var(--text-2); font-size: var(--okf-text-sm); }
 .okf-search-initial { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--okf-space-5); }
 .okf-search-initial section { border-top: 1px solid var(--border-strong); }
 .okf-search-initial h3 {

@@ -314,6 +314,24 @@ def test_search_result_title_is_a_44px_coarse_target(live_url: str, page, width:
         context.close()
 
 
+@pytest.mark.parametrize("surface", ["live", "static"])
+def test_search_limit_notice_and_empty_actions(live_url: str, static_url: str, page, surface: str) -> None:
+    url = live_url + "/__search" if surface == "live" else static_url + "/__search.html"
+    page.goto(url + "?q=orders&limit=1")
+    expect(page.locator(".okf-search-limit-notice")).to_be_visible()
+    expect(page.locator(".okf-search-limit-notice")).to_contain_text("Result limit" if surface == "live" else "Showing 1 of")
+    page.goto(url + "?q=zzqxv")
+    empty = page.locator(".okf-search-empty")
+    expect(empty.get_by_role("link", name="Clear filters")).to_have_count(0)
+    expect(empty.get_by_role("link", name="Try Best overall")).to_be_visible()
+    links = empty.locator(".okf-search-empty__actions a")
+    assert links.count() == 2
+    boxes = [link.bounding_box() for link in links.all()]
+    assert boxes[1]["x"] - boxes[0]["x"] - boxes[0]["width"] >= 8
+    page.goto(url + "?q=zzqxv&tag=missing")
+    expect(page.locator(".okf-search-empty").get_by_role("link", name="Clear filters")).to_be_visible()
+
+
 def test_portable_search_verifies_evidence_on_plain_http_nonlocalhost(static_url: str, page) -> None:
     # Transport stays on our owned loopback server, but the browser evaluates
     # the document and its scripts as an ordinary, non-secure LAN origin.

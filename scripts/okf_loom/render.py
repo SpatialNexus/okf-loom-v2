@@ -6749,7 +6749,12 @@ def _render_search_page(
                         f'<h3>Search request error</h3><p>{_esc(error.message)}</p><ul>{field_rows}</ul>'
                         f'<p><a class="okf-btn" href="{clear_href}">Start a new search</a> <a href="{back_link}">Browse the index</a></p></div>')
     elif result_parts:
-        results_html = '<ol class="okf-search-results-list">' + "\n".join(result_parts) + '</ol>'
+        cap_notice = ""
+        if len(results) >= req_limit:
+            guidance = ("Increase Result limit in Filters to check for more matches."
+                        if req_limit < 100 else "Narrow your query or filters to find other matches.")
+            cap_notice = f'<p class="okf-search-limit-notice" role="status">Result limit reached ({int(req_limit)}). {guidance}</p>'
+        results_html = cap_notice + '<ol class="okf-search-results-list">' + "\n".join(result_parts) + '</ol>'
     elif not query and not active_filters:
         # F7: the empty-query suggestion head follows the metadata owner's
         # effective change instant, not the raw legacy ``timestamp`` key.
@@ -6761,8 +6766,17 @@ def _render_search_page(
                         f'<section><h3>Browse</h3><p>{browse_types}</p><p>{browse_tags}</p></section>'
                         '<section><h3>Try a search</h3><p><a href="?q=architecture&amp;mode=hybrid">architecture</a> or <a href="?q=decision&amp;mode=semantic">meaning of a decision</a></p></section></div>')
     else:
-        results_html = (f'<div class="okf-search-empty"><h3>No matching passages</h3><p>No evidence matched “{_esc(query)}” with the current filters.</p>'
-                        f'<p><a class="okf-btn" href="{clear_href}?q={_esc_attr_qs(query)}">Clear filters</a> <a href="{back_link}">Browse the index</a></p></div>')
+        empty_message = (f'No evidence matched “{_esc(query)}”' if query else 'No evidence matched')
+        empty_message += (' with the current filters.' if active_filters else ' using this match mode.')
+        empty_actions = f'<a class="okf-btn" href="{back_link}">Browse the index</a>'
+        if active_filters:
+            reset_query = urlencode({"q": query, "mode": req_mode, "limit": req_limit})
+            empty_actions = f'<a class="okf-btn" href="{clear_href}?{_esc_attr_qs(reset_query)}">Clear filters</a>' + empty_actions
+        elif req_mode != "hybrid":
+            broaden_query = urlencode({"q": query, "mode": "hybrid", "limit": req_limit})
+            empty_actions = f'<a class="okf-btn" href="{clear_href}?{_esc_attr_qs(broaden_query)}">Try Best overall</a>' + empty_actions
+        results_html = (f'<div class="okf-search-empty"><h3>No matching passages</h3><p>{empty_message}</p>'
+                        f'<div class="okf-search-empty__actions">{empty_actions}</div></div>')
 
     theme_attr = ""
     configured_theme = _theme_preference(config)
