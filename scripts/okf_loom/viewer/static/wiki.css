@@ -1134,6 +1134,10 @@ pre code.hljs { display: block; overflow-x: auto; }
   letter-spacing: var(--label-track);
   text-transform: uppercase;
 }
+/* One-token cells (dates, numbers, ids, paths) never split at a hyphen or
+ * slash; a table too wide for its column scrolls in its wrapper instead
+ * (renderers.js marks them). */
+.okf-table td.okf-cell-atomic { white-space: nowrap; }
 .okf-table tbody tr:last-child td { border-bottom: 0; }
 .okf-table tbody tr:hover td { background: var(--surface-2); }
 .okf-table td code { font-size: 11.5px; }
@@ -1149,7 +1153,9 @@ pre code.hljs { display: block; overflow-x: auto; }
  * so the cues stay pinned to the visible edges at every scroll offset. */
 .okf-tablewrap-frame { position: relative; max-width: 100%; margin: 16px 0 0; }
 .okf-tablewrap { position: relative; max-width: 100%; margin: 0; overflow-x: auto; }
-.okf-tablewrap--fit { overflow-x: visible; }
+/* A table that fits sizes its wrapper, so the filter/count/Copy CSV toolbar
+ * spans the table it controls rather than the whole column. */
+.okf-tablewrap--fit { width: fit-content; overflow-x: visible; }
 .okf-tablewrap .okf-table { margin: 0; }
 .okf-table--enhanced { display: table; overflow-x: visible; }
 /* Scroll cues: a flat canvas strip with a 2px strong rule on whichever side
@@ -3342,6 +3348,11 @@ body:has(.okf-graph-loading--error) .okf-cytoscape-fallback-actions { display: f
    * scroll-away chrome (shell.css) keeps pinned while reading. Tighter tab
    * spacing keeps Rendered / Source / Split and Focus view on one row down
    * to 320px. */
+  /* Phone tables scroll in their wrapper instead of squeezing every column
+   * to its longest word: heads stay on one line, text cells keep a
+   * readable minimum measure (one-token cells are already unbroken). */
+  .okf-table th { white-space: nowrap; }
+  .okf-table td:not(.okf-cell-atomic) { min-width: 7rem; }
   body.okf-viewer .okf-concept-viewbar { gap: 4px 12px; padding-inline: 12px; }
   body.okf-viewer .okf-concept-viewbar > .okf-outline-jump { flex: 1 0 100%; }
   body.okf-viewer .okf-viewswitch { gap: 12px; }

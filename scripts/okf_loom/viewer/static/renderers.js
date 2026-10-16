@@ -856,6 +856,8 @@
   // Show the filter/count/copy toolbar only when a table has enough rows
   // for scanning to hurt; sorting + resizing apply to every table.
   var TABLE_TOOLBAR_MIN_ROWS = 5;
+  // Longest single token kept on one line; longer ones (URLs) may still wrap.
+  var ATOMIC_CELL_MAX = 32;
 
   function proseRoots() {
     return Array.prototype.slice.call(document.querySelectorAll(PROSE_SELECTOR));
@@ -998,6 +1000,16 @@
     // that fits gains no extra tab stop and a table that overflows always
     // gets the cue back.
     wireTableScrollAffordance(frame, wrap, table);
+
+    // One-token cells (dates, numbers, ids, paths) are marked so wiki.css can
+    // keep them unbroken: a narrow column scrolls the table in its wrapper
+    // rather than splitting "2026-01-15" at its hyphen.
+    rows.forEach(function (row) {
+      Array.prototype.forEach.call(row.cells, function (cell) {
+        var text = collapseWs(cell.textContent);
+        if (text && text.length <= ATOMIC_CELL_MAX && !/\s/.test(text)) cell.classList.add("okf-cell-atomic");
+      });
+    });
 
     // Original row order, for the third state of the sort cycle.
     var originalRows = rows.slice();
