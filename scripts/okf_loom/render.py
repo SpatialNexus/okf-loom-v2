@@ -4708,7 +4708,7 @@ def _render_concept_page(
             f'<button type="button" class="okf-btn okf-context-copy okf-js-action" data-context-concept="{_esc_attr_qs(cid_str)}" '
             'aria-describedby="okf-context-action-note">Copy concept context</button>'
             f'<span id="okf-context-action-note" hidden>{context_note}</span>'
-            '<details class="okf-context-manual-options"><summary>More context options</summary>'
+            '<details class="okf-context-manual-options"><summary class="okf-btn">More context options</summary>'
             f'<a class="okf-btn" href="{_esc_attr_qs(local_href)}" '
             f'aria-label="Open canonical concept-only context pack for {_esc_attr_qs(concept.title)}">'
             'Open concept-only context pack</a>'

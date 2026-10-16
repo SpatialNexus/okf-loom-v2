@@ -10,6 +10,8 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Portable context disclosures share the adjacent button's scale and coarse
+  target sizing; graph view-only notes use the panel's secondary text role.
 - Static Graph and Search pages opened from disk show one server-required
   explanation instead of contradictory fetch errors and impossible retry controls.
 - Opening a single-file Index concept resets only its detail pane and focuses

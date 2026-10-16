@@ -1321,6 +1321,64 @@ def test_phase2_desktop_infobox_stays_collapsed_when_studio_boots_after_wiki(
     )
 
 
+@pytest.mark.parametrize("surface", ["static_url", "spa_url"])
+@pytest.mark.parametrize("coarse", [False, True])
+def test_portable_context_disclosure_matches_its_adjacent_control(
+    request, page, surface: str, coarse: bool,
+) -> None:
+    base = request.getfixturevalue(surface)
+    with page.context.browser.new_context(has_touch=coarse) as context:
+        portable = context.new_page()
+        portable.goto(base + "/tables/orders.html", wait_until="load")
+        summary = portable.locator(".okf-context-manual-options > summary")
+        button = portable.locator(".okf-page-utilities .okf-context-copy")
+        expect(summary).to_be_visible()
+        scale = portable.evaluate("""() => {
+          const summary=document.querySelector('.okf-context-manual-options > summary');
+          const button=document.querySelector('.okf-page-utilities .okf-context-copy');
+          const measure=el => {const css=getComputedStyle(el),box=el.getBoundingClientRect();
+            return {font:css.fontSize,weight:css.fontWeight,top:box.top,height:box.height};};
+          return {summary:measure(summary),button:measure(button)};
+        }""")
+        assert scale["summary"] == scale["button"], scale
+        assert scale["summary"]["height"] >= (44 if coarse else 32), scale
+        summary.focus()
+        summary.press("Enter")
+        expect(portable.locator(".okf-context-manual-options a")).to_be_visible()
+        expect(button).to_be_visible()
+
+
+@pytest.mark.parametrize("target", ["static", "single-file"])
+def test_portable_graph_view_only_note_uses_secondary_type(
+    tmp_path: Path, page, target: str,
+) -> None:
+    from okf_loom import Bundle
+    from okf_loom.render import build_site
+
+    out = tmp_path / "output"
+    build_site(Bundle.load(DEMO_BUNDLE), out, target=target, assets="offline")
+    port = _free_port()
+    base = f"http://127.0.0.1:{port}"
+    with managed_server(
+        [sys.executable, "-m", "http.server", str(port), "--bind", "127.0.0.1",
+         "--directory", str(out)], base, tmp_path / "view-only-http.log",
+    ):
+        page.goto(base + ("/index.html" if target == "single-file" else "/__graph.html"), wait_until="load")
+        page.wait_for_function("() => !!window.__okfLoomGraph?.cy")
+        if target == "single-file":
+            page.locator('[data-okf-shell-item="graph"] a').click()
+        note = page.locator(".okf-detail-view-only")
+        expect(note).to_be_visible()
+        role = note.evaluate("""el => {
+          const css=getComputedStyle(el),probe=document.createElement('span');
+          probe.style.color='var(--text-2)';el.appendChild(probe);
+          const secondary=getComputedStyle(probe).color;probe.remove();
+          return {size:parseFloat(css.fontSize),color:css.color,secondary};
+        }""")
+        assert role["size"] == 12, role
+        assert role["color"] == role["secondary"], role
+
+
 def test_phase2_static_desktop_infobox_collapsed_without_studio(static_url: str, page) -> None:
     """Static output, which does not load studio.js, matches the live page:
     at 1440px Document details is collapsed once wiki.js (the shared loader

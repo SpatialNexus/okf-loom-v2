@@ -577,12 +577,11 @@ body.okf-viewer--graph[data-okf-narrow-reflow] .okf-topbar__controls>*,body.okf-
   border-color: var(--okf-fg-muted);
 }
 .okf-detail-view-only {
-  margin: 0 0 var(--okf-space-4);
-  padding: 8px 0;
-  color: var(--okf-fg);
-  font-size: var(--okf-text-sm);
+  margin: 0 0 var(--okf-space-3);
+  padding: 0;
+  color: var(--text-2);
+  font-size: var(--okf-text-xs);
   line-height: 1.4;
-  border-bottom: 1px solid var(--okf-border);
 }
 /* The active lens's question, always visible under the chips. */
 .okf-signal__question {
