@@ -428,6 +428,33 @@ def test_graph_settings_flow_in_the_pane_and_chip_rings_are_whole(page, docs_ser
     assert seen["clips"] == [] and seen["above"], seen
 
 
+def test_selected_concept_body_keeps_ledger_prose_and_contained_code(page, docs_server_url: str) -> None:
+    """D3-002/D2-003: the details pane renders a selected concept with the
+    document page's prose styles: padded code wells whose long lines scroll
+    inside their own scrollport, inline-code chips and underlined links."""
+    page.set_viewport_size({"width": 1440, "height": 900})
+    page.goto(docs_server_url + "/__graph?selected=reference/cli", wait_until="domcontentloaded")
+    page.wait_for_function("() => document.querySelector('#detail-body pre')")
+    seen = page.evaluate("""() => {
+      const body = document.getElementById('detail-body'), pane = document.getElementById('okf-detail');
+      const wells = [...body.querySelectorAll('pre')].map(pre => {
+        let port = pre.parentElement;
+        while (port !== body && getComputedStyle(port).overflowX === 'visible') port = port.parentElement;
+        const cs = getComputedStyle(pre);
+        return {pad: parseFloat(cs.paddingLeft), fill: cs.backgroundColor !== 'rgba(0, 0, 0, 0)',
+                contained: port !== body && port.getBoundingClientRect().right <= pane.getBoundingClientRect().right + 0.5,
+                scrolls: pre.scrollWidth <= port.clientWidth || port.scrollWidth > port.clientWidth};
+      });
+      const code = body.querySelector('p code'), link = body.querySelector('p a');
+      return {prose: body.classList.contains('okf-prose'), wells,
+              chip: code && getComputedStyle(code).backgroundColor !== 'rgba(0, 0, 0, 0)',
+              underline: link && getComputedStyle(link).textDecorationLine};
+    }""")
+    assert seen["prose"] and seen["wells"], seen
+    assert all(w["pad"] >= 12 and w["fill"] and w["contained"] and w["scrolls"] for w in seen["wells"]), seen
+    assert seen["chip"] and seen["underline"] == "underline", seen
+
+
 def test_graph_settings_disclosure_matches_its_sibling_summaries(page, docs_server_url: str) -> None:
     """Graph settings opens like Explore with lenses: the native marker on
     the left in body type, not a hidden marker with a trailing glyph; the

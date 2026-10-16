@@ -5189,7 +5189,9 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
         // anchor comments to the right concept when the user selects
         // text in the graph detail panel.
         bodyEl.setAttribute("data-concept-id", conceptId);
-        bodyEl.className = "okf-page__body okf-graph-detail__body";
+        // okf-prose owns the document's Ledger reading styles (code wells,
+        // inline code, prose links, task lists), as on the cited-document path.
+        bodyEl.className = "okf-prose okf-page__body okf-graph-detail__body";
         showSelectedBody(conceptId, bodyEl, metadataSlot);
       }
 

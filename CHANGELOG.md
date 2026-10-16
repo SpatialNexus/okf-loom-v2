@@ -18,6 +18,9 @@ follow [Semantic Versioning](https://semver.org/). The product version
   and touch-only devices drop the arrow-key hint.
 - Graph settings flow in the details pane instead of a nested 440px scroller, and
   a focused filter chip shows its whole focus ring beside its joined Only button.
+- A concept selected in the graph details pane (and every single-file document)
+  keeps the Ledger prose styles: padded, scrollable code wells, inline-code chips,
+  underlined prose links, task lists and blockquotes.
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
   including source derivations; the full/tool graph projection is unchanged.
 - Missing or malformed embedded search evidence in single-file exports settles as
