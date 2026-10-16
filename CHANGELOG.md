@@ -12,6 +12,8 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 - Landscape phones (short, coarse viewports such as 844x390) now scroll the top bar
   and view tabs away while reading, like portrait phones; only the Sections row stays.
+- The two-row top bar no longer drops Appearance onto a third row at 641–665px or
+  beside an open Studio rail: below a 780px page the launcher shows only "Studio".
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
   including source derivations; the full/tool graph projection is unchanged.
 - Missing or malformed embedded search evidence in single-file exports settles as

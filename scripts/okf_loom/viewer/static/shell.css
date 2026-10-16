@@ -396,6 +396,39 @@ html[data-okf-js="1"][data-okf-studio-status="failed"] .okf-shell__studio-slot[d
     width: 100%; min-width: 0; max-width: 100%;
     justify-content: flex-start; flex-wrap: wrap;
   }
+  /* T1-004: the destination row (search, Index, Graph, "Studio · Editable",
+   * "Appearance · Bone") needs ~620px, so below ~665px, and beside an open
+   * Studio rail (a 960px viewport leaves a 640px page), Appearance wrapped
+   * onto a third row. The row is sized from the page width actually
+   * available (the okf-page container): under 780px the launcher
+   * consolidates to its action label, as on phones and in the condensed
+   * single row; the accessible name keeps the full status. */
+  @container okf-page (max-width: 779.98px) {
+    body.okf-viewer .okf-shell .okf-studio-launcher { position: relative; min-width: 5.5rem; }
+    body.okf-viewer .okf-shell .okf-studio-launcher__summary {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    body.okf-viewer .okf-shell .okf-studio-launcher[data-attention="pending"]::after {
+      content: "\25A0" / " · Needs attention";
+      font-size: 0.7em;
+      color: var(--status-warn);
+    }
+    body.okf-viewer .okf-shell .okf-studio-launcher[data-attention="failure"]::after {
+      content: "!" / " · Error";
+      color: var(--status-error);
+    }
+    .okf-shell .okf-appearance-trigger__prefix,
+    .okf-shell .okf-appearance-trigger__family { font-size: var(--okf-text-xs); }
+    /* The field follows the page width too, not the viewport (15vw of a
+     * 960px window is a 640px page's whole slack). */
+    .okf-shell__search-form input { width: clamp(7rem, 15cqw, 13rem); }
+  }
 }
 /* U2 tablet band: give every global nav control the same 44px touch floor
  * the <=640px compact block already applies. The former ~30px links passed
@@ -529,8 +562,8 @@ body.okf-viewer { container: okf-page / inline-size; }
     }
   }
 }
-@media (min-width: 1101px) and (forced-colors: active) {
-  body.okf-viewer .okf-shell .okf-studio-launcher[data-attention="pending"]::after { color: CanvasText; }
+@media (min-width: 641px) and (forced-colors: active) {
+  body.okf-viewer .okf-shell .okf-studio-launcher:is([data-attention="pending"], [data-attention="failure"])::after { color: CanvasText; }
 }
 /* The viewbar follows the shell in the DOM. Its positioning is owned by
  * studio.css (the bar is only mounted on live concept pages): the bar is

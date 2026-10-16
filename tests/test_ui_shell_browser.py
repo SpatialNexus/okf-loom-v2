@@ -1141,6 +1141,35 @@ def test_masthead_stays_one_row_beside_the_studio_rail_and_counts_do_not_move_it
     assert failures == []
 
 
+@pytest.mark.parametrize("width,rail", [(645, False), (660, False), (960, True)])
+def test_two_row_masthead_keeps_every_destination_on_its_second_row(
+    page, server_url: str, width: int, rail: bool,
+) -> None:
+    """T1-004: at 645-660px, and at 960px beside the Studio rail (a 640px
+    page), Appearance wrapped onto a third top-bar row. Narrow two-row pages
+    consolidate the launcher to its action label (the name keeps the status)
+    so brand / destinations stay two rows."""
+    page.set_viewport_size({"width": width, "height": 900})
+    page.goto(server_url + "/tables/orders")
+    page.wait_for_function("() => window.okfLoomStudio && window.okfLoomStudio.state.eventsReady")
+    launcher = page.locator(".okf-studio-launcher")
+    if rail:
+        launcher.click()
+        page.locator("#okf-panel").get_by_role("button", name="Comments").click()
+        page.wait_for_function("() => document.body.classList.contains('okf-panel-rail')")
+    page.evaluate("() => document.fonts.ready")
+    geometry = page.evaluate(_MASTHEAD_GEOMETRY)
+    assert geometry["rail"] is rail, geometry
+    assert not geometry["sharesRow"], geometry
+    assert geometry["itemRows"] == 1, geometry
+    assert geometry["overflow"] <= 0, geometry
+    expect(launcher).to_have_accessible_name(re.compile(r"^Studio\s+·\s+Editable$"))
+    page.evaluate("window.okfLoomLive.emit('activity',{event_id:'two-row-1',type:'activity',action:'update',ts:new Date().toISOString()})")
+    expect(launcher).to_have_attribute("data-attention", "pending")
+    expect(launcher).to_have_accessible_name(re.compile(r"^Studio\s+·\s+1 change\s+·\s+Needs attention$"))
+    assert page.evaluate(_MASTHEAD_GEOMETRY)["itemRows"] == 1
+
+
 # Records every text the launcher summary ever shows, from the moment Studio
 # creates it, with page timestamps.
 _LAUNCHER_TEXT_RECORDER = """(() => {
