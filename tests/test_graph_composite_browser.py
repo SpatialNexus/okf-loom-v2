@@ -495,6 +495,75 @@ def test_find_in_graph_band_stays_put_while_typing(page, docs_server_url: str, w
     assert page.evaluate(_FIND_BAND_JS)["band"] == idle["band"]
 
 
+def test_relation_legend_lists_relation_types_in_their_canvas_line_style(page, docs_server_url: str) -> None:
+    """D2-008: the Edge: relation type key lists canonical relation types (the
+    same values as the relationship filter chips), never link anchor text or
+    paths, and each row's line matches how the canvas draws that type."""
+    _open(page, docs_server_url, 1440)
+    key = page.evaluate("""() => {
+      const cy = window.__okfLoomGraph.cy;
+      const typeOf = e => { const p = e.data('primary_relation') || (e.data('relations') || [])[0]; return p ? p.type : ''; };
+      const drawn = {};
+      cy.edges().forEach(e => { const t = typeOf(e); drawn[t] = drawn[t] || {count: 0, dashed: 0};
+        drawn[t].count++; if (e.style('line-style') !== 'solid') drawn[t].dashed++; });
+      const title = [...document.querySelectorAll('.okf-graph-legend__title')].find(t => t.textContent === 'Edge: relation type');
+      const rows = [];
+      for (let el = title && title.nextElementSibling; el && el.classList.contains('okf-graph-legend__item'); el = el.nextElementSibling) {
+        const line = el.querySelector('.okf-graph-legend__line');
+        rows.push({text: el.textContent, line: line ? getComputedStyle(line).borderTopStyle : null});
+      }
+      const chips = [...document.querySelectorAll('[aria-label="Relationship filters"] [data-filter-value]')].map(c => c.dataset.filterValue);
+      return {drawn, rows, chips};
+    }""")
+    rows = [row for row in key["rows"] if row["line"]]
+    assert rows and rows[0]["text"] == "link", key
+    assert len(rows) == min(10, len(key["drawn"])), key
+    for row in rows:
+        assert row["text"] in key["drawn"] and row["text"] in key["chips"], (row, key)
+        assert "/" not in row["text"] and " " not in row["text"], row
+        drawn = key["drawn"][row["text"]]
+        # Plain links draw solid; every typed relation draws dashed.
+        if row["text"] == "link":
+            assert row["line"] == "solid" and drawn["dashed"] == 0, (row, drawn)
+        else:
+            assert row["line"] in ("dashed", "dotted") and drawn["dashed"] == drawn["count"], (row, drawn)
+    counts = [key["drawn"][row["text"]]["count"] for row in rows]
+    assert counts == sorted(counts, reverse=True), rows
+
+
+_REL_LABELS_JS = """(owner) => {
+  const cy = window.__okfLoomGraph.cy;
+  const probe = document.createElement('canvas').getContext('2d');
+  const norm = c => { probe.fillStyle = '#000'; probe.fillStyle = c; return probe.fillStyle; };
+  const shown = cy.edges('.okf-show-label');
+  const incident = owner ? cy.getElementById(owner).connectedEdges().filter(e => !!e.data('label')) : cy.collection();
+  return {shown: shown.map(e => e.id()).sort(), incident: incident.map(e => e.id()).sort(),
+          ink: shown.length ? norm(shown.first().style('color')) : null,
+          weight: shown.length ? shown.first().style('font-weight') : null,
+          muted: norm(getComputedStyle(document.documentElement).getPropertyValue('--text-3').trim()),
+          hues: [...new Set(cy.edges().map(e => norm(e.style('line-color'))))].length};
+}"""
+
+
+def test_relationship_labels_name_only_the_focused_neighbourhood(page, docs_server_url: str) -> None:
+    """D2-010: Show relationship labels reveals every relationship as a quiet
+    line; text appears only on the selected or hovered concept's edges, in
+    the muted ink, and the edges keep the single neutral Ledger hue."""
+    _open(page, docs_server_url, 1440)
+    page.locator(".okf-signal__advanced > summary").click()
+    page.get_by_label("Show relationship labels").check()
+    page.wait_for_function("() => window.__okfLoomGraph.cy.edges('.okf-edge-elided').length === 0")
+    page.wait_for_timeout(300)
+    idle = page.evaluate(_REL_LABELS_JS, None)
+    assert idle["shown"] == [] and idle["hues"] == 1, idle
+    page.evaluate("() => window.__okfLoomGraph.interaction.dispatch({type: 'SELECT', id: 'reference/cli'})")
+    page.wait_for_timeout(400)
+    selected = page.evaluate(_REL_LABELS_JS, "reference/cli")
+    assert selected["shown"] and selected["shown"] == selected["incident"], selected
+    assert selected["ink"] == selected["muted"] and selected["weight"] == "500", selected
+    assert selected["hues"] == 1, selected
+
+
 def test_single_file_short_canvas_keeps_zoom_clear_of_concept_index(tmp_path, page) -> None:
     """With the Search & context drawer open the single-file canvas is short:
     the zoom controls become a bottom-left row and never cover All concepts;

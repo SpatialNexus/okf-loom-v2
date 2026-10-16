@@ -43,7 +43,7 @@
   //   nodeText    --graph-label       node label ink
   //   halo        --graph-halo        label halo and relationship-label plate
   //   edge        --graph-edge        edge line and arrowhead
-  //   edgeLabel   --text-2            relationship label ink (AA on the halo)
+  //   edgeLabel   --text-3            muted relationship label ink (AA on the halo)
   //   select      --accent            the selected node's 4px stroke / edge
   //   cue         --text              path, search and bridge marks (ink)
   //   raised      --surface-2         neutral hub / hover / focus halos
@@ -53,7 +53,7 @@
   var GRAPH_TOKENS = {
     canvas: "--graph-bg", node: "--graph-node", nodeIcon: "--graph-node-icon",
     nodeBorder: "--border-strong", nodeText: "--graph-label", halo: "--graph-halo",
-    edge: "--graph-edge", edgeLabel: "--text-2", select: "--accent", cue: "--text",
+    edge: "--graph-edge", edgeLabel: "--text-3", select: "--accent", cue: "--text",
     muted: "--text-3", raised: "--surface-2", surface: "--surface", chip: "--bg-2",
     warn: "--status-warn", error: "--status-error", info: "--status-info"
   };
@@ -61,7 +61,7 @@
   // Ledger stylesheet; every viewer surface resolves the tokens above.
   var GRAPH_TOKEN_FALLBACK = {
     canvas: "#f6f3ed", node: "#d2cabd", nodeIcon: "#1d1a16", nodeBorder: "#b0a696",
-    nodeText: "#1d1a16", halo: "#f6f3ed", edge: "#a39a8b", edgeLabel: "#575047",
+    nodeText: "#1d1a16", halo: "#f6f3ed", edge: "#a39a8b", edgeLabel: "#675f55",
     select: "#a3573a", cue: "#1d1a16", muted: "#6a6258", raised: "#e3ddd2", surface: "#fbf9f5",
     chip: "#eae5dc", warn: "#7f5410", error: "#9e2f2a", info: "#36597e"
   };
@@ -1258,6 +1258,13 @@
       data.bundleLabel=data.multiplicity>1?String(data.multiplicity):"";
       return data;
     }
+    // The relation type an edge is drawn as: its primary relation's canonical
+    // type (an untyped legacy edge falls back to its label). Body links are
+    // type "link" and draw as the plain solid edge; every other type is a
+    // typed relation that carries a dash (and, under the Relations intent, a
+    // muted hue). Anchor text never keys the encoding.
+    function edgePrimaryType(data){var relations=Array.isArray(data.relations)?data.relations:[],primary=data.primary_relation||relations[Number(data.primary_relation_index)||0]||relations[0];return primary&&primary.type?String(primary.type):String(data.label||"");}
+    function isTypedRelation(type){return !!type&&type!=="link";}
     function edgeRelations(edge){var relations=edge.data("relations");return Array.isArray(relations)&&relations.length?relations:[{id:edge.id()+"__relation",type:edge.data("label")||"link",label:edge.data("label")||"related",kind:edge.data("label")?"relation":"body_link",direction:"outgoing",source:edge.data("source"),target:edge.data("target")}];}
     // Relationship filters intentionally use one normalized dimension:
     // canonical relation `type`. Labels remain explanatory legend/detail text.
@@ -1327,8 +1334,9 @@
     (function () {
       var counts = {};
       bundle.edges.forEach(function (e) {
+        var primaryType = edgePrimaryType(e.data);
+        if (primaryType && !relationLabelSet[primaryType]) { relationLabelSet[primaryType] = true; relationLabelList.push(primaryType); }
         (e.data.relations || []).forEach(function(relation){
-          [relation.type,relation.label].forEach(function(value){if(value&&!relationLabelSet[value]){relationLabelSet[value]=true;relationLabelList.push(value);}});
           [e.data.source, e.data.target].forEach(function (nid) {
             incidentLabeled[nid] = (incidentLabeled[nid] || 0) + 1;
             counts[nid] = counts[nid] || {};
@@ -1410,7 +1418,7 @@
       incidentLabeled = {}; nodeRelLabel = {}; relationLabelSet = {}; relationLabelList = [];
       var counts = {};
       candidate.edges.forEach(function (e) {
-        var d=e.data||{}, label=d.label;
+        var d=e.data||{}, label=edgePrimaryType(d);
         if (!label) return;
         if (!relationLabelSet[label]) { relationLabelSet[label]=true; relationLabelList.push(label); }
         [d.source,d.target].forEach(function (id) {
@@ -1984,8 +1992,11 @@
             // instead of rendering as faint noise; they return on zoom-in. This
             // preserves Relations/Focus semantics (labels are still emitted via
             // .okf-show-label) and only changes WHEN they paint.
+            // D2-010: relationship labels are secondary text, so they read
+            // in the muted --text-3 ink at a regular weight (still AA on the
+            // 0.9 halo plate in every palette).
             "font-size": 11,
-            "font-weight": 600,
+            "font-weight": 500,
               "color": INITIAL_GRAPH_PALETTE.edgeLabel,
               "font-family": INITIAL_GRAPH_PALETTE.font,
             "text-rotation": "autorotate",
@@ -2721,13 +2732,23 @@
       // otherwise the legend contradicts the canvas. Previously this was
       // gated on the Relations preset, which now disagrees with the
       // always-on encoding.
-      if (relationLabelList.length) {
+      // One row per relation type the canvas actually draws (each edge's
+      // primary type), busiest first, in that type's real line style: plain
+      // links solid, typed relations dashed (hued only under Relations).
+      var drawnTypes = {};
+      cy.edges().forEach(function (e) { var t = e.data("relType"); if (t) drawnTypes[t] = (drawnTypes[t] || 0) + 1; });
+      var drawnTypeList = Object.keys(drawnTypes).sort(function (a, b) { return (drawnTypes[b] - drawnTypes[a]) || (a < b ? -1 : (a > b ? 1 : 0)); });
+      if (drawnTypeList.length) {
         body.appendChild(legendTitle("Edge: relation type"));
-        relationLabelList.slice(0, 10).forEach(function (lab) {
-          body.appendChild(legendLineRow(relColor(lab, !!controlState.relationEdges), relDashClass(lab), lab));
+        drawnTypeList.slice(0, 10).forEach(function (type) {
+          var typed = isTypedRelation(type);
+          var row = legendLineRow(typed ? relColor(type, !!controlState.relationEdges) : graphPalette().edge, typed ? relDashClass(type) : "solid", type);
+          row.dataset.relationType = type;
+          body.appendChild(row);
         });
-        buildFilterChips(body,allRelationValues(),controlState.hiddenRelations,"Relationship");
+        if (drawnTypeList.length > 10) body.appendChild(legendRow("transparent", "+ " + (drawnTypeList.length - 10) + " more relation types"));
       }
+      if (relationLabelList.length) buildFilterChips(body,allRelationValues(),controlState.hiddenRelations,"Relationship");
       var hasBody = body.childNodes.length > 0;
       legend.hidden = !hasBody;
       if (!hasBody) { legend.classList.remove("okf-graph-legend--collapsed"); return; }
@@ -2912,12 +2933,13 @@
           // default Map lens without having to flip presets (the prior
           // gate was a reviewer-6 contradiction with the plan's "typed
           // edge get their hue/dash always" requirement).
-          var lab = e.data("label");
+          var relType = edgePrimaryType(e.data());
+          e.data("relType", relType);
           e.removeClass("okf-rel-edge okf-reld-1 okf-reld-2 okf-reld-3");
-          if (lab) {
-            e.data("relColor", relColor(lab, !!controlState.relationEdges));
+          if (isTypedRelation(relType)) {
+            e.data("relColor", relColor(relType, !!controlState.relationEdges));
             e.addClass("okf-rel-edge");
-            e.addClass(relDashClass(lab));
+            e.addClass(relDashClass(relType));
           }
         });
       });
@@ -2966,10 +2988,19 @@
     // drops or the user zooms/selects in. The EXPLICIT Relations/Focus path
     // (showEdgeLabels) is untouched — that is deliberate "show the relationships"
     // intent and stays on the existing min-zoomed-font-size LOD.
+      // D2-010: relationship text is a neighbourhood reading aid, never a
+      // whole-map layer. With labels on (the setting, or a lens that asks
+      // for them) only the edges of the selected, hovered or focus-root
+      // concept carry text; every other edge stays a quiet line. Painting
+      // all of them at once was an unreadable pile of rotated anchor text.
       function applyEdgeLabels() {
         var selId = null;
         var sel = cy.nodes(":selected");
         if (sel && sel.length) selId = sel.id();
+        var labelOwners = {};
+        if (selId) labelOwners[selId] = true;
+        if (interactionState.hovered) labelOwners[interactionState.hovered] = true;
+        if (controlState.focusEnabled && focusRoot) labelOwners[focusRoot] = true;
         // Relationship text is an explicit Advanced choice. Selection still
         // emphasizes incident lines, but never silently turns labels on.
         // P1 edge highlight: toggle .okf-incident on edges touching the
@@ -2981,8 +3012,8 @@
             var incident = !!(selId && (e.source().id() === selId || e.target().id() === selId));
             e.toggleClass("okf-incident", incident);
             var show = false;
-            if (e.data("label")) {
-              if (controlState.showEdgeLabels && !FORCED_COLORS) show = true;
+            if (e.data("label") && controlState.showEdgeLabels && !FORCED_COLORS) {
+              show = !!(labelOwners[e.source().id()] || labelOwners[e.target().id()]);
             }
             e.toggleClass("okf-show-label", show);
           });
@@ -3771,7 +3802,7 @@
       [mobileOverviewStatus,densityIndicator].forEach(stampVisibilityProjection);
       mobileOverviewStatus.textContent=visibleEdges+" of "+cy.edges().length+" connection bundles · "+visibleRelationshipInstanceCount()+" of "+relationshipInstanceCount(cy.edges())+" relationship instances · select a concept to inspect its connections";mobileOverviewAll.hidden=false;mobileOverviewAll.textContent=controlState.relationshipDetailOptIn?"Show backbone":"Show all relationships";
       if (!densityIndicator) { updateStatus(); return; }
-      var detailInstruction = " · Graph settings → Show relationship labels reveals all relationships and their labels";
+      var detailInstruction = " · Graph settings → Show relationship labels reveals all relationships and names those of the selected or hovered concept";
       var tierCopy = densityTier === "full"
         ? "Local detail · " + visibleEdges + " of " + cy.edges().length + " relationships (connection bundles) · "+visibleRelationshipInstanceCount()+" relationship instances · node titles remain shortened; use Concepts for full titles" + detailInstruction
         : densityTier === "intermediate"
@@ -4392,7 +4423,9 @@
         markCustom(); applyGrouping(); applyVisualEncoding(); applyFilters(); updateLegend(); updateStatus(); scheduleLayout(false);
       });
         ui.relLabels = checkRow(vfs, "Show relationship labels", controlState.showEdgeLabels, function (c) {
-          controlState.showEdgeLabels = c; controlState.relationEdges = c;
+          // Labels and the complete relationship set only: hue stays the
+          // Relations lens's encoding, so the map keeps its muted palette.
+          controlState.showEdgeLabels = c;
           controlState.relationshipDetailOptIn = c;
            markCustom(); applyVisualEncoding(); applyEdgeLabels(); applyEdgeElision(); reconcileVisibleRelationshipProjection();
           // Cytoscape may defer style/class projection until the current event

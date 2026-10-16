@@ -5267,7 +5267,8 @@ def test_lens_switching_mutates_graph_state(server_url: str, page) -> None:
     assert any(br["nodes"][k]["color"] != base["nodes"][k]["color"] for k in base["nodes"]), \
         "Bridges colour ramp did not recolour any node"
 
-    # Flow: relationship labels on; typed edges carry colour + labels.
+    # Flow: relationship labels on; typed edges carry colour, and the
+    # selected concept's relationships carry their labels (D2-010).
     prev = _applied_seq(page)
     _preset(page, "flow")
     _wait_applied_after(page, prev)
@@ -5276,7 +5277,16 @@ def test_lens_switching_mutates_graph_state(server_url: str, page) -> None:
     assert st["relationEdges"] and st["showEdgeLabels"]
     fl = _snap(page)
     assert fl["relEdges"] >= 1, "Flow lens set no okf-rel-edge"
+    assert not any(e["showLabel"] for e in fl["edges"].values()), "Flow labelled the whole map"
+    owner = page.evaluate("""() => { const G = window.__okfLoomGraph;
+      const n = G.cy.nodes().filter(n => n.connectedEdges().some(e => !!e.data('label'))).first();
+      G.interaction.dispatch({type: 'SELECT', id: n.id()}); return n.id(); }""")
+    page.wait_for_timeout(300)
+    fl = _snap(page)
     assert any(e["showLabel"] for e in fl["edges"].values()), "no edge label shown in Flow"
+    assert page.evaluate("""id => window.__okfLoomGraph.cy.edges('.okf-show-label')
+      .every(e => e.source().id() === id || e.target().id() === id)""", owner)
+    page.evaluate("() => window.__okfLoomGraph.interaction.dispatch({type: 'CLEAR'})")
 
     # Recent: recency colouring is applied (demo nodes lack timestamps →
     # the neutral undated colour is fine; just prove the mode switched).
@@ -5287,10 +5297,11 @@ def test_lens_switching_mutates_graph_state(server_url: str, page) -> None:
     assert _state(page)["colorMode"] == "recency"
 
     # Back to Map: bridge glow cleared. Phase 3 dash-always: typed edges
-    # (edges with a non-empty label) STILL carry their .okf-reld-N dash
-    # class in the Map lens — the dash encoding is no longer an explicit-
-    # labels state. Assert the dash count equals the labelled-edge count
-    # exactly (the deterministic Phase 3 contract: dash ⇔ has-label).
+    # (whose primary relation type is not a plain "link") STILL carry their
+    # .okf-reld-N dash class in the Map lens — the dash encoding is no longer
+    # an explicit-labels state. Assert the dash count equals the typed-edge
+    # count exactly (the deterministic contract: dash ⇔ typed relation;
+    # D2-008: anchor-text labels never key the encoding).
     prev = _applied_seq(page)
     _preset(page, "map")
     _wait_applied_after(page, prev)
@@ -5301,10 +5312,10 @@ def test_lens_switching_mutates_graph_state(server_url: str, page) -> None:
         "window.__okfLoomGraph.cy.edges('.okf-reld-1, .okf-reld-2, .okf-reld-3').length"
     )
     labelled_count = page.evaluate(
-        "window.__okfLoomGraph.cy.edges().filter(e => !!e.data('label')).length"
+        "window.__okfLoomGraph.cy.edges().filter(e => " + _TYPED_EDGE_JS + ").length"
     )
     assert dash_count == labelled_count, (
-        f"Phase 3 dash-always invariant: dash count {dash_count} != labelled-edge "
+        f"Phase 3 dash-always invariant: dash count {dash_count} != typed-edge "
         f"count {labelled_count} (every typed edge must carry its dash class "
         f"in every lens, including Map)"
     )
@@ -5453,8 +5464,9 @@ def test_lens_communities_deterministic_and_painted(server_url: str, page) -> No
 def test_lens_encoding_toggles(server_url: str, page) -> None:
     """Graph settings toggles: 'Colour by theme' paints the muted community
     ramp and off returns every node to the neutral fill (the Saket et al.
-    evidence-mandated escape hatch); 'Show relationship labels' reveals
-    typed-edge labels in any lens."""
+    evidence-mandated escape hatch); 'Show relationship labels' names the
+    relationships of the selected concept in any lens (D2-010: never the
+    whole map at once, and never by switching edges to the hue ramp)."""
     _open_graph(page, server_url)
     page.wait_for_timeout(400)
     assert _state(page)["colorMode"] == "type"
@@ -5485,10 +5497,19 @@ def test_lens_encoding_toggles(server_url: str, page) -> None:
     _toggle_check(page, "Show relationship labels")
     page.wait_for_timeout(300)
     st = _state(page)
-    assert st["showEdgeLabels"] and st["relationEdges"]
+    assert st["showEdgeLabels"] and not st["relationEdges"]
     after = _snap(page)
-    assert any(e["showLabel"] for e in after["edges"].values()), \
-        "relationship-label toggle revealed no labels"
+    assert not any(e["showLabel"] for e in after["edges"].values()), \
+        "relationship labels painted the whole map with nothing selected"
+    owner = page.evaluate("""() => { const G = window.__okfLoomGraph;
+      const n = G.cy.nodes().filter(n => n.connectedEdges().some(e => !!e.data('label'))).first();
+      G.interaction.dispatch({type: 'SELECT', id: n.id()}); return n.id(); }""")
+    page.wait_for_timeout(300)
+    labelled = page.evaluate("""id => { const cy = window.__okfLoomGraph.cy;
+      return {shown: cy.edges('.okf-show-label').map(e => e.id()).sort(),
+              incident: cy.getElementById(id).connectedEdges().filter(e => !!e.data('label')).map(e => e.id()).sort()}; }""", owner)
+    assert labelled["shown"] and labelled["shown"] == labelled["incident"], \
+        "relationship labels must name exactly the selected concept's relationships"
 
 
 def test_graph_theme_type_palette_no_collision(server_url: str, page) -> None:
@@ -5794,9 +5815,17 @@ def test_graph_phase3_orphan_shelf_demo_has_no_orphans_hidden(server_url: str, p
     )
 
 
+# An edge is typed when its primary relation's canonical type is not a plain
+# body "link" (an untyped legacy edge falls back to its label).
+_TYPED_EDGE_JS = (
+    "(() => { const r = e.data('relations') || [], p = e.data('primary_relation') || r[0];"
+    " const t = p && p.type ? p.type : (e.data('label') || ''); return !!t && t !== 'link'; })()"
+)
+
+
 def test_graph_phase3_typed_edge_dash_always_in_every_lens(server_url: str, page) -> None:
-    """Phase 3 contract: typed edges (edges with a non-empty label) ALWAYS
-    carry their ``.okf-reld-N`` dash class, in EVERY lens — not only under
+    """Phase 3 contract: typed edges (primary relation type other than a
+    plain link) ALWAYS carry their ``.okf-reld-N`` dash class, in EVERY lens — not only under
     the explicit Relations/Focus intent. Walks every preset and asserts the
     invariant. (Regression guard for the prior relationEdges-gated dash.)"""
     _open_graph(page, server_url)
@@ -5821,7 +5850,7 @@ def test_graph_phase3_typed_edge_dash_always_in_every_lens(server_url: str, page
             """() => {
                 const cy = window.__okfLoomGraph.cy;
                 return {
-                    labelled: cy.edges().filter(e => !!e.data('label')).length,
+                    labelled: cy.edges().filter(e => """ + _TYPED_EDGE_JS + """).length,
                     dashed: cy.edges('.okf-reld-1, .okf-reld-2, .okf-reld-3').length,
                     rel: cy.edges('.okf-rel-edge').length,
                     lens: window.__okfLoomGraph.getState().lens,
@@ -7648,7 +7677,8 @@ def test_graph_phase3_r3_dense_overview_progressively_restores_model_detail(
     assert detail["edges"] == expected_edges and 0 < detail["hiddenEdges"] < detail["edges"]
     assert detail["relationLabels"] == 0 and f"of {expected_edges} relationships" in detail["indicator"]
     assert "node titles remain shortened" in detail["indicator"]
-    assert "Show relationship labels reveals all relationships and their labels" in detail["indicator"]
+    assert ("Show relationship labels reveals all relationships and names those of the selected or hovered concept"
+            in detail["indicator"])
     default_visible = detail["edges"] - detail["hiddenEdges"]
     default_visible_ids = detail["visibleIds"]
     proof_dir = Path(tempfile.gettempdir()) / "okf-loom-phase3-proof-r6"
@@ -7663,7 +7693,9 @@ def test_graph_phase3_r3_dense_overview_progressively_restores_model_detail(
         "() => {const cy=window.__okfLoomGraph.cy;return {total:cy.edges().length,hidden:cy.edges('.okf-edge-elided').length,shown:cy.edges('.okf-show-label').length,typed:cy.edges('[label]').length,indicator:document.querySelector('.okf-graph-density').textContent};}"
     )
     assert explicit["total"] == expected_edges and explicit["hidden"] == 0
-    assert explicit['shown'] == explicit['typed']
+    # D2-010: every relationship is revealed, but text stays on the selected
+    # or hovered concept's edges; nothing is selected here, so none carry it.
+    assert explicit['shown'] == 0
     assert explicit['typed'] == sum(edge['data'].get('label') is not None for edge in canonical['edges'])
     assert f"{expected_edges} of {expected_edges} relationships" in explicit["indicator"]
 
