@@ -2056,7 +2056,9 @@ body.okf-viewer .okf-viewswitch__btn:is(.okf-source-wrap, .okf-focus-toggle)[ari
   text-decoration: none;
 }
 .okf-onthispage__link:hover { color: var(--text); text-decoration: underline; }
-.okf-onthispage__link:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+/* Inset ring: the lists scroll, and an outset ring on the first or last
+ * entry would be clipped by the scroller's edge. */
+.okf-onthispage__link:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 /* Current section (document-outline.js; aria-current="location" is the
  * machine-readable signal, this is its visible counterpart). */
 .okf-onthispage__link.is-active { border-left-color: var(--accent); color: var(--text); font-weight: 600; }
@@ -2112,17 +2114,30 @@ body.okf-viewer .okf-viewswitch__btn:is(.okf-source-wrap, .okf-focus-toggle)[ari
   top: calc(100% + 6px);
   right: 0;
   z-index: 60;
+  display: flex;
+  flex-direction: column;
   min-width: 15rem;
   max-width: min(24rem, calc(100vw - 1.5rem));
   max-height: min(60vh, 30rem);
   padding: var(--okf-space-2);
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  overflow: hidden;
   border: 0;
   background: var(--surface);
   box-shadow: var(--shadow-pop);
 }
-.okf-outline-jump__panel .okf-onthispage__nav { padding: 0; }
+.okf-outline-jump__panel[hidden] { display: none; }
+/* The list is the panel's one scroller. Scroll cue: a 2px strong rule on
+ * whichever edge still has sections beyond it (document-outline.js). */
+.okf-outline-jump__panel .okf-onthispage__nav {
+  min-height: 0;
+  max-height: none;
+  padding: 0;
+  overscroll-behavior: contain;
+  border-block: 2px solid transparent;
+}
+.okf-outline-jump__panel .okf-onthispage__list { margin: 0; }
+.okf-outline-jump__panel[data-okf-more-above] .okf-onthispage__nav { border-top-color: var(--border-strong); }
+.okf-outline-jump__panel[data-okf-more-below] .okf-onthispage__nav { border-bottom-color: var(--border-strong); }
 
 /* ---- Reading lane --------------------------------------------------------------
  * Workspace vs lane: the document body / Source / Split region always takes

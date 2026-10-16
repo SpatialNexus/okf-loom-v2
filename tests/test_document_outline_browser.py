@@ -632,6 +632,92 @@ def test_viewbar_sections_popover_reaches_below_fold_and_lands_outside_chrome(lo
     assert compact["current"] is not None
 
 
+_TAB_LEFTS = "() => Array.from(document.querySelectorAll('.okf-viewswitch__btn:not([hidden])'))" \
+    ".map(b => Math.round(b.getBoundingClientRect().left))"
+_JUMP_LABEL = "() => document.querySelector('[data-okf-outline-jump] .okf-outline-jump__current').textContent"
+
+
+@pytest.mark.browser
+def test_sections_label_tracks_any_jump_and_view_tabs_never_move(long_document_page) -> None:
+    """D1-005/D1-006/M1-005: the current section follows the reading
+    position after jumps that skip every heading (programmatic scrolls,
+    Home), the Sections menu opens on that section with focus on it and a
+    scroll cue, its last entry's ring is not clipped, and the Rendered /
+    Source / Split tabs never move while the label changes."""
+    page = long_document_page
+    page.wait_for_function("() => window.okfStudioReadiness && window.okfStudioReadiness.ready")
+    tabs = page.evaluate(_TAB_LEFTS)
+    for section in (7, 2, 10, 4):
+        # Land the heading just above the reading line in one jump.
+        page.evaluate("""(id) => { const h = document.getElementById(id);
+          window.scrollTo(0, h.getBoundingClientRect().top + scrollY - innerHeight * 0.2); }""",
+                      f"section-{section}")
+        page.wait_for_function(f"() => ({_JUMP_LABEL})() === 'Section {section}'", timeout=5000)
+        assert page.evaluate(_TAB_LEFTS) == tabs, f"view tabs moved at Section {section}"
+    page.locator("body").press("Home")
+    page.wait_for_function(f"() => scrollY === 0 && ({_JUMP_LABEL})() === 'Section 1'", timeout=5000)
+
+    # A short viewport makes the list scroll inside the menu.
+    page.set_viewport_size({"width": 1440, "height": 360})
+    page.evaluate("""() => { const h = document.getElementById('section-9');
+      window.scrollTo(0, h.getBoundingClientRect().top + scrollY - innerHeight * 0.2); }""")
+    page.wait_for_function(f"() => ({_JUMP_LABEL})() === 'Section 9'", timeout=5000)
+    page.locator("[data-okf-outline-jump] button").click()
+    cue = """() => {
+      const panel = document.getElementById('okf-outline-jump-panel');
+      const nav = panel.querySelector('.okf-onthispage__nav');
+      const active = document.activeElement, box = nav.getBoundingClientRect(), r = active.getBoundingClientRect();
+      return {focused: active.getAttribute('href'), current: active.getAttribute('aria-current'),
+              shown: r.top >= box.top - 0.5 && r.bottom <= box.bottom + 0.5,
+              scrolls: nav.scrollHeight > nav.clientHeight, panelScrolls: panel.scrollHeight > panel.clientHeight + 1,
+              cueMatches: panel.hasAttribute('data-okf-more-above') === nav.scrollTop > 1 &&
+                panel.hasAttribute('data-okf-more-below') === nav.scrollHeight - nav.scrollTop - nav.clientHeight > 1,
+              above: panel.hasAttribute('data-okf-more-above'), below: panel.hasAttribute('data-okf-more-below')};
+    }"""
+    opened = page.evaluate(cue)
+    assert opened["above"] or opened["below"], opened
+    opened.pop("above"), opened.pop("below")
+    assert opened == {"focused": "#section-9", "current": "location", "shown": True, "scrolls": True,
+                      "panelScrolls": False, "cueMatches": True}, opened
+    # The cue follows the list's own scrolling (scroll events are async).
+    settled = ("(want) => { const c = (" + cue + ")(); return c.focused === want.focused && c.cueMatches"
+               " && c.above === want.above && c.below === want.below; }")
+    page.keyboard.press("Home")
+    page.wait_for_function(settled, arg={"focused": "#section-1", "above": False, "below": True}, timeout=5000)
+    page.keyboard.press("End")
+    page.wait_for_function(settled, arg={"focused": "#section-10", "above": True, "below": False}, timeout=5000)
+    end = page.evaluate("""() => {
+      const panel = document.getElementById('okf-outline-jump-panel');
+      const nav = panel.querySelector('.okf-onthispage__nav');
+      const link = document.activeElement, cs = getComputedStyle(link);
+      const ring = parseFloat(cs.outlineWidth) + parseFloat(cs.outlineOffset);
+      const box = nav.getBoundingClientRect(), r = link.getBoundingClientRect();
+      return {focused: link.getAttribute('href'),
+              ringInside: r.top - ring >= box.top - 0.5 && r.bottom + ring <= box.bottom + 0.5,
+              below: panel.hasAttribute('data-okf-more-below')};
+    }""")
+    assert end == {"focused": "#section-10", "ringInside": True, "below": False}, end
+    page.keyboard.press("Escape")
+
+
+@pytest.mark.browser
+def test_phone_view_tab_focus_ring_clears_the_sticky_top_bar(long_document_page) -> None:
+    """M1-009: on a phone the view bar sits flush under the sticky top bar;
+    a focused view tab's complete ring stays below the bar's bottom edge."""
+    page = long_document_page
+    page.wait_for_function("() => window.okfStudioReadiness && window.okfStudioReadiness.ready")
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.evaluate("() => window.scrollTo(0, 0)")
+    _focus_by_tabbing(page, ".okf-viewswitch")
+    ring = page.evaluate("""() => {
+      const button = document.activeElement, cs = getComputedStyle(button);
+      const top = button.getBoundingClientRect().top - parseFloat(cs.outlineOffset) - parseFloat(cs.outlineWidth);
+      return {tab: button.classList.contains('okf-viewswitch__btn'), ringTop: top,
+              barBottom: document.querySelector('.okf-topbar').getBoundingClientRect().bottom};
+    }""")
+    assert ring["tab"] and ring["ringTop"] >= ring["barBottom"] - 0.5, ring
+
+
 @pytest.mark.browser
 def test_disclosure_filter_leaves_sections_popover_complete(long_document_page) -> None:
     """U3 filter scoping: the near-header disclosure filter narrows ONLY the
