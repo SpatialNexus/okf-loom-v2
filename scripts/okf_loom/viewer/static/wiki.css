@@ -1833,11 +1833,15 @@ sup.okf-footnote-ref { line-height: 0; }
 /* View tabs (Rendered / Source / Split / Focus view). Studio mounts the bar
  * (studio.css owns its stickiness); Ledger draws text tabs on the band: the
  * selected view is bold with a 2px accent underline. Wrap and Focus are
- * modifier toggles, marked neutrally, so accent only means "current view". */
+ * modifier toggles, marked neutrally, so accent only means "current view".
+ * The tabs anchor to the start of the bar, so neither the Wrap toggle
+ * appearing nor the Sections label changing ever moves them; the 4px top
+ * gutter keeps their outset focus ring clear of the sticky top bar. */
 body.okf-viewer .okf-concept-viewbar {
+  justify-content: flex-start;
   gap: 18px;
   min-height: 48px;
-  padding: 0 20px;
+  padding: 4px 20px 0;
   border-bottom: 1px solid var(--border);
   background: var(--bg-2);
 }
@@ -2087,10 +2091,12 @@ body.okf-viewer .okf-viewswitch__btn:is(.okf-source-wrap, .okf-focus-toggle)[ari
 .okf-context-manual-options > summary { min-height: 44px; padding-block: .65rem; cursor: pointer; }
 
 /* "Sections" in the view bar (document-outline.js): one restrained jump
- * control driven by the same heading state as the outline disclosure. */
-.okf-outline-jump { position: relative; display: flex; min-width: 0; max-width: 100%; margin-left: var(--okf-space-3); }
+ * control driven by the same heading state as the outline disclosure. It
+ * keeps a fixed slot at the end of the bar; the current-section label
+ * truncates inside it, so a changing label never resizes the control. */
+.okf-outline-jump { position: relative; display: flex; width: 20rem; min-width: 0; max-width: 100%; margin-left: auto; }
 .okf-outline-jump[hidden] { display: none; }
-.okf-outline-jump__toggle { gap: var(--okf-space-2); min-width: 0; max-width: 100%; overflow: hidden; }
+.okf-outline-jump__toggle { flex: 1 1 auto; justify-content: flex-start; gap: var(--okf-space-2); min-width: 0; max-width: 100%; overflow: hidden; }
 .okf-outline-jump__toggle > :not(.okf-outline-jump__current) { flex: none; }
 .okf-outline-jump__current {
   min-width: 0;
