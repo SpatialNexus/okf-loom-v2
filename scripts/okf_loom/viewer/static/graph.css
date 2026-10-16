@@ -954,6 +954,10 @@ summary + .okf-lens-summary__verdict + .okf-lens-summary__row { border-top: 1px 
 }
 .okf-graph-canvas-proxy{position:absolute;inset:8px;z-index:1;pointer-events:none;border:2px solid transparent;border-radius:0}
 .okf-graph-canvas-proxy:focus-visible{outline:3px solid var(--okf-focus-color);outline-offset:-3px}
+/* The graph region itself takes focus as a fragment/shell target (#okf-graph).
+ * It runs edge to edge, so an outward ring is clipped into a stray L; the
+ * ring is inset to hug the region, like the canvas proxy's. */
+#okf-graph:focus-visible{outline:2px solid var(--okf-accent);outline-offset:-2px}
 .okf-node-index__item.is-active{border-inline-start:2px solid var(--accent);font-weight:700}
 .okf-graph-actions{position:absolute;z-index:32;display:flex;gap:2px;max-width:calc(100% - 16px);padding:4px;background:var(--okf-bg-elev);border:0;border-radius:0;box-shadow:var(--shadow-pop)}
 .okf-graph-actions[hidden]{display:none}

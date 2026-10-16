@@ -32,6 +32,9 @@ follow [Semantic Versioning](https://semver.org/). The product version
   Collaborators disclosure and lens hint match their siblings, starting-point
   counts stay on one line, tablet content shares one left edge, and a concept's
   broken-link marker reads "! 4 broken" instead of a bare "!".
+- Focusing the graph region (single-file Graph, `#okf-graph`) draws an inset ring
+  that hugs it instead of a clipped L, and the Static/Local mode word is no
+  longer an empty Tab stop.
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
   including source derivations; the full/tool graph projection is unchanged.
 - Missing or malformed embedded search evidence in single-file exports settles as

@@ -596,6 +596,38 @@ def test_graph_390_title_and_tools_share_the_pane_gutter(page, docs_server_url: 
     assert edges["title"] == edges["tools"] == edges["tabs"] == 12, edges
 
 
+def test_single_file_graph_focus_ring_is_inset_and_mode_word_is_not_a_tab_stop(tmp_path, page) -> None:
+    """D3-010/D3-011: keyboard Graph in the single-file top bar focuses the
+    edge-to-edge graph region with an inset ring (an outward one is clipped
+    into an L), and the "Local" mode word is a status, not a Tab stop."""
+    from okf_loom import Bundle
+    from okf_loom.render import render_single_file
+    from test_viewer_browser import DOCS_BUNDLE
+
+    out = tmp_path / "single.html"
+    render_single_file(Bundle.load(DOCS_BUNDLE), out)
+    page.set_viewport_size({"width": 1440, "height": 900})
+    page.add_init_script("try { localStorage.setItem('okfGraphTourDone', '1'); } catch (e) {}")
+    page.goto(out.as_uri(), wait_until="domcontentloaded")
+    page.wait_for_function("() => window.okfGraphCaptureState && window.okfGraphCaptureState().layoutSettled")
+    expect(page.locator(".okf-mobile-mode")).to_have_text("Local")
+    stops = []
+    for _ in range(12):
+        page.keyboard.press("Tab")
+        stops.append(page.evaluate("() => [document.activeElement.className, (document.activeElement.textContent || '').trim()]"))
+        if stops[-1][1] == "Graph":
+            break
+    assert stops[-1][1] == "Graph", stops
+    assert not any("okf-mobile-mode" in str(cls) for cls, _ in stops), stops
+    page.keyboard.press("Enter")
+    page.wait_for_function("() => document.activeElement && document.activeElement.id === 'okf-graph'")
+    ring = page.evaluate("""() => { const el = document.activeElement, cs = getComputedStyle(el);
+      return {visible: el.matches(':focus-visible'), style: cs.outlineStyle,
+              width: parseFloat(cs.outlineWidth), offset: parseFloat(cs.outlineOffset)}; }""")
+    assert ring["visible"] and ring["style"] == "solid" and ring["width"] >= 2, ring
+    assert ring["offset"] <= -ring["width"], ring
+
+
 def test_single_file_short_canvas_keeps_zoom_clear_of_concept_index(tmp_path, page) -> None:
     """With the Search & context drawer open the single-file canvas is short:
     the zoom controls become a bottom-left row and never cover All concepts;

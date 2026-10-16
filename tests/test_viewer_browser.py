@@ -11015,7 +11015,7 @@ def test_phase4_mobile_header_tabs_tools_mode_names_and_contrast(request,surface
     commands=page.get_by_role("button",name="Open the command palette (Control K)")
     if surface=="live":
         page.locator(".okf-studio-launcher").click();expect(commands).to_be_visible();commands.focus();expect(commands).to_be_focused();page.get_by_role("button",name="Close panel").click()
-    else:mode.focus();expect(mode).to_be_focused()
+    else:assert mode.evaluate("el=>el.tabIndex")<0  # D3-011: a status word is not a Tab stop
     expect(page.locator(".okf-mobile-secondary__controls")).to_be_hidden()
     assert page.evaluate('b=>{const r=b.getBoundingClientRect();return r.left>=-1&&r.right<=innerWidth+1}',find.element_handle())
     # Direct accessibility-tree proof: icon controls expose unique names; a
