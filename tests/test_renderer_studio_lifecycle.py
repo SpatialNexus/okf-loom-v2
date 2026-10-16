@@ -508,6 +508,32 @@ def test_mermaid_shared_tooltip_uses_square_viewer_geometry(lifecycle_server, li
     assert tooltip.evaluate("t => t.style.borderRadius") == ''
 
 
+@pytest.mark.browser
+def test_mermaid_holds_a_legible_scale_and_scrolls_in_its_port(lifecycle_server, lifecycle_page):
+    """M1-006/D1-019: a diagram wider than its column is never shrunk below
+    ~12px labels (12/14 of Mermaid's 14px); it keeps that scale and scrolls
+    inside its named diagram scroll port, without page overflow."""
+    page = lifecycle_page
+    page.set_viewport_size({"width": 320, "height": 740})
+    page.goto(lifecycle_server + '/playbooks/refund_flow')
+    page.wait_for_function("() => window.okfRendererReadiness && window.okfRendererReadiness.ready")
+    expect(page.locator('div.mermaid svg')).to_have_count(1)
+    page.wait_for_function("""() => { const p = document.querySelector('div.mermaid').closest('.okf-content-scrollport');
+      return p && p.getAttribute('role') === 'region'; }""")
+    fit = page.evaluate("""() => {
+      const svg = document.querySelector('div.mermaid svg'), port = svg.closest('.okf-content-scrollport');
+      return {scale: svg.getBoundingClientRect().width / svg.viewBox.baseVal.width,
+              wide: svg.viewBox.baseVal.width * 12 / 14 > port.clientWidth,
+              scrolls: port.scrollWidth > port.clientWidth + 1, tab: port.tabIndex,
+              label: port.getAttribute('aria-label'),
+              overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth};
+    }""")
+    assert fit["wide"], f"fixture diagram must be wider than the 320px column: {fit}"
+    assert fit["scale"] >= 12 / 14 - 0.01, fit
+    assert fit["scrolls"] and fit["tab"] == 0 and fit["label"].startswith("Diagram"), fit
+    assert fit["overflow"] <= 0, fit
+
+
 _MERMAID_SWAP_PROBE = """() => {
   // Every mutation (MutationObserver, before paint) and every animation frame
   // must show a drawn SVG, no raw source text and the same container box.

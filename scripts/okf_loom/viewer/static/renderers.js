@@ -650,6 +650,19 @@
     return host;
   }
 
+  // Mermaid fits a diagram to its column (width:100%, max-width: natural
+  // width), so a wide flowchart shrank its 14px labels to 4-8px. Hold a
+  // minimum scale so labels never render below ~12px: a diagram wider than
+  // that keeps its size and scrolls inside its diagram scroll port. Applied
+  // in the same task as the swap, so the palette swap stays atomic.
+  var MERMAID_MIN_SCALE = 12 / 14;
+  function holdMermaidScale(el) {
+    var svg = el.querySelector("svg");
+    var box = svg && svg.viewBox && svg.viewBox.baseVal;
+    if (!box || !(box.width > 0)) return;
+    svg.style.minWidth = Math.round(box.width * MERMAID_MIN_SCALE) + "px";
+  }
+
   function mermaidNeedsRender(el, token) {
     if (!el.querySelector("svg")) return "first";
     // An SVG this renderer did not draw (no authored source kept) is left as is.
@@ -727,6 +740,7 @@
           }
           // The single atomic swap: old SVG out, new SVG in, same task.
           el.innerHTML = svg;
+          holdMermaidScale(el);
           el.setAttribute(MERMAID_THEME_ATTR, token.themeName);
           el.removeAttribute("aria-busy");
           el.classList.remove("mermaid--fallback");
