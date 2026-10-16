@@ -5928,9 +5928,20 @@ def _render_index_page(
     # container or delay the first browseable concept group.
     intro_remainder = ""
     title_anchor = ''
+    head_title = None
     if sub:
         title = f"{name} / {sub}"
         intro = normalize_document_links(markdown_to_html(index_file.body), sub + '/index.md', mode) if index_file else ''
+        # D1-016: a section index.md that opens with "# How-to guides" rendered
+        # a second, title-sized h1 under "<bundle> / how-to". As on the root
+        # index, the authored heading becomes the one page title.
+        authored_heading = re.match(r"\s*#\s+([^\n]+)\n", index_file.body) if index_file else None
+        if authored_heading:
+            title = authored_heading.group(1).strip()
+            head_title = f"{title} — {name}"
+            from .viewer.markdown import _slugify
+            title_anchor = ' id="' + _esc_attr_qs(_slugify(title)) + '"'
+            intro = re.sub(r'^\s*<h1\b[^>]*>.*?</h1>', '', intro, count=1, flags=re.DOTALL)
     else:
         title = name
         intro_md = ""
@@ -6333,7 +6344,7 @@ def _render_index_page(
         .replace("__LANG__", "en")
         .replace("__THEME_ATTR__", theme_attr)
         .replace("__DATA_ATTRS__", data_attrs)
-        .replace("__HEAD_TITLE__", _esc(title))
+        .replace("__HEAD_TITLE__", _esc(head_title or title))
         .replace("__BUNDLE_NAME__", _esc(name))
         .replace("__BRAND_HREF__", _esc_attr_qs(brand_href))
         .replace("__BRAND_ARIA_CURRENT__", brand_aria)

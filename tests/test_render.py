@@ -3273,6 +3273,29 @@ def test_phase2_infobox_external_to_body(tmp_path: _Path) -> None:
     )
 
 
+def test_section_index_promotes_its_authored_heading_to_the_one_page_title(tmp_path: _Path) -> None:
+    """D1-016: /how-to/ showed "<bundle> / how-to" and, right under it, the
+    authored "# How-to guides" as a second h1. Like the root index, the
+    authored leading heading is now the single page title."""
+    import re
+    bundle = _build_bundle_with(tmp_path, {
+        "guides/index.md": "# How-to guides\n\nRecipes for real goals.\n\n## Validation\n\n* item\n",
+        "guides/a.md": "---\ntype: Guide\ntitle: A\n---\nbody\n",
+        "plain/index.md": "Plain section without a heading.\n",
+        "plain/b.md": "---\ntype: Guide\ntitle: B\n---\nbody\n",
+    })
+    _render_concept_html(bundle, "guides/a")
+    html = (bundle / "_site" / "guides" / "index.html").read_text(encoding="utf-8")
+    h1s = re.findall(r"<h1\b[^>]*>(.*?)</h1>", html, re.S)
+    assert h1s == ["How-to guides"], h1s
+    assert "<title>How-to guides — " in html
+    assert re.search(r"<h2\b[^>]*>Validation</h2>", html)
+    assert "Recipes for real goals." in html
+    plain = (bundle / "_site" / "plain" / "index.html").read_text(encoding="utf-8")
+    plain_h1s = re.findall(r"<h1\b[^>]*>(.*?)</h1>", plain, re.S)
+    assert len(plain_h1s) == 1 and plain_h1s[0].endswith(" / plain"), plain_h1s
+
+
 def test_document_details_names_each_documents_short_content_revision(tmp_path: _Path) -> None:
     """D1-012 / M1-013: the summary read "rev section-" on every page (the
     first 8 characters of the corpus revision's scheme prefix). It now names

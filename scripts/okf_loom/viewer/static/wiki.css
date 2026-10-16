@@ -1393,6 +1393,15 @@ sup.okf-footnote-ref { line-height: 0; }
   }
 }
 
+/* D1-016: a section index has no visual column (no spotlight or graph
+ * preview), so its authored body (lists, tables) takes the document lane
+ * instead of a 60ch track beside an empty one; paragraphs keep 60ch. */
+body.okf-viewer .okf-hero:not(:has(> .okf-hero__visual > *)) { display: block; }
+.okf-hero:not(:has(> .okf-hero__visual > *)) > .okf-index__intro { max-width: var(--doc-max); }
+/* On the title's left edge, as on documents (generic prose centres capped
+ * blocks); text keeps its prose measure, tables and code use the lane. */
+.okf-hero:not(:has(> .okf-hero__visual > *)) > .okf-index__intro > * { margin-inline: 0; }
+
 /* Corpus totals: the ledger's summary line — mono figures over micro-labels,
  * divided by hairlines between a strong rule above and a hairline below. */
 .okf-hero__stats {

@@ -24,6 +24,8 @@ follow [Semantic Versioning](https://semver.org/). The product version
   "Undo all (N)" counts the same changes as the summary ("Undo 4 of 5" when some can't be undone).
 - Home: "Recently changed" now comes before the spotlight in Tab order (left column first).
 - Home spotlight: the "New" badge and check marks are neutral; the accent stays on the one CTA.
+- Section indexes (e.g. /how-to/) use their authored heading as the single page title, and
+  their body sits on the title's edge in the document lane instead of a 60ch column.
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
   including source derivations; the full/tool graph projection is unchanged.
 - Missing or malformed embedded search evidence in single-file exports settles as
