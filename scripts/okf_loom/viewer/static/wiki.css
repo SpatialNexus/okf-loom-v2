@@ -2124,9 +2124,10 @@ body.okf-viewer .okf-viewswitch__btn:is(.okf-source-wrap, .okf-focus-toggle)[ari
 
 /* "Sections" in the view bar (document-outline.js): one restrained jump
  * control driven by the same heading state as the outline disclosure. It
- * keeps a fixed slot at the end of the bar; the current-section label
- * truncates inside it, so a changing label never resizes the control. */
-.okf-outline-jump { position: relative; display: flex; width: 20rem; min-width: 0; max-width: 100%; margin-left: auto; }
+ * keeps a slot at the end of the bar sized by the bar, never by its label
+ * (which truncates inside): 20rem where there is room, down to 12rem so it
+ * stays on the tabs' row in narrow bars (641px, or beside the Studio rail). */
+.okf-outline-jump { position: relative; display: flex; flex: 1 1 12rem; min-width: 0; max-width: min(20rem, 100%); margin-left: auto; }
 .okf-outline-jump[hidden] { display: none; }
 .okf-outline-jump__toggle { flex: 1 1 auto; justify-content: flex-start; gap: var(--okf-space-2); min-width: 0; max-width: 100%; overflow: hidden; }
 .okf-outline-jump__toggle > :not(.okf-outline-jump__current) { flex: none; }
@@ -3366,7 +3367,7 @@ body:has(.okf-graph-loading--error) .okf-cytoscape-fallback-actions { display: f
   .okf-table th { white-space: nowrap; }
   .okf-table td:not(.okf-cell-atomic) { min-width: 7rem; }
   body.okf-viewer .okf-concept-viewbar { gap: 4px 12px; padding-inline: 12px; }
-  body.okf-viewer .okf-concept-viewbar > .okf-outline-jump { flex: 1 0 100%; }
+  body.okf-viewer .okf-concept-viewbar > .okf-outline-jump { flex: 1 0 100%; max-width: none; }
   body.okf-viewer .okf-viewswitch { gap: 12px; }
   body.okf-viewer .okf-viewswitch__btn:is(.okf-source-wrap, .okf-focus-toggle) { padding-left: 12px; }
   /* "Wrap lines" shows as "Wrap"; the full name stays in the button. */
