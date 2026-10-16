@@ -1321,6 +1321,64 @@ def test_phase2_desktop_infobox_stays_collapsed_when_studio_boots_after_wiki(
     )
 
 
+@pytest.mark.parametrize("surface", ["static_url", "spa_url"])
+@pytest.mark.parametrize("coarse", [False, True])
+def test_portable_context_disclosure_matches_its_adjacent_control(
+    request, page, surface: str, coarse: bool,
+) -> None:
+    base = request.getfixturevalue(surface)
+    with page.context.browser.new_context(has_touch=coarse) as context:
+        portable = context.new_page()
+        portable.goto(base + "/tables/orders.html", wait_until="load")
+        summary = portable.locator(".okf-context-manual-options > summary")
+        button = portable.locator(".okf-page-utilities .okf-context-copy")
+        expect(summary).to_be_visible()
+        scale = portable.evaluate("""() => {
+          const summary=document.querySelector('.okf-context-manual-options > summary');
+          const button=document.querySelector('.okf-page-utilities .okf-context-copy');
+          const measure=el => {const css=getComputedStyle(el),box=el.getBoundingClientRect();
+            return {font:css.fontSize,weight:css.fontWeight,top:box.top,height:box.height};};
+          return {summary:measure(summary),button:measure(button)};
+        }""")
+        assert scale["summary"] == scale["button"], scale
+        assert scale["summary"]["height"] >= (44 if coarse else 32), scale
+        summary.focus()
+        summary.press("Enter")
+        expect(portable.locator(".okf-context-manual-options a")).to_be_visible()
+        expect(button).to_be_visible()
+
+
+@pytest.mark.parametrize("target", ["static", "single-file"])
+def test_portable_graph_view_only_note_uses_secondary_type(
+    tmp_path: Path, page, target: str,
+) -> None:
+    from okf_loom import Bundle
+    from okf_loom.render import build_site
+
+    out = tmp_path / "output"
+    build_site(Bundle.load(DEMO_BUNDLE), out, target=target, assets="offline")
+    port = _free_port()
+    base = f"http://127.0.0.1:{port}"
+    with managed_server(
+        [sys.executable, "-m", "http.server", str(port), "--bind", "127.0.0.1",
+         "--directory", str(out)], base, tmp_path / "view-only-http.log",
+    ):
+        page.goto(base + ("/index.html" if target == "single-file" else "/__graph.html"), wait_until="load")
+        page.wait_for_function("() => !!window.__okfLoomGraph?.cy")
+        if target == "single-file":
+            page.locator('[data-okf-shell-item="graph"] a').click()
+        note = page.locator(".okf-detail-view-only")
+        expect(note).to_be_visible()
+        role = note.evaluate("""el => {
+          const css=getComputedStyle(el),probe=document.createElement('span');
+          probe.style.color='var(--text-2)';el.appendChild(probe);
+          const secondary=getComputedStyle(probe).color;probe.remove();
+          return {size:parseFloat(css.fontSize),color:css.color,secondary};
+        }""")
+        assert role["size"] == 12, role
+        assert role["color"] == role["secondary"], role
+
+
 def test_phase2_static_desktop_infobox_collapsed_without_studio(static_url: str, page) -> None:
     """Static output, which does not load studio.js, matches the live page:
     at 1440px Document details is collapsed once wiki.js (the shared loader
@@ -1821,6 +1879,35 @@ def test_phase2_search_live_grouping_and_recent(server_url: str, page) -> None:
             proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
             proc.kill(); proc.wait(timeout=5)
+
+
+@pytest.mark.parametrize("target", ["static", "spa", "single-file"])
+def test_portable_graph_keeps_the_rendered_brand(tmp_path: Path, page, target: str) -> None:
+    """Even a slug-shaped configured title is never renamed by graph boot."""
+    from okf_loom import Bundle
+    from okf_loom.render import build_site
+
+    bundle = copy_bundle(DEMO_BUNDLE, tmp_path / "bundle")
+    (bundle / "okf-loom.config.yaml").write_text(
+        "viewer:\n  title: configured-site\n", encoding="utf-8")
+    out = tmp_path / "output"
+    build_site(Bundle.load(bundle), out, target=target, assets="offline")
+    if target == "single-file":
+        page.goto((out / "index.html").as_uri(), wait_until="load")
+        page.wait_for_function("() => !!window.__okfLoomGraph?.cy")
+        expect(page.locator('.okf-topbar__brand strong')).to_have_text("configured-site")
+        assert page.title() == "configured-site"
+    else:
+        port = _free_port()
+        base = f"http://127.0.0.1:{port}"
+        with managed_server(
+            [sys.executable, "-m", "http.server", str(port), "--bind", "127.0.0.1",
+             "--directory", str(out)], base, tmp_path / "title-http.log",
+        ):
+            page.goto(base + "/__graph.html", wait_until="load")
+            page.wait_for_function("() => !!window.__okfLoomGraph?.cy")
+            expect(page.locator('.okf-topbar__brand strong')).to_have_text("configured-site")
+            assert page.title() == "Graph — configured-site"
 
 
 def test_static_recent_pages_navigate_to_html_concept(static_url: str, page) -> None:
@@ -3071,6 +3158,43 @@ def test_static_portable_modes_context_and_fail_closed_url(static_url: str, page
     expect(page.locator("#okf-search-query")).to_be_focused()
 
 
+@pytest.mark.parametrize("assets", ["cdn", "offline"])
+@pytest.mark.parametrize("route", ["__graph.html", "__search.html?q=theme"])
+def test_static_file_pages_explain_the_web_server_requirement(
+    tmp_path: Path, page, assets: str, route: str,
+) -> None:
+    """Disk pages have one actionable state, no doomed data fetch, and honest nav."""
+    from okf_loom import Bundle
+    from okf_loom.render import build_site
+
+    out = tmp_path / "static"
+    build_site(Bundle.load(DEMO_BUNDLE), out, target="static", assets=assets)
+    requests, errors = [], []
+    page.on("request", lambda request: requests.append(request.url))
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    filename, _, query = route.partition("?")
+    page.goto((out / filename).as_uri() + ("?" + query if query else ""), wait_until="load")
+    note = page.locator(".okf-portable-server-note")
+    expect(note).to_have_count(1)
+    expect(note).to_be_visible()
+    assert "without JavaScript" not in page.locator("#okf-main").inner_text()
+    expect(note).to_contain_text("Graph and Search cannot load their data")
+    expect(note).to_contain_text("python -m http.server")
+    expect(note).to_contain_text("Index and documents also work directly from disk")
+    expect(page.locator(".okf-graph-loading--error, .okf-search-error")).to_have_count(0)
+    expect(page.get_by_role("button", name="Retry", exact=True)).to_have_count(0)
+    expect(page.locator(".okf-static-viewer-note")).to_have_count(0)
+    assert page.locator("body").get_attribute("data-okf-capture-ready") == "unavailable"
+    assert not any("/__data/" in url for url in requests), requests
+    assert not errors, errors
+    if assets == "offline":
+        assert not any(url.startswith(("http:", "https:")) for url in requests), requests
+    note.get_by_role("link", name="Browse the concept index").click()
+    expect(page.locator(".okf-card").first).to_be_visible()
+    page.locator(".okf-card a.okf-card__link").first.click()
+    expect(page.locator(".okf-page__body")).to_be_visible()
+
+
 def test_static_provider_setup_failure_publishes_explicit_error(static_url: str, page) -> None:
     page.route(
         "**/passages-manifest.json",
@@ -4098,6 +4222,51 @@ def test_graph_detail_accessible_order_controls_and_focus_provenance(server_url:
     concept_id = page.locator('#okf-node-index-list [role="option"]').first.get_attribute("data-target")
     assert page.evaluate("id => window.okfActivateGraphConcept(id, 'pointer')", concept_id)
     assert page.evaluate("() => document.activeElement.className") == focused_before
+
+
+@pytest.mark.parametrize("width,height", [(1440, 900), (1280, 800)])
+@pytest.mark.parametrize("theme", ["bone", "plum"])
+def test_single_file_index_navigation_scrolls_only_the_detail_pane(
+    tmp_path: Path, page, width: int, height: int, theme: str,
+) -> None:
+    """Pointer and keyboard Index opens keep chrome/canvas inside the viewport."""
+    from okf_loom import Bundle
+    from okf_loom.render import build_site
+
+    out = tmp_path / "single"
+    build_site(Bundle.load(DOCS_BUNDLE), out, target="single-file", assets="offline")
+    page.set_viewport_size({"width": width, "height": height})
+    page.add_init_script(f"localStorage.setItem('okf-loom.appearance', '{theme}')")
+    page.goto((out / "index.html").as_uri(), wait_until="load")
+    page.wait_for_function("() => !!window.__okfLoomGraph?.cy")
+    entry = page.locator('[data-okf-single-concept="how-to/archive_threads"]')
+    for activation in ("pointer", "keyboard"):
+        entry.scroll_into_view_if_needed()
+        assert page.evaluate("() => scrollY") > 0, "exercise the document-scrolled Index"
+        if activation == "keyboard":
+            entry.focus()
+            entry.press("Enter")
+        else:
+            entry.click()
+        expect(page.locator("#detail-content")).to_be_focused()
+        expect(page.locator("#detail-title")).to_have_text("Archive and resolve comment threads")
+        geometry = page.evaluate("""() => {
+          const pane=document.getElementById('okf-detail');
+          return {scrollY, top:document.querySelector('.okf-topbar').getBoundingClientRect().top,
+            graphBottom:document.getElementById('okf-graph').getBoundingClientRect().bottom,
+            paneBottom:pane.getBoundingClientRect().bottom, paneScroll:pane.scrollTop,
+            paneHeight:pane.clientHeight, contentHeight:pane.scrollHeight};
+        }""")
+        assert geometry["scrollY"] == geometry["top"] == geometry["paneScroll"] == 0, geometry
+        assert geometry["graphBottom"] <= height + 1, geometry
+        assert geometry["paneBottom"] <= height + 1, geometry
+        assert geometry["contentHeight"] > geometry["paneHeight"], geometry
+        page.locator("#okf-detail").evaluate("el => el.scrollTop = 400")
+        assert page.locator("#okf-detail").evaluate("el => el.scrollTop") > 0
+        assert page.evaluate("() => scrollY") == 0
+        page.go_back()
+        expect(page.locator("#okf-single-index")).to_be_visible()
+        expect(page.locator("#okf-main")).to_be_hidden()
 
 
 def test_single_file_graph_detail_hierarchy_and_keyboard_focus(tmp_path: Path, page) -> None:

@@ -3598,8 +3598,11 @@ def build_site(
         )
 
     from .config import OkfConfig
+    bundle_config = OkfConfig.load(bundle.root)
+    # Match serve's configured title before the legacy viewer-name/folder fallback.
+    name = name or bundle_config.viewer.title
     session_roots = (source / ".okf-loom/session",
-                     source / OkfConfig.load(bundle.root).studio.session_path)
+                     source / bundle_config.studio.session_path)
     publish_directory_modes = not any(destination.is_relative_to(path.resolve())
                                       for path in session_roots)
 
@@ -4705,7 +4708,7 @@ def _render_concept_page(
             f'<button type="button" class="okf-btn okf-context-copy okf-js-action" data-context-concept="{_esc_attr_qs(cid_str)}" '
             'aria-describedby="okf-context-action-note">Copy concept context</button>'
             f'<span id="okf-context-action-note" hidden>{context_note}</span>'
-            '<details class="okf-context-manual-options"><summary>More context options</summary>'
+            '<details class="okf-context-manual-options"><summary class="okf-btn">More context options</summary>'
             f'<a class="okf-btn" href="{_esc_attr_qs(local_href)}" '
             f'aria-label="Open canonical concept-only context pack for {_esc_attr_qs(concept.title)}">'
             'Open concept-only context pack</a>'
@@ -6803,6 +6806,11 @@ def _render_search_page(
             f'<script src="{static_prefix}/static-search.js" defer></script>'
         )
 
+    if mode == "static":
+        js_link = js_link.replace(
+            f'<script src="{static_prefix}/static-search.js" defer></script>',
+            f'<script src="{static_prefix}/portable-page.js" data-okf-runtime="static-search.js" defer></script>')
+
     # P2-61: shared topbar nav. Search page lives at the bundle root, so
     # the form posts back to itself and Graph/Index are root-relative.
     root_prefix_for_nav = "/" if mode in ("serve", "spa") else "./"
@@ -6999,6 +7007,10 @@ def _render_graph_page(
         f'<script src="{static_prefix}/graph.js" defer></script>\n'
         f'<script src="{static_prefix}/renderers.js" defer></script>'
     )
+    if mode == "static":
+        graph_js = graph_js.replace(
+            f'<script src="{static_prefix}/graph.js" defer></script>',
+            f'<script src="{static_prefix}/portable-page.js" data-okf-runtime="graph.js" defer></script>')
     shell_html = _application_shell_html(
         name=name,
         bundle_href=back_link,

@@ -15,6 +15,14 @@ follow [Semantic Versioning](https://semver.org/). The product version
   outset box half hidden under the button and the suggestions list (also in forced colours).
 - The search fields' clear "x" is a palette-ink glyph instead of Chrome's stock blue one;
   Find in graph, which has its own Clear button, no longer shows a second one.
+- Portable context disclosures share the adjacent button's scale and coarse
+  target sizing; graph view-only notes use the panel's secondary text role.
+- Static Graph and Search pages opened from disk show one server-required
+  explanation instead of contradictory fetch errors and impossible retry controls.
+- Opening a single-file Index concept resets only its detail pane and focuses
+  without scrolling the graph workspace or hiding its top bar.
+- Portable builds use the configured viewer title consistently across Index,
+  documents, Graph, Search and the single-file viewer, without client-side renaming.
 - Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
   including source derivations; the full/tool graph projection is unchanged.
 - Missing or malformed embedded search evidence in single-file exports settles as

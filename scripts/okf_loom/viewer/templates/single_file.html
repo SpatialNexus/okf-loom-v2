@@ -30,7 +30,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='1' y='1' width='30' height='30' fill='%231d1a16' stroke='%23b0a696' stroke-width='2'/%3E%3Cpath d='M8 8h16M8 16h10M8 24h16' stroke='%23f6f3ed' stroke-width='4'/%3E%3C/svg%3E">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'none'; font-src 'self' data: https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self'">
-<title>OKF Viewer</title>
+<title>__BUNDLE_NAME_DISPLAY__</title>
 __CDN_SCRIPTS__
 <style>
 /*__VIEWER_CSS__*/
@@ -250,12 +250,18 @@ window.OKF_LOOM_INITIAL_LAYOUT = "__INITIAL_LAYOUT__";
     /* A plain container (the concept article) is not focusable on its own,
      * so focus() was a silent no-op and keyboard focus stayed on <body>. */
     if (target.tabIndex < 0 && !target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
-    target.scrollIntoView({block: "start"});
+    var detail = document.getElementById("okf-detail");
+    /* The workspace's panes, not every ancestor up to the window, own
+     * scrolling. Native scrollIntoView can move the whole viewport past
+     * the top bar when a long embedded article overflows the detail pane. */
+    if (detail && detail.contains(target)) detail.scrollTop = 0;
+    else if (!graph.contains(target)) target.scrollIntoView({block: "start"});
     target.focus({preventScroll: true});
   }
   function select(destination, focus, historyMode) {
     var graphSelected = destination !== "index";
     var conceptSelected = destination === "concept";
+    var leavingIndex = !index.hidden && graphSelected;
     index.hidden = graphSelected;
     graph.hidden = !graphSelected;
     /* The graph is a viewport-bound application workspace; the Index is an
@@ -263,6 +269,7 @@ window.OKF_LOOM_INITIAL_LAYOUT = "__INITIAL_LAYOUT__";
      * so every entry stays reachable by wheel, keyboard and touch. */
     document.body.dataset.okfSingleDestination = destination;
     if (tools) tools.hidden = !graphSelected;
+    if (leavingIndex) window.scrollTo({top: 0, left: 0, behavior: "instant"});
     if (graphSelected) {
       indexLink.removeAttribute("aria-current");
       graphLink.setAttribute("aria-current", "page");

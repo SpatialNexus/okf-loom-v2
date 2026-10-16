@@ -2095,7 +2095,15 @@ body.okf-viewer .okf-viewswitch__btn:is(.okf-source-wrap, .okf-focus-toggle)[ari
   background: transparent;
 }
 .okf-page-utilities [data-okf-live-utilities] { display: contents; }
-.okf-context-manual-options > summary { min-height: 44px; padding-block: .65rem; cursor: pointer; }
+.okf-context-manual-options > summary::before { content: "+"; }
+.okf-context-manual-options[open] > summary::before { content: "−"; }
+.okf-portable-server-note {
+  max-width: 70ch;
+  margin-block: var(--okf-space-4);
+  padding: var(--okf-space-4);
+  border-left: 2px solid var(--status-info);
+}
+.okf-portable-server-note h2 { color: var(--status-info); }
 
 /* "Sections" in the view bar (document-outline.js): one restrained jump
  * control driven by the same heading state as the outline disclosure. */

@@ -133,7 +133,11 @@ def test_graph_vendor_chain_defers_in_order_without_changing_integrity(tmp_path,
     html = render._render_graph_page(bundle, mode=mode, name="Proof", config={},
                                      offline_assets=offline)
     scripts = _ScriptTags(html).scripts
-    graph_index = next(i for i, tag in enumerate(scripts) if tag.get("src", "").endswith("/graph.js"))
+    entry = "/portable-page.js" if mode == "static" else "/graph.js"
+    graph_index = next(i for i, tag in enumerate(scripts) if tag.get("src", "").endswith(entry))
+    if mode == "static":
+        assert scripts[graph_index]["data-okf-runtime"] == "graph.js"
+        assert not any(tag.get("src", "").endswith("/graph.js") for tag in scripts)
     chain = [tag for tag in scripts[:graph_index] if "cdn.jsdelivr.net" in tag.get("src", "")
              or "/vendor/" in tag.get("src", "")]
     original = _ScriptTags(render._CDN_SCRIPTS).scripts
