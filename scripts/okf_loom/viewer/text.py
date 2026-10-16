@@ -42,7 +42,7 @@ def readable_text(markdown: str | None) -> str:
         name = match[1].lower()
         if name.startswith("#"):
             code = int(name[2:], 16) if name.startswith("#x") else int(name[1:])
-            return chr(code) if 0 < code < 0x110000 else match[0]
+            return chr(code) if 0 < code < 0x110000 and not 0xD800 <= code <= 0xDFFF else match[0]
         return _ENTITIES.get(name, match[0])
 
     text = re.sub(r"&(#x[0-9a-f]+|#\d+|[a-z]+);", entity, text, flags=re.I)

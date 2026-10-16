@@ -26,7 +26,7 @@
       .replace(/(\*{1,3}|~~)(?=\S)([\s\S]*?\S)\1/g,"$2")
       .replace(/(^|[^0-9A-Za-z_])(_{1,3})(?=\S)([\s\S]*?\S)\2(?![0-9A-Za-z_])/g,"$1$3")
       .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi,function(all,name){
-        if(name[0]==="#"){var code=name[1].toLowerCase()==="x"?parseInt(name.slice(2),16):parseInt(name.slice(1),10);return code>0&&code<0x110000?String.fromCodePoint(code):all;}
+        if(name[0]==="#"){var code=name[1].toLowerCase()==="x"?parseInt(name.slice(2),16):parseInt(name.slice(1),10);return code>0&&code<0x110000&&!(code>=0xd800&&code<=0xdfff)?String.fromCodePoint(code):all;}
         return Object.prototype.hasOwnProperty.call(ENTITIES,name.toLowerCase())?ENTITIES[name.toLowerCase()]:all;
       })
       .replace(/\uE000(\d+)\uE001/g,function(all,i){return Number(i)<escaped.length?escaped[Number(i)]:all;});

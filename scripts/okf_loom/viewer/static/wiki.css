@@ -2664,19 +2664,18 @@ details.okf-frontmatter[open] { padding-bottom: var(--okf-space-2); }
   text-transform: uppercase;
 }
 .okf-search-result .okf-search-snippet {
-  display: -webkit-box;
+  display: block;
   max-width: 75ch;
   margin: var(--okf-space-1) 0;
   padding: 0;
-  overflow: hidden;
   border: 0;
   color: var(--text);
   font: 400 14px/1.55 var(--font-body);
   white-space: normal;
   overflow-wrap: anywhere;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
 }
+/* Only the result-row teaser is clamped; disclosed evidence stays readable. */
+.okf-search-result > .okf-search-snippet { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 4; -webkit-box-orient: vertical; }
 .okf-search-result .okf-search-snippet mark,
 .okf-search-snippet mark { background: transparent; color: var(--text); font-weight: 700; }
 .okf-search-evidence-summary { margin: var(--okf-space-1) 0 var(--okf-space-2); color: var(--text-3); font: var(--label-weight) var(--label-size)/1.4 var(--font-label); letter-spacing: var(--label-track); text-transform: uppercase; }
@@ -3484,7 +3483,8 @@ body:has(.okf-graph-loading--error) .okf-cytoscape-fallback-actions { display: f
     .okf-breadcrumb a, .okf-conn__title, .okf-card__link, .okf-card__comments,
     .okf-v2-spotlight__tertiary, .okf-search-mode, .okf-search-disclosure > summary,
     .okf-page-context > details > summary, .okf-search-query input, .okf-search-submit,
-    .okf-brand-link, .okf-skip-link, .okf-search-result h3 > a) {
+    .okf-brand-link, .okf-skip-link, .okf-search-result h3 > a,
+    .okf-search-raw-source > summary) {
     min-height: 44px;
     min-inline-size: 44px;
   }

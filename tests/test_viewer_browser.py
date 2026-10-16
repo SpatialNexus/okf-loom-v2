@@ -4768,7 +4768,7 @@ def test_populated_search_accessibility_in_every_theme(static_url: str, page, th
     expect(page.locator(".okf-search-result").first).to_be_visible()
     first_disclosure = page.locator(".okf-search-disclosure").first
     expect(first_disclosure).to_be_visible()
-    first_disclosure.locator("summary").click()
+    first_disclosure.locator(":scope > summary").click()
     expect(first_disclosure.locator(".okf-search-citation")).to_be_visible()
     expect(page.locator("#okf-search-query")).to_be_visible()
     page.locator("#okf-search-query").focus()

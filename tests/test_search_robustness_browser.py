@@ -138,7 +138,9 @@ def _assert_clean(page) -> None:
 
 def _assert_marks_are_query_terms(page, container: str) -> None:
     """Highlighting wraps only word text, never a metacharacter."""
-    marks = page.locator(f"{container} mark").all_inner_texts()
+    # Evidence now has a second readable preview inside a closed disclosure;
+    # check the text of those hidden marks too, not their empty innerText.
+    marks = page.locator(f"{container} mark").all_text_contents()
     assert all(text.strip() and not re.search(r"[\[\]().*\\]", text) for text in marks), marks
 
 
@@ -246,6 +248,9 @@ def test_search_preview_and_concept_summary_are_readable_but_copy_keeps_source(m
     source = result.locator("[data-copy-passage]").get_attribute("data-excerpt")
     assert "**settled**" in source and "`ledger-sync --zebrafinch`" in source
     result.locator(".okf-search-disclosure > summary").click()
+    evidence_preview = result.locator(".okf-search-disclosure .okf-search-snippet")
+    expect(evidence_preview).to_be_visible()
+    assert evidence_preview.evaluate("n => getComputedStyle(n).webkitLineClamp") == "none"
     raw = result.locator(".okf-search-source")
     expect(raw).not_to_be_visible()
     result.get_by_text("Exact Markdown source", exact=True).click()

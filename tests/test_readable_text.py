@@ -19,6 +19,7 @@ VECTORS = [
     ('<img src=x onerror=alert(1)> <script>evil()</script> &lt;svg onload=x&gt;', 'evil() <svg onload=x>'),
     ("[reference][id] <!-- hidden -->[^note] &mdash; &#x1f600;", "reference — 😀"),
     ("\uE000999\uE001 and 42", "\uE000999\uE001 and 42"),
+    ("&#xD800; &#1114112; &#0;", "&#xD800; &#1114112; &#0;"),
 ]
 
 
