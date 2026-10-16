@@ -215,6 +215,26 @@ def test_live_suggestion_evidence_reads_as_plain_text_around_the_highlighted_mat
     _assert_clean(page)
 
 
+def test_search_suggestion_empty_and_recent_states(live_url: str, page) -> None:
+    page.goto(live_url + "/tables/orders")
+    search = page.locator(".okf-shell__search-form input[name='q']")
+    search.focus()
+    live = page.get_by_role("listbox", name="Search suggestions")
+    expect(live).to_be_hidden()  # the only visit is the current page
+    page.goto(live_url + "/")
+    search = page.locator(".okf-shell__search-form input[name='q']")
+    search.focus()
+    live = page.get_by_role("listbox", name="Search suggestions")
+    expect(live).to_be_visible()
+    expect(live.get_by_role("option")).to_have_count(1)
+    assert live.get_by_role("option").get_attribute("data-href") == "/tables/orders"
+    search.fill("zzqxv")
+    expect(live.locator(".okf-search-live__empty")).to_have_text("No matching pages")
+    expect(live.get_by_role("option")).to_have_count(1)
+    expect(live.get_by_role("option")).to_have_text("View all results")
+    assert live.get_by_role("option").evaluate("n => getComputedStyle(n).borderBottomWidth") == "0px"
+
+
 def test_search_preview_and_concept_summary_are_readable_but_copy_keeps_source(markdown_url: str, page) -> None:
     page.goto(markdown_url + "/__search?q=" + MARKDOWN_TERM)
     result = page.locator('.okf-search-result[data-concept-id="references/ledger_conventions"]')

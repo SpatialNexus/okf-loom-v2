@@ -715,6 +715,13 @@
     container.textContent = "";
     if (!items) items = [];
     var shown = items.slice(0, 8);
+    if (!shown.length) {
+      var empty = document.createElement("div");
+      empty.className = "okf-search-live__empty";
+      empty.setAttribute("role", "presentation");
+      empty.textContent = "No matching pages";
+      container.appendChild(empty);
+    }
     // Group by type when there are many results (>6) so the box reads as
     // type-banded sections rather than a flat monoculture; otherwise a flat
     // list (lighter for 1-6 hits). Group headers are dividers, NOT options.
@@ -751,24 +758,17 @@
   }
 
   // Recent-pages panel for an empty query (shown on focus / cleared input).
-  // Renders a "Recent pages" group header + one option per recent visit, or
-  // a quiet empty state when the reader has no history yet. All options are
+  // Exclude the current page and stay closed with no other visits. Options are
   // real role=option nodes so the existing combobox keyboard model owns them.
   function renderRecent(container, input) {
     container.textContent = "";
-    var recent = loadRecent();
+    var recent = loadRecent().filter(function (it) { return it.id !== document.body.dataset.okfConcept; });
+    container.hidden = !recent.length;
+    if (!recent.length) return;
     container.appendChild(makeGroupHeader("Recent pages", "recent"));
-    if (!recent.length) {
-      var empty = document.createElement("div");
-      empty.className = "okf-search-live__empty";
-      empty.textContent = "No recent pages yet. Pages you open appear here.";
-      container.appendChild(empty);
-    } else {
-      recent.forEach(function (it) {
-        container.appendChild(makeOption(container, input, it, "", it.id));
-      });
-    }
-    container.hidden = false;
+    recent.forEach(function (it) {
+      container.appendChild(makeOption(container, input, it, "", it.id));
+    });
   }
 
   // ---- Deterministic Context Pack copy --------------------------------

@@ -10,6 +10,8 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Suggestions show an explicit no-match message, omit the current page from
+  Recent pages, stay closed for empty history, and have one bottom edge (D1-004).
 - Search previews, evidence previews, graph descriptions and concept summaries
   share a safe plain-text Markdown projection; exact source remains available
   separately and copied passages/Context Packs are unchanged (D2-016, M1-015,

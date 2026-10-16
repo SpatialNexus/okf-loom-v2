@@ -1798,8 +1798,8 @@ def test_phase2_search_live_grouping_and_recent(server_url: str, page) -> None:
         )
         assert grouping["optionCount"] > 6, "precondition: >6 gamma suggestions expected"
         assert grouping["groupCount"] >= 2, f"type grouping missing (>6 results): {grouping}"
-        # Recent pages on empty focus: clear the query and focus — a Recent
-        # pages group appears (or the empty state, but never nothing/stale).
+        # Without a prior concept visit, clearing the query closes the panel
+        # instead of presenting an empty Recent pages menu.
         search.fill("")
         page.wait_for_timeout(150)
         recent = page.evaluate(
@@ -1813,8 +1813,7 @@ def test_phase2_search_live_grouping_and_recent(server_url: str, page) -> None:
                 };
             }"""
         )
-        assert recent["open"], "empty query should surface the live panel (recent pages)"
-        assert recent["recentGroup"], f"Recent pages group missing on empty query: {recent}"
+        assert not recent["open"] and not recent["recentGroup"] and not recent["empty"], recent
     finally:
         proc.terminate()
         try:

@@ -2823,6 +2823,7 @@ details.okf-frontmatter[open] { padding-bottom: var(--okf-space-2); }
   box-shadow: var(--shadow-pop);
 }
 .okf-search-live__option { display: grid; gap: 2px; padding: 8px 12px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.okf-search-live__option:last-child { border-bottom: 0; }
 .okf-search-live__option:hover { background: var(--surface-2); }
 .okf-search-live__option[aria-selected="true"] { background: var(--surface-2); color: var(--text); box-shadow: inset 2px 0 0 0 var(--accent); }
 .okf-search-live__head { display: flex; align-items: center; gap: var(--okf-space-2); min-width: 0; }
