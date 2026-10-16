@@ -2528,6 +2528,33 @@ def test_link_preview_shows_the_target_concepts_title_type_and_counts(server_url
     expect(page.locator("#okf-popover .okf-popover__counts")).to_have_text("Links 4Relations 3")
 
 
+def test_focus_opened_link_preview_never_covers_the_focused_link(server_url: str, page) -> None:
+    """D1-007 (WCAG 2.4.11): a preview opened by keyboard focus sits beside
+    its link: below it when the card fits, above it near the viewport
+    bottom. It never covers the focused link or its focus ring."""
+    page.set_viewport_size({"width": 1280, "height": 420})
+    page.goto(f"{server_url}/tables/customers", wait_until="domcontentloaded")
+    page.locator("h1.okf-page__title").wait_for(state="visible")
+    link = page.locator('.okf-page__body a[href="/tables/orders"]').first
+    popover = page.locator("#okf-popover")
+    page.mouse.move(1270, 410)
+    for place, link_top in (("below", 140), ("above", 380)):
+        page.evaluate("() => document.activeElement && document.activeElement.blur()")
+        expect(popover).to_be_hidden()
+        link.evaluate("(a, top) => window.scrollBy(0, a.getBoundingClientRect().top - top)", link_top)
+        link.evaluate("a => a.focus({preventScroll: true})")
+        expect(popover.locator("h4")).to_have_text("Orders")
+        geometry = link.evaluate("""a => {
+          const cs = getComputedStyle(a), ring = parseFloat(cs.outlineWidth) + Math.max(0, parseFloat(cs.outlineOffset));
+          const r = a.getBoundingClientRect(), c = document.getElementById('okf-popover').getBoundingClientRect();
+          return {focused: document.activeElement === a,
+                  below: c.top >= r.bottom + ring, above: c.bottom <= r.top - ring,
+                  inViewport: c.top >= 0 && c.bottom <= innerHeight && c.left >= 0 && c.right <= innerWidth};
+        }""")
+        assert geometry["focused"] and geometry["inViewport"], (place, geometry)
+        assert geometry[place], (place, geometry)
+
+
 def _popover_title(page) -> str:
     """Read the current popover title text (or '' if hidden/empty).
 
