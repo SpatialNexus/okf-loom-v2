@@ -161,7 +161,8 @@ def _graph_theme_snapshot(page):
           const hover = first('node.okf-hover');
           const hub = first('node.okf-hub');
           const selected = first('node:selected');
-          const path = first('edge.okf-path');
+          // Prefer the traced typed relation: the path's ink must win over its hue.
+          const path = cy.edges('.okf-path.okf-rel-edge').length ? first('edge.okf-path.okf-rel-edge') : first('edge.okf-path');
           const multi = first('edge.okf-multi-edge');
           const plain = cy.edges().not('.okf-path').not(':selected').first();
           const canvas = document.querySelector('.okf-graph-minimap canvas');
@@ -213,7 +214,10 @@ def test_graph_theme_event_repaints_every_stateful_cue_and_minimap(
         """() => {
           const G = window.__okfLoomGraph;
           const cy = G.cy;
-          const typed = cy.edges().filter(e => !!e.data('label')).first();
+          // A typed relation (primary type other than a plain link, D2-008)
+          // with no reverse edge, so the traced path is that relation.
+          const typed = cy.edges('.okf-rel-edge').filter(e => cy.edges().filter(o =>
+            o.source().same(e.target()) && o.target().same(e.source())).empty()).first();
           const start = typed.source().id();
           const end = typed.target().id();
           G.interaction.dispatch({type: 'SELECT', id: start, source: 'test', quietUrl: true});
