@@ -399,6 +399,35 @@ def test_phone_graph_chrome_leaves_the_viewport_to_the_graph(page, docs_server_u
         context.close()
 
 
+def test_graph_settings_flow_in_the_pane_and_chip_rings_are_whole(page, docs_server_url: str) -> None:
+    """D2-002/D2-012: Graph settings have no nested scroller inside the
+    detail pane, and a keyboard-focused joined filter chip paints its whole
+    ring: no ancestor below the pane clips it and the joined Only button
+    does not paint over it."""
+    _open(page, docs_server_url, 1440)
+    page.locator(".okf-signal__advanced > summary").click()
+    chip = page.locator(".okf-filter-chip-group > .okf-filter-chip").first
+    chip.scroll_into_view_if_needed()
+    chip.focus()
+    page.keyboard.press("Shift+Tab")
+    page.keyboard.press("Tab")
+    seen = page.evaluate("""() => {
+      const body = document.querySelector('.okf-signal__body'), el = document.activeElement;
+      const clips = [];
+      for (let a = el.parentElement; a && !a.classList.contains('okf-detail'); a = a.parentElement) {
+        const cs = getComputedStyle(a);
+        if (cs.overflowX !== 'visible' || cs.overflowY !== 'visible') clips.push(a.className);
+      }
+      const solo = el.nextElementSibling, cs = getComputedStyle(el);
+      return {scroll: body.scrollHeight, client: body.clientHeight, focusVisible: el.matches(':focus-visible'),
+              isChip: el.classList.contains('okf-filter-chip'), clips, outline: cs.outlineStyle,
+              above: cs.position !== 'static' && Number(cs.zIndex) > (Number(getComputedStyle(solo).zIndex) || 0)};
+    }""")
+    assert seen["scroll"] == seen["client"], seen
+    assert seen["isChip"] and seen["focusVisible"] and seen["outline"] == "solid", seen
+    assert seen["clips"] == [] and seen["above"], seen
+
+
 def test_graph_settings_disclosure_matches_its_sibling_summaries(page, docs_server_url: str) -> None:
     """Graph settings opens like Explore with lenses: the native marker on
     the left in body type, not a hidden marker with a trailing glyph; the
