@@ -11023,7 +11023,7 @@ def test_phase4_mobile_header_tabs_tools_mode_names_and_contrast(request,surface
     names=page.locator(".okf-graph-zoom button").evaluate_all("bs=>bs.map(b=>b.getAttribute('aria-label'))")
     assert len(names)==6 and all(names) and len(set(names))==len(names)
     assert page.locator(".okf-viewport-label").all_text_contents()==["Zoom in","Zoom out","Fit","Full screen","Reset","Overview","Re-run layout"]
-    assert page.evaluate("()=>{const bs=[...document.querySelectorAll('.okf-graph-zoom button')],toolbar=document.querySelector('.okf-graph-zoom');return getComputedStyle(toolbar).gridTemplateColumns.split(' ').length===3&&bs.every(b=>{const r=b.getBoundingClientRect();return r.width>=44&&r.height>=44})}")
+    assert page.evaluate("()=>{const bs=[...document.querySelectorAll('.okf-graph-zoom button')],toolbar=document.querySelector('.okf-graph-zoom');return getComputedStyle(toolbar).gridTemplateColumns.split(' ').length===(innerWidth>=375?6:3)&&bs.every(b=>{const r=b.getBoundingClientRect();return r.width>=44&&r.height>=44})}")
     tree=page.locator(".okf-graph-zoom").aria_snapshot()
     assert all(name in tree for name in names),tree
     contrast=page.evaluate("""()=>{const e=window.__okfLoomGraph.cy.edges().first(),c=document.getElementById('okf-graph'),parse=s=>s.match(/[\\d.]+/g).slice(0,3).map(Number),lin=x=>(x/=255)<=.04045?x/12.92:((x+.055)/1.055)**2.4,L=s=>{const v=parse(s).map(lin);return .2126*v[0]+.7152*v[1]+.0722*v[2]},a=L(e.style('line-color')),b=L(getComputedStyle(c).backgroundColor);return {line:e.style('line-color'),background:getComputedStyle(c).backgroundColor,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05),arrow:e.style('target-arrow-color'),labels:e.style('label')}}""")
