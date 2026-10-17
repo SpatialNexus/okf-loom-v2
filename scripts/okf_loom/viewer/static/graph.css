@@ -732,17 +732,19 @@ summary + .okf-lens-summary__verdict + .okf-lens-summary__row { border-top: 1px 
   overflow-wrap: anywhere;
   word-break: break-word;
 }
-.okf-lens-summary__note {
+.okf-layout > .okf-detail .okf-lens-summary__note {
   position: relative;
   color: var(--okf-fg-subtle);
-  /* A short mono figure ("38 connections", "2y old"): one line, its own
-   * column; the label wraps (two-line clamp) instead. */
+  /* Short figures keep their own column, but an unusually long note must
+   * wrap rather than consume the label or disappear outside the row. */
   flex: 0 0 auto;
   min-width: 4rem;
+  max-width: 60%;
   text-align: right;
   font-family: var(--font-mono);
   font-size: 11px;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
 }
 .okf-lens-summary__hint { margin-top: var(--okf-space-3); font-size: var(--okf-text-xs); }
