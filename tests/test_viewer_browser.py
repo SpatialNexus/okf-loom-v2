@@ -6683,7 +6683,19 @@ def test_multi_edge_400_percent_reflow_has_no_page_overflow(server_url: str, pag
     page.locator(".okf-edge-bundle-index summary").evaluate("e=>e.click()")
     page.get_by_role("option", name="Checkout Service → Orders · 3 relationships").evaluate("e=>e.click()")
     expect(page.get_by_role("heading", name="Relationships (3)")).to_be_visible()
-    overflow = page.evaluate("""() => ({page:document.documentElement.scrollWidth-document.documentElement.clientWidth,offenders:Array.from(document.querySelectorAll('body *')).filter(e=>!e.closest('#okf-graph .cytoscape-container')&&e.getBoundingClientRect().right>document.documentElement.clientWidth+1).map(e=>e.className||e.tagName).slice(0,10)})""")
+    overflow = page.evaluate("""() => {
+      // Wide authored tables now keep atomic cell values and scroll locally.
+      // Exempt only a bounded, keyboard-reachable table scrollport, not page
+      // overflow or arbitrary clipping of detail content.
+      const containedTable = e => {
+        const port = e.closest('.okf-tablewrap');
+        if (!port || port === e || port.tabIndex < 0 || !/auto|scroll/.test(getComputedStyle(port).overflowX)) return false;
+        const r = port.getBoundingClientRect();
+        return r.left >= -1 && r.right <= document.documentElement.clientWidth + 1;
+      };
+      return {page:document.documentElement.scrollWidth-document.documentElement.clientWidth,
+        offenders:Array.from(document.querySelectorAll('body *')).filter(e=>!e.closest('#okf-graph .cytoscape-container')&&!containedTable(e)&&e.getBoundingClientRect().right>document.documentElement.clientWidth+1).map(e=>e.className||e.tagName).slice(0,10)};
+    }""")
     assert overflow["page"] <= 1, overflow
     assert overflow["offenders"] == [], overflow
     expect(page.locator(".okf-topbar")).to_be_visible()
