@@ -387,9 +387,12 @@ _LENS_AUDIT_JS = """() => {
 
 
 def _apply_lens(page, lens: str) -> None:
+    applied = page.evaluate("() => window.__okfLoomGraph.layoutStats.lastAppliedSeq")
     page.evaluate("l => window.__okfLoomGraph.applyLens(l)", lens)
     page.wait_for_function("l => window.__okfLoomGraph.getState().lens === l", arg=lens)
-    page.wait_for_function("() => window.okfGraphCaptureState().layoutSettled")
+    # A lens schedules its layout; the previous generation can still report
+    # settled until the debounce fires. Culling depends on the new positions.
+    page.wait_for_function("n => window.__okfLoomGraph.layoutStats.lastAppliedSeq > n && window.okfGraphCaptureState().layoutSettled", arg=applied)
 
 
 @pytest.mark.parametrize("palette", PALETTES)
@@ -1044,7 +1047,10 @@ def test_forced_colour_states_differ_by_more_than_colour(docs_server_url: str, p
     assert len(set(shapes)) == len(shapes), shapes
 
 
-_RESTORE_SNAPSHOT_JS = """() => {
+_RESTORE_SNAPSHOT_JS = """async () => {
+  // Label culling follows layout/palette updates on the next paint frame.
+  // Compare settled paint, not an intermediate set of count-chip plates.
+  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   const cy = window.__okfLoomGraph.cy;
   const NODE = ['background-color', 'border-color', 'border-width', 'border-style', 'shape', 'color',
     'text-background-color', 'text-background-opacity', 'text-outline-color', 'underlay-color',
