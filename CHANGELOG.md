@@ -70,7 +70,9 @@ follow [Semantic Versioning](https://semver.org/). The product version
   and touch-only devices drop the arrow-key hint.
 - Short touch screens (320x568, landscape phones) give the graph canvas most of the
   viewport: Find in graph and the presence row fold behind a Tools toggle in the pane
-  tabs, and the fitted graph no longer runs under the docked zoom bar.
+  tabs, and the fitted graph no longer runs under the docked zoom bar. While a Find
+  filter is active the toggle reads "Tools · 2" (match count, also in its name), and
+  rotating into this layout keeps a focused or filled Find band open with its focus.
 - Graph settings flow in the details pane instead of a nested 440px scroller, and
   a focused filter chip shows its whole focus ring beside its joined Only button.
 - A concept selected in the graph details pane (and every single-file document)

@@ -2248,7 +2248,9 @@ body.okf-viewer--graph.okf-viewer--singlefile[data-okf-single-destination="index
   body.okf-viewer--graph:not(.okf-viewer--singlefile) { height: 100dvh; min-height: 0; overflow-y: auto; }
   body.okf-viewer--graph:not(.okf-viewer--singlefile) .okf-graph-main { flex: 1 0 auto; min-height: 0; overflow: visible; }
   body.okf-viewer--graph:not(.okf-viewer--singlefile) .okf-layout[data-mobile-pane] { flex: 1 0 0; height: auto; min-height: 240px; }
-  body.okf-viewer--graph:not(.okf-viewer--singlefile):not([data-okf-graph-tools-open]) :is(.okf-graph-tools, .okf-mobile-presence) { display: none; }
+  /* A band holding focus is never hidden under it (a rotation into this
+   * layout would drop focus to the body); graph.js then marks it open. */
+  body.okf-viewer--graph:not(.okf-viewer--singlefile):not([data-okf-graph-tools-open]) :is(.okf-graph-tools:not(:focus-within), .okf-mobile-presence) { display: none; }
   /* The Concepts tab owns the list here, as on phones: no All concepts
    * overlay squeezing the short canvas's fit from the top. */
   body.okf-viewer--graph:not(.okf-viewer--singlefile) .okf-layout[data-mobile-pane="graph"] .okf-node-index { display: none; }
@@ -2258,7 +2260,9 @@ body.okf-viewer--graph.okf-viewer--singlefile[data-okf-single-destination="index
   }
   body.okf-viewer--graph:not(.okf-viewer--singlefile) .okf-graph-mobile-nav,
   body.okf-viewer--graph:not(.okf-viewer--singlefile)[data-okf-narrow-reflow] .okf-graph-mobile-nav {
-    grid-template-columns: repeat(3, minmax(0, 1fr)) auto !important;
+    /* Tabs share the row equally but never below their label, so a longer
+     * "Tools · 38" Find cue takes Graph's spare room, not Concepts' text. */
+    grid-template-columns: repeat(3, minmax(min-content, 1fr)) auto !important;
   }
   .okf-viewer--graph .okf-graph-mobile-nav .okf-graph-tools-toggle {
     display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 44px; padding-inline: 10px;
