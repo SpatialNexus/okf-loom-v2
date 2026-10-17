@@ -4748,7 +4748,7 @@ def test_clipboard_fallback_late_settlement_and_320px_capture(static_url: str, p
       return {clipped,labels:controls.map(el=>(el.textContent||el.getAttribute('aria-label')||el.value).trim()),detailsOpen:details.open,summaryHeight:summary.height,firstTop:first.top,summaryBottom:summary.bottom,overflow:document.documentElement.scrollWidth>viewport};
     }""")
     assert responsive["clipped"] == [] and responsive["overflow"] is False
-    assert any("demo_bundle" in label for label in responsive["labels"])
+    assert "OKF Demo Bundle" in responsive["labels"]
     assert any("Graph" in label for label in responsive["labels"])
     assert any("Index" in label for label in responsive["labels"])
     assert responsive["detailsOpen"] is False and responsive["summaryHeight"] <= 44
