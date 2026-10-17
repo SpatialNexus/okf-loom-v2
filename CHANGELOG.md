@@ -68,6 +68,9 @@ follow [Semantic Versioning](https://semver.org/). The product version
   "Collaborators", not a second "Details"), a one-row Find in graph band and a
   one-row labelled zoom dock from 375px; at 320px Appearance stays beside Studio
   and touch-only devices drop the arrow-key hint.
+- Short touch screens (320x568, landscape phones) give the graph canvas most of the
+  viewport: Find in graph and the presence row fold behind a Tools toggle in the pane
+  tabs, and the fitted graph no longer runs under the docked zoom bar.
 - Graph settings flow in the details pane instead of a nested 440px scroller, and
   a focused filter chip shows its whole focus ring beside its joined Only button.
 - A concept selected in the graph details pane (and every single-file document)

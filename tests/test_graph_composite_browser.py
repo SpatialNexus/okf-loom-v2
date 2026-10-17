@@ -382,6 +382,11 @@ def test_phone_graph_chrome_leaves_the_viewport_to_the_graph(page, docs_server_u
         phone.wait_for_function("() => window.__okfLoomGraph?.layoutStats?.lastAppliedSeq >= 1")
         phone.locator('[data-graph-pane="graph"]').click()
         expect(phone.locator(".okf-mobile-presence__agent")).not_to_be_empty()
+        if height <= 700:
+            # Short phones fold the band and presence row behind Tools (M1-002);
+            # the open rows keep the same one-row geometry.
+            assert phone.evaluate(_PHONE_CHROME_JS)["graphTop"] <= height / 2
+            phone.get_by_role("button", name="Tools").click()
         geo = phone.evaluate(_PHONE_CHROME_JS)
         assert geo["presenceHeight"] <= geo["presenceButtonHeight"] + 10, geo
         assert geo["presenceLabels"].count("Details") == 1, geo
@@ -392,11 +397,81 @@ def test_phone_graph_chrome_leaves_the_viewport_to_the_graph(page, docs_server_u
             assert geo["layoutTop"] <= 0.45 * geo["inner"], geo
         else:
             assert geo["appearanceTop"] == geo["studioTop"] and geo["appearanceTop"] < geo["tabsTop"], geo
-        hidden_label = phone.locator(".okf-graph-tools__search > span").first
-        assert hidden_label.evaluate("el => el.getBoundingClientRect().width") <= 1
         phone.get_by_role("searchbox", name="Search graph concepts").fill("no-such-concept")
         expect(phone.locator(".okf-graph-search-status")).not_to_be_empty()
         assert phone.locator(".okf-graph-search-status").evaluate("el => el.getBoundingClientRect().width") > 1
+    finally:
+        context.close()
+
+
+_SHORT_GRAPH_JS = """() => {
+  const graph = document.getElementById('okf-graph').getBoundingClientRect();
+  const dock = document.querySelector('.okf-graph-viewport-toolbar').getBoundingClientRect();
+  const cy = window.__okfLoomGraph.cy, drawn = cy.nodes(':visible').renderedBoundingBox({includeLabels: true});
+  const title = document.querySelector('.okf-graph-route-title').getBoundingClientRect();
+  return {inner: innerHeight, scrolled: document.scrollingElement.scrollTop + document.body.scrollTop,
+          visible: Math.max(0, Math.min(graph.bottom, innerHeight) - Math.max(graph.top, 0)),
+          drawnBottom: graph.top + drawn.y2, dockTop: dock.top, titleHeight: title.height};
+}"""
+
+
+def _on_screen(locator, size) -> bool:
+    box = locator.bounding_box()
+    return bool(box) and box["x"] >= 0 and box["y"] >= 0 and min(box["width"], box["height"]) >= 44 - 0.5 \
+        and box["x"] + box["width"] <= size[0] + 0.5 and box["y"] + box["height"] <= size[1] + 0.5
+
+
+@pytest.mark.parametrize("size", [(320, 568), (844, 390)])
+def test_short_coarse_graph_gives_the_canvas_the_viewport(page, docs_server_url: str, size) -> None:
+    """M1-002: on a short phone (portrait 320x568, landscape 844x390) the
+    graph canvas takes most of the viewport on load, without scrolling. Pane
+    tabs, Appearance and every docked viewport action stay on screen as named
+    44px targets; Find in graph and the presence row fold behind one Tools
+    disclosure; the route title remains the h1; the fitted drawing stays
+    clear of the dock."""
+    width, height = size
+    context = page.context.browser.new_context(
+        viewport={"width": width, "height": height}, has_touch=True, is_mobile=True)
+    try:
+        phone = context.new_page()
+        phone.add_init_script("try { localStorage.setItem('okfGraphTourDone', '1'); } catch (e) {}")
+        phone.goto(docs_server_url + "/__graph", wait_until="domcontentloaded")
+        phone.wait_for_function("() => window.__okfLoomGraph?.layoutStats?.lastAppliedSeq >= 1")
+        panes = phone.get_by_role("navigation", name="Graph panes")
+        panes.get_by_role("button", name="Graph", exact=True).click()
+        phone.wait_for_function("""() => {const cy=window.__okfLoomGraph.cy,c=document.getElementById('okf-graph');
+            return c.clientHeight > 0 && Math.abs(cy.height()-c.clientHeight)<2;}""")
+        geo = phone.evaluate(_SHORT_GRAPH_JS)
+        assert geo["scrolled"] == 0 and geo["visible"] >= 0.5 * geo["inner"], geo
+        expect(phone.get_by_role("heading", level=1, name=re.compile("graph view"))).to_have_count(1)
+        assert geo["titleHeight"] <= 1, geo
+
+        for name in ("Graph", "Concepts", "Details"):
+            assert _on_screen(panes.get_by_role("button", name=name, exact=True), size), name
+        appearance = phone.locator('[data-okf-shell-item="appearance"] button').first
+        assert _on_screen(appearance, size) and appearance.inner_text().startswith("Appearance")
+        for name in ("Zoom in", "Zoom out", "Fit graph (f)", "Enter fullscreen", "Reset graph view", "Show minimap"):
+            assert _on_screen(phone.get_by_role("button", name=name, exact=True), size), name
+
+        phone.get_by_role("button", name="Fit graph (f)", exact=True).click()
+        phone.wait_for_function(f"() => {{ const g = ({_SHORT_GRAPH_JS})(); return g.drawnBottom <= g.dockTop + 1; }}")
+
+        tools = panes.get_by_role("button", name="Tools")
+        find = phone.get_by_role("searchbox", name="Search graph concepts")
+        assert _on_screen(tools, size)
+        expect(tools).to_have_attribute("aria-expanded", "false")
+        expect(find).to_be_hidden()
+        tools.click()
+        expect(tools).to_have_attribute("aria-expanded", "true")
+        expect(find).to_be_focused()
+        expect(phone.get_by_role("search", name="Find in graph")).to_be_visible()
+        find.fill("cli")
+        expect(phone.locator(".okf-graph-search-status")).not_to_be_empty()
+        tools.click()
+        expect(tools).to_have_attribute("aria-expanded", "false")
+        expect(find).to_be_hidden()
+        expect(tools).to_be_focused()
+        assert phone.evaluate(_SHORT_GRAPH_JS)["visible"] >= 0.5 * height
     finally:
         context.close()
 

@@ -2236,6 +2236,48 @@ body.okf-viewer--graph[data-okf-single-destination="index"] {
  * than the narrow-reflow display rule that docks them in the top bar. */
 body.okf-viewer--graph.okf-viewer--singlefile[data-okf-single-destination="index"] .okf-graph-mobile-nav { display: none !important; }
 
+/* M1-002: short coarse viewports (a phone below ~700px of height: 320x568
+ * portrait or any landscape phone) give the graph pane the viewport. The
+ * Find band and the phone presence row fold behind the Tools disclosure
+ * graph.js appends to the pane-tab row; the route title stays the accessible
+ * h1 (shown while it holds route focus); the pane fills the remaining height,
+ * and the page scrolls only when the open tools need the room. Below 375px
+ * the six docked viewport actions keep one row as named icons. */
+.okf-graph-tools-toggle { display: none; }
+@media (max-width: 900px) and (max-height: 700px) and (pointer: coarse) {
+  body.okf-viewer--graph:not(.okf-viewer--singlefile) { height: 100dvh; min-height: 0; overflow-y: auto; }
+  body.okf-viewer--graph:not(.okf-viewer--singlefile) .okf-graph-main { flex: 1 0 auto; min-height: 0; overflow: visible; }
+  body.okf-viewer--graph:not(.okf-viewer--singlefile) .okf-layout[data-mobile-pane] { flex: 1 0 0; height: auto; min-height: 240px; }
+  body.okf-viewer--graph:not(.okf-viewer--singlefile):not([data-okf-graph-tools-open]) :is(.okf-graph-tools, .okf-mobile-presence) { display: none; }
+  /* The Concepts tab owns the list here, as on phones: no All concepts
+   * overlay squeezing the short canvas's fit from the top. */
+  body.okf-viewer--graph:not(.okf-viewer--singlefile) .okf-layout[data-mobile-pane="graph"] .okf-node-index { display: none; }
+  body.okf-viewer--graph:not(.okf-viewer--singlefile) .okf-graph-route-title:not(:focus) {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+    clip-path: inset(50%); white-space: nowrap;
+  }
+  body.okf-viewer--graph:not(.okf-viewer--singlefile) .okf-graph-mobile-nav,
+  body.okf-viewer--graph:not(.okf-viewer--singlefile)[data-okf-narrow-reflow] .okf-graph-mobile-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) auto !important;
+  }
+  .okf-viewer--graph .okf-graph-mobile-nav .okf-graph-tools-toggle {
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 44px; padding-inline: 10px;
+  }
+  .okf-graph-tools-toggle::after { content: "\25BE" / ""; color: var(--okf-fg-muted); }
+  .okf-viewer--graph .okf-graph-mobile-nav .okf-graph-tools-toggle[aria-expanded="true"] { background: var(--okf-bg-inset); }
+  .okf-graph-tools-toggle[aria-expanded="true"]::after { content: "\25B4" / ""; }
+}
+@media (max-width: 374px) and (max-height: 700px) and (pointer: coarse) {
+  /* Four tabs share the shell's gutter so "Concepts" keeps its padding. */
+  body.okf-viewer--graph:not(.okf-viewer--singlefile)[data-okf-narrow-reflow] .okf-graph-mobile-nav { padding-inline: 0 !important; }
+  .okf-viewer--graph .okf-graph-mobile-nav button,
+  .okf-viewer--graph .okf-graph-mobile-nav .okf-graph-tools-toggle { padding-inline: 4px; }
+  body.okf-viewer--graph:not(.okf-viewer--singlefile) .okf-graph-viewport-toolbar .okf-graph-zoom { grid-template-columns: repeat(6, minmax(44px, 1fr)); }
+  body.okf-viewer--graph:not(.okf-viewer--singlefile) .okf-graph-viewport-toolbar .okf-viewport-label {
+    position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+}
+
 /* Coarse pointers: every graph and single-file control is a 44px target.
  * Last in the file so it follows the base rules it enlarges. */
 @media (pointer: coarse) {
