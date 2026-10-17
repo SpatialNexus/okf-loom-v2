@@ -10415,7 +10415,8 @@ def test_phase1_centered_reading_lane_balanced(server_url: str, page) -> None:
           const infobox = document.querySelector('.okf-page__infobox');
           if (!body || !col) return {missing: true};
           const p = body.querySelector('p');
-          const pre = body.querySelector('pre, .okf-tablewrap');
+          const pre = body.querySelector('pre');
+          const table = body.querySelector('.okf-tablewrap');
           if (!p) return {missing: true};
           const pRect = p.getBoundingClientRect();
           const cRect = col.getBoundingClientRect();
@@ -10424,12 +10425,16 @@ def test_phase1_centered_reading_lane_balanced(server_url: str, page) -> None:
             const r = pre.getBoundingClientRect();
             edges.pre = [Math.round(r.left), Math.round(r.right)];
           }
+          if (table) {
+            const r = table.getBoundingClientRect();
+            edges.table = [Math.round(r.left), Math.round(r.right)];
+          }
           const h2 = body.querySelector('h2');
           if (h2) {
             const r = h2.getBoundingClientRect();
             edges.h2 = [Math.round(r.left), Math.round(r.right)];
           }
-          const blocks = [p, pre, h2].filter(Boolean).map(b => b.getBoundingClientRect());
+          const blocks = [p, pre, table, h2].filter(Boolean).map(b => b.getBoundingClientRect());
           return {
             paraWidth: Math.round(pRect.width),
             colWidth: Math.round(cRect.width),
@@ -10456,7 +10461,8 @@ def test_phase1_centered_reading_lane_balanced(server_url: str, page) -> None:
     # Prose holds the ~55ch measure (a readable line, not the full column)
     # and is never collapsed to a narrow strip.
     assert 45 * geom["ch"] <= geom["paraWidth"] <= 60 * geom["ch"], geom
-    # Code/tables are never narrower than the prose above them.
+    # Code is never narrower than the prose above it. A fitting table now
+    # sizes its wrapper/toolbar to its content (D1-010), on the same left edge.
     if "pre" in edges:
         assert edges["pre"][1] >= edges["p"][1] - 2, edges
     # No block overhangs the column.
