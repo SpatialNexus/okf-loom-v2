@@ -472,6 +472,78 @@ def test_short_coarse_graph_gives_the_canvas_the_viewport(page, docs_server_url:
         expect(find).to_be_hidden()
         expect(tools).to_be_focused()
         assert phone.evaluate(_SHORT_GRAPH_JS)["visible"] >= 0.5 * height
+
+        # P3-1: the folded band never hides the filter fading the canvas. The
+        # toggle says so in text (forced-colour safe) and in its name; the
+        # pane tabs keep their 44px targets beside the longer label.
+        count = phone.evaluate("() => window.__okfLoomGraph.cy.nodes('.okf-search-match').length")
+        assert count > 0
+        expect(tools).to_have_text(f"Tools · {count}")
+        expect(tools).to_have_accessible_name(re.compile(rf"^Tools · {count}, Find active: .*“cli”"))
+        for name in ("Graph", "Concepts", "Details"):
+            assert _on_screen(panes.get_by_role("button", name=name, exact=True), size), name
+        assert _on_screen(tools, size)
+        phone.keyboard.press("Enter")
+        expect(tools).to_have_attribute("aria-expanded", "true")
+        expect(find).to_be_focused()
+        phone.locator(".okf-graph-search-clear").click()
+        expect(find).to_have_value("")
+        tools.click()
+        expect(tools).to_have_attribute("aria-expanded", "false")
+        expect(tools).to_have_text("Tools")
+        expect(tools).to_have_accessible_name("Tools")
+        # A two-digit cue takes spare tab room; no pane label overflows.
+        tools.click()
+        find.fill("e")
+        tools.click()
+        expect(tools).to_have_text(re.compile(r"^Tools · \d\d$"))
+        assert phone.evaluate("""() => [...document.querySelectorAll('.okf-graph-mobile-nav > button')]
+            .every(b => b.scrollWidth <= b.clientWidth)""")
+        for name in ("Graph", "Concepts", "Details"):
+            assert _on_screen(panes.get_by_role("button", name=name, exact=True), size), name
+        assert _on_screen(tools, size)
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("held", ["focus", "query"])
+def test_short_coarse_graph_keeps_the_held_find_band_on_rotation(page, docs_server_url: str, held: str) -> None:
+    """P3-1: rotating a phone into the short layout (390x844 -> 844x390)
+    keeps the Find band open while it holds focus or a query: focus stays
+    where it was, the query and its status stay visible, and Tools reports
+    the band as expanded."""
+    context = page.context.browser.new_context(
+        viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True)
+    try:
+        phone = context.new_page()
+        phone.add_init_script("try { localStorage.setItem('okfGraphTourDone', '1'); } catch (e) {}")
+        phone.goto(docs_server_url + "/__graph", wait_until="domcontentloaded")
+        phone.wait_for_function("() => window.__okfLoomGraph?.layoutStats?.lastAppliedSeq >= 1")
+        panes = phone.get_by_role("navigation", name="Graph panes")
+        graph_tab = panes.get_by_role("button", name="Graph", exact=True)
+        graph_tab.click()
+        find = phone.get_by_role("searchbox", name="Search graph concepts")
+        find.focus()
+        if held == "query":
+            find.fill("cli")
+            expect(phone.locator(".okf-graph-search-status")).not_to_be_empty()
+            graph_tab.focus()
+        held_el = find if held == "focus" else graph_tab
+        expect(held_el).to_be_focused()
+
+        phone.set_viewport_size({"width": 844, "height": 390})
+        tools = panes.get_by_role("button", name="Tools")
+        expect(tools).to_be_visible()
+        expect(tools).to_have_attribute("aria-expanded", "true")
+        expect(find).to_be_visible()
+        expect(held_el).to_be_focused()
+        if held == "query":
+            expect(find).to_have_value("cli")
+            expect(phone.locator(".okf-graph-search-status")).to_be_visible()
+        # The band was opened by the rotation, not pinned: Tools still folds it.
+        tools.click()
+        expect(tools).to_have_attribute("aria-expanded", "false")
+        expect(find).to_be_hidden()
     finally:
         context.close()
 
