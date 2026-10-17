@@ -266,7 +266,14 @@ def test_joined_search_focus_ring_hugs_each_part_and_is_never_covered(
             if field.startswith(".okf-shell"):
                 # Recent pages excludes the current page; seed another visit so
                 # the list opens under the field and could cover the ring.
-                page.goto(server_url + "/tables/customers")
+                # Use another page in this context (recent pages are shared
+                # local storage). Its cancelled background fetches on close
+                # must not pollute the tested page's error probe.
+                seed = context.new_page()
+                try:
+                    seed.goto(server_url + "/tables/customers")
+                finally:
+                    seed.close()
             page.goto(server_url + route)
             page.wait_for_function("() => document.documentElement.classList.contains('okf-theme-ready')")
             input_ = page.locator(field)
