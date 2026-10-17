@@ -3641,7 +3641,9 @@ def test_static_malformed_percent_or_utf8_is_field_error(static_url: str, page, 
     expect(page.locator(".okf-page-context")).to_have_count(0)
     assert page.evaluate("""() => document.querySelector('#okf-results-heading').getBoundingClientRect().top < document.querySelector('.okf-search-input-error').getBoundingClientRect().top""")
     expect(page.get_by_role("button", name="Retry")).to_have_count(0)
-    assert page.evaluate("() => !!window.okfPortableProvider")
+    # URL hydration now rejects malformed fields before loading evidence.
+    # Input correction is not a provider failure or a claimed ready corpus.
+    assert page.evaluate("() => !window.okfPortableProvider && !document.body.dataset.okfCaptureRevision")
     # Layout sanity at 320px: the document must not overflow horizontally
     # (no sideways page scroll), AND every topbar control must remain
     # keyboard-reachable (Tab reaches it). The Phase 1 single-row sticky
@@ -3676,6 +3678,9 @@ def test_static_malformed_percent_or_utf8_is_field_error(static_url: str, page, 
     assert reflow["scrollerOverflowX"] in ("auto", "scroll", "hidden", "visible"), (
         f"unexpected controls overflow-x: {reflow['scrollerOverflowX']!r}"
     )
+    page.get_by_role("link", name="Start clean", exact=True).click()
+    page.wait_for_function("() => window.okfPortableProvider && document.body.dataset.okfCaptureReady === 'ready'")
+    expect(page.locator("#okf-search-query")).not_to_have_attribute("aria-invalid", "true")
 
 
 def test_suggestions_timeout_and_superseded_response_are_deterministic(server_url: str, page) -> None:
