@@ -3436,6 +3436,9 @@ body:has(.okf-graph-loading--error) .okf-cytoscape-fallback-actions { display: f
   body.okf-viewer .okf-concept-viewbar { gap: 4px 12px; padding-inline: 12px; }
   body.okf-viewer .okf-concept-viewbar > .okf-outline-jump { flex: 1 0 100%; max-width: none; }
   body.okf-viewer .okf-viewswitch { gap: 12px; }
+  /* Keep the two-row strip below 84px including its focus-ring gutter.
+   * Coarse pointers retain their separate 44px minimum target height. */
+  body.okf-viewer .okf-viewswitch__btn { padding-block: var(--okf-space-2); }
   body.okf-viewer .okf-viewswitch__btn:is(.okf-source-wrap, .okf-focus-toggle) { padding-left: 12px; }
   /* "Wrap lines" shows as "Wrap"; the full name stays in the button. */
   .okf-viewswitch__more {
