@@ -276,6 +276,21 @@ follow [Semantic Versioning](https://semver.org/). The product version
   output alone embeds the faces as base64 data URLs. All use `font-display: swap`
   (text may paint in a fallback face first); only serve/SPA preload the upright
   faces. No external font network access is needed on any target.
+- **README media re-recorded in Ledger** from the final redesign: a
+  theme-aware hero (Bone for GitHub's light theme, Slate for dark) showing a
+  real resolved comment loop, a four-palette still, a cited-search still, a
+  two-minute captioned tour (`walkthrough.mp4`, with a poster still), and a
+  new 1280×640 social card. The rendering still uses Focus view so the whole
+  flowchart fits.
+  The clips now show Find in graph and cited search results, and the comment
+  loop's terminal text is set larger so it stays legible at README width.
+  `graph-map.png` is no longer produced.
+- The README media scripts accept `--cdn-mirror vendor` to serve the Studio's
+  pinned CDN libraries from the lock-verified vendored copies (SRI-pinned
+  files byte-identical; the two un-pinned ES-module entry points rebuilt from
+  the same versions) on hosts that cannot reach jsDelivr. Their bundle snapshot also carries the repository
+  files the docs link to (`../../SKILL.md` and others), so those links no
+  longer render as broken-link markers in the captured graph.
 
 ### Appearance migration
 

@@ -188,8 +188,18 @@ full browser suite stays manual.
 
 ## Regenerating the README media
 
-The README's screenshots and clips live in [`docs/media/`](docs/media/) and
-are reproducible from a live Studio. Use the browser setup above.
+The README's screenshots, clips and tour live in [`docs/media/`](docs/media/)
+and are reproducible from a live Studio. Use the browser setup above.
+
+On a host that cannot reach `cdn.jsdelivr.net` (a sandbox or an offline CI
+runner), add `--cdn-mirror vendor` to either script. The browser then gets
+the Studio's pinned Mermaid, KaTeX, highlight.js and Cytoscape files from the
+lock-verified copies in `scripts/okf_loom/viewer/vendor/`, with the page's SRI
+checks still enforced (see `scripts/cdn_mirror.py`). Every SRI-pinned file is
+the identical vendored copy. The two ES-module entry points the Studio
+imports without SRI (Mermaid's and highlight.js's) are rebuilt locally from
+the same pinned versions, so they are equivalent to the CDN files, not
+byte-identical.
 
 **Screenshots and the social card:**
 
@@ -201,24 +211,41 @@ It serves a snapshot of the docs bundle's git-tracked files, so local comment
 history and activity never appear in the media (`--in-place` serves the bundle
 as-is instead). It seeds no appearance settings, so the stills show the
 shipped defaults, and it fails on any browser console, page or network error.
-It also captures the two phone stills (`phone-top.png`, `phone-scrolled.png`)
-on a 390×844 touch viewport, swiping the page so the chrome scrolls away, and
-composes `docs/media/social-preview.png`, the 1280×640 repository card. Options: `--bundle`, `--out-dir`, `--chrome`.
+The README hero (`hero-light.png` in Bone, `hero-dark.png` in Slate, shown
+by GitHub to readers in its light and dark themes) comes from a real comment
+loop, posted in the page and then claimed, edited and resolved with
+`scripts/okf-loom` on a separate throwaway copy, so its edit never reaches the
+other stills. The script also captures the two phone stills
+(`phone-top.png`, `phone-scrolled.png`) on a 390×844 touch viewport, swiping
+the page so the chrome scrolls away; `palettes.png`, the home in all four
+palettes; and composes `docs/media/social-preview.png`, the 1280×640
+repository card. The card is not used by the README: upload it under the
+repository's **Settings → General → Social preview**. Options: `--bundle`,
+`--out-dir`, `--chrome`, `--in-place`, `--cdn-mirror`.
 
-**Clips (MP4 and GIF):**
+**Clips (MP4 and GIF) and the tour (MP4):**
 
 ```bash
 python scripts/record_showcase_media.py
 python scripts/record_showcase_media.py --only search --only graph
+python scripts/record_showcase_media.py --only walkthrough
 ```
 
-It records `comment-loop`, `appearance`, `graph` and `search`, each as an
-H.264 1280×720 MP4 and a looping 960 px GIF. Every clip runs against its own
-scratch copy of the docs bundle's git-tracked files, so recording never
-changes the checkout. The pointer, captions, key hints and terminal panel are
-a recording-only overlay, never part of the product. It needs `ffmpeg` and
-`ffprobe` (with libx264 and the GIF encoder) on `PATH`; Pillow is not needed.
-Options: `--out`, `--chrome`, `--keep-frames DIR`.
+By default it records `comment-loop`, `appearance`, `graph` and `search`, each
+as an H.264 1280×720 MP4 and a looping 960 px GIF. `--only walkthrough`
+records the two-minute captioned tour, `walkthrough.mp4`, kept under GitHub's
+10 MB limit for a video uploaded into the README. To show it in an inline
+player, edit the README on github.com and drag the file onto the marked line
+in **The two-minute tour**; GitHub hosts the upload and inserts its URL.
+
+Every clip runs against its own scratch copy of the docs bundle's git-tracked
+files, so recording never changes the checkout. The pointer, captions, key
+hints, title cards and terminal panel are a recording-only overlay, never
+part of the product. While each newly loaded page is booting, its frames are
+left out, so a navigation cuts straight to the ready page instead of showing
+the brief pre-boot notice. It needs `ffmpeg` and `ffprobe` (with libx264 and
+the GIF encoder) on `PATH`; Pillow is not needed. Options: `--out`,
+`--chrome`, `--keep-frames DIR`, `--cdn-mirror`.
 
 Both scripts find a browser the same way: `--chrome`, then `OKF_CHROME`, then
 `AIC_PLAYWRIGHT_CHROME_PATH`, known system Chrome paths, the Chrome channel,
