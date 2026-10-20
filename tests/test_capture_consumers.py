@@ -501,6 +501,40 @@ def test_readme_media_serves_only_git_tracked_bundle_files(tmp_path):
     assert copied == ["concept/a.md", "index.md"]
 
 
+def test_readme_media_snapshot_keeps_out_of_bundle_link_targets(tmp_path):
+    """A link from the bundle to a tracked repository file must not turn into a
+    broken-link marker just because the capture serves a copy of the bundle."""
+    from okf_loom.model import Bundle
+
+    repo = tmp_path / "repo"
+    bundle = repo / "docs-bundle"
+    (bundle / "guide").mkdir(parents=True)
+    (repo / "tools").mkdir()
+    (repo / "NOTES.md").write_text("# Notes\n")
+    (repo / "tools" / "README.md").write_text("# Tools\n")
+    (repo / "UNTRACKED.md").write_text("# Not in git\n")
+    (bundle / "index.md").write_text("# Index\n")
+    (bundle / "guide" / "start.md").write_text(
+        "---\ntype: Tutorial\n---\n\nSee [notes](../../NOTES.md), "
+        "[tools](../../tools/README.md#usage), [gone](../../UNTRACKED.md) "
+        "and [site](https://example.com/x.md).\n")
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "add", "docs-bundle", "NOTES.md", "tools"], check=True)
+
+    snapshot = media._tracked_bundle_snapshot(bundle, tmp_path / "out")
+    context = sorted(p.relative_to(tmp_path / "out").as_posix()
+                     for p in (tmp_path / "out").rglob("*")
+                     if p.is_file() and "docs-bundle" not in p.parts)
+    assert context == ["NOTES.md", "tools/README.md"]
+    unresolved = [link.target_raw for link in Bundle.load(snapshot).graph().unresolved]
+    assert unresolved == ["../../UNTRACKED.md"]  # untracked: a fresh clone breaks it too
+
+    skipped = media._tracked_bundle_snapshot(bundle, tmp_path / "skip", skip_context=("tools",))
+    assert (tmp_path / "skip" / "NOTES.md").is_file()
+    assert not (tmp_path / "skip" / "tools").exists()
+    assert skipped == tmp_path / "skip" / "docs-bundle"
+
+
 def test_readme_stills_publish_nothing_when_the_browser_reported_a_fault(tmp_path, monkeypatch):
     (tmp_path / "graph-map.png").write_bytes(b"previous")
 
