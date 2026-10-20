@@ -17,9 +17,9 @@ README media scripts. Each browser context then answers those requests from
   and the offline highlight.js bundle (core plus every language, exactly as
   ``build --assets offline`` ships it) with a default export appended.
 
-Any other jsDelivr request is aborted and recorded, so the capture's
-request-failure check names it. Nothing here changes what the studio serves;
-this is a recording-host shim only.
+Any other jsDelivr request is aborted, so the capture's request-failure check
+fails the run and names the URL. Nothing here changes what the studio
+serves; this is a recording-host shim only.
 """
 from __future__ import annotations
 
@@ -98,7 +98,6 @@ class CdnMirror:
         table[_MERMAID_ESM] = (_mermaid_module(mermaid), _TYPES[".mjs"])
         table[_HLJS_ESM] = (_hljs_module(offline.files[_vendor.HLJS_DERIVED]), _TYPES[".js"])
         self.table = table
-        self.misses: list[str] = []
 
     def lookup(self, url: str) -> tuple[bytes, str] | None:
         return self.table.get(url.split("#", 1)[0].split("?", 1)[0])
@@ -107,7 +106,6 @@ class CdnMirror:
         url = route.request.url
         hit = self.lookup(url)
         if hit is None:
-            self.misses.append(url)
             route.abort("blockedbyclient")
             return
         body, content_type = hit

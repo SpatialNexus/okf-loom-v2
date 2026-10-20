@@ -13,7 +13,8 @@ media is refreshed:
 * ``studio-home.png``        — dashboard index with the studio connected,
                                ending on an inventory group boundary
 * ``palettes.png``           — the studio home in Bone, Slate, Clay and Plum
-* ``showcase-rendering.png`` — Mermaid/KaTeX section of demo/showcase
+* ``showcase-rendering.png`` — Mermaid/KaTeX section of demo/showcase in
+                               Focus view, wide enough for the whole flowchart
 * ``comment-composer.png``   — an exact-text selection with the composer open
 * ``graph-bridges-dark.png`` — Bridges lens, dark mode, hovering the top
                                bridger so its connections and preview show
@@ -98,9 +99,10 @@ HERO_VIEWPORT = {"width": 1440, "height": 960}
 # then trims to end just above the group named here.
 HOME_VIEWPORT = {"width": 1440, "height": 1200}
 HOME_END_BEFORE_GROUP = 4
-# Both Mermaid diagrams and the KaTeX block need ~100px more to share a
-# frame; the capture then trims the height to end above the next section.
-SHOWCASE_VIEWPORT = {"width": 1440, "height": 1000}
+# The showcase uses Focus view, whose wider workspace fits the flowchart
+# without a horizontal scroll; both diagrams and the KaTeX block share the
+# frame, which is trimmed to end just below the math.
+SHOWCASE_VIEWPORT = {"width": 1440, "height": 1100}
 # The Comments rail sits beside the page; the Ledger header fits at 1440.
 COMPOSER_VIEWPORT = STILL_VIEWPORT
 # Search shows the match modes, then the first result's evidence; the frame
@@ -728,23 +730,33 @@ def _stage_stills(browser, base: str, stage: Path,
     # The same home in every Ledger palette, set two by two.
     _capture_palettes(browser, base, stage, still("palettes.png"), diagnostics)
 
-    # Showcase concept: the Diagrams heading sits just under the sticky
-    # chrome so the Mermaid diagrams and the KaTeX block share the frame.
+    # Showcase concept in Focus view (the reader's own wide-workspace mode, so
+    # the flowchart needs no horizontal scroll): the Diagrams heading sits just
+    # under the sticky chrome, and the frame ends just below the KaTeX block.
     def frame_showcase(p) -> None:
         settled_light(p)
         p.wait_for_function(_SHOWCASE_RENDERED_JS, timeout=15_000)
         p.evaluate("() => document.fonts.ready.then(() => true)")
+        p.locator(".okf-concept-viewbar").get_by_text("Focus view", exact=True).click(timeout=5_000)
+        p.wait_for_function("""() => {
+          const ports = [...document.querySelectorAll('.okf-page__body .okf-content-scrollport--diagram')];
+          return ports.length >= 2 && ports.every((e) => e.scrollWidth <= e.clientWidth + 1);
+        }""", timeout=5_000)
         if not p.evaluate(_SCROLL_UNDER_CHROME_JS, ["h2, h3", r"^\s*Diagrams", 16]):
             raise RuntimeError("demo/showcase has no Diagrams heading")
-        # End the frame just above the Code section so no heading is sliced.
-        cut = p.evaluate("""() => {
-          const h = [...document.querySelectorAll('h2, h3')]
-            .find(x => /^\\s*Code with syntax/i.test(x.textContent));
-          return h ? Math.floor(h.getBoundingClientRect().top) : null;
+        p.wait_for_timeout(100)
+        bottom = p.evaluate("""() => {
+          const m = document.querySelector('.okf-page__body .katex-display');
+          const box = m && (m.closest('.okf-content-scrollport') || m);
+          return box ? Math.ceil(box.getBoundingClientRect().bottom) : null;
         }""")
-        if cut and STILL_VIEWPORT["height"] < cut <= SHOWCASE_VIEWPORT["height"] + 40:
-            p.set_viewport_size({"width": SHOWCASE_VIEWPORT["width"],
-                                 "height": min(cut - 4, SHOWCASE_VIEWPORT["height"])})
+        if not bottom or not STILL_VIEWPORT["height"] < bottom + 24 <= SHOWCASE_VIEWPORT["height"]:
+            raise RuntimeError(f"the KaTeX block ends at {bottom}px, outside the showcase frame")
+        p.set_viewport_size({"width": SHOWCASE_VIEWPORT["width"], "height": bottom + 24})
+        p.wait_for_timeout(100)
+        if not p.evaluate(_SCROLL_UNDER_CHROME_JS, ["h2, h3", r"^\s*Diagrams", 16]):
+            raise RuntimeError("demo/showcase has no Diagrams heading")
+        _park_pointer(p, SHOWCASE_VIEWPORT["width"] - 8, 400)
     ctx, page = page_for("showcase-rendering", SHOWCASE_VIEWPORT)
     capture_target(page, f"{base}/demo/showcase", "document", still("showcase-rendering.png"),
                    full_page=False, prepare=frame_showcase)

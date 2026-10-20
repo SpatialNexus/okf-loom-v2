@@ -304,3 +304,37 @@ def test_help_lists_the_clips_and_options():
     for text in ("--only", "--out", "--chrome", "--keep-frames", "--cdn-mirror",
                  "comment-loop", "appearance", "graph", "search", "walkthrough"):
         assert text in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# _PaintGate: frames of a booting page are dropped, nothing else
+# ---------------------------------------------------------------------------
+
+
+def test_paint_gate_hides_only_a_booting_page_plus_its_settle_margin():
+    gate = recorder._PaintGate(limit=4.0)
+    gate.set(None, False, 10_000)   # document starts at t=10 s
+    gate.set(None, True, 10_400)    # ready at 10.4 s
+    settle = recorder._PaintGate.SETTLE
+    assert not gate.hides(9.99)
+    assert gate.hides(10.0) and gate.hides(10.39) and gate.hides(10.4 + settle - 0.001)
+    assert not gate.hides(10.4 + settle)
+    assert gate.unready() == []
+
+
+def test_paint_gate_a_new_document_ends_an_unready_one_and_is_reported_if_it_never_boots():
+    gate = recorder._PaintGate(limit=4.0)
+    gate.set(None, False, 1_000)    # page A starts, never reports ready
+    gate.set(None, False, 1_500)    # page B replaces it
+    gate.set(None, True, 1_700)     # B is ready
+    assert gate.spans[0] == [1.0, 1.5]
+    assert not gate.hides(1.7 + recorder._PaintGate.SETTLE)
+    assert gate.unready() == []
+    gate.set(None, False, 3_000)    # page C never reports ready
+    assert gate.unready() == [[3.0, 7.0]]
+
+
+def test_paint_gate_ignores_a_ready_edge_without_a_loading_one():
+    gate = recorder._PaintGate()
+    gate.set(None, True, 5_000)
+    assert gate.spans == [] and not gate.hides(5.0)

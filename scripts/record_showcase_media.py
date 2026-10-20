@@ -78,9 +78,10 @@ from pathlib import Path
 from typing import Callable
 
 from capture_readme_media import (
-    DEFAULT_BUNDLE, REPO_ROOT, _BrowserDiagnostics, _SCROLL_UNDER_CHROME_JS,
-    _STUDIO_SETTLED_JS, _free_port, _script_env, _stylesheet_href,
-    _tracked_bundle_snapshot, _wait_for_http_ok,
+    DEFAULT_BUNDLE, LOOP_ACTOR, LOOP_BODY, LOOP_EDIT_NEW, LOOP_EDIT_OLD, LOOP_PAGE,
+    LOOP_REPLY, LOOP_SENTENCE, LOOP_SUMMARY, LOOP_TITLE, REPO_ROOT,
+    _BrowserDiagnostics, _SCROLL_UNDER_CHROME_JS, _STUDIO_SETTLED_JS, _free_port,
+    _script_env, _stylesheet_href, _tracked_bundle_snapshot, _wait_for_http_ok,
 )
 from okf_loom import LOOM_VERSION, SPEC_VERSION
 import cdn_mirror
@@ -119,18 +120,18 @@ _TERMINAL_WIDTH = 74
 # first heading is scrolled up under the sticky chrome so the frame's top edge
 # is the title and first paragraphs, not the header band's ids, paths and
 # metadata.
-COMMENT_PAGE = "tutorials/live_studio_basics"
-COMMENT_TITLE = "Use the live studio"
-COMMENT_SENTENCE = "This tutorial assumes you have a small bundle to point at."
-COMMENT_BODY = "What is a bundle? Say it in plain words."
+# The same loop as the README hero (capture_readme_media.py owns the strings).
 # The edit adds the explanation right after the anchored sentence without
 # touching the sentence itself, so the annotation stays attached to it.
-EDIT_OLD = "If you do not, finish"
-EDIT_NEW = ("A bundle is just a folder of Markdown pages.\n"
-            "If you do not have one, finish")
-RESOLVE_SUMMARY = "Explained what a bundle is"
-RESOLVE_REPLY = "Added one plain sentence that says what a bundle is."
-ACTOR = "docs-agent"
+COMMENT_PAGE = LOOP_PAGE
+COMMENT_TITLE = LOOP_TITLE
+COMMENT_SENTENCE = LOOP_SENTENCE
+COMMENT_BODY = LOOP_BODY
+EDIT_OLD = LOOP_EDIT_OLD
+EDIT_NEW = LOOP_EDIT_NEW
+RESOLVE_SUMMARY = LOOP_SUMMARY
+RESOLVE_REPLY = LOOP_REPLY
+ACTOR = LOOP_ACTOR
 # The studio home, framed on its ruled inventory: type chips, numbered rows,
 # mono ids and tabular link counts are the Ledger structure every palette keeps.
 APPEARANCE_PAGE = ""
@@ -188,7 +189,7 @@ _OVERLAY_JS = r"""(() => {
   const KEY = '__okf_showcase_overlay__';
   let saved = {};
   try { saved = JSON.parse(sessionStorage.getItem(KEY) || '{}') || {}; } catch (e) { saved = {}; }
-  const st = Object.assign({x: null, y: null, cap: '', step: '', term: false, lines: []}, saved);
+  const st = Object.assign({x: null, y: null, cap: '', step: '', term: false, lines: [], hideCur: false}, saved);
   addEventListener('pagehide', () => {
     try { sessionStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* storage full */ }
   });
@@ -197,6 +198,9 @@ _OVERLAY_JS = r"""(() => {
 .cur { position: fixed; left: 0; top: 0; width: 22px; height: 26px;
   transform: translate(-60px, -60px); will-change: transform;
   filter: drop-shadow(0 1px 1.5px rgba(0,0,0,.5)); }
+.cur.hid { display: none; }
+.tick { position: fixed; right: 0; bottom: 0; width: 1px; height: 1px; background: #000;
+  opacity: .01; }
 .cur svg { display: block; transform-origin: 2px 2px; transition: transform 90ms ease-out; }
 .cur.down svg { transform: scale(.84); }
 .rip { position: fixed; left: 0; top: 0; width: 46px; height: 46px; margin: -23px 0 0 -23px;
@@ -244,7 +248,9 @@ kbd { display: inline-block; min-width: 14px; padding: 2px 8px; border-radius: 6
     + 'stroke="#0f172a" stroke-width="1.6" stroke-linejoin="round"/></svg>';
   let host = null, els = null;
   function place() {
-    if (!els || st.x === null) return;
+    if (!els) return;
+    els.cur.classList.toggle('hid', !!st.hideCur);
+    if (st.x === null) return;
     els.cur.style.transform = `translate(${st.x - 2}px, ${st.y - 2}px)`;
   }
   function renderLine(kind, text) {
@@ -284,12 +290,12 @@ kbd { display: inline-block; min-width: 14px; padding: 2px 8px; border-radius: 6
       <div class="term off"><div class="bar"><i></i><i></i><i></i><span>docs-agent \u2014 terminal</span></div>
       <div class="pad"><div class="body"></div></div></div>
       <div class="cap off"><span class="chip"></span><span class="txt"></span><span class="keys off"></span></div>
-      <div class="cur">${CURSOR}</div>`;
+      <div class="cur">${CURSOR}</div><i class="tick"></i>`;
     els = {
       root, term: root.querySelector('.term'), body: root.querySelector('.body'),
       cap: root.querySelector('.cap'), chip: root.querySelector('.chip'),
       txt: root.querySelector('.txt'), keys: root.querySelector('.keys'),
-      cur: root.querySelector('.cur'),
+      cur: root.querySelector('.cur'), tick: root.querySelector('.tick'),
     };
     document.documentElement.appendChild(host);
     place(); renderCap(); renderTerm();
@@ -322,6 +328,7 @@ kbd { display: inline-block; min-width: 14px; padding: 2px 8px; border-radius: 6
       keysTimer = setTimeout(() => els.keys.classList.add('off'), ms || 1400);
     },
     term(on) { st.term = !!on; renderTerm(); },
+    cursor(on) { st.hideCur = !on; place(); },
     termOut(lines) { st.lines.push(...lines); renderTerm(); },
     async termType(lines, cps) {
       // Types command lines at a steady rate; resolves when the last is shown.
@@ -351,10 +358,12 @@ kbd { display: inline-block; min-width: 14px; padding: 2px 8px; border-radius: 6
         last.remove();
       }
     },
-    // Screencast only emits a frame when something paints; this forces one.
+    // Screencast only emits a frame when something paints; this forces one
+    // by flipping one corner pixel between 1% and 2% black (which paints even
+    // when the overlay shows nothing else, as on a title card).
     nudge() {
-      if (!host) return;
-      host.style.opacity = host.style.opacity === '1' ? '0.999' : '1';
+      if (!els) return;
+      els.tick.style.opacity = els.tick.style.opacity === '0.02' ? '0.01' : '0.02';
     },
     text() { return els ? [st.cap, st.step, ...st.lines.map((l) => l[1])].join('\n') : ''; },
     // Layout boxes (ignoring the show/hide transform) of the caption and the
@@ -574,17 +583,29 @@ class _PaintGate:
 
     def __init__(self, limit: float = 4.0) -> None:
         self.limit = limit
-        self.spans: list[list[float]] = []
+        self.spans: list[list[float]] = []  # [start, end], in seconds
+        self._open_span: list[float] | None = None
 
     def set(self, _source, is_open, at_ms) -> None:
         at = float(at_ms) / 1000.0
         if not is_open:
-            self.spans.append([at, at + self.limit])
-        elif self.spans and self.spans[-1][0] <= at:
-            self.spans[-1][1] = at + self.SETTLE
+            # A document that starts while an earlier one never reported ready
+            # ends that earlier span: the earlier page is gone.
+            if self._open_span is not None and self._open_span[0] <= at:
+                self._open_span[1] = min(self._open_span[1], at)
+            self._open_span = [at, at + self.limit]
+            self.spans.append(self._open_span)
+        elif self._open_span is not None and self._open_span[0] <= at:
+            self._open_span[1] = at + self.SETTLE
+            self._open_span = None
 
     def hides(self, stamp: float) -> bool:
         return any(start <= stamp < end for start, end in self.spans)
+
+    def unready(self) -> list[list[float]]:
+        """Spans that ran to ``limit`` without the page reporting ready."""
+        return [span for span in self.spans
+                if span is self._open_span or span[1] - span[0] >= self.limit]
 
 
 class _Screencast:
@@ -609,6 +630,10 @@ class _Screencast:
         self._cdp.send("Page.screencastFrameAck", {"sessionId": params["sessionId"]})
 
     def start(self) -> None:
+        # Begin past any page-load span, so the first frame is one that is kept.
+        deadline = time.time() + self.gate.limit + 1
+        while time.time() < deadline and any(end > time.time() for _, end in self.gate.spans):
+            self.page.wait_for_timeout(30)
         self._recording = True
         self._cdp.send("Page.startScreencast", {
             "format": "jpeg", "quality": 92, "everyNthFrame": 1,
@@ -616,7 +641,7 @@ class _Screencast:
         })
         self.page.evaluate("() => window.__okfRec.nudge()")
         self.page.wait_for_timeout(120)
-        if not self.frames:
+        if not [frame for frame in self.frames if not self.gate.hides(frame[0])]:
             raise RuntimeError("the screencast produced no first frame")
 
     def stop(self) -> list[tuple[float, str]]:
@@ -628,6 +653,9 @@ class _Screencast:
         kept = [frame for frame in self.frames if not self.gate.hides(frame[0])]
         if not kept:
             raise RuntimeError("every screencast frame fell inside a page load")
+        if self.gate.unready():
+            raise RuntimeError(f"a page never reported ready within {self.gate.limit:g}s "
+                               "of loading, so its frames were all dropped")
         return kept
 
 
@@ -674,6 +702,9 @@ class _Take:
 
     def keys(self, *names: str) -> None:
         self.page.evaluate("(k) => window.__okfRec.keys(k, 1500)", list(names))
+
+    def cursor(self, visible: bool) -> None:
+        self.page.evaluate("(v) => window.__okfRec.cursor(v)", visible)
 
     # -- pointer --------------------------------------------------------------
     def park(self, x: float, y: float) -> None:
@@ -808,14 +839,20 @@ _COMMENT_CARD_JS = """(id) => {
           state: state ? state.textContent.trim() : ''};
 }"""
 
-# The empty strip between the reading column's text and the Comments rail:
-# the pointer rests there between steps, clear of the text and every control.
+# The empty strip right of the reading column, before the page's Related
+# sidebar (or, without one, the Comments rail): the pointer rests there
+# between steps, clear of the text, its links and every control.
 _READING_MARGIN_JS = """() => {
   const body = document.querySelector('.okf-page__body');
   const rail = document.querySelector('#okf-panel');
   if (!body || !rail) return null;
-  const b = body.getBoundingClientRect(), r = rail.getBoundingClientRect();
-  return {x: (b.right + r.left) / 2, gap: r.left - b.right};
+  const b = body.getBoundingClientRect();
+  const edges = [rail.getBoundingClientRect().left];
+  const side = document.querySelector('.okf-page__sidebar');
+  const s = side && side.getBoundingClientRect();
+  if (s && s.width > 0 && s.left > b.right) edges.push(s.left);
+  const right = Math.min(...edges);
+  return {x: (b.right + right) / 2, gap: right - b.right};
 }"""
 
 _TOASTS_JS = """() => [...document.querySelectorAll('.okf-toast')]
@@ -1092,10 +1129,10 @@ def _setup_graph(take: _Take) -> object:
     page.wait_for_function(_GRAPH_SETTLED_JS, timeout=15_000)
     take.hold(900)
     # At 1280x720 the lens disclosure sits below the detail panel's fold.
-    # Scroll it into view before recording, so the GIF budget goes on the
-    # lenses rather than on a panel scroll.
     summary = page.locator("details.okf-signal__lenses summary")
-    _reveal_in_detail_panel(take, summary)
+    # The detail panel opens at its top, so its overview note is whole; the
+    # pointer scrolls it to the lenses on camera, as a reader would.
+    page.evaluate("() => { const d = document.getElementById('okf-detail'); if (d) d.scrollTop = 0; }")
     take.park(650, 330)  # empty canvas, clear of nodes and the detail panel
     take.check_public("graph start")
     return summary
@@ -1194,7 +1231,10 @@ def _act_search(take: _Take) -> None:
     take.hold(300)
     field = page.locator(".okf-shell input[type=search]").first
     take.click(field, ms=650, dx=0.3)
-    take.hold(200)
+    # Off the field, so the pointer never covers the words being typed: the
+    # empty stretch of the top bar left of the search box.
+    box = field.bounding_box()
+    take.glide(box["x"] - 90, box["y"] + box["height"] / 2, 300)
     page.keyboard.type(SEARCH_QUERY, delay=60)
     results = page.locator(".okf-shell [role=listbox] [role=option], .okf-shell [role=option]")
     results.first.wait_for(state="visible", timeout=5_000)
@@ -1340,6 +1380,7 @@ def _walk_home_and_reading(take: _Take) -> None:
     """The home inventory, a jump to the tutorials, and the reading views."""
     page = take.page
     take.goto("")
+    take.cursor(True)
     take.park(640, 470)
     take.caption("Your docs as one browsable inventory", "Home")
     take.hold(1800)
@@ -1386,12 +1427,15 @@ def direct_walkthrough(take: _Take, rec: _Screencast) -> None:
                sub="Your coding agent picks up each comment, edits the files and replies. "
                    "The files stay plain Markdown.",
                cmd="A two-minute tour")
-    take.park(1240, 690)
+    take.cursor(False)
     rec.start()
     take.hold(3200)
 
     _walk_home_and_reading(take)
 
+    # The comment chapter opens the Comments rail on camera, so it is named
+    # before the page reloads into it.
+    take.caption("Comments go to your agent", "Comment")
     rest = _setup_comment_loop(take)
     _act_comment_loop(take, rest)
     take.hold(600)
@@ -1416,7 +1460,7 @@ def direct_walkthrough(take: _Take, rec: _Screencast) -> None:
     _show_card(take, "end", lede="You comment. Your agent edits. Files stay yours.",
                sub=f"Clone {WALKTHROUGH_REPO} and try it on its own docs:",
                cmd="$ scripts/okf-loom serve docs-bundle")
-    take.glide(1240, 690, 500)  # out of the way, in the card's empty corner
+    take.cursor(False)
     take.hold(4000)
     take.check_public("walkthrough end")
 
@@ -1432,6 +1476,7 @@ class ClipSpec:
     mp4_budget: int = MP4_BUDGET
     gif: bool = True       # README clips ship a looping GIF beside the MP4
     default: bool = True   # recorded when no --only is given
+    poster_at: float | None = None  # also write <name>-poster.png from this second
 
 
 CLIPS: dict[str, ClipSpec] = {spec.name: spec for spec in (
@@ -1444,7 +1489,7 @@ CLIPS: dict[str, ClipSpec] = {spec.name: spec for spec in (
     # MP4 only, kept under GitHub's 10 MB limit for a video uploaded into a
     # README through the web editor (the way an inline player is embedded).
     ClipSpec("walkthrough", direct_walkthrough, 90, 180, 0,
-             mp4_budget=int(9.5 * MB), gif=False, default=False),
+             mp4_budget=int(9.5 * MB), gif=False, default=False, poster_at=2.0),
 )}
 
 
@@ -1580,6 +1625,14 @@ def record_clip(browser, spec: ClipSpec, stage: Path, work: Path,
         gif_setting = encode_gif(concat, gif, spec.gif_budget, spec.gif_stats)
         report.append(validate(gif, spec))
         report[1]["encoding"] = gif_setting
+    if spec.poster_at is not None:
+        # The README links this still to the MP4 until an inline player is
+        # embedded; it is the tour's own title card, not a mock-up.
+        poster = stage / f"{spec.name}-poster.png"
+        _ffmpeg("-ss", f"{spec.poster_at:.2f}", "-i", str(mp4), "-frames:v", "1", str(poster))
+        width, height = MP4_SIZE
+        report.append({"file": poster.name, "seconds": 0.0, "bytes": poster.stat().st_size,
+                       "width": width, "height": height, "encoding": f"frame at {spec.poster_at:g}s"})
     return report
 
 
@@ -1630,6 +1683,8 @@ def main(argv: list[str] | None = None) -> int:
                 browser = launch_chromium(p, args.chrome)
                 try:
                     for name in names:
+                        # Only pass the mirror when one is in use, so the call
+                        # keeps record_clip's original shape otherwise.
                         extra = {"mirror": mirror} if mirror is not None else {}
                         reports.extend(record_clip(browser, CLIPS[name], stage, work,
                                                    diagnostics, **extra))
