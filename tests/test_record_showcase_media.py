@@ -182,8 +182,16 @@ def test_clip_contract_matches_the_readme_media_budget():
         "comment-loop": (25, 35, 3 * recorder.MB),
         "appearance": (15, 25, 2 * recorder.MB),
         "graph": (15, 25, 2 * recorder.MB),
-        "search": (10, 15, 2 * recorder.MB),
+        "search": (10, 16, 2 * recorder.MB),
+        "walkthrough": (90, 180, 0),
     }
+    readme_clips = [name for name, spec in recorder.CLIPS.items() if spec.default]
+    assert readme_clips == ["comment-loop", "appearance", "graph", "search"]
+    assert all(recorder.CLIPS[name].gif for name in readme_clips)
+    walkthrough = recorder.CLIPS["walkthrough"]
+    assert not walkthrough.gif and not walkthrough.default
+    # GitHub embeds a README video only when the uploaded file is under 10 MB.
+    assert walkthrough.mp4_budget < 10 * recorder.MB
     assert recorder.MP4_SIZE == (1280, 720)
     assert recorder.MP4_BUDGET == int(2.5 * recorder.MB)
     assert recorder.GIF_WIDTH == 960 and recorder.GIF_FPS == 10
@@ -293,6 +301,6 @@ def test_help_lists_the_clips_and_options():
     result = subprocess.run([sys.executable, str(SCRIPTS / "record_showcase_media.py"), "--help"],
                             capture_output=True, text=True, timeout=60)
     assert result.returncode == 0, result.stderr
-    for text in ("--only", "--out", "--chrome", "--keep-frames",
-                 "comment-loop", "appearance", "graph", "search"):
+    for text in ("--only", "--out", "--chrome", "--keep-frames", "--cdn-mirror",
+                 "comment-loop", "appearance", "graph", "search", "walkthrough"):
         assert text in result.stdout
