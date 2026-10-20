@@ -194,9 +194,12 @@ and are reproducible from a live Studio. Use the browser setup above.
 On a host that cannot reach `cdn.jsdelivr.net` (a sandbox or an offline CI
 runner), add `--cdn-mirror vendor` to either script. The browser then gets
 the Studio's pinned Mermaid, KaTeX, highlight.js and Cytoscape files from the
-byte-verified copies in `scripts/okf_loom/viewer/vendor/`, with the page's SRI
-checks still enforced (see `scripts/cdn_mirror.py`). The media come out the
-same either way.
+lock-verified copies in `scripts/okf_loom/viewer/vendor/`, with the page's SRI
+checks still enforced (see `scripts/cdn_mirror.py`). Every SRI-pinned file is
+the identical vendored copy. The two ES-module entry points the Studio
+imports without SRI (Mermaid's and highlight.js's) are rebuilt locally from
+the same pinned versions, so they are equivalent to the CDN files, not
+byte-identical.
 
 **Screenshots and the social card:**
 

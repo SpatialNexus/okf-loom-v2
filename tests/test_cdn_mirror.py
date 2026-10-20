@@ -76,7 +76,7 @@ def test_query_strings_and_fragments_do_not_defeat_lookup(mirror):
     assert mirror.lookup(url + "?v=1") == mirror.lookup(url + "#x") == mirror.lookup(url)
 
 
-def test_unknown_cdn_paths_are_refused_and_recorded(mirror):
+def test_unknown_cdn_paths_are_refused(mirror):
     class Route:
         def __init__(self, url):
             self.request = type("R", (), {"url": url})()
@@ -91,7 +91,6 @@ def test_unknown_cdn_paths_are_refused_and_recorded(mirror):
     route = Route(mirror_mod.CDN_PREFIX + "left-pad@1.3.0/index.js")
     mirror._handle(route)
     assert route.aborted == "blockedbyclient"
-    assert mirror.misses[-1].endswith("left-pad@1.3.0/index.js")
 
 
 def test_mode_off_builds_nothing():

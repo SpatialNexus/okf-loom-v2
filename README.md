@@ -78,8 +78,10 @@ unless you opt in, see [Sharing and security](#sharing-and-security)).
 ### The two-minute tour
 
 <!-- To show an inline player here: edit this README on github.com, drag
-docs/media/walkthrough.mp4 onto the line below this comment, and remove the
-"Watch the tour" link once GitHub has inserted the video. -->
+docs/media/walkthrough.mp4 into the editor in place of the linked poster
+image below, and keep the description paragraph under it. -->
+
+[![The okf-loom tour's title card: okf-loom, Read and comment on your Markdown docs in a live studio, A two-minute tour](docs/media/walkthrough-poster.png)](docs/media/walkthrough.mp4)
 
 [Watch the tour](docs/media/walkthrough.mp4) (2 min, MP4): the home inventory,
 reading and source views, a comment worked to resolution by an agent, cited
@@ -139,9 +141,9 @@ passage, or comment on the whole page.
 
 **Rendering.** Mermaid diagrams, KaTeX math and highlighted code render in the
 page. [`docs-bundle/demo/showcase.md`](docs-bundle/demo/showcase.md) uses every
-renderer on one page.
+renderer on one page; here in Focus view, which widens the workspace.
 
-![A concept page rendering a Mermaid flowchart, a Mermaid sequence diagram and a KaTeX display equation, below the Rendered, Source, Split and Focus view controls and a Sections menu](docs/media/showcase-rendering.png)
+![A concept page in Focus view rendering a whole Mermaid flowchart from Author writes markdown to Agent applies edits, a Mermaid sequence diagram between User, Studio and Agent, and a KaTeX display equation, below the Rendered, Source and Split tabs, the checked Focus view box and a Sections menu](docs/media/showcase-rendering.png)
 
 **Search.** Every result shows the passage it matched, and its evidence gives
 the exact source lines and the methods that ranked it.
@@ -151,7 +153,7 @@ the exact source lines and the methods that ranked it.
 **Graph, dark mode.** The Bridges lens ranks the concepts that connect the
 bundle's topic areas. Hovering one lights up its connections.
 
-![The graph view in the Slate palette under the Bridges lens, with the pointer on CLI command reference: its connections stay lit while the rest of the graph dims, a preview card shows its type, description and 18 outgoing and 22 incoming links, and the Top bridgers list ranks it first at 100%](docs/media/graph-bridges-dark.png)
+![The graph view in the Slate palette under the Bridges lens, hovering CLI command reference: its connections stay lit while the rest of the graph dims, a preview card shows its type, description and 18 outgoing and 22 incoming links, and the Top bridgers list ranks it first at 100%](docs/media/graph-bridges-dark.png)
 
 **Phone.** The top bar and view tabs fit above the page. Scroll down and they
 slide away, leaving only the Sections row pinned; scroll up to bring them back.
