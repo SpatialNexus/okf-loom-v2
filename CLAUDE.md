@@ -21,3 +21,7 @@ Ground rules: run everything via the checked-in `scripts/okf-loom` helper
 keys and hand-authored content; the binding contract on any ambiguity is
 [`docs-bundle/reference/spec.md`](docs-bundle/reference/spec.md); the full
 rule list is [`resources/gotchas.md`](resources/gotchas.md).
+
+Commits: author them as SpatialNexus or AIC, never as Claude, and add no AI
+attribution trailers or PR footers (see `AGENTS.md`, "Commits and pull
+requests").

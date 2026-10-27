@@ -51,8 +51,9 @@ okf-site/
 .playwright-mcp/
 workspace/
 
-# Historical design checkout is reference-only input, never a release artifact.
-/docs/design/incoming-v1-theme/
+# Design inputs (the historical v1 theme checkout, the Ledger appearance pack)
+# are reference-only, never release artifacts.
+/docs/design/
 
 # Local screenshot/proof output from the capture helpers: never committed.
 /captures/
