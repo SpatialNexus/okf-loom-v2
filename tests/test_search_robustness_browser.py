@@ -115,8 +115,26 @@ def page():
                   if message.type == "error" else None)
             pg.on("response", lambda response: problems.append(f"http {response.status}: {response.url}")
                   if response.status >= 400 else None)
-            pg.on("requestfailed", lambda request: problems.append(f"requestfailed: {request.url} {request.failure}")
-                  if not request.url.split("?")[0].endswith(("/__events", "/__presence")) else None)
+            # live.js re-reads the current page's own path to refresh its derived
+            # regions (refreshDerivedRegions, 250ms after the stream connects). One
+            # in flight when a search submit leaves that page is aborted with it;
+            # that abort, between the main frame leaving and the next load, is benign.
+            departing: list[str] = []
+
+            def leaving(request) -> None:
+                if request.is_navigation_request() and request.frame == pg.main_frame and pg.url.startswith("http"):
+                    departing[:] = [urllib.parse.urlsplit(pg.url)._replace(query="", fragment="").geturl()]
+
+            def failed(request) -> None:
+                if request.url.split("?")[0].endswith(("/__events", "/__presence")):
+                    return
+                if request.resource_type == "fetch" and request.failure == "net::ERR_ABORTED" and request.url in departing:
+                    return
+                problems.append(f"requestfailed: {request.url} {request.failure}")
+
+            pg.on("request", leaving)
+            pg.on("requestfailed", failed)
+            pg.on("load", lambda _: departing.clear())
             pg.okf_problems = problems
             yield pg
             context.close()
