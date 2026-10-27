@@ -756,7 +756,7 @@ def test_pagehide_fences_late_save_and_escape_cancel_restores_focus(server_url, 
     trigger.click()
     page.get_by_role("button", name="Use selected text").click()
     page.get_by_role("button", name="Save anchor").click()
-    page.wait_for_function("window.okfLoomStudio.state.annotationEditor && window.okfLoomStudio.state.annotationEditor.mode === 'saving'")
+    page.wait_for_function("() => window.okfLoomStudio.state.annotationEditor && window.okfLoomStudio.state.annotationEditor.mode === 'saving'")
     page.evaluate("window.dispatchEvent(new PageTransitionEvent('pagehide'))")
     assert page.evaluate("window.okfLoomStudio.state.annotationEditor") is None
     held[0].fulfill(status=200, json={"ok": True, "comment": {}, "concept_content_rev": "a" * 64, "replayed": False})
@@ -1254,8 +1254,10 @@ def test_wrapped_sample_reaches_ready_with_valid_projection(server_url, page):
     (orders.md:59-63) must produce a valid projection that the browser
     validator accepts. commentsStatus must be 'ready', not 'error'."""
     page.goto(server_url + "/tables/orders", wait_until="load")
-    page.wait_for_function("typeof window.okfLoomStudio === 'object'")
-    page.wait_for_function("!!(window.okfLoomStudio.state.doc && window.okfLoomStudio.state.doc.annotation_source)")
+    # Function predicates: a bare expression is re-polled through eval(),
+    # which the studio's CSP (no 'unsafe-eval') rejects.
+    page.wait_for_function("() => typeof window.okfLoomStudio === 'object'")
+    page.wait_for_function("() => !!(window.okfLoomStudio.state.doc && window.okfLoomStudio.state.doc.annotation_source)")
     # Must be ready, not error. Do not accept error.
     page.wait_for_function("() => window.okfLoomStudio.state.commentsStatus === 'ready'")
     assert page.evaluate("window.okfLoomStudio.state.commentsStatus") == "ready"
@@ -1329,7 +1331,11 @@ def test_resolved_mark_has_visible_styling(server_url, page):
     }""")
     mark = page.locator("mark.okf-comment-mark[data-comment-id='01JRESOLVED']")
     expect(mark).to_be_visible()
-    style = mark.evaluate("""e => {
+    # Query and read in one evaluation: live.js's initial-ready reconciliation
+    # may re-apply marks (a fresh <mark> element) after the seed, and a handle
+    # resolved a round trip earlier would then be detached.
+    style = page.evaluate("""() => {
+        const e = document.querySelector("mark.okf-comment-mark[data-comment-id='01JRESOLVED']");
         const s = getComputedStyle(e);
         return {
             bg: s.backgroundColor,
