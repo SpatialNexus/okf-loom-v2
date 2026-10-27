@@ -793,19 +793,38 @@ def test_graph_presence_halo(server_url: str, page) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_toast_has_no_sidestripe_border(server_url: str, page) -> None:
-    """A toast must not use a >1px border-left stripe (impeccable ban)."""
+_RESOLVED_TOKENS_JS = """(names) => { const probe = document.createElement('span');
+  document.body.appendChild(probe); const out = {};
+  for (const n of names) { probe.style.color = `var(${n})`; out[n] = getComputedStyle(probe).color; }
+  probe.remove(); return out; }"""
+
+
+def test_toast_tone_is_a_status_bar_not_a_wash(server_url: str, page) -> None:
+    """Ledger: a toast's tone is a 2px status bar down its left edge plus a
+    status-hued glyph — never a tinted wash or a tinted frame. The toast is
+    a floating layer: panel surface, square, the --shadow-pop ring."""
     page.goto(f"{server_url}/tables/orders", wait_until="load")
     _wait_for_studio(page)
-    page.evaluate("window.okfLoomStudio._toast('test toast', { tone: 'success' })")
-    toast = page.locator(".okf-toast").first
-    expect(toast).to_be_visible(timeout=3000)
-    bw = toast.evaluate("el => parseFloat(getComputedStyle(el).borderLeftWidth)")
-    assert bw <= 1.0, f"toast border-left-width is {bw}px (>1px side-stripe)"
+    tokens = page.evaluate(_RESOLVED_TOKENS_JS, ["--status-ok", "--status-error", "--surface"])
+    for tone, status in (("success", "--status-ok"), ("error", "--status-error")):
+        page.evaluate(f"window.okfLoomStudio._toast('{tone} toast', {{ tone: '{tone}' }})")
+        toast = page.locator(f".okf-toast[data-tone='{tone}']").first
+        expect(toast).to_be_visible(timeout=3000)
+        s = toast.evaluate("""el => { const s = getComputedStyle(el), i = getComputedStyle(el.querySelector('.okf-toast__icon'));
+          return {bl: parseFloat(s.borderLeftWidth), blc: s.borderLeftColor, bt: parseFloat(s.borderTopWidth),
+                  bg: s.backgroundColor, radius: s.borderTopLeftRadius, shadow: s.boxShadow,
+                  icon: i.color, iconBg: i.backgroundColor}; }""")
+        assert s["bl"] == 2 and s["blc"] == tokens[status], (tone, s, tokens)
+        assert s["bt"] == 0, f"{tone} toast regained a tinted frame: {s}"
+        assert s["bg"] == tokens["--surface"], f"{tone} toast is washed with a tint: {s}"
+        assert s["icon"] == tokens[status] and s["iconBg"] in ("rgba(0, 0, 0, 0)", "transparent"), (tone, s)
+        assert s["radius"] == "0px" and s["shadow"].startswith("rgb") and "0px 0px 0px 1px" in s["shadow"], (tone, s)
 
 
 def test_claimed_comment_has_no_sidestripe(server_url: str, page) -> None:
-    """A claimed comment card must not use a >1px border-left stripe."""
+    """A claimed thread is a record row, not a tinted card: no thick left
+    border frame and no warn wash. Its state is the outlined micro-label plus
+    a 2px warn status bar (painted inset, so the row geometry never shifts)."""
     page.goto(f"{server_url}/tables/orders", wait_until="load")
     _wait_for_studio(page)
     page.evaluate(
@@ -827,6 +846,10 @@ def test_claimed_comment_has_no_sidestripe(server_url: str, page) -> None:
     assert bw <= 1.0 or bw == rw, (
         f"claimed comment has a thick left stripe (left={bw}, right={rw})"
     )
+    tokens = page.evaluate(_RESOLVED_TOKENS_JS, ["--status-warn"])
+    cue = card.evaluate("el => ({bg: getComputedStyle(el).backgroundColor, shadow: getComputedStyle(el).boxShadow})")
+    assert cue["bg"] in ("rgba(0, 0, 0, 0)", "transparent"), f"claimed thread is washed with a tint: {cue}"
+    assert tokens["--status-warn"] in cue["shadow"] and "inset" in cue["shadow"], (cue, tokens)
 
 
 # ---------------------------------------------------------------------------
@@ -2206,6 +2229,50 @@ def test_conflict_modal_copy_and_button_hierarchy(server_url: str, page) -> None
     )
 
 
+def test_burst_toast_counts_read_grammatically_and_match_the_undo_button(server_url: str, page) -> None:
+    """D1-018 / M1-016: the toast read "7 text edits, 1 changes to 5 concepts
+    · Undo all (6)": plural nouns for a count of one, and a button that
+    counted undo targets while the summary counted changes. A count of one is
+    singular, and the coalesced button names the changes it reverts ("Undo 4
+    of 5" when one of them cannot be undone)."""
+    _install_error_trap(page)
+    page.goto(f"{server_url}/tables/orders", wait_until="load")
+    _wait_for_studio(page)
+    result = page.evaluate(
+        """async () => {
+            const hub = window.okfLoomLive;
+            const at = () => new Date().toISOString();
+            const read = async () => {
+                await new Promise(r => setTimeout(r, 700));
+                const toasts = document.querySelectorAll('.okf-toast');
+                const toast = toasts[toasts.length - 1];
+                return toast ? { text: toast.textContent.replace(/\\s+/g, ' ').trim(),
+                    actions: Array.from(toast.querySelectorAll('.okf-toast__action')).map(b => b.textContent.trim()) } : null;
+            };
+            hub.emit('activity', { id: 'plural-1', actor: 'agent', action: 'add_link',
+                ids: ['tables/orders'], ts: at() });
+            hub.emit('activity', { id: 'plural-2', actor: 'agent', action: 'mystery_op',
+                ids: ['tables/orders'], ts: at() });
+            const singular = await read();
+            for (let i = 0; i < 4; i++) {
+                hub.emit('activity', { id: 'mixed-undo-' + i, actor: 'agent', action: 'replace_text',
+                    ids: ['tables/orders'], undoable: true, ts: at() });
+            }
+            hub.emit('activity', { id: 'mixed-undo-x', actor: 'agent', action: 'replace_text',
+                ids: ['tables/customers'], undoable: false, ts: at() });
+            const partial = await read();
+            return { singular, partial };
+        }"""
+    )
+    assert result["singular"], result
+    assert "Agent added 1 link, 1 change to " in result["singular"]["text"], result
+    assert "1 changes" not in result["singular"]["text"] and "1 links" not in result["singular"]["text"]
+    assert result["partial"], result
+    assert "added 5 text edits to 2 concepts" in result["partial"]["text"], result
+    assert result["partial"]["actions"] == ["Undo 4 of 5"], result
+    _assert_no_page_errors(page)
+
+
 def test_burst_toast_caps_inline_undo_buttons(server_url: str, page) -> None:
     """A burst of > 3 undoable groups collapses to a single 'Undo all (N)'
     button instead of rendering one button per group (CRI2-005). A toast is
@@ -2579,7 +2646,19 @@ def test_seeded_undo_all_mixed_group_and_standalone_restores_pre_burst_bytes(
     _wait_for_studio(page)
     _install_undo_journal(page)
 
-    seeded = page.evaluate(
+    # Seeding five HTTP writes is not itself a 500ms browser burst on a
+    # loaded host. Hold the browser clock until all five real SSE activities
+    # arrive, then advance the unchanged coalescing window as one burst.
+    page.wait_for_function("() => window.okfLoomLive.state === 'online'")
+    page.clock.install(time=0)
+    page.clock.pause_at(1000)
+    page.evaluate("""() => {
+        let received = 0;
+        window.okfLoomLive.on('activity', () => {
+            if (++received === 5) console.debug('mixed-burst-activities-received');
+        });
+    }""")
+    seed_burst = (
         """async (group) => {
             const apply = (target, args, groupId) =>
                 window.okfLoomStudio.ctx().tokenFetch("/__apply", {
@@ -2602,20 +2681,27 @@ def test_seeded_undo_all_mixed_group_and_standalone_restores_pre_burst_bytes(
             out.push(await apply("services/checkout",
                 { heading: "Endpoints", body: "Mixed-burst standalone services edit." }));
             return out;
-        }""",
-        group,
+        }"""
     )
+    with page.expect_console_message(
+        predicate=lambda message: message.text == 'mixed-burst-activities-received',
+        timeout=15000,
+    ):
+        seeded = page.evaluate(seed_burst, group)
+    page.clock.fast_forward(500)
+    page.clock.resume()
     assert seeded == [200, 200, 200, 200, 200], seeded
     # The burst really happened on disk.
     assert touched["tables/orders"].read_text(encoding="utf-8") != originals["tables/orders"]
 
     # Four undoable targets (standalone orders, the group, datasets,
-    # services) exceed the inline cap -> one coalesced "Undo all (4)".
-    _seeded_toast_action(page, "Undo all (4)")
+    # services) exceed the inline cap -> one coalesced button. It counts the
+    # five CHANGES it reverts, like the toast's summary line (D1-018/M1-016).
+    _seeded_toast_action(page, "Undo all (5)")
     clicked = page.evaluate(
         """() => {
             const btn = Array.from(document.querySelectorAll('.okf-toast .okf-toast__action'))
-                .find((b) => b.textContent.trim() === 'Undo all (4)');
+                .find((b) => b.textContent.trim() === 'Undo all (5)');
             if (!btn) return { missing: true };
             btn.click();
             return { disabled: btn.disabled };
@@ -2642,7 +2728,7 @@ def test_seeded_undo_all_mixed_group_and_standalone_restores_pre_burst_bytes(
     for cid, path in touched.items():
         assert path.read_text(encoding="utf-8") == originals[cid], cid
     success = page.locator('.okf-toast[data-tone="success"]',
-                           has_text="Undid 4 change(s)")
+                           has_text="Undid 5 change(s)")
     expect(success.first).to_be_visible()
     _assert_no_page_errors(page)
 
@@ -4145,7 +4231,7 @@ def test_presence_two_viewers_render_remote_pointer_and_leave(
                 bar = b.locator(".okf-mobile-presence")
                 expect(bar).to_be_visible()
                 expect(bar.locator(".okf-mobile-presence__collaborators")).to_have_text(f"1 collaborator · {label_a} · upper left")
-                bar.get_by_role("button", name="Show collaborator details").click()
+                bar.get_by_role("button", name="Show collaborators").click()
             expect(b.locator(".okf-collaborators")).to_have_attribute("open", "")
             row = _browser_rows(b)
             expect(row).to_have_count(1)

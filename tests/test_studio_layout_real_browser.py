@@ -1,10 +1,10 @@
 """Studio screen fit, measured in a real browser against the production server.
 
 The workspace (Rendered / Source / Split) takes the article column whatever
-the content length; running text shares one bounded lane with the title;
-Related, Comments and Split are admitted by the space that is really left.
-Every number here is measured CSS geometry at a set viewport. None of this
-is browser zoom.
+the content length; running text shares one bounded lane with the title and
+keeps the Ledger prose measure (~55ch); Related, Comments and Split are
+admitted by the space that is really left. Every number here is measured CSS
+geometry at a set viewport. None of this is browser zoom.
 """
 from __future__ import annotations
 
@@ -13,6 +13,12 @@ import pytest
 from browser_support import expect, launch_chromium, live_server, sync_playwright
 
 pytestmark = pytest.mark.browser
+
+# Ledger reading column (--doc-max / --okf-article-maxw) and Studio drawer.
+LEDGER_COLUMN = 760
+LEDGER_DRAWER = 320
+PROSE_MEASURE = """() => { const p = document.querySelector('.okf-page__body > p');
+  return p ? parseFloat(getComputedStyle(p).maxWidth) : null; }"""
 
 SHORT = "---\ntype: Note\ntitle: Short\n---\n\n# Short\n\nTwo words.\n"
 LONG_LINE = "okf-loom " + " ".join(f"--flag-{n}=value-{n}" for n in range(60))
@@ -113,9 +119,10 @@ def test_short_document_gets_the_whole_workspace(layout_base, browser, view):
     g = _geometry(page)
     assert g["mode"] == view, g
     # The article is the bounded content column (--okf-article-maxw): at
-    # 1920 the shell track is wider, so the column caps at 1120px and the
-    # workspace still fills the WHOLE column whatever the content length.
-    assert g["article"]["w"] == 1120, g
+    # 1920 the shell track is wider, so the column caps at the Ledger 760px
+    # reading column and the workspace still fills the WHOLE column whatever
+    # the content length.
+    assert g["article"]["w"] == LEDGER_COLUMN, g
     assert abs(g["view"]["w"] - g["article"]["w"]) <= 1, f"workspace shrink-wrapped its content: {g}"
     if view == "source":
         assert abs(g["source"]["w"] - g["article"]["w"]) <= 1, g
@@ -128,33 +135,40 @@ def test_short_document_gets_the_whole_workspace(layout_base, browser, view):
 @pytest.mark.parametrize("width", [1920, 1280, 390])
 def test_title_headings_and_prose_share_one_bounded_lane(layout_base, browser, width):
     """One bounded article column: title band, headings, prose AND wide
-    blocks (table wrapper, code scrollport) all start and end on the same
-    edges. The text is bounded by the column, not by a narrower centered
-    prose strip, and no block overhangs the column."""
+    blocks (table wrapper, code scrollport) all start on the same edge.
+    Headings and wide blocks span the lane; running text keeps the Ledger
+    prose measure (~55ch) and fills it, or the whole lane when the lane is
+    narrower. No block overhangs the column."""
     page = _open(browser, layout_base, "rich", width)
     g = _geometry(page)
+    measure = page.evaluate(PROSE_MEASURE)
+    assert measure and measure < LEDGER_COLUMN, f"prose has no Ledger measure: {measure}"
     assert g["para"]["w"] <= g["article"]["w"], f"prose overflows the article column: {g}"
     assert abs(g["title"]["x"] - g["para"]["x"]) <= 1, f"title and prose start on different edges: {g}"
     assert abs(g["h2"]["x"] - g["para"]["x"]) <= 1, f"heading and prose start on different edges: {g}"
-    assert abs(g["h2"]["w"] - g["para"]["w"]) <= 1, f"the measure depends on the element font: {g}"
-    # Wide blocks share the paragraph edges (the whole point of the single
-    # column) instead of overhanging the text on both sides.
+    # Long running text reaches its measure: the lane where it fits, else the
+    # ~55ch prose measure (never an arbitrary narrower strip).
+    assert abs(g["para"]["w"] - min(g["h2"]["w"], measure)) <= 1, f"prose misses its measure: {g} {measure}"
+    # Wide blocks share the lane edges (the whole point of the single
+    # column) instead of overhanging the text on either side.
     wide = page.evaluate("""() => {
       const f = [...document.querySelectorAll('.okf-page__body .okf-tablewrap')].pop();
       const r = f.getBoundingClientRect();
       return {left: Math.round(r.left), right: Math.round(r.right), width: Math.round(r.width)};
     }""")
     assert abs(wide["left"] - g["para"]["x"]) <= 2, (wide, g)
-    assert abs(wide["right"] - g["para"]["right"]) <= 2, (wide, g)
+    assert abs(wide["right"] - g["h2"]["right"]) <= 2, (wide, g)
     assert g["overflow"] <= 0, g
 
 
 def test_panel_back_control_looks_clickable_and_responds(layout_base, browser):
-    """The rail's '← Studio' control must read as a button at rest — elevated
-    surface, strong border, pointer cursor, labelled for assistive tech —
-    and must visibly respond on hover and press. Interaction semantics
-    (activation, Escape, focus restoration) are covered by the shell and
-    phase4 behavior tests; this pins the affordance."""
+    """The rail's '← Studio' control must read as a button at rest — the
+    Ledger outlined button: a visible 1px --btn-border outline on a
+    transparent ground, a 32px control height, pointer cursor, labelled for
+    assistive tech — and must visibly respond on hover and press.
+    Interaction semantics (activation, Escape, focus restoration) are
+    covered by the shell and phase4 behavior tests; this pins the
+    affordance."""
     page = _open(browser, layout_base, "rich", 1280)
     # Reach Comments the way a user does — Studio launcher, then the nested
     # Comments control. The back control only exists after a real Studio →
@@ -173,12 +187,14 @@ def test_panel_back_control_looks_clickable_and_responds(layout_base, browser):
 
     rest = page.evaluate(
         """() => { const s = getComputedStyle(document.querySelector('.okf-panel__back'));
-          return {cursor: s.cursor, bg: s.backgroundColor,
-                  border: s.borderTopWidth, minHeight: parseFloat(s.minHeight)}; }""")
+          return {cursor: s.cursor, bg: s.backgroundColor, borderColor: s.borderTopColor,
+                  borderStyle: s.borderTopStyle, border: s.borderTopWidth,
+                  minHeight: parseFloat(s.minHeight)}; }""")
     assert rest["cursor"] == "pointer", rest
-    assert rest["bg"] not in ("transparent", "rgba(0, 0, 0, 0)"), (
-        f"back control has no surface at rest — reads as plain text: {rest}")
-    assert rest["border"] == "1px" and rest["minHeight"] >= 36, rest
+    # Ledger buttons are outlined, not filled: the outline is the affordance.
+    assert rest["borderStyle"] == "solid" and rest["borderColor"] not in ("transparent", "rgba(0, 0, 0, 0)"), (
+        f"back control has no visible outline at rest — reads as plain text: {rest}")
+    assert rest["border"] == "1px" and rest["minHeight"] >= 32, rest
 
     at_rest = bg_color()
     back.hover()
@@ -259,12 +275,14 @@ def test_related_yields_then_comments_overlays_by_measured_space(layout_base, br
     # 1200: Comments fits beside the article only because Related yields.
     page = _open(browser, layout_base, "rich", 1200)
     closed = _geometry(page)
-    assert closed["related"] == "side" and closed["sidebar"]["right"] <= closed["article"]["x"], closed
+    # Ledger: the Related panel sits to the right of the reading column.
+    assert closed["related"] == "side" and closed["sidebar"]["x"] >= closed["article"]["right"], closed
     page.evaluate("() => window.okfLoomStudio.openPanel('comments')")
     page.wait_for_function("() => document.body.classList.contains('okf-panel-rail')")
     opened = _geometry(page)
     assert opened["related"] == "below", opened
     assert opened["article"]["w"] >= 600, f"reading column squeezed before Related yielded: {opened}"
+    assert opened["panel"]["w"] == LEDGER_DRAWER, f"Studio drawer is not the Ledger 320px rail: {opened}"
     assert opened["article"]["right"] <= opened["panel"]["x"] + 1, opened
     assert opened["panelRole"] == "complementary" and opened["panelModal"] is None, opened
     assert opened["overflow"] <= 0, opened
@@ -281,9 +299,10 @@ def test_related_yields_then_comments_overlays_by_measured_space(layout_base, br
     assert restored["related"] == "side" and restored["article"] == closed["article"], (closed, restored)
     page.context.close()
 
-    # 1000: no safe side-by-side even with Related yielded, so Comments
-    # overlays as a modal and the document keeps its geometry underneath.
-    page = _open(browser, layout_base, "rich", 1000, 800)
+    # 900: no safe side-by-side even with Related yielded (the 320px rail
+    # would leave less than the 600px reading minimum), so Comments overlays
+    # as a modal and the document keeps its geometry underneath.
+    page = _open(browser, layout_base, "rich", 900, 800)
     closed = _geometry(page)
     page.evaluate("() => window.okfLoomStudio.openPanel('comments')")
     page.locator("#okf-panel").wait_for(state="visible")
@@ -294,7 +313,9 @@ def test_related_yields_then_comments_overlays_by_measured_space(layout_base, br
 
 
 def test_split_is_admitted_by_workspace_width_and_returns_with_the_room(layout_base, browser):
-    page = _open(browser, layout_base, "rich?view=split", 1104, 800)
+    # 960: Split fits the closed workspace; the 320px Comments rail then
+    # leaves a 600px column, too narrow for two readable panes.
+    page = _open(browser, layout_base, "rich?view=split", 960, 800)
     g = _geometry(page)
     assert g["mode"] == "split" and g["splitDisabled"] is None, g
     assert g["body"]["w"] >= 300 and g["source"]["w"] >= 300, g
@@ -328,7 +349,7 @@ def test_split_is_admitted_by_workspace_width_and_returns_with_the_room(layout_b
     assert not page.console_errors, page.console_errors
 
 
-# --- Reading Focus workspace + persistent document view controls ----------
+# --- Reading Focus workspace + scroll-aware document view controls --------
 
 BAR_STACK = """() => {
   const rect = (sel) => { const n = document.querySelector(sel); if (!n || !n.getClientRects().length) return null;
@@ -350,6 +371,51 @@ BAR_STACK = """() => {
     overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
   };
 }"""
+
+
+def _assert_view_controls_hit(page):
+    """Every painted view control must receive pointer input, not just exist."""
+    controls = page.locator(".okf-concept-viewbar .okf-viewswitch__btn")
+    assert controls.count() >= 5
+    for control in controls.all():
+        if not control.is_visible():
+            continue  # Wrap is absent in Rendered; it is checked again in Source.
+        assert control.evaluate("""node => {
+          const r = node.getBoundingClientRect();
+          const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          return r.top >= 0 && r.bottom <= innerHeight && !!hit && node.contains(hit);
+        }"""), control.inner_text()
+
+
+def _reveal_phone_viewbar_after_scroll(page):
+    """Down hides the tabs by transform; a small upward scroll reveals them."""
+    page.wait_for_function("() => document.documentElement.dataset.okfChrome === 'compact'")
+    page.wait_for_function("""() => !document.getAnimations().some(a =>
+      a.transitionProperty === 'transform' && a.playState === 'running')""")
+    hidden = page.evaluate("""() => {
+      const bar = document.querySelector('.okf-concept-viewbar');
+      const tabs = bar.querySelector('.okf-viewswitch');
+      const jump = bar.querySelector('.okf-outline-jump');
+      const top = document.querySelector('.okf-topbar');
+      return {shift: new DOMMatrixReadOnly(getComputedStyle(bar).transform).m42,
+        tabsBottom: tabs.getBoundingClientRect().bottom,
+        topBottom: top.getClientRects().length ? top.getBoundingClientRect().bottom : 0,
+        jumpTop: jump && jump.getClientRects().length ? jump.getBoundingClientRect().top : null};
+    }""")
+    assert hidden["shift"] < 0 and hidden["tabsBottom"] <= 1 and hidden["topBottom"] <= 1, hidden
+    if hidden["jumpTop"] is not None:
+        assert 0 <= hidden["jumpTop"] <= 8, hidden  # Only Sections stays pinned.
+    page.evaluate("() => scrollBy(0, -50)")
+    page.wait_for_function("() => document.documentElement.dataset.okfChrome === 'revealed'")
+    page.wait_for_function("""() => !document.getAnimations().some(a =>
+      a.transitionProperty === 'transform' && a.playState === 'running')""")
+    g = page.evaluate(BAR_STACK)
+    if g["topbar"] is None:  # Reading Focus has no top bar.
+        assert g["bar"]["y"] == 0, g
+    else:
+        assert g["topbar"]["y"] == 0, g
+        assert abs(g["bar"]["y"] - g["topbar"]["bottom"]) <= 1, g
+    _assert_view_controls_hit(page)
 
 
 @pytest.mark.parametrize("width", [1600, 1920])
@@ -382,7 +448,7 @@ def test_focus_rendered_expands_and_exits_cleanly(layout_base, browser):
     assert "focus=" not in page.url
     g = page.evaluate(BAR_STACK)
     # Exiting Focus restores the bounded normal-mode article column.
-    assert g["focus"] is False and g["article"]["w"] == 1120, g
+    assert g["focus"] is False and g["article"]["w"] == LEDGER_COLUMN, g
     assert not page.console_errors, page.console_errors
     page.context.close()
 
@@ -455,7 +521,7 @@ def _focus_blocks(page):
     The review that returned the first Focus fix to FAIL showed why the outer
     article width alone is not acceptance evidence: wiki.css caps the rendered
     descendants through --okf-lane, so the article can be wide while every
-    paragraph inside it is still bounded at 1120px."""
+    block inside it is still bounded at the normal reading column."""
     return page.evaluate("""() => {
       const box = (n) => { if (!n || !n.getClientRects().length) return null;
         const r = n.getBoundingClientRect();
@@ -477,45 +543,55 @@ def _focus_blocks(page):
 
 
 def _assert_focus_block_spans_workspace(block, article, label):
-    """A focus content block must span the available workspace width — the
-    article minus the modest existing reading gutters (2 × 25px) — not the
-    retired 1120px lane, and it must keep the title's left edge."""
-    expected = article["w"] - 50
-    assert expected > 1120, f"viewport is not beyond the retired lane cap: {article}"
+    """A focus wide block (code, table) must span the available workspace
+    width — the article minus its modest reading gutters on both sides — not
+    the normal 760px reading column."""
+    inset = block["x"] - article["x"]
+    assert 0 <= inset <= 32, f"{label} lost the gutter alignment: {block} vs {article}"
+    expected = article["w"] - 2 * inset
+    assert expected > LEDGER_COLUMN, f"viewport is not beyond the normal column: {article}"
     assert abs(block["w"] - expected) <= 2, f"{label} kept an inner cap: {block} vs {article}"
-    assert abs(block["x"] - (article["x"] + 25)) <= 2, f"{label} lost the gutter alignment: {block} vs {article}"
 
 
 def test_focus_rendered_blocks_fill_the_expanded_workspace(layout_base, browser):
-    """Reading Focus must widen the CONTENT, not only its container: headers,
-    paragraphs, lists, quotes and ordinary code/table blocks take the whole
-    available workspace with the existing gutters at a desktop width beyond
-    the 1120px lane. Focus Split keeps its pane geometry, and the rendered
-    pane's own blocks fill that pane with the pane as the real scroll
-    surface."""
+    """Reading Focus must widen the CONTENT, not only its container: the
+    title band and ordinary code/table blocks take the whole available
+    workspace with the existing gutters at a desktop width beyond the 760px
+    column, while running text (paragraphs, list items, quotes) keeps the
+    Ledger ~55ch prose measure on the same left edge. Focus Split keeps its
+    pane geometry, and the rendered pane's own text sits at the pane edge
+    with the pane as the real scroll surface."""
     page = _open(browser, layout_base, "rich", 1600, 900)
     normal = _focus_blocks(page)
-    # Normal mode keeps the bounded lane: no block escapes the 1120px column.
+    measure = page.evaluate(PROSE_MEASURE)
+    # Normal mode keeps the bounded lane: no block escapes the 760px column.
     for label in ("para", "h2", "list", "quote", "code", "table"):
-        assert normal[label]["w"] <= 1120, f"normal {label} exceeds the bounded lane: {normal}"
+        assert normal[label]["w"] <= LEDGER_COLUMN, f"normal {label} exceeds the bounded lane: {normal}"
 
     page = _open(browser, layout_base, "rich?focus=1", 1600, 900)
     focus = _focus_blocks(page)
-    for label in ("para", "h2", "list", "quote", "code", "table"):
+    for label in ("code", "table"):
         _assert_focus_block_spans_workspace(focus[label], focus["article"], f"focus {label}")
+    assert focus["title"]["w"] >= focus["article"]["w"] - 64, f"focus title band kept a cap: {focus}"
+    for label in ("para", "list", "quote"):
+        # Running text keeps the prose measure and fills it (long lines).
+        assert abs(focus[label]["w"] - measure) <= 2, f"focus {label} lost the prose measure: {focus}"
+        assert abs(focus[label]["x"] - focus["code"]["x"]) <= 2, f"focus {label} left edge drifted: {focus}"
     assert abs(focus["title"]["x"] - focus["para"]["x"]) <= 2, focus
     assert focus["overflow"] <= 0, focus
 
     # Focus Split at 1600: panes keep the ~half/half geometry of the expanded
-    # article; the rendered pane's blocks fill the pane (the lane must not
-    # cap inside it) and the pane — not a blank clamp — owns the scrolling.
+    # article; the rendered pane's text starts at the pane edge and keeps the
+    # prose measure inside it, and the pane — not a blank clamp — owns the
+    # scrolling.
     page = _open(browser, layout_base, "rich?view=split&focus=1", 1600, 900)
     split = _focus_blocks(page)
     assert split["splitPane"]["w"] >= 700, split
     assert split["splitPane"]["w"] <= split["article"]["w"] / 2 + 8, split
     assert abs(split["splitPara"]["x"] - split["splitPane"]["x"]) <= 1, split
-    assert abs(split["splitPara"]["w"] - (split["splitPane"]["w"] - 12)) <= 2, \
-        f"split rendered blocks do not fill their pane: {split}"  # 12px = --okf-space-3 pane padding
+    # 12px = --okf-space-3 pane padding when the pane is narrower than the measure.
+    assert abs(split["splitPara"]["w"] - min(split["splitPane"]["w"] - 12, measure)) <= 2, \
+        f"split rendered text misses its measure inside the pane: {split}"
     assert split["splitScrolls"], f"split pane lost its usable scrolling height: {split}"
     assert split["overflow"] <= 0, split
     page.context.close()
@@ -543,8 +619,8 @@ def test_headingless_concept_publishes_chrome_geometry_and_keeps_toolbar_operabl
     a live patch without a reload), and the measured sticky-chrome variables
     (--okf-viewbar-top/-h) must still be published — with only the nominal
     token fallback, a wrapped shell paints over the pinned viewbar. Prove the
-    geometry, then prove the controls with real clicks at a deep scroll, in
-    Focus and after exiting it."""
+    geometry, then prove the phone tabs scroll away and return on scroll-up,
+    with real clicks at a deep scroll, in Focus and after exiting it."""
     page = _open(browser, headingless_base, "plain", 390, 844)
     assert page.evaluate("""() => {
         const host = document.querySelector('[data-okf-document-outline]');
@@ -559,17 +635,24 @@ def test_headingless_concept_publishes_chrome_geometry_and_keeps_toolbar_operabl
 
     page.evaluate("() => scrollTo(0, document.documentElement.scrollHeight)")
     page.wait_for_timeout(150)
+    _reveal_phone_viewbar_after_scroll(page)
     g = page.evaluate(BAR_STACK)
-    assert g["bar"]["y"] >= g["topbar"]["bottom"] - 1, f"viewbar pinned under the wrapped shell: {g}"
+    assert g["bar"]["y"] >= g["topbar"]["bottom"] - 1, f"revealed viewbar pinned under the wrapped shell: {g}"
     assert g["bar"]["bottom"] <= g["viewport"]["h"], f"viewbar scrolled out of the viewport: {g}"
     assert abs(g["bar"]["y"] - float(g["viewbarTopVar"].replace("px", ""))) <= 1, g
     assert abs(float(g["viewbarHVar"].replace("px", "")) - g["bar"]["h"]) <= 1, g
 
-    # Real clicks on the pinned bar at the deepest scroll position.
+    # Real clicks on the revealed bar while still deep in the document.
+    # Split is aria-disabled at this width but still explains a real pointer press.
+    split = page.locator('.okf-viewswitch__btn[data-mode="split"]').bounding_box()
+    page.mouse.click(split["x"] + split["width"] / 2, split["y"] + split["height"] / 2)
+    expect(page.locator("#okf-annotation-status")).to_contain_text("Split needs a wider workspace")
+    assert page.evaluate(BAR_STACK)["mode"] == "rendered"
     page.locator('.okf-viewswitch__btn[data-mode="source"]').click()
     page.wait_for_function("() => document.querySelector('.okf-view').dataset.okfView === 'source'")
     wrap = page.get_by_role("button", name="Wrap lines")
     expect(wrap).to_be_visible()
+    _assert_view_controls_hit(page)
     wrap.click()
     expect(wrap).to_have_attribute("aria-pressed", "false")
 
@@ -598,14 +681,15 @@ def test_headingless_concept_publishes_chrome_geometry_and_keeps_toolbar_operabl
 
 @pytest.mark.parametrize("width", [1600, 390])
 def test_view_controls_stay_visible_and_operable_while_scrolled(layout_base, browser, width):
-    """The Rendered/Source/Split/Wrap/Focus toolbar must persist — visibly in
-    the viewport and really clickable — at any scroll depth, in normal view
-    (stacked below the measured sticky shell) and in Reading Focus (pinned at
-    the very top with the shell hidden)."""
+    """Desktop keeps the toolbar pinned; phone tabs hide on scroll-down and
+    return on scroll-up. Once revealed every control is really clickable at
+    depth, below the measured shell or at the top in Reading Focus."""
     page = _open(browser, layout_base, "rich", width, 900)
     page.wait_for_timeout(250)
     page.evaluate("() => scrollTo(0, document.documentElement.scrollHeight)")
     page.wait_for_timeout(150)
+    if width <= 640:
+        _reveal_phone_viewbar_after_scroll(page)
     g = page.evaluate(BAR_STACK)
     assert g["bar"], g
     assert g["bar"]["y"] >= 0 and g["bar"]["bottom"] <= g["viewport"]["h"], \
@@ -614,14 +698,29 @@ def test_view_controls_stay_visible_and_operable_while_scrolled(layout_base, bro
     assert abs(g["bar"]["y"] - float(g["viewbarTopVar"].replace("px", ""))) <= 1, g
     assert abs(float(g["viewbarHVar"].replace("px", "")) - g["bar"]["h"]) <= 1, g
 
-    # A real Playwright click (visibility + actionability required) proves the
-    # pinned controls are operable, not merely present in the DOM.
+    # Hit-testing plus real Playwright clicks prove the pinned/revealed controls
+    # are operable, not merely present in the DOM.
+    _assert_view_controls_hit(page)
     if width >= 900:
         page.locator('.okf-viewswitch__btn[data-mode="split"]').click()
         page.wait_for_function("() => document.querySelector('.okf-view').dataset.okfView === 'split'")
         wrap = page.get_by_role("button", name="Wrap lines")
         expect(wrap).to_be_visible()
     else:
+        # aria-disabled Split still explains a real pointer press, without a forced click.
+        split = page.locator('.okf-viewswitch__btn[data-mode="split"]').bounding_box()
+        page.mouse.click(split["x"] + split["width"] / 2, split["y"] + split["height"] / 2)
+        expect(page.locator("#okf-annotation-status")).to_contain_text("Split needs a wider workspace")
+        assert page.evaluate(BAR_STACK)["mode"] == "rendered"
+        page.locator('.okf-viewswitch__btn[data-mode="source"]').click()
+        page.wait_for_function("() => document.querySelector('.okf-view').dataset.okfView === 'source'")
+        _assert_view_controls_hit(page)
+        wrap = page.get_by_role("button", name="Wrap lines")
+        expect(wrap).to_be_visible()
+        wrap.click()
+        expect(wrap).to_have_attribute("aria-pressed", "false")
+        page.locator('.okf-viewswitch__btn[data-mode="rendered"]').click()
+        page.wait_for_function("() => document.querySelector('.okf-view').dataset.okfView === 'rendered'")
         page.locator('.okf-viewswitch__btn[data-mode="source"]').click()
         page.wait_for_function("() => document.querySelector('.okf-view').dataset.okfView === 'source'")
 
@@ -634,6 +733,8 @@ def test_view_controls_stay_visible_and_operable_while_scrolled(layout_base, bro
 
     page.evaluate("() => scrollTo(0, Math.round(document.documentElement.scrollHeight / 2))")
     page.wait_for_timeout(150)
+    if width <= 640:
+        _reveal_phone_viewbar_after_scroll(page)
     g = page.evaluate(BAR_STACK)
     assert g["bar"]["y"] == 0 and g["bar"]["bottom"] <= g["viewport"]["h"], \
         f"viewbar did not stay pinned mid-scroll in focus: {g}"
@@ -734,7 +835,7 @@ def test_rendered_code_and_tables_scroll_locally_only_when_they_must(layout_base
         assert regions[key]["scrolls"] and regions[key]["tab"] == "0" and regions[key]["role"] == "region", regions
         assert regions[key]["label"], regions
     assert regions["preWs"] == "pre", regions          # formatting kept, not wrapped
-    assert regions["cellFont"] >= 13, regions          # scrolled, not scaled down
+    assert regions["cellFont"] >= 12.5, regions        # scrolled, not scaled down (Ledger cell 12.5px)
     assert regions["overflow"] <= 0, regions
     port = page.locator(".okf-page__body .okf-content-scrollport").first
     port.focus()

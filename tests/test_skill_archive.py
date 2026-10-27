@@ -931,7 +931,7 @@ def test_vendored_licence_notices_ship_in_the_skill_archive(tmp_path: Path) -> N
     licences = [entry["dest"] for package in lock["packages"] for entry in package["files"]
                 if entry["dest"].rsplit("/", 1)[-1] == "LICENSE"]
     notices = [entry["dest"] for entry in lock["auxiliary"] if entry["role"] == "notices"]
-    assert len(licences) == len(lock["packages"]) == 9
+    assert len(licences) == len(lock["packages"]) == 11
     assert {"THIRD-PARTY-NOTICES.txt", "BUNDLED-DEPENDENCY-NOTICES.txt"} <= set(notices)
     paths = [f"{vendor_rel}/{dest}" for dest in (*licences, *notices)]
     root = _repo(tmp_path)

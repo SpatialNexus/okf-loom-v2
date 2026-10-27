@@ -603,7 +603,8 @@ def test_live_graph_uses_existing_studio_and_fails_closed_on_corruption(tmp_path
     try:
         with urllib.request.urlopen(url, timeout=5) as response:
             payload = json.loads(response.read())
-            assert response.headers["Cache-Control"] == "no-store"
+            assert response.headers["Cache-Control"] == "private, no-cache"
+            assert re.fullmatch(r'"[0-9a-f]{64}"', response.headers["ETag"])
         nodes = {node["data"]["id"]: node["data"] for node in payload["nodes"]}
         assert nodes["tables/orders"]["active_comment_count"] == 1
         assert "HTTP private body" not in json.dumps(payload)

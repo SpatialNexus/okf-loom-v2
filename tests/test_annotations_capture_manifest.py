@@ -565,9 +565,9 @@ def test_inventory_rejects_socket():
     """r5-6: a socket in an inventory root raises ValueError."""
     import socket as _socket
     import tempfile
-    # AF_UNIX paths are length-limited (~108 chars); the session TMPDIR is
-    # already ~104 chars, so use the system /tmp with a very short prefix.
-    short_tmp = Path(tempfile.mkdtemp(dir="/tmp", prefix="s"))
+    # Conftest supplies a short private TMPDIR for Unix socket consumers;
+    # tmp_path itself may be too deep, and system /tmp may be denied.
+    short_tmp = Path(tempfile.mkdtemp(prefix="s"))
     try:
         root = short_tmp / "r"
         (root / "scripts").mkdir(parents=True)
@@ -642,22 +642,22 @@ def test_inventory_rejects_device_file(tmp_path):
 # ---- r5-7: Git provenance fails closed -----------------------------------
 
 
-def test_git_tracked_set_raises_on_non_git_dir():
+def test_git_tracked_set_raises_on_non_git_dir(monkeypatch):
     """r5-7: _git_tracked_set raises GitProvenanceError outside a git repo."""
     from okf_loom.capture_provenance import _git_tracked_set
-    # Use /tmp directly — the session TMPDIR is inside the repo so git would
-    # discover the parent repo and succeed.
+    # TMPDIR may be inside a checkout. Stop Git's parent discovery at this
+    # fixture boundary, without requiring a writable system /tmp.
     import tempfile
     import shutil as _shutil
-    non_git = Path(tempfile.mkdtemp(dir="/tmp", prefix="ng_"))
+    non_git = Path(tempfile.mkdtemp(prefix="ng_"))
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(non_git.parent))
     try:
         # Guard: verify this dir really is outside any git repo.
         result = subprocess.run(
             ["git", "rev-parse", "--git-dir"],
             cwd=str(non_git), capture_output=True, text=True, timeout=5,
         )
-        if result.returncode == 0:
-            return  # can't create a true non-git dir — skip
+        assert result.returncode != 0, "fixture unexpectedly discovered a Git repository"
         try:
             _git_tracked_set(non_git)
             raise AssertionError("should have raised GitProvenanceError")
@@ -667,11 +667,12 @@ def test_git_tracked_set_raises_on_non_git_dir():
         _shutil.rmtree(str(non_git), ignore_errors=True)
 
 
-def test_compute_inventory_fails_on_git_error():
+def test_compute_inventory_fails_on_git_error(monkeypatch):
     """r5-7: compute_inventory_entries raises on Git failure."""
     import tempfile
     import shutil as _shutil
-    root = Path(tempfile.mkdtemp(dir="/tmp", prefix="ng_")) / "repo"
+    root = Path(tempfile.mkdtemp(prefix="ng_")) / "repo"
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(root.parent))
     (root / "scripts").mkdir(parents=True)
     (root / "scripts" / "f.py").write_text("x = 1\n")
     try:
@@ -679,8 +680,7 @@ def test_compute_inventory_fails_on_git_error():
             ["git", "rev-parse", "--git-dir"],
             cwd=str(root), capture_output=True, text=True, timeout=5,
         )
-        if result.returncode == 0:
-            return  # can't create a true non-git dir — skip
+        assert result.returncode != 0, "fixture unexpectedly discovered a Git repository"
         try:
             compute_inventory_entries(root)
             raise AssertionError("should have raised on missing git")
@@ -2305,11 +2305,18 @@ def _post_real_comment_and_get_mark_id(page, server_url, mod):
     composer = page.get_by_role("textbox", name="Comment for agent")
     composer.fill("Integration probe for resolved-mark helpers.")
     page.get_by_role("button", name="Send", exact=True).click()
+    # The first mark is optimistic and its local id is renamed after POST.
+    # Bind the helper proof to the settled canonical row, not that transient id.
+    page.wait_for_function("""() => {
+        const s = window.okfLoomStudio.state;
+        return s.commentsStatus === 'ready' && !s.composerPost && s.comments.some(c =>
+            c.body === 'Integration probe for resolved-mark helpers.' && c.row_token &&
+            document.querySelector('mark.okf-comment-mark[data-comment-id="' + CSS.escape(c.id) + '"]'));
+    }""")
     page.wait_for_function(
         "() => document.querySelector('mark.okf-comment-mark') !== null")
-    comment_id = page.evaluate(
-        "() => document.querySelector('mark.okf-comment-mark')"
-        ".getAttribute('data-comment-id')")
+    comment_id = page.evaluate("""() => window.okfLoomStudio.state.comments.find(c =>
+        c.body === 'Integration probe for resolved-mark helpers.' && c.row_token).id""")
     if not comment_id:
         raise AssertionError("no data-comment-id on the rendered mark")
     return comment_id

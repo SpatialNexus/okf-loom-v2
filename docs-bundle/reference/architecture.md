@@ -248,12 +248,13 @@ okf-loom is extensible without forking. The five override surfaces:
    Claude Code / Codex) is itself the best true-semantic engine, so a
    dense/vector backend would be redundant. The CLI `--mode` flag
    dispatches to the matching backend.
-3. **Viewer template / static / palette / config overrides**
+3. **Viewer template / static / config overrides**
    (`viewer/assets.py`). A bundle drops files under
-   `.okf-loom/viewer/{templates,static}/`, `.okf-loom/viewer/palette.json`, or
-   `.okf-loom/viewer/config.json` to customise rendering without code. Palette
-   overrides are gated on the active-code gate AND validated against a strict
-   CSS-color allowlist. See `viewer/OVERRIDES.md`.
+   `.okf-loom/viewer/{templates,static}/` or `.okf-loom/viewer/config.json`
+   to customise rendering. Executable overrides require the active-code gate.
+   Type-colour overrides in `.okf-loom/viewer/palette.json` are retired:
+   compatibility data may still be loaded, but Ledger ignores it when painting
+   types and graph nodes. See `viewer/OVERRIDES.md`.
 4. **ViewerPlugin hook** (`viewer/plugins.py`, current spec §15).
    `on_concept_render(concept, html) -> html` (plus optional
    `on_index_render`). Plugins are discovered via the

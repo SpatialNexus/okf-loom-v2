@@ -46,14 +46,18 @@ def test_shared_shell_has_stable_order_and_one_active_destination(
     pages = {
         "index": output / "index.html",
         "concept": output / "tables" / "users.html",
+        "section-index": output / "tables" / "index.html",
         "search": output / "__search.html",
         "graph": output / "__graph.html",
     }
+    # D1-017: a concept page is no destination's page, so nothing is marked
+    # aria-current="page" there (Index used to be).
     expected_active = {
-        "index": "index",
-        "concept": "index",
-        "search": "search",
-        "graph": "graph",
+        "index": ["index"],
+        "concept": [],
+        "section-index": [],
+        "search": ["search"],
+        "graph": ["graph"],
     }
 
     for route, path in pages.items():
@@ -61,7 +65,7 @@ def test_shared_shell_has_stable_order_and_one_active_destination(
         assert [name for name, _ in probe.items] == [
             "bundle", "search", "index", "graph", "studio", "appearance",
         ], route
-        assert probe.current_links == [expected_active[route]], route
+        assert probe.current_links == expected_active[route], route
 
 
 def test_portable_shell_reserves_but_does_not_advertise_studio(
@@ -76,6 +80,33 @@ def test_portable_shell_reserves_but_does_not_advertise_studio(
         assert "hidden" in studio
         assert studio.get("data-okf-studio-capability") == "unavailable"
         assert ">Studio<" not in html
+        for page in output.rglob("*.html"):
+            assert "data-okf-viewbar-placeholder" not in page.read_text(encoding="utf-8")
+
+
+def test_inactive_live_shell_does_not_emit_launcher():
+    from okf_loom.render import _application_shell_html
+    html = _application_shell_html(
+        name="Proof", bundle_href="/", search_href="/__search", index_href="/",
+        graph_href="/__graph", current="index", mode="serve", studio_available=False,
+    )
+    assert 'data-okf-studio-capability="unavailable"' in html
+    assert 'okf-studio-launcher' not in html
+
+
+def test_live_shell_emits_only_inert_launcher_placeholder():
+    from okf_loom.render import _application_shell_html
+
+    html = _application_shell_html(
+        name="Proof", bundle_href="/", search_href="/__search", index_href="/",
+        graph_href="/__graph", current="index", mode="serve",
+    )
+    probe = _ShellProbe()
+    probe.feed(html)
+    studio = dict(probe.items)["studio"]
+    assert studio["data-okf-studio-capability"] == "available" and "hidden" in studio
+    assert 'class="okf-studiobtn okf-studio-launcher" disabled tabindex="-1" aria-hidden="true"' in html
+    assert 'class="okf-studio-launcher__label">Studio</span>' in html
 
 
 def test_single_file_uses_target_honest_shared_shell(
@@ -218,8 +249,7 @@ def test_shell_search_current_destination_and_query_escaping(
     shell = _application_shell_html(
         name="tiny_good", bundle_href="/", search_href="/__search", index_href="/",
         graph_href="/__graph", current="search", mode="serve",
-        initial_theme="okf-loom", initial_mode="auto", initial_contrast="normal",
-        initial_border="subtle", search_query=hostile_query,
+        appearance_choice="bone", search_query=hostile_query,
     )
     probe = _ShellProbe()
     probe.feed(shell)
@@ -234,8 +264,7 @@ def test_shell_search_current_destination_and_query_escaping(
     plain = _application_shell_html(
         name="tiny_good", bundle_href="/", search_href="/__search", index_href="/",
         graph_href="/__graph", current=None, mode="serve",
-        initial_theme="okf-loom", initial_mode="auto", initial_contrast="normal",
-        initial_border="subtle",
+        appearance_choice="bone",
     )
     plain_probe = _ShellProbe()
     plain_probe.feed(plain)

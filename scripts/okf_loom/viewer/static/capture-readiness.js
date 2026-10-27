@@ -29,7 +29,7 @@
       cssViewport: { width: innerWidth, height: innerHeight },
       dpr: Number(window.devicePixelRatio || 1),
       browserZoomEvidence: { visualViewportScale: vv ? Number(vv.scale || 1) : null, source: "visualViewport.scale; not a text-only zoom claim" },
-      theme: document.documentElement.dataset.theme || (document.body && document.body.dataset.theme) || "light",
+      theme: document.documentElement.dataset.theme || (document.body && document.body.dataset.theme) || "bone",
       javascript: true,
       readinessPhase: phase,
       generation: own,
@@ -158,6 +158,12 @@
         message: renderer.message || "The document renderer could not settle.",
       };
       if (renderer.status !== "ready") return { pending: true, phase: "deferred-renderers" };
+      // A ready cycle for an older palette (its Mermaid SVGs still carry the
+      // old colours) is not ready for the palette now on the root.
+      if (typeof renderer.themeName === "string" && root.hasAttribute("data-theme") &&
+          renderer.themeName !== root.getAttribute("data-theme")) {
+        return { pending: true, phase: "deferred-renderers" };
+      }
     }
 
     // A served page with a bootstrap block is expected to expose the usable
@@ -307,6 +313,10 @@
   }
   function start(options) {
     options = options || {};
+    // A capture shows the full page chrome: on phones the top bar scrolls
+    // away while reading (shell.css); this marker keeps it revealed, without
+    // a slide, for the rest of the page's life.
+    try { document.documentElement.setAttribute("data-okf-capture", "active"); } catch (error) { /* no root */ }
     var own = ++generation, started = Date.now(), targetName = options.target || "document";
     if (active) finish(active, failure("superseded", "Capture readiness was superseded by a newer generation.", active.generation, active.started, "superseded"));
     var resolvePromise, rejectPromise;

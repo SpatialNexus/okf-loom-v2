@@ -100,6 +100,340 @@ def open_page(chromium, server_url):
         context.close()
 
 
+@pytest.fixture(scope='module')
+def coarse_server_url(tmp_path_factory):
+    bundle = copy_bundle(DEMO_BUNDLE, tmp_path_factory.mktemp('coarse-targets') / 'bundle')
+    concept = bundle / 'tables/orders.md'
+    concept.write_text(concept.read_text() + ''.join(f'\n## Extra section {i}\n\nText.\n' for i in range(12)))
+    for path in ['demo/annotations_v2_showcase.md', 'explanation/v2_release_notes.md']:
+        file = bundle / path
+        file.parent.mkdir(exist_ok=True)
+        file.write_text('---\ntype: Reference\ntitle: Coarse proof\n---\n# Coarse proof\n')
+    with live_server(bundle) as base:
+        yield base
+
+
+# The shell's brand link and the (focused) skip link are coarse targets on
+# every route, not only the route-specific controls.
+_SHELL_TARGETS = ['.okf-brand-link', '.okf-skip-link']
+
+
+@pytest.mark.parametrize('route,selectors', [
+    (CONCEPT, ['.okf-sidebar-panel__toggle', '.okf-heading-anchor', '.okf-breadcrumb a',
+               '.okf-conn__title', '.okf-viewswitch__btn', '.okf-onthispage__filter',
+               '.okf-th-sortable', '.okf-entity-chip', '.okf-document-end a',
+               '.okf-toast__action', '.okf-toast__close', *_SHELL_TARGETS]),
+    (INDEX, ['.okf-card__link', '.okf-card__comments', '.okf-v2-spotlight__tertiary', *_SHELL_TARGETS]),
+    (SEARCH, ['.okf-search-mode', '.okf-search-disclosure > summary',
+              '.okf-search-query input', '.okf-search-submit', *_SHELL_TARGETS]),
+])
+def test_core_coarse_pointer_targets_are_44px_at_390(chromium, coarse_server_url, route, selectors):
+    server_url = coarse_server_url
+    context = chromium.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True, has_touch=True)
+    try:
+        page = context.new_page()
+        page.goto(server_url + CONCEPT)
+        page.wait_for_function(STUDIO_READY)
+        assert page.evaluate("matchMedia('(pointer: coarse)').matches")
+        # Produce a real comment so inventory comment links are exposed.
+        page.locator('.okf-studio-launcher').click()
+        page.locator('#okf-panel').get_by_role('button', name='Comments', exact=True).click()
+        comment = f'Coarse-pointer target proof for {route}.'
+        page.get_by_role('textbox', name='Comment for agent').fill(comment)
+        page.get_by_role('button', name='Send', exact=True).click()
+        # Wait on the persistent canonical card, not a short-lived toast.
+        expect(page.locator('.okf-comment__body', has_text=comment)).to_be_visible(timeout=15000)
+        page.goto(server_url + route)
+        page.wait_for_function(STUDIO_READY)
+        if route == CONCEPT:
+            page.locator('.okf-onthispage > summary').click()
+            disclosure = page.locator('.okf-connections-disclosure > summary')
+            if disclosure.count():
+                disclosure.click()
+            page.evaluate("""() => {
+              const action = document.createElement('button'); action.className = 'okf-toast__action';
+              action.textContent = 'View comment';
+              action.addEventListener('click', () => { window.__coarseAction = true; });
+              window.okfLoomStudio._toast(action, {sticky: true});
+            }""")
+        for selector in selectors:
+            targets = _coarse_targets(page, selector)
+            assert targets, f'{route}: no visible target for {selector}'
+            assert all(t['width'] >= 43.5 and t['height'] >= 43.5 for t in targets), (route, selector, targets)
+        if route == CONCEPT:
+            page.locator('.okf-toast__action').click()
+            assert page.evaluate('window.__coarseAction')
+            page.locator('.okf-toast__close').click()
+            expect(page.locator('.okf-toast__action')).to_have_count(0)
+        overflow = page.evaluate(_OVERFLOW)
+        assert overflow['scrollWidth'] <= overflow['innerWidth'] + 1, overflow
+        _assert_shell_search_shows_placeholder(page, route)
+        page.set_viewport_size({'width': 320, 'height': 844})
+        page.wait_for_function('w => innerWidth === w', arg=320)
+        _assert_shell_search_shows_placeholder(page, route)
+    finally:
+        context.close()
+
+
+_SEARCH_PLACEHOLDER_FIT = """async () => {
+  await document.fonts.ready;
+  const input = document.querySelector('.okf-shell__search-form input[type="search"]');
+  const style = getComputedStyle(input);
+  const ctx = document.createElement('canvas').getContext('2d');
+  ctx.font = style.font;
+  const r = input.getBoundingClientRect();
+  return {placeholder: input.placeholder, width: r.width,
+          needed: ctx.measureText(input.placeholder).width,
+          available: input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)};
+}"""
+
+
+def _assert_shell_search_shows_placeholder(page, label):
+    """The top-bar search field keeps its whole placeholder ("Search…", not
+    the former "Searc" at 390) beside the 44px coarse destinations."""
+    fit = page.evaluate(_SEARCH_PLACEHOLDER_FIT)
+    width = page.viewport_size['width']
+    assert fit['placeholder'] == 'Search…', fit
+    assert fit['needed'] <= fit['available'], (label, width, fit)
+    overflow = page.evaluate(_OVERFLOW)
+    assert overflow['scrollWidth'] <= overflow['innerWidth'] + 1, (label, width, overflow)
+
+
+@pytest.mark.parametrize('attention', [None, 'pending', 'failure'])
+@pytest.mark.parametrize('route', [CONCEPT, INDEX, GRAPH])
+@pytest.mark.parametrize('viewport', [(390, 844, 1), (320, 844, 1)], ids=_viewport_id)
+def test_fine_pointer_narrow_shell_search_shows_placeholder(open_page, route, viewport, attention):
+    """A narrow fine-pointer window keeps its compact rows and the search
+    field keeps its whole placeholder, in every Studio attention state."""
+    page = open_page(route, viewport)
+    assert not page.evaluate("matchMedia('(pointer: coarse)').matches")
+    page.evaluate("""async (attention) => {
+      const launcher = document.querySelector('.okf-studio-launcher');
+      if (attention) launcher.dataset.attention = attention; else delete launcher.dataset.attention;
+      await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)));
+    }""", attention)
+    _assert_shell_search_shows_placeholder(page, route)
+
+
+def _coarse_targets(page, selector):
+    """Measure every visible match; skip links are measured while focused,
+    the only state in which they are on screen."""
+    measure = """n => { const r = n.getBoundingClientRect();
+      return {text: n.textContent, width: r.width, height: r.height}; }"""
+    if selector == '.okf-skip-link':
+        links = page.locator(selector)
+        targets = []
+        for i in range(links.count()):
+            link = links.nth(i)
+            if not link.evaluate('n => n.checkVisibility()'):
+                continue
+            link.focus()
+            expect(link).to_be_focused()
+            # Focused skip links slide in from top:-100px; measure on screen.
+            page.wait_for_function('n => n.getBoundingClientRect().top >= 0', arg=link.element_handle())
+            targets.append(link.evaluate(measure))
+        return targets
+    return page.locator(selector).evaluate_all(
+        f"nodes => nodes.filter(n => n.checkVisibility()).map({measure})")
+
+
+def test_coarse_pointer_shell_targets_are_44px_on_graph_and_single_file(chromium, coarse_server_url, tmp_path):
+    """The graph route and the single-file target restyle the shell brand and
+    carry their own skip links; the single-file search drawer reuses the
+    search-mode labels. Each stays a 44px target on a coarse pointer."""
+    from okf_loom import Bundle
+    from okf_loom.render import render_single_file
+
+    single = tmp_path / 'single.html'
+    render_single_file(Bundle.load(copy_bundle(DEMO_BUNDLE, tmp_path / 'bundle')), single)
+    context = chromium.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True,
+                                   has_touch=True, reduced_motion='reduce')
+    try:
+        page = context.new_page()
+        page.route('https://cdn.jsdelivr.net/**', lambda route: route.abort())
+        page.goto(coarse_server_url + GRAPH)
+        page.wait_for_function(STUDIO_READY)
+        assert page.evaluate("matchMedia('(pointer: coarse)').matches")
+        measured = {GRAPH: {s: _coarse_targets(page, s) for s in _SHELL_TARGETS}}
+        assert len(measured[GRAPH]['.okf-skip-link']) >= 2, measured
+        _assert_shell_search_shows_placeholder(page, GRAPH)
+        # A fresh load at 320 (the in-place 390 -> 320 resize is covered by
+        # test_graph_route_resizes_in_place_without_a_stale_width).
+        narrow = chromium.new_context(viewport={'width': 320, 'height': 844}, is_mobile=True,
+                                      has_touch=True, reduced_motion='reduce')
+        try:
+            graph_320 = narrow.new_page()
+            graph_320.route('https://cdn.jsdelivr.net/**', lambda route: route.abort())
+            graph_320.goto(coarse_server_url + GRAPH)
+            graph_320.wait_for_function(STUDIO_READY)
+            _assert_shell_search_shows_placeholder(graph_320, GRAPH)
+        finally:
+            narrow.close()
+        page.goto(single.as_uri())
+        page.wait_for_function("() => document.body.dataset.okfSearchCaptureReady === 'ready'"
+                               " && !document.getElementById('okf-single-search-toggle').disabled")
+        page.get_by_role('navigation', name='Primary navigation').get_by_role(
+            'button', name='Search', exact=True).click()
+        expect(page.locator('#okf-single-search .okf-search-mode').first).to_be_visible()
+        measured['single-file'] = {s: _coarse_targets(page, s)
+                                   for s in ['#okf-single-search .okf-search-mode', *_SHELL_TARGETS]}
+        for surface, by_selector in measured.items():
+            for selector, targets in by_selector.items():
+                assert targets, f'{surface}: no visible target for {selector}'
+                assert all(t['width'] >= 43.5 and t['height'] >= 43.5 for t in targets), (surface, selector, targets)
+        overflow = page.evaluate(_OVERFLOW)
+        assert overflow['scrollWidth'] <= overflow['innerWidth'] + 1, overflow
+    finally:
+        context.close()
+
+
+_GRAPH_VIEWPORT_FIT = """() => {
+  const bar = document.querySelector('.okf-topbar');
+  return {innerWidth, clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+    scale: visualViewport ? visualViewport.scale : 1,
+    visualWidth: visualViewport ? visualViewport.width : innerWidth,
+    topbar: bar ? bar.getBoundingClientRect().width : null,
+    effective: document.body.style.getPropertyValue('--okf-effective-vw')};
+}"""
+
+
+@pytest.mark.parametrize('steps', [
+    [(320, 844)],
+    [(844, 390), (390, 844)],
+    [(568, 320), (320, 568)],
+], ids=['390-to-320', 'rotate-390x844-844x390-back', 'rotate-narrow-568x320-320x568'])
+def test_graph_route_resizes_in_place_without_a_stale_width(chromium, server_url, steps):
+    """A mobile viewport that shrinks or rotates in place keeps the graph
+    route at the new width. The narrow chrome follows the visual viewport, so
+    a stale px width used to overflow the new layout viewport, the browser
+    zoomed out to fit it (scale 0.82 at 390 -> 320), and the zoomed-out
+    visual viewport reported the stale width back."""
+    context = chromium.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True,
+                                   has_touch=True, device_scale_factor=3)
+    try:
+        page = context.new_page()
+        page.goto(server_url + GRAPH)
+        page.wait_for_function(STUDIO_READY)
+        page.wait_for_function(GRAPH_SETTLED)
+        page.wait_for_function("() => document.body.hasAttribute('data-okf-narrow-reflow')")
+        for width, height in steps:
+            page.set_viewport_size({'width': width, 'height': height})
+            page.wait_for_function('w => document.documentElement.clientWidth === w', arg=width)
+            try:
+                page.wait_for_function("""w => innerWidth === w && visualViewport.scale === 1
+                  && document.documentElement.scrollWidth <= innerWidth
+                  && Math.abs(document.querySelector('.okf-topbar').getBoundingClientRect().width - w) <= 1""",
+                                       arg=width, timeout=5000)
+            except Exception:
+                pass  # the explicit assertions below report the measured state
+            fit = page.evaluate(_GRAPH_VIEWPORT_FIT)
+            assert fit['innerWidth'] == width, (width, height, fit)
+            assert fit['scrollWidth'] <= fit['innerWidth'], (width, height, fit)
+            assert fit['scale'] == 1, (width, height, fit)
+            assert abs(fit['topbar'] - width) <= 1, (width, height, fit)
+    finally:
+        context.close()
+
+
+def test_single_file_index_offers_graph_pane_tabs_only_with_the_graph(chromium, tmp_path):
+    """Narrow single-file output docks the Graph/Concepts/Details pane tabs
+    in the top bar. They switch panes of the graph workspace, so the Index
+    destination (like the static and live index, which have no pane tabs)
+    hides them; with the graph shown they return and the pressed tab is the
+    visible pane."""
+    from okf_loom import Bundle
+    from okf_loom.render import render_single_file
+
+    single = tmp_path / 'single.html'
+    render_single_file(Bundle.load(copy_bundle(DEMO_BUNDLE, tmp_path / 'bundle')), single)
+    context = chromium.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True, has_touch=True)
+    try:
+        page = context.new_page()
+        page.goto(single.as_uri())
+        page.wait_for_function("() => document.body.dataset.okfSingleDestination === 'index'"
+                               " && document.body.hasAttribute('data-okf-narrow-reflow')"
+                               " && window.__okfLoomGraph && window.__okfLoomGraph.interaction")
+        panes = page.get_by_role('navigation', name='Graph panes')
+        expect(page.locator('#okf-single-index')).to_be_visible()
+        expect(panes).to_be_hidden()
+        assert page.evaluate("() => getComputedStyle(document.querySelector('.okf-graph-mobile-nav')).display") == 'none'
+
+        primary = page.get_by_role('navigation', name='Primary navigation')
+        primary.get_by_role('link', name='Graph', exact=True).click()
+        page.wait_for_function("() => document.body.dataset.okfSingleDestination === 'graph'")
+        expect(panes).to_be_visible()
+        for name, pane in (('Concepts', 'concepts'), ('Details', 'details'), ('Graph', 'graph')):
+            if name != 'Concepts':
+                panes.get_by_role('button', name=name, exact=True).click()
+            expect(page.locator('.okf-layout')).to_have_attribute('data-mobile-pane', pane)
+            pressed = panes.locator('button[aria-pressed="true"]')
+            expect(pressed).to_have_count(1)
+            expect(pressed).to_have_text(name)
+
+        primary.get_by_role('link', name='Index', exact=True).click()
+        page.wait_for_function("() => document.body.dataset.okfSingleDestination === 'index'")
+        expect(page.locator('#okf-single-index')).to_be_visible()
+        expect(panes).to_be_hidden()
+        overflow = page.evaluate(_OVERFLOW)
+        assert overflow['scrollWidth'] <= overflow['innerWidth'] + 1, overflow
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize('theme', ['bone', 'slate', 'clay', 'plum'])
+def test_ledger_hover_press_and_breadcrumb_cues_remain_visible(open_page, theme):
+    page = open_page(CONCEPT, DESKTOP)
+    _choose_appearance(page, theme)
+    separators = page.locator('.okf-breadcrumb__sep')
+    assert separators.count() > 0
+    for i in range(separators.count()):
+        expect(separators.nth(i)).to_be_visible()
+    rows = page.evaluate(_TEXT_CONTRAST, '.okf-breadcrumb__sep')
+    assert rows and all(row['ratio'] >= 4.5 for row in rows), rows
+    page.locator('.okf-studio-launcher').click()
+    button = page.locator('#okf-panel').get_by_role('button', name='Comments', exact=True)
+    # Sampling immediately after hover/down can read the first (unchanged)
+    # frame of the CSS transition. Observe each real state after its own
+    # animations finish, rather than relying on host scheduling or a sleep.
+    colour = '''async b => {
+        getComputedStyle(b).backgroundColor;
+        await Promise.all(b.getAnimations().map(animation => animation.finished));
+        return getComputedStyle(b).backgroundColor;
+    }'''
+    idle = button.evaluate(colour)
+    button.hover()
+    hovered = button.evaluate(colour)
+    page.mouse.down()
+    pressed = button.evaluate(colour)
+    page.mouse.up()
+    assert idle != hovered and hovered != pressed, (theme, idle, hovered, pressed)
+
+
+@pytest.mark.parametrize('theme', ['bone', 'slate'])
+@pytest.mark.parametrize('color_scheme', ['light', 'dark'])
+def test_search_modes_keep_native_keyboard_semantics_with_square_segments(open_page, theme, color_scheme):
+    page = open_page(SEARCH, DESKTOP)
+    _choose_appearance(page, theme)
+    radios = page.locator('.okf-search-mode input')
+    first = radios.first
+    first.focus()
+    page.keyboard.press('ArrowRight')
+    expect(radios.nth(1)).to_be_checked()
+    expect(radios.nth(1)).to_be_focused()
+    assert first.evaluate("r => getComputedStyle(r).borderRadius") == '0px'
+    assert page.locator('.okf-search-query input').bounding_box()['height'] == 32
+    page.emulate_media(forced_colors='active', color_scheme=color_scheme)
+    visible = radios.nth(1).evaluate("""r => { const s = getComputedStyle(r.closest('label'));
+      return s.borderInlineStartWidth === '2px' && s.outlineStyle === 'solid' && s.outlineWidth === '2px'; }""")
+    assert visible
+    colours = radios.nth(1).evaluate("""r => { const label = r.closest('label');
+      return {text: getComputedStyle(label).color,
+        children: [...label.querySelectorAll('span, small')].map(el => getComputedStyle(el).color)}; }""")
+    assert len(colours['children']) >= 2, colours
+    assert all(colour == colours['text'] for colour in colours['children']), colours
+
+
 def _settle(page) -> None:
     """Wait until scrolling and CSS transitions are at rest (frame state, not time)."""
     settled = page.evaluate("""() => new Promise(resolve => {
@@ -580,11 +914,10 @@ def test_complementary_landmarks_are_named_with_the_studio_rail_open(open_page, 
 
 # ------------------------------------------------ E. measured text contrast (Q7)
 
-# Every Appearance theme (theme.js THEMES, kept in sync with render.py and
-# config.py). The test also reads the runtime list, so a theme added there
+# Every Ledger palette (theme.js THEMES, kept in sync with render.py and
+# config.py). The test also reads the runtime list, so a palette added there
 # without a row here fails instead of going unmeasured.
-APPEARANCE_THEMES = ("technical-light", "technical-dark", "swiss-light", "swiss-dark",
-                     "purple-light", "purple-dark", "coffee-light", "coffee-dark")
+APPEARANCE_THEMES = ("bone", "slate", "clay", "plum")
 
 # WCAG 1.4.3 for every visible node that owns text under the matched elements.
 # The effective background composites the background colours of the node and
@@ -639,15 +972,15 @@ _TEXT_CONTRAST = r"""(selector) => {
 }"""
 
 
-def _choose_appearance(page, group: str, value: str) -> None:
-    """Pick one Appearance option the way a reader does (its label)."""
+def _choose_appearance(page, theme: str) -> None:
+    """Pick one Appearance palette the way a reader does (its label)."""
     trigger = page.locator("#okf-theme")
     menu = page.locator("#okf-appearance-menu")
     trigger.click()
     expect(menu).to_be_visible()
-    option = menu.locator(f'input[data-okf-set="{group}"][data-okf-val="{value}"]')
+    option = menu.locator(f'input[data-okf-set="theme"][data-okf-val="{theme}"]')
     reveal_control(page, option)
-    menu.locator(f'label.okf-appearance__opt[for="okf-appearance-{group}-{value}"]').click()
+    menu.locator(f'label.okf-appearance__opt[for="okf-appearance-theme-{theme}"]').click()
     expect(option).to_be_checked()
     page.keyboard.press("Escape")
     expect(menu).to_be_hidden()
@@ -657,9 +990,7 @@ def _choose_appearance(page, group: str, value: str) -> None:
 def test_muted_and_secondary_text_meets_wcag_aa_contrast_in_every_theme(open_page, server_url, theme) -> None:
     page = open_page(CONCEPT, DESKTOP)
     assert tuple(page.evaluate("() => window.OKFLoomTheme.THEMES")) == APPEARANCE_THEMES
-    family, mode = theme.rsplit("-", 1)
-    _choose_appearance(page, "family", family)
-    _choose_appearance(page, "mode", mode)
+    _choose_appearance(page, theme)
     expect(page.locator("html")).to_have_attribute("data-theme", theme)
 
     measured: dict[str, list[dict]] = {}
@@ -701,15 +1032,24 @@ def test_muted_and_secondary_text_meets_wcag_aa_contrast_in_every_theme(open_pag
     assert not failing, f"{theme}: text below WCAG AA contrast: {failing[:8]}"
 
 
-# Every studio.css rule that paints text in an --okf-*-on colour on its solid
-# status fill: the toast tone icons and the resolved/claimed comment markers.
-# They are built with the shipped classes (a claimed marker needs a live agent
-# claim, a toast a mutation outcome), so the measured colours are the real
-# rules' cascade, not the tokens read back.
+# Ledger status roles are text, icons and 2px bars, never fills. Two kinds of
+# probe sit on a --surface panel: one line of text per status role (ok, warn,
+# error, info), and the shipped studio.css status carriers (the toast tone
+# icons, the resolved/claimed comment markers), built with the real classes
+# (a claimed marker needs a live agent claim, a toast a mutation outcome) so
+# the measured colours are whatever the cascade paints, fill or no fill.
 _STATUS_ON_PROBES = """() => {
   const host = document.createElement('div');
   host.id = 'okf-status-on-probe';
-  host.style.cssText = 'position:fixed;top:120px;left:40px;z-index:2147483647;display:flex;gap:12px;align-items:center';
+  host.style.cssText = 'position:fixed;top:120px;left:40px;z-index:2147483647;display:flex;gap:12px;align-items:center;padding:8px;background:var(--surface)';
+  for (const role of ['ok', 'warn', 'error', 'info']) {
+    const line = document.createElement('span');
+    line.className = 'okf-status-probe';
+    line.style.color = `var(--status-${role})`;
+    line.style.fontSize = '13px';
+    line.textContent = role;
+    host.append(line);
+  }
   for (const tone of ['error', 'success', 'warn']) {
     const toast = document.createElement('div');
     toast.className = 'okf-toast';
@@ -735,24 +1075,23 @@ _STATUS_ON_PROBES = """() => {
 
 
 @pytest.mark.parametrize("theme", APPEARANCE_THEMES)
-def test_status_fill_on_colours_meet_wcag_aa_contrast_in_every_theme(open_page, theme) -> None:
-    """The light --okf-warn-on (#1f1600-#241700) measured 2.85-3.04:1 on the amber
-    fill, so claimed comment markers and warn toast icons were illegible."""
+def test_status_text_and_carriers_meet_wcag_aa_contrast_in_every_theme(open_page, theme) -> None:
+    """Status hues are read as text: each --status-* role on --surface, and
+    the toast icons / comment markers as the cascade paints them, reach AA.
+    (The retired solid fills once put --okf-warn-on at 2.85-3.04:1.)"""
     page = open_page(CONCEPT, DESKTOP)
-    family, mode = theme.rsplit("-", 1)
-    _choose_appearance(page, "family", family)
-    _choose_appearance(page, "mode", mode)
+    _choose_appearance(page, theme)
     expect(page.locator("html")).to_have_attribute("data-theme", theme)
     page.evaluate(_STATUS_ON_PROBES)
-    rows = page.evaluate(_TEXT_CONTRAST, "#okf-status-on-probe .okf-toast__icon, #okf-status-on-probe .okf-comment-marker")
-    fills = page.evaluate("""() => [...document.querySelectorAll('#okf-status-on-probe .okf-toast__icon, #okf-status-on-probe .okf-comment-marker')]
-      .map(el => getComputedStyle(el).backgroundColor)""")
-    tokens = page.evaluate("""() => { const s = getComputedStyle(document.documentElement);
-      return ['--okf-error', '--okf-ok', '--okf-warn', '--okf-ok', '--okf-warn']
-        .map(t => { const p = document.createElement('i'); p.style.color = s.getPropertyValue(t); document.body.append(p);
-                    const c = getComputedStyle(p).color; p.remove(); return c; }); }""")
-    assert fills == tokens, f"{theme}: probes are not painted by the status fills: {fills} != {tokens}"
-    assert [row["text"] for row in rows] == ["!", "OK", "?", "3", "3"], rows
+    rows = page.evaluate(_TEXT_CONTRAST, "#okf-status-on-probe .okf-status-probe, #okf-status-on-probe .okf-toast__icon, #okf-status-on-probe .okf-comment-marker")
+    assert [row["text"] for row in rows] == ["ok", "warn", "error", "info", "!", "OK", "?", "3", "3"], rows
+    # The role probes really paint the palette status hues on --surface.
+    resolved = page.evaluate("""() => ['--status-ok', '--status-warn', '--status-error', '--status-info', '--surface'].map(t => {
+      const p = document.createElement('i'); p.style.color = `var(${t})`; document.body.append(p);
+      const c = getComputedStyle(p).color; p.remove(); return c; })""")
+    painted = page.evaluate("""() => [...document.querySelectorAll('#okf-status-on-probe .okf-status-probe')].map(e => getComputedStyle(e).color)""")
+    assert painted == resolved[:4], (theme, painted, resolved)
+    assert page.evaluate("() => getComputedStyle(document.getElementById('okf-status-on-probe')).backgroundColor") == resolved[4]
     unresolved = [row for row in rows if not row["opaque"] or row["images"]]
     assert not unresolved, f"{theme}: background not measurable from colours: {unresolved}"
     failing = [(row["node"], row["text"], row["fg"], row["bg"], row["ratio"], row["required"])
@@ -843,12 +1182,15 @@ CODE_TOKENS = {
     "tag": ".hljs-tag", "name": ".hljs-name", "selector-tag": ".hljs-selector-tag",
     "subst": ".hljs-subst", "emphasis": ".hljs-emphasis", "strong": ".hljs-strong",
 }
-# Dark themes keep the vendored github-dark token colours except
-# .hljs-section: its #1f6feb measured 4.15-4.35:1 on the dark code
-# backgrounds, so wiki.css lifts it to #79c0ff. There is no known-gap floor
-# any more: every token in every theme must reach 4.5:1.
-GITHUB_DARK_KEYWORD = "rgb(255, 123, 114)"
-DARK_SECTION = "rgb(121, 192, 255)"
+# Ledger code blocks are one dark well in every palette (Bone included):
+# --code-bg / --code-text, with three syntax roles (--syn-1 keys/keywords,
+# --syn-2 values, --syn-3 comments/punctuation) painted by wiki.css; no
+# vendor theme sheet. Inline code is the quiet raised --icode-* chip. Every
+# token in every palette must reach 4.5:1.
+_CODE_ROLES = """() => { const s = getComputedStyle(document.documentElement);
+  return Object.fromEntries(['--code-bg', '--code-text', '--icode-bg', '--icode-text', '--syn-1']
+    .map(t => { const p = document.createElement('i'); p.style.color = s.getPropertyValue(t).trim();
+                document.body.append(p); const c = getComputedStyle(p).color; p.remove(); return [t, c]; })); }"""
 RENDERERS_READY = """(theme) => { const r = window.okfRendererReadiness;
   return !!r && r.ready && r.themeName === theme
     && document.querySelectorAll('pre > code[class*="language-"]:not(.hljs)').length === 0; }"""
@@ -892,9 +1234,7 @@ def open_code_page(chromium, code_server_url):
         page = context.new_page()
         page.goto(code_server_url + path, wait_until="load")
         page.wait_for_function(STUDIO_READY)
-        family, mode = theme.rsplit("-", 1)
-        _choose_appearance(page, "family", family)
-        _choose_appearance(page, "mode", mode)
+        _choose_appearance(page, theme)
         expect(page.locator("html")).to_have_attribute("data-theme", theme)
         return page
 
@@ -928,7 +1268,6 @@ def test_code_block_tokens_and_chrome_meet_wcag_aa_contrast_in_every_theme(open_
     # Token spans, plain text in a highlighted block, and the untagged block.
     assert {"span.hljs-keyword", "span.hljs-comment", "span.hljs-string",
             "code.language-python", "code"} <= token_nodes, token_nodes
-    dark = theme.endswith("-dark")
     failing = [(label, row["node"], row["text"], row["fg"], row["bg"], row["ratio"], row["required"])
                for label, rows in measured.items() for row in rows if row["ratio"] < row["required"]]
     assert not failing, f"{theme}: code text below WCAG AA contrast: {failing[:8]}"
@@ -938,21 +1277,19 @@ def test_code_block_tokens_and_chrome_meet_wcag_aa_contrast_in_every_theme(open_
     # The <pre> owns padding in every theme; the vendor `pre code.hljs
     # { padding: 1em }` used to double-pad dark tagged code.
     assert boxes["taggedCode"] == boxes["untaggedCode"], f"{theme}: tagged and untagged code differ: {boxes}"
-    if dark:
-        # Dark themes keep github-dark token colours, bar the lifted section.
-        assert boxes["keyword"] == GITHUB_DARK_KEYWORD, f"{theme}: dark tokens changed: {boxes['keyword']}"
-        assert boxes["section"] == DARK_SECTION, f"{theme}: dark section colour: {boxes['section']}"
-    else:
-        # Light code blocks are light: the same surface and ink as inline code.
-        assert (boxes["tagged"]["bg"], boxes["tagged"]["fg"]) == (boxes["inline"]["bg"], boxes["inline"]["fg"]), boxes
+    roles = page.evaluate(_CODE_ROLES)
+    assert (boxes["tagged"]["bg"], boxes["tagged"]["fg"]) == (roles["--code-bg"], roles["--code-text"]), (theme, boxes, roles)
+    assert (boxes["inline"]["bg"], boxes["inline"]["fg"]) == (roles["--icode-bg"], roles["--icode-text"]), (theme, boxes, roles)
+    assert boxes["keyword"] == boxes["section"] == roles["--syn-1"], (theme, boxes, roles)
 
 
-LIGHT_THEMES = tuple(theme for theme in APPEARANCE_THEMES if theme.endswith("-light"))
+# The light palettes (theme.js scheme "light"): Bone only.
+LIGHT_THEMES = ("bone",)
 
-# The dimmed light palettes top out at relative luminance ~0.91 (Technical
-# --okf-bg-elev #f3f5f7). Anything visibly painted brighter than this reads as
-# the glare the user ruled out, pure white (1.0) included.
-GLARE_LUMINANCE = 0.92
+# Bone's brightest surface is --surface #fbf9f5 (relative luminance ~0.949).
+# Anything visibly painted brighter than that reads as the glare the user
+# ruled out, pure white (1.0) included.
+GLARE_LUMINANCE = 0.95
 # Every visible element whose computed background is opaque and brighter than
 # the glare ceiling. A 1x1 canvas parses any CSS colour syntax (oklch, color-mix).
 _GLARING = """(ceiling) => {
@@ -1014,11 +1351,10 @@ def test_light_theme_surfaces_are_never_pure_white(open_code_page, code_server_u
 # ------------------------------------------------ G. type names (Q7 follow-up)
 
 # Type colours (curated hsl 38-54% lightness, hash fallback hsl(h, 62%, 48%))
-# are mid-tones made for fills, strokes, icons and tints. As text they measured
-# 2.3:1 (Reference #95a92d, infobox summary, light) and 3.2:1 (Table indigo,
-# hovered relation target and popover type band, dark). A type's NAME is text
-# in the theme ink; its colour stays beside it in an icon, stripe, underline or
-# tint. The colour cues are asserted too, so the fix cannot drop the identity.
+# measured 2.3-3.2:1 as text. Ledger retires them on the document surfaces: a
+# type's NAME is palette ink, its identity is the name (and icon shape), and
+# no per-type --okf-type-accent, tint or coloured underline is painted. The
+# graph canvas (graph.css/graph.js, lane C) is measured for contrast only.
 _RESOLVE_COLOUR = """(value) => { const probe = document.createElement('i'); probe.style.color = value;
   document.body.append(probe); const colour = getComputedStyle(probe).color; probe.remove(); return colour; }"""
 _TYPE_CUES = """() => {
@@ -1032,11 +1368,11 @@ _TYPE_CUES = """() => {
 
 
 @pytest.mark.parametrize("theme", APPEARANCE_THEMES)
-def test_type_names_meet_wcag_aa_contrast_and_keep_their_colour_cue(open_code_page, code_server_url, theme) -> None:
-    # CODE_CONCEPT is a Reference: the amber type colour.
+def test_type_names_meet_wcag_aa_contrast_and_carry_no_type_colour(open_code_page, code_server_url, theme) -> None:
+    # CODE_CONCEPT is a Reference (formerly the amber type colour).
     page = open_code_page(CODE_CONCEPT, theme)
     measured: dict[str, list[dict]] = {}
-    cues: dict[str, tuple] = {}
+    tinted: dict[str, object] = {}
 
     def measure(label: str, selector: str) -> None:
         measured[label] = page.evaluate(_TEXT_CONTRAST, selector)
@@ -1052,7 +1388,8 @@ def test_type_names_meet_wcag_aa_contrast_and_keep_their_colour_cue(open_code_pa
     measure("concept header type chip", ".okf-page__header .okf-type-chip")
     measure("infobox type", ".okf-infobox__summary .okf-infobox__type")
     info = page.evaluate(_TYPE_CUES)
-    cues["infobox icon keeps the type colour"] = (info["infoboxIcon"], resolve(info["infoboxAccent"]))
+    if info["infoboxAccent"]:
+        tinted["infobox inline type accent"] = info["infoboxAccent"]
 
     goto(CONCEPT)
     target = page.locator("a.okf-relation__target").first
@@ -1065,17 +1402,20 @@ def test_type_names_meet_wcag_aa_contrast_and_keep_their_colour_cue(open_code_pa
     expect(page.locator("#okf-popover .okf-popover__type")).to_be_visible()
     measure("hovered relation target", "a.okf-relation__target:hover")
     hover = target.evaluate("""a => { const t = getComputedStyle(a.querySelector('.okf-relation__title'));
-      return {line: t.textDecorationLine, colour: t.textDecorationColor, accent: a.style.getPropertyValue('--okf-type-accent').trim()}; }""")
+      return {line: t.textDecorationLine, colour: t.textDecorationColor, ink: t.color, accent: a.style.getPropertyValue('--okf-type-accent').trim()}; }""")
     assert "underline" in hover["line"], f"{theme}: hovered relation target has no hover cue: {hover}"
-    cues["relation hover underline is the type colour"] = (hover["colour"], resolve(hover["accent"]))
+    if hover["colour"] != hover["ink"] or hover["accent"]:
+        tinted["relation hover underline"] = hover
     measure("link popover type band", "#okf-popover .okf-popover__type")
     band = page.evaluate("""() => getComputedStyle(document.querySelector('#okf-popover .okf-popover__type')).backgroundColor""")
-    inset = resolve("var(--okf-bg-inset)")
-    assert band != inset, f"{theme}: popover type band lost its type tint ({band})"
+    if band != "rgba(0, 0, 0, 0)":
+        tinted["popover type band fill"] = band
 
     goto(INDEX)
+    # Ledger index rows are grouped under their type's section title; the
+    # per-row type label is not shown, so the section title is the type name.
     measure("index section title", ".okf-section__title")
-    measure("index card type", ".okf-card__type")
+    assert page.evaluate("() => [...document.querySelectorAll('.okf-card__type')].every(e => !e.checkVisibility())")
 
     goto("/__search?q=highlight")
     measure("search result type", ".okf-search-result__type")
@@ -1088,13 +1428,11 @@ def test_type_names_meet_wcag_aa_contrast_and_keep_their_colour_cue(open_code_pa
     page.wait_for_function(GRAPH_SETTLED)
     point = page.evaluate("""() => { const g = window.__okfLoomGraph, n = g.cy.nodes().filter(x => x.data('type') === 'Reference').first(),
       p = n.renderedPosition(), r = document.getElementById('okf-graph').getBoundingClientRect();
-      return {x: r.left + p.x, y: r.top + p.y, id: n.id(), base: n.data('baseColor')}; }""")
+      return {x: r.left + p.x, y: r.top + p.y, id: n.id()}; }""")
     page.mouse.move(point["x"], point["y"])
     page.wait_for_function("id => window.__okfLoomGraph.interaction.snapshot().hovered === id", arg=point["id"])
     expect(page.locator(".okf-graph-tip__type")).to_be_visible()
     measure("graph hover tip type", ".okf-graph-tip__type")
-    stripe = page.evaluate("() => getComputedStyle(document.querySelector('.okf-graph-tip__type')).borderInlineStartColor")
-    cues["graph tip stripe is the node colour"] = (stripe, resolve(point["base"]))
 
     unmeasured = [label for label, rows in measured.items() if not rows]
     assert not unmeasured, f"{theme}: no visible type name measured for {unmeasured}"
@@ -1104,8 +1442,7 @@ def test_type_names_meet_wcag_aa_contrast_and_keep_their_colour_cue(open_code_pa
     failing = [(label, row["node"], row["text"], row["fg"], row["bg"], row["ratio"], row["required"])
                for label, rows in measured.items() for row in rows if row["ratio"] < row["required"]]
     assert not failing, f"{theme}: type names below WCAG AA contrast: {failing[:8]}"
-    lost = {label: pair for label, pair in cues.items() if pair[0] != pair[1]}
-    assert not lost, f"{theme}: type colour cue lost: {lost}"
+    assert not tinted, f"{theme}: a type colour is still painted: {tinted}"
 
 
 
@@ -1154,8 +1491,9 @@ _MIDWORD_BREAKS = r"""(root) => { const out = [];
 def open_width(chromium, code_server_url):
     contexts = []
 
-    def _open(path: str, width: int):
-        context = chromium.new_context(viewport={"width": width, "height": 844})
+    def _open(path: str, width: int, *, coarse: bool = False):
+        options = {"is_mobile": True, "has_touch": True} if coarse else {}
+        context = chromium.new_context(viewport={"width": width, "height": 844}, **options)
         contexts.append(context)
         page = context.new_page()
         page.add_init_script("localStorage.setItem('okfGraphTourDone', '1')")
@@ -1182,6 +1520,35 @@ def test_code_block_badge_and_copy_never_cover_code_text(open_width, width) -> N
 
 
 @pytest.mark.parametrize("width", NARROW_WIDTHS)
+def test_coarse_code_copy_stays_clear_and_reachable_while_code_scrolls(open_width, width) -> None:
+    """On touch screens the 44px Copy target overflowed its 34px strip onto the
+    first code line, and scrolling a long line carried Copy out of view."""
+    page = open_width(LONG_LINE_CONCEPT, width, coarse=True)
+    page.wait_for_function(CODE_READY)
+    result = page.evaluate(_CODE_TOOLS_OVER_TEXT)
+    assert not result["covered"], f"coarse code tools cover code text at {width}px: {result['covered']}"
+    state = page.evaluate("""() => {
+      const out = [];
+      document.querySelectorAll('.okf-prose .okf-content-scrollport--code').forEach((port, i) => {
+        if (port.scrollWidth <= port.clientWidth + 1) return;
+        const button = port.querySelector('.okf-code-copy');
+        port.scrollLeft = port.scrollWidth;
+        const box = button.getBoundingClientRect(), view = port.getBoundingClientRect();
+        out.push({i, height: Math.round(box.height), opacity: getComputedStyle(button).opacity,
+                  inside: box.left >= view.left - 0.5 && box.right <= view.right + 0.5});
+      });
+      return out; }""")
+    assert state, "fixture has no horizontally scrolling code block"
+    for row in state:
+        assert row["height"] >= 44 and row["opacity"] == "1" and row["inside"], row
+    button = page.locator(".okf-prose .okf-content-scrollport--code .okf-code-copy").first
+    button.evaluate("e => e.scrollIntoView({block: 'center'})")  # clear of the sticky chrome
+    box = button.bounding_box()
+    assert page.evaluate("([x, y]) => document.elementFromPoint(x, y)?.classList.contains('okf-code-copy')",
+                         [box["x"] + box["width"] / 2, box["y"] + box["height"] / 2])
+
+
+@pytest.mark.parametrize("width", NARROW_WIDTHS)
 @pytest.mark.parametrize("route", [pytest.param(LONG_LINE_CONCEPT, id="concept"), pytest.param(GRAPH, id="graph")])
 def test_appearance_menu_breaks_lines_only_between_words(open_width, route, width) -> None:
     """The graph topbar's narrow reflow inherits `overflow-wrap: anywhere`,
@@ -1194,7 +1561,7 @@ def test_appearance_menu_breaks_lines_only_between_words(open_width, route, widt
     for index in range(advanced.count()):
         if advanced.nth(index).get_attribute("open") is None:
             advanced.nth(index).locator("summary").click()
-    assert menu.locator('input[data-okf-set="family"]').first.is_visible()
+    assert menu.locator('input[data-okf-set="theme"]').first.is_visible()
     box = menu.bounding_box()
     assert box["x"] >= 0 and box["x"] + box["width"] <= width, f"menu leaves the {width}px viewport: {box}"
     breaks = page.evaluate(_MIDWORD_BREAKS, "#okf-appearance-menu")
@@ -1207,7 +1574,6 @@ def test_appearance_menu_breaks_lines_only_between_words(open_width, route, widt
 # the menu under the pointer.
 _MENU_SPOTS = (
     ("group legend", lambda menu: _centre(menu.locator("legend").first)),
-    ("footnote", lambda menu: _centre(menu.locator(".okf-appearance__note"))),
     ("group padding", lambda menu: _corner(menu.locator(".okf-appearance__group").first, 4)),
     ("dialog padding", lambda menu: _corner(menu, 3)),
 )
@@ -1238,10 +1604,10 @@ def test_appearance_menu_stays_open_when_its_non_focusable_parts_are_clicked(ope
         expect(trigger).to_have_attribute("aria-expanded", "true")
         assert page.evaluate(inside), f"focus left the menu after a click on the {name}"
     # The dialog itself is a click focus target, never a Tab stop: Tab goes
-    # on to the first group's checked option.
+    # on to the palette group's checked option.
     assert menu.get_attribute("tabindex") == "-1"
     page.keyboard.press("Tab")
-    assert page.evaluate("() => document.activeElement?.dataset.okfSet") == "mode"
+    assert page.evaluate("() => document.activeElement?.dataset.okfSet") == "theme"
     page.keyboard.press("Escape")
     expect(menu).to_be_hidden()
     expect(trigger).to_be_focused()

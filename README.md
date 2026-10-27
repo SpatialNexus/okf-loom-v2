@@ -13,6 +13,11 @@ throughout.**
 
 </div>
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/media/hero-dark.png">
+  <img src="docs/media/hero-light.png" alt="The okf-loom Studio with a tutorial page open and the Comments rail beside it. The sentence a reader commented on is underlined, the sentence the agent added follows it in the text, and the resolved thread in the rail shows the reader's question, the agent's summary of what it did and its reply.">
+</picture>
+
 okf-loom is a toolkit and loadable agent skill for
 [Open Knowledge Format (OKF)](https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md)
 bundles: documentation or knowledge kept as plain Markdown files with YAML
@@ -70,44 +75,64 @@ unless you opt in, see [Sharing and security](#sharing-and-security)).
 
 ## See it in action
 
+### The two-minute tour
+
+<!-- To show an inline player here: edit this README on github.com, drag
+docs/media/walkthrough.mp4 into the editor in place of the linked poster
+image below, and keep the description paragraph under it. -->
+
+[![The okf-loom tour's title card: okf-loom, Read and comment on your Markdown docs in a live studio, A two-minute tour](docs/media/walkthrough-poster.png)](docs/media/walkthrough.mp4)
+
+[Watch the tour](docs/media/walkthrough.mp4) (2 min, MP4): the home inventory,
+reading and source views, a comment worked to resolution by an agent, cited
+search, the command palette, the graph and the four palettes, in one take.
+
 ### Comment, and your agent does the work
 
 ![Screen recording: a sentence on a tutorial page is selected and a comment asking to explain it in plain words is posted; a terminal panel shows the agent's wait, comment-claim, replace-text and comment-resolve commands while the page gains a new sentence in place and the comment card turns from open to claimed to resolved with the agent's reply](docs/media/comment-loop.gif)
 
 Select a sentence and leave a comment. Your agent's `wait` picks it up, then
 it claims the comment, edits the Markdown (the page updates live) and resolves
-the thread with a reply. [Watch the MP4](docs/media/comment-loop.mp4) (28 s).
+the thread with a reply. [Watch the MP4](docs/media/comment-loop.mp4) (31 s).
 
-### Restyle the page from one menu
+### Restyle the studio from one menu
 
-![Screen recording: the Appearance menu switches a documentation page to dark mode, through the Swiss, Purple and Coffee theme families, soft contrast and borders, and back to the defaults](docs/media/appearance.gif)
+![Screen recording: the Appearance menu is opened over the studio home's concept inventory, and the page restyles live through the Slate, Clay and Plum palettes, then System, and back to Bone, while the ruled rows, type chips and link counts keep their structure](docs/media/appearance.gif)
 
-One Appearance menu restyles the page live: dark mode, the Swiss, Purple and
-Coffee families, soft contrast and borders, then back to the defaults.
-[Watch the MP4](docs/media/appearance.mp4) (22 s).
+One Appearance menu applies Ledger live: **Bone** (the light default), **Slate**,
+**Clay**, **Plum**, or **System** (Bone in OS light mode, Slate in dark mode).
+Public Sans and Azeret Mono are self-hosted, including offline and single-file
+output. [Watch the MP4](docs/media/appearance.mp4) (17 s).
 
 ### Explore the bundle as a graph
 
-![Screen recording: the bundle graph is shown under the Themes, Bridges and Map lenses from the Explore with lenses panel, hovering a concept shows a preview of it, and a double-click opens its page](docs/media/graph.gif)
+![Screen recording: the bundle graph opens on the Map lens; Find in graph narrows it to the seven concepts that match "comment"; the Themes and Bridges lenses from the Explore with lenses panel reframe it; hovering a concept shows a preview of it, and a double-click opens its page](docs/media/graph.gif)
 
-The bundle graph under the Themes, Bridges and Map lenses. Hover a concept to
-preview it; double-click to open its page.
-[Watch the MP4](docs/media/graph.mp4) (20 s).
+Find concepts by title, id or tag, switch lenses to reframe the same bundle,
+hover a concept to preview it and double-click to open its page.
+[Watch the MP4](docs/media/graph.mp4) (23 s).
 
-### Search and jump
+### Search with citations, and jump anywhere
 
-![Screen recording: typing in the header search box lists matching pages as you type and one is opened; hovering a link on that page previews the target's type, title and description; then Ctrl+K opens the command palette and a page is opened from it](docs/media/search.gif)
+![Screen recording: typing in the header search box lists matching pages as you type; Enter opens the full results, and a result's Evidence and context shows the matched passage with its explanation/live_studio_design.md#L12-L24 citation and why it ranked; then Ctrl+K opens the command palette and a page is opened from it](docs/media/search.gif)
 
-Search as you type in the header, hover a link to preview where it goes, or
-press `Ctrl+K` to open the command palette and jump straight to a page.
-[Watch the MP4](docs/media/search.mp4) (13 s).
+Search as you type in the header, then open the full results: each one shows
+the exact passage it matched, with a `[path.md#Lx-Ly]` citation and the reason
+it ranked. Press `Ctrl+K` to open the command palette and jump straight to a
+page. [Watch the MP4](docs/media/search.mp4) (15 s).
 
 ### Screenshots
 
 **Studio home.** The bundle's front page: its title and purpose, counts of
-concepts, types and links, and one browsable inventory of every concept.
+concepts, types and links, and one browsable inventory of every concept,
+grouped by type in ruled rows.
 
-![Studio home for the okf-loom documentation: the bundle title and description, chips reading 38 concepts, 9 types and 528 links, a New in Annotations v2 panel, and concept type filters above the concept inventory](docs/media/studio-home.png)
+![Studio home for the okf-loom documentation: the bundle title and description, figures reading 38 concepts, 9 types and 529 links, a New in Annotations v2 panel, the concept type chips, and the first inventory groups with each concept's title, id, summary, link counts and tags](docs/media/studio-home.png)
+
+**Palettes.** The same home in Bone, Slate, Clay and Plum. Content types are
+not colour-coded, so the structure reads the same in every palette.
+
+![The studio home shown four times, in the Bone, Slate, Clay and Plum palettes, each with its accent colour on the hands-on demo button and the selected Index tab](docs/media/palettes.png)
 
 **Comments.** Select text and the composer pins the comment to that exact
 passage, or comment on the whole page.
@@ -116,14 +141,27 @@ passage, or comment on the whole page.
 
 **Rendering.** Mermaid diagrams, KaTeX math and highlighted code render in the
 page. [`docs-bundle/demo/showcase.md`](docs-bundle/demo/showcase.md) uses every
-renderer on one page.
+renderer on one page; here in Focus view, which widens the workspace.
 
-![A concept page rendering a Mermaid flowchart, a Mermaid sequence diagram and a KaTeX display equation, below the Rendered, Source, Split and Focus view controls and a Sections menu](docs/media/showcase-rendering.png)
+![A concept page in Focus view rendering a whole Mermaid flowchart from Author writes markdown to Agent applies edits, a Mermaid sequence diagram between User, Studio and Agent, and a KaTeX display equation, below the Rendered, Source and Split tabs, the checked Focus view box and a Sections menu](docs/media/showcase-rendering.png)
+
+**Search.** Every result shows the passage it matched, and its evidence gives
+the exact source lines and the methods that ranked it.
+
+![Search results for "live studio" under Best overall: the six match modes above the results, and the first result, Why the live studio exists, with its matched passage, its Open, Open matching section and Copy passage actions, and its evidence open to show the citation explanation/live_studio_design.md#L12-L24 and that the lexical and semantic-lite rankers both ranked it](docs/media/search.png)
 
 **Graph, dark mode.** The Bridges lens ranks the concepts that connect the
-bundle's topic areas.
+bundle's topic areas. Hovering one lights up its connections.
 
-![The graph view in dark mode under the Bridges lens: concept nodes joined by numbered relationship bundles, zoom, fit, fullscreen and reset controls beside the canvas, and a ranked Top bridgers list with CLI command reference first](docs/media/graph-bridges-dark.png)
+![The graph view in the Slate palette under the Bridges lens, hovering CLI command reference: its connections stay lit while the rest of the graph dims, a preview card shows its type, description and 18 outgoing and 22 incoming links, and the Top bridgers list ranks it first at 100%](docs/media/graph-bridges-dark.png)
+
+**Phone.** The top bar and view tabs fit above the page. Scroll down and they
+slide away, leaving only the Sections row pinned; scroll up to bring them back.
+
+<p>
+<img src="docs/media/phone-top.png" width="300" alt="A tutorial page on a phone, at the top: the site name and Appearance menu, the search box with Index, Graph and Studio, the Rendered, Source, Split and Focus view tabs, and the Sections menu above the page header">
+<img src="docs/media/phone-scrolled.png" width="300" alt="The same tutorial scrolled down on a phone: the top bar and view tabs have slid away, and only the Sections row stays pinned above the text">
+</p>
 
 ## What's new in v2
 
@@ -176,13 +214,14 @@ explains the larger changes.
 
 **Appearance**
 
-- Four theme families (Technical, the default, plus Swiss, Purple and
-  Coffee), each in light and dark, with Auto following your system setting.
-  They replace v1's five themes.
-- Light themes use softened surfaces rather than paper white, and code
-  blocks stay light in light mode.
-- Soft contrast, interface borders (off by default) and compact (default) or
-  comfortable density.
+- Ledger replaces the old families with Bone, Slate, Clay and Plum, plus System.
+  Bone is the default; a saved reader choice overrides bundle configuration.
+- Square geometry, ruled inventory rows, tabular mono figures and one accent
+  keep structure consistent across palettes. Content types are not colour-coded.
+- Code wells stay dark in every palette. The reading column is 760px with
+  16px/1.72 prose capped at 55ch; Focus expands the workspace, not prose measure.
+- Contrast, border and density modifiers are retired. Public Sans and Azeret
+  Mono (normal and italic) ship locally under SIL OFL 1.1.
 
 **Graph**
 
@@ -233,9 +272,13 @@ removed. OKF 0.1 bundles validate unchanged, and v1 Studio session state
 - **OKF 0.2 is optional.** `scripts/okf-loom upgrade <bundle>` only previews;
   the [migration guide](docs-bundle/how-to/migrate_spec_version.md) covers
   applying it.
-- **Themes.** v1 theme names still load, as aliases: `light` →
-  `technical-light`, `dark` and `midnight` → `technical-dark`, `pastel` and
-  `sepia` → `swiss-light`. Switch to the family names (or `auto`).
+- **Themes.** Old names still load: all old light variants (including v1
+  `light`, `pastel`, `sepia`) → Bone; Technical/Swiss dark (including `dark`,
+  `midnight`) → Slate; Coffee dark → Clay; Purple dark → Plum; `auto` → System.
+  Prefer `bone|slate|clay|plum|system` in `studio.theme` or viewer `theme`.
+  Browser choices migrate once to `okf-loom.appearance`; retired modifier keys
+  are ignored. Saved choice > configured choice > Bone; reset returns to the
+  configured choice. See [migration notes](CHANGELOG.md#unreleased).
 - **Index links.** Your first `index` run rewrites the links in generated
   index blocks from relative (`orders.md`) to bundle-absolute
   (`/datasets/orders.md`), a one-time diff. On GitHub a leading `/` resolves
@@ -416,7 +459,7 @@ okf-loom/
 │   ├── okf-loom              # the checked-in command
 │   ├── okf_loom/             # checkout-local runtime (standard library only)
 │   ├── capture_readme_media.py   # regenerates the README screenshots
-│   ├── record_showcase_media.py  # records the README clips
+│   ├── record_showcase_media.py  # records the README clips and the tour
 │   ├── build_skill_archive.py    # builds and verifies the skill zip
 │   └── …                     # capture, benchmark and vendor tools
 ├── docs-bundle/              # okf-loom's own docs, as an OKF bundle

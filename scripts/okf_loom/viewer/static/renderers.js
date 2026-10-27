@@ -228,6 +228,11 @@
     // ran). +esm serves a self-contained ESM bundle with hljs as the
     // default export, still pinned to the exact version.
     hljsEsm: "https://cdn.jsdelivr.net/npm/highlight.js@11.12.0/+esm",
+    // The GitHub light/dark sheets stay pinned (and vendored) for vendor
+    // parity, but the viewer no longer loads either: Ledger code wells are
+    // dark in every palette and wiki.css paints every highlight.js token from
+    // the three syntax roles (--syn-1 keys, --syn-2 strings, --syn-3
+    // punctuation/comments), so there is no per-scheme sheet to switch.
     hljsThemeLight: {
       href: "https://cdn.jsdelivr.net/npm/highlight.js@11.12.0/styles/github.min.css",
       integrity: "sha384-eFTL69TLRZTkNfYZOLM+G04821K1qZao/4QLJbet1pP4tcF+fdXq/9CdqAbWRl/L",
@@ -328,8 +333,6 @@
   var activeToken = null;
   var currentThemeName = themeName();
   var currentResolvedMode = resolvedMode(currentThemeName);
-  var hljsThemeLink = null;
-  var hljsThemeRequest = null;
   var hljsModulePromise = null;
   var katexAssetsPromise = null;
   var mermaidModulePromise = null;
@@ -337,19 +340,84 @@
 
   function themeName() {
     var root = document.documentElement;
-    return (root && (root.getAttribute("data-theme") || root.dataset.theme)) || "technical-light";
+    return (root && (root.getAttribute("data-theme") || root.dataset.theme)) || "bone";
   }
 
+  // Ledger palettes carry their scheme by name, not by a "-dark" suffix:
+  // Bone is light; Slate, Clay and Plum are dark. Mermaid's darkMode flag
+  // follows it; its colours come from the palette tokens (mermaidTheme).
   function resolvedMode(name) {
-    return /-dark$/.test(name || "") ? "dark" : "light";
+    return name === "slate" || name === "clay" || name === "plum" ? "dark" : "light";
   }
 
-  function isDark() {
-    // Resolved themes are "<family>-<mode>" (e.g. "technical-dark"). A
-    // theme is dark whenever its resolved mode is dark, regardless of family.
+  // Mermaid theme variables derived from the ACTIVE palette's tokens, read
+  // from the root's computed style at the start of each render cycle (so a
+  // palette change always re-derives them). Mermaid's "base" theme computes
+  // its remaining shades from these. Hosts that cannot expose tokens (no
+  // getComputedStyle / getPropertyValue, or an unthemed embed) fall back to
+  // Mermaid's own default/dark theme for the resolved scheme.
+  var MERMAID_TOKEN_MAP = {
+    background: "--bg",
+    mainBkg: "--surface-2",
+    primaryColor: "--surface-2",
+    primaryTextColor: "--text",
+    primaryBorderColor: "--border-strong",
+    secondaryColor: "--bg-2",
+    secondaryTextColor: "--text",
+    secondaryBorderColor: "--border-strong",
+    tertiaryColor: "--surface",
+    tertiaryTextColor: "--text",
+    tertiaryBorderColor: "--border",
+    nodeBorder: "--border-strong",
+    nodeTextColor: "--text",
+    textColor: "--text",
+    titleColor: "--text",
+    lineColor: "--graph-edge",
+    defaultLinkColor: "--graph-edge",
+    edgeLabelBackground: "--bg",
+    clusterBkg: "--bg-2",
+    clusterBorder: "--border",
+    noteBkgColor: "--bg-2",
+    noteTextColor: "--text",
+    noteBorderColor: "--border-strong",
+    actorBkg: "--surface-2",
+    actorBorder: "--border-strong",
+    actorTextColor: "--text",
+    actorLineColor: "--border-strong",
+    signalColor: "--text-2",
+    signalTextColor: "--text",
+    labelBoxBkgColor: "--bg-2",
+    labelBoxBorderColor: "--border-strong",
+    labelTextColor: "--text",
+    loopTextColor: "--text",
+    activationBkgColor: "--bg-2",
+    activationBorderColor: "--border-strong",
+    sequenceNumberColor: "--bg",
+    errorBkgColor: "--bg-2",
+    errorTextColor: "--status-error",
+  };
+
+  function mermaidTheme(mode) {
+    var fallback = { theme: mode === "dark" ? "dark" : "default", themeVariables: null };
     var root = document.documentElement;
-    var name = root && (root.getAttribute("data-theme") || root.dataset.theme) || "technical-light";
-    return /-dark$/.test(name);
+    var view = typeof window.getComputedStyle === "function" ? window : null;
+    if (!root || !view) return fallback;
+    var style;
+    try { style = view.getComputedStyle(root); } catch (error) { return fallback; }
+    if (!style || typeof style.getPropertyValue !== "function") return fallback;
+    var vars = { darkMode: mode === "dark" };
+    var keys = Object.keys(MERMAID_TOKEN_MAP);
+    for (var i = 0; i < keys.length; i++) {
+      var value = String(style.getPropertyValue(MERMAID_TOKEN_MAP[keys[i]]) || "").trim();
+      // Mermaid derives shades from real colours; never pass it an unresolved
+      // var() or an empty token.
+      if (!/^(#[0-9a-f]{3,8}|rgba?\([^)]*\))$/i.test(value)) return fallback;
+      vars[keys[i]] = value;
+    }
+    var font = String(style.getPropertyValue("--font-body") || "").trim();
+    if (font) vars.fontFamily = font;
+    vars.fontSize = "14px";
+    return { theme: "base", themeVariables: vars };
   }
 
   function rendererError(code, message, cause) {
@@ -553,8 +621,57 @@
   // --- Mermaid ---------------------------------------------------------
   // Mermaid's render() API returns SVG text. Rendering off-DOM and committing
   // only after the token check is what makes a late theme/body completion
-  // unable to overwrite a newer diagram. The authored source is preserved in
-  // data-source and is restored only for a current, resolved mode change.
+  // unable to overwrite a newer diagram (latest wins). The authored source is
+  // preserved in data-source and is never put back into a rendered diagram:
+  // a palette re-render keeps the old SVG visible (aria-busy) and replaces it
+  // in one write once the new SVG exists, so the container never shows raw
+  // source and never changes size mid-swap. data-okf-mermaid-theme records
+  // the palette the visible SVG was drawn with; a mismatch with the current
+  // palette is what marks a diagram stale for any later cycle (theme or body),
+  // including after a failed re-render, which keeps the old diagram.
+  var MERMAID_THEME_ATTR = "data-okf-mermaid-theme";
+
+  // Mermaid measures text in a temporary element. Give it a hidden, size-
+  // neutral host instead of the body end: visibility keeps layout metrics
+  // (getBBox) real, height:0 + overflow:hidden keep it out of the page's
+  // scrollable overflow, and the body's width keeps label wrapping identical
+  // to Mermaid's default body-appended measurement.
+  function mermaidRenderHost() {
+    var body = document.body;
+    if (!body || typeof document.createElement !== "function") return null;
+    var host = document.createElement("div");
+    host.setAttribute("aria-hidden", "true");
+    host.setAttribute("data-okf-mermaid-render-host", "");
+    var width = body.clientWidth;
+    host.style.cssText = "position:absolute;top:0;left:0;height:0;overflow:hidden;" +
+      "visibility:hidden;pointer-events:none;contain:layout paint;" +
+      (width > 0 ? "width:" + width + "px;" : "width:100%;");
+    body.appendChild(host);
+    return host;
+  }
+
+  // Mermaid fits a diagram to its column (width:100%, max-width: natural
+  // width), so a wide flowchart shrank its 14px labels to 4-8px. Hold a
+  // minimum scale so labels never render below ~12px: a diagram wider than
+  // that keeps its size and scrolls inside its diagram scroll port. Applied
+  // in the same task as the swap, so the palette swap stays atomic.
+  var MERMAID_MIN_SCALE = 12 / 14;
+  function holdMermaidScale(el) {
+    var svg = el.querySelector("svg");
+    var box = svg && svg.viewBox && svg.viewBox.baseVal;
+    if (!box || !(box.width > 0)) return;
+    svg.style.minWidth = Math.round(box.width * MERMAID_MIN_SCALE) + "px";
+  }
+
+  function mermaidNeedsRender(el, token) {
+    if (!el.querySelector("svg")) return "first";
+    // An SVG this renderer did not draw (no authored source kept) is left as is.
+    if (!el.hasAttribute("data-source")) return null;
+    var painted = el.getAttribute(MERMAID_THEME_ATTR);
+    if (painted !== null) return painted !== token.themeName ? "rerender" : null;
+    return token.forceMermaid ? "rerender" : null;
+  }
+
   function getMermaidModule() {
     if (!mermaidModulePromise) {
       mermaidModulePromise = OFFLINE
@@ -567,90 +684,96 @@
   function initMermaid(token) {
     var allDivs = Array.prototype.slice.call(document.querySelectorAll("div.mermaid"));
     if (!allDivs.length) return Promise.resolve();
-    var mermaidDivs = allDivs.filter(function (el) {
-      if (token.forceMermaid && currentToken(token) && el.hasAttribute("data-source")) {
-        // Restore the exact authored source as text. This is a synchronous
-        // mutation owned by the current theme generation.
-        el.textContent = el.getAttribute("data-source");
-        el.classList.remove("mermaid--fallback");
-      }
-      return !el.querySelector("svg");
+    var jobs = [];
+    allDivs.forEach(function (el) {
+      var kind = mermaidNeedsRender(el, token);
+      if (kind) jobs.push({ el: el, rerender: kind === "rerender" });
+      // Bone -> Slate -> Bone before Slate finished: the painted SVG already
+      // matches again, the Slate render is fenced out, nothing is redrawing.
+      else if (el.getAttribute(MERMAID_THEME_ATTR) === token.themeName) el.removeAttribute("aria-busy");
     });
-    if (!mermaidDivs.length) return Promise.resolve();
-    mermaidDivs.forEach(function (el) {
+    if (!jobs.length) return Promise.resolve();
+    jobs.forEach(function (job) {
+      var el = job.el;
       if (!el.hasAttribute("data-source")) el.setAttribute("data-source", el.textContent || "");
       if (!el.id) el.id = "okf-mermaid-" + (++mermaidId);
+      if (job.rerender) {
+        // The old diagram stays painted; assistive tech is told it is being
+        // redrawn. An unstamped SVG becomes explicitly stale ("") so a later
+        // non-forced cycle still re-renders it if this one is superseded.
+        if (el.getAttribute(MERMAID_THEME_ATTR) === null) el.setAttribute(MERMAID_THEME_ATTR, "");
+        el.setAttribute("aria-busy", "true");
+      }
     });
+    function releaseBusy() {
+      if (!currentToken(token)) return;
+      jobs.forEach(function (job) {
+        if (job.rerender) job.el.removeAttribute("aria-busy");
+      });
+    }
     return getMermaidModule().then(function (mod) {
       if (!currentToken(token)) return;
       var mermaid = (mod && (mod.default || mod.mermaid)) || window.mermaid;
       if (!mermaid || typeof mermaid.initialize !== "function" || typeof mermaid.render !== "function") {
         throw rendererError(LOAD_FAILURE, "Mermaid did not expose its renderer API.");
       }
-      mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: token.resolvedMode === "dark" ? "dark" : "default" });
-      return Promise.all(mermaidDivs.map(function (el) {
+      var themed = mermaidTheme(token.resolvedMode);
+      var options = { startOnLoad: false, securityLevel: "strict", theme: themed.theme };
+      if (themed.themeVariables) options.themeVariables = themed.themeVariables;
+      mermaid.initialize(options);
+      return Promise.all(jobs.map(function (job) {
+        var el = job.el;
         if (!currentToken(token)) return Promise.resolve();
         var source = el.getAttribute("data-source") || "";
         // Mermaid owns/removes a temporary DOM element with the render id.
         // Never give it the authored host id (that deletes our projection node).
         var renderId = "okf-mermaid-svg-" + (++mermaidId);
-        return Promise.resolve(mermaid.render(renderId, source)).then(function (rendered) {
+        var host = mermaidRenderHost();
+        return Promise.resolve().then(function () {
+          return host ? mermaid.render(renderId, source, host) : mermaid.render(renderId, source);
+        }).then(function (rendered) {
+          removeNode(host);
           if (!currentToken(token) || !el.isConnected) return;
           var svg = rendered && rendered.svg != null ? rendered.svg : rendered;
           if (typeof svg !== "string" || !svg) {
             throw rendererError("renderer-failure", "Mermaid returned no SVG output.");
           }
+          // The single atomic swap: old SVG out, new SVG in, same task.
           el.innerHTML = svg;
+          holdMermaidScale(el);
+          el.setAttribute(MERMAID_THEME_ATTR, token.themeName);
+          el.removeAttribute("aria-busy");
           el.classList.remove("mermaid--fallback");
           if (rendered && typeof rendered.bindFunctions === "function") {
             rendered.bindFunctions(el);
           }
+          // Mermaid creates a shared body tooltip with an inline 2px radius.
+          // Let the viewer's square geometry rule own it, not vendor defaults.
+          document.querySelectorAll("body > div.mermaidTooltip").forEach(function (tooltip) {
+            tooltip.style.removeProperty("border-radius");
+          });
+        }, function (error) {
+          removeNode(host);
+          throw error;
         });
       }));
     }).catch(function (error) {
       if (!currentToken(token)) return;
-      mermaidDivs.forEach(function (el) {
-        if (currentToken(token)) el.classList.add("mermaid--fallback");
+      // A first render falls back to its truthful source text; a failed
+      // re-render keeps the previous diagram (still stamped with its old
+      // palette, so the next cycle retries) and the cycle reports failure.
+      releaseBusy();
+      jobs.forEach(function (job) {
+        if (!job.rerender) job.el.classList.add("mermaid--fallback");
       });
       throw asRendererError(error, "blocked-script", "Mermaid could not be loaded.");
     });
   }
 
   // --- Syntax highlighting (highlight.js) -----------------------------
-  function cssHref(link) {
-    return link && (link.href || (link.getAttribute &&
-      (link.getAttribute("href") || link.getAttribute("data-okf-href")))) || "";
-  }
-
-  function ensureHljsTheme(token) {
-    var pin = token.resolvedMode === "dark" ? PINS.hljsThemeDark : PINS.hljsThemeLight;
-    if (hljsThemeLink && cssHref(hljsThemeLink) === pin.href) return Promise.resolve(hljsThemeLink);
-    if (hljsThemeRequest && hljsThemeRequest.href === pin.href && hljsThemeRequest.removed) {
-      hljsThemeRequest = null;
-    }
-    if (!hljsThemeRequest || hljsThemeRequest.href !== pin.href) {
-      hljsThemeRequest = { href: pin.href, promise: loadCSS(pin) };
-    }
-    var request = hljsThemeRequest;
-    return request.promise.then(function (link) {
-      if (!currentToken(token)) {
-        // A newer mode will either adopt the same request or remove this
-        // inert sheet. It is never promoted to active CSS by this completion.
-        if (currentResolvedMode !== token.resolvedMode && link !== hljsThemeLink) {
-          request.removed = true;
-          removeNode(link);
-        }
-        return link;
-      }
-      request.removed = false;
-      link.media = "all";
-      var old = hljsThemeLink;
-      hljsThemeLink = link;
-      if (old && old !== link) removeNode(old);
-      return link;
-    });
-  }
-
+  // highlight.js only tokenises (adds hljs-* classes); wiki.css owns every
+  // colour through the three Ledger syntax roles on the dark code well, so a
+  // palette change needs no stylesheet swap and no re-highlight.
   function getHljsModule() {
     if (!hljsModulePromise) {
       hljsModulePromise = OFFLINE
@@ -664,8 +787,8 @@
     var allBlocks = Array.prototype.slice.call(document.querySelectorAll("pre > code[class*='language-']"));
     if (!allBlocks.length) return Promise.resolve();
     var codeBlocks = allBlocks.filter(function (el) { return !el.dataset.highlighted; });
-    var tasks = [ensureHljsTheme(token)];
-    if (!codeBlocks.length) return Promise.all(tasks);
+    if (!codeBlocks.length) return Promise.resolve();
+    var tasks = [];
     tasks.push(getHljsModule().then(function (mod) {
       if (!currentToken(token)) return;
       var hljs = (mod && mod.default) || (mod && mod.hljs) || window.hljs;
@@ -710,7 +833,9 @@
         if (!currentToken(token) || el.dataset.mathRendered) return;
         var tex = el.textContent;
         el.id = el.id || ("okf-math-" + i);
-        window.katex.render(tex, el, { throwOnError: false, displayMode: true });
+        // Math inherits the text colour (wiki.css); an error keeps its source
+        // readable in the palette's status-error hue, live across palettes.
+        window.katex.render(tex, el, { throwOnError: false, displayMode: true, errorColor: "var(--status-error)" });
         if (currentToken(token)) el.dataset.mathRendered = "true";
       });
     }).catch(function (error) {
@@ -731,6 +856,8 @@
   // Show the filter/count/copy toolbar only when a table has enough rows
   // for scanning to hurt; sorting + resizing apply to every table.
   var TABLE_TOOLBAR_MIN_ROWS = 5;
+  // Longest single token kept on one line; longer ones (URLs) may still wrap.
+  var ATOMIC_CELL_MAX = 32;
 
   function proseRoots() {
     return Array.prototype.slice.call(document.querySelectorAll(PROSE_SELECTOR));
@@ -873,6 +1000,16 @@
     // that fits gains no extra tab stop and a table that overflows always
     // gets the cue back.
     wireTableScrollAffordance(frame, wrap, table);
+
+    // One-token cells (dates, numbers, ids, paths) are marked so wiki.css can
+    // keep them unbroken: a narrow column scrolls the table in its wrapper
+    // rather than splitting "2026-01-15" at its hyphen.
+    rows.forEach(function (row) {
+      Array.prototype.forEach.call(row.cells, function (cell) {
+        var text = collapseWs(cell.textContent);
+        if (text && text.length <= ATOMIC_CELL_MAX && !/\s/.test(text)) cell.classList.add("okf-cell-atomic");
+      });
+    });
 
     // Original row order, for the third state of the sort cycle.
     var originalRows = rows.slice();
@@ -1393,17 +1530,17 @@
     var detail = event && event.detail;
     currentThemeName = nextName;
     currentResolvedMode = resolvedMode(nextName);
-    // A real theme event, including a family-only or modifier-only change,
-    // revokes every older renderer token. Mermaid receives force=true only
-    // when the resolved light/dark mode changed; family-only changes therefore
-    // do not rerender an already-rendered diagram.
+    // A real theme event revokes every older renderer token. Mermaid SVGs
+    // embed palette colours, so ANY palette change (Slate -> Clay keeps the
+    // dark scheme but not the colours) re-renders from the authored source
+    // with the new palette's variables, swapping the old SVG out only when
+    // the new one is ready. Readiness is "loading" until then, so a capture
+    // never takes the old-palette diagram as ready. A repeated event for the
+    // palette already painted starts a fenced cycle without re-rendering.
     if (nextName === previousName && !detail) return;
     themeGeneration += 1;
-    var resolvedModeChanged = previousMode !== currentResolvedMode;
-    if (detail && detail.previousResolvedMode === detail.resolvedMode) {
-      resolvedModeChanged = false;
-    }
-    initAll("theme", resolvedModeChanged);
+    var paletteChanged = nextName !== previousName || previousMode !== currentResolvedMode;
+    initAll("theme", paletteChanged);
   }
 
   // theme.js dispatches the semantic event. The observer is only a defensive

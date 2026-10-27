@@ -3,6 +3,7 @@
 from okf_loom.model import Bundle
 from okf_loom.paths import concept_id_to_str
 from test_live import _post, live_server
+from conftest import private_session_root
 from pathlib import Path
 import json
 import multiprocessing
@@ -73,6 +74,7 @@ def test_mig_07_cli(tmp_path: Path) -> None:
     assert not (bundle / ".okf-loom/session/proposal-review-v1").exists()
 
 
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_mig_11_cli_direct_compatibility(tmp_path: Path) -> None:
     """Every direct writer family is byte/CLI/lock compatible after activation."""
     executable = str(Path(__file__).parents[1] / "scripts/okf-loom")
@@ -101,6 +103,7 @@ def test_mig_11_cli_direct_compatibility(tmp_path: Path) -> None:
     for family, command in cases.items():
         case = tmp_path / family; baseline = case / "baseline"; activated = case / "activated"
         _direct_fixture(baseline); shutil.copytree(baseline, activated)
+        private_session_root(activated)
         activation = activate(activated); activation.close()
         auxiliaries = []
         for side in (baseline, activated):
@@ -121,6 +124,7 @@ def test_mig_11_cli_direct_compatibility(tmp_path: Path) -> None:
     # The common direct-writer lock remains blocking before and after backend activation.
     lock_case = tmp_path / "locking"; baseline = lock_case / "baseline"; activated = lock_case / "activated"
     _direct_fixture(baseline); shutil.copytree(baseline, activated)
+    private_session_root(activated)
     activation = activate(activated); activation.close()
     context = multiprocessing.get_context("spawn")
     lock_results = []

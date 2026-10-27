@@ -91,14 +91,17 @@ def test_search_uses_canonical_labels_compact_disclosure_and_action_ids(tmp_path
     ):
         assert re.search(rf'name="mode" value="{value}"[^>]*>\s*<span>{label}<small>', html)
     article = re.search(r'<article class="okf-search-result".*?</article>', html, re.DOTALL).group(0)
-    assert '<a class="okf-btn okf-btn--primary okf-search-open"' in article
+    # Ledger: one primary action per page (the search submit); each result's
+    # Open is a secondary outlined button.
+    assert '<a class="okf-btn okf-search-open"' in article
+    assert 'okf-btn--primary' not in article
     assert article.count("Evidence and context") == 1
     assert '<details class="okf-search-disclosure">' in article
     assert '<details class="okf-search-disclosure" open>' not in article
     assert 'data-search-action="copy-passage"' in article and '>Copy passage</button>' in article
     assert 'data-search-action="copy-concept-context"' in article and '>Copy concept context</button>' in article
     assert "Source:" in article and "Scope:" in article and "Estimated size:" in article
-    disclosure = re.search(r'<details class="okf-search-disclosure">(.*?)</details>', article, re.DOTALL).group(1)
+    disclosure = article.split('<details class="okf-search-disclosure">', 1)[1]
     assert "[guide-0.md#L9-L9]" in disclosure
     assert "Exact canonical source passage" in disclosure
     assert "title contains needle" in disclosure
@@ -187,6 +190,32 @@ def test_search_advisory_lists_only_non_default_states(tmp_path: Path) -> None:
         results=[results[list(cases).index("fresh-default")]],
     )
     assert "okf-search-advisory" not in live
+
+
+def test_search_limit_notice_and_relevant_empty_actions(tmp_path: Path) -> None:
+    from okf_loom.retrieval import SearchRequest
+    bundle = _bundle(tmp_path)
+    limited = _render_search_page(bundle, mode="serve", name="Bundle", config={}, query="needle",
+                                  results=[_result(0)], request=SearchRequest(limit=1))
+    assert 'class="okf-search-limit-notice"' in limited
+    assert "Result limit reached (1). Increase Result limit in Filters" in limited
+    empty = _render_search_page(bundle, mode="serve", name="Bundle", config={}, query="zzqxv", results=[])
+    assert "Clear filters</a>" not in empty and "Try Best overall</a>" in empty
+    assert "with the current filters" not in empty
+    filtered = _render_search_page(bundle, mode="serve", name="Bundle", config={}, query="zzqxv", results=[],
+                                   request=SearchRequest(mode="semantic", tag="needle"))
+    assert "Clear filters</a>" in filtered and "with the current filters" in filtered
+    assert '?q=zzqxv&amp;mode=semantic&amp;limit=20' in filtered
+    assert 'class="okf-search-empty__actions"' in filtered
+
+
+def test_search_marks_only_complete_non_stopword_terms(tmp_path: Path) -> None:
+    row = _result(0)
+    row["evidence"]["passage"]["excerpt"] = "Special specification inspection spec SPEC and command the themes café cafés snake_case"
+    html = _render_search_page(_bundle(tmp_path), mode="serve", name="Bundle", config={},
+                               query="spec and the café snake_case", results=[row])
+    preview = re.search(r'<blockquote class="okf-search-snippet okf-search-snippet--compact">(.*?)</blockquote>', html).group(1)
+    assert re.findall(r"<mark>(.*?)</mark>", preview) == ["spec", "SPEC", "café", "snake_case"]
 
 
 def test_passageless_result_is_honest_and_has_no_passage_action(tmp_path: Path) -> None:
@@ -285,6 +314,13 @@ def test_portable_adapters_render_shared_results_with_capability_actions(
             expect(scope.get_by_role("radio", name=label)).to_have_count(1)
 
         expect(results).to_have_count(5)
+        first_meta = results.first.locator(".okf-search-result__meta")
+        expect(first_meta.locator(".okf-search-result__type svg")).to_have_count(1)
+        assert ".md" not in first_meta.inner_text()
+        if surface == "static":
+            expect(page.locator('.okf-topbar input[name="q"]')).to_have_value("needle")
+            expect(results.first.locator(".okf-copy-scope code").first).to_have_text(re.compile(r"guide-\d\.md"))
+            expect(page.locator(".okf-page-context > details > summary")).to_have_text("Build context pack for first 5 results")
         # Every displayed result is a node the shared renderer returned.
         assert results.evaluate_all(
             "items => items.every(item => window.__okfSharedNodes.has(item))")
@@ -296,6 +332,12 @@ def test_portable_adapters_render_shared_results_with_capability_actions(
             summary = disclosure.locator(":scope > summary")
             expect(summary).to_have_text("Evidence and context")
             assert disclosure.evaluate("details => details.open") is False
+            # R11: one filled primary per view (the Search submit); every
+            # row's Open stays an outlined button.
+            open_action = item.get_by_role("link", name="Open", exact=True)
+            expect(open_action).to_have_count(1)
+            open_markup = open_action.evaluate("a => a.outerHTML")
+            assert "okf-btn" in open_markup and "okf-btn--primary" not in open_markup, open_markup
             passage = item.get_by_role("button", name="Copy passage", exact=True)
             expect(passage).to_have_attribute("data-search-action", "copy-passage")
             summary.click()

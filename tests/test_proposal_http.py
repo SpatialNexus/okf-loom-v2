@@ -396,6 +396,8 @@ def test_http_adapter_withdraw_envelope() -> None:
 
 class _RealProposalHTTP:
     def __init__(self, root):
+        from conftest import private_session_root
+        private_session_root(root)
         self.root = root
         (root / "orders.md").write_text(
             "---\ntype: Table\ntitle: Orders\ndescription: Orders table.\n"
@@ -607,6 +609,8 @@ def test_http_06_07_apply_undo_success_and_replay(tmp_path) -> None:
 
 
 def test_transport_async_committed_mutation_outbox_failure_retry(tmp_path) -> None:
+    from conftest import private_session_root
+    private_session_root(tmp_path)
     (tmp_path / "orders.md").write_text(
         "---\ntype: Table\n---\n\nOrders\n", encoding="utf-8")
     activation = activate_http(tmp_path)

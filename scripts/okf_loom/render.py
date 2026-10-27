@@ -30,6 +30,9 @@ from .portable_feedback_export import (
     single_file_bootstrap_script as single_file_portable_feedback_script,
 )
 
+import functools
+import copy
+from concurrent.futures import Future
 import json
 import hashlib
 import base64
@@ -39,13 +42,14 @@ import os
 import posixpath
 import re
 import tempfile
-from datetime import timezone
+from datetime import datetime, timezone
 from html.parser import HTMLParser
 from html.entities import html5 as _html5_entities
 from urllib.parse import quote as _url_quote, urlencode, unquote as _url_unquote
 from pathlib import Path
 from typing import Any
 
+from .viewer.text import readable_text
 from .aliases import alias_labels
 from .metadata import effective_instant_key, parse_instant
 from .viewer.metadata import (FIELDS as METADATA_FIELDS, render_metadata, join_source_footnotes,
@@ -1785,201 +1789,6 @@ def build_annotation_projection(source: str, body: str, rendered_html: str,
 
 
 # ---------------------------------------------------------------------------
-# Chip foreground color (luminance-aware contrast)
-# ---------------------------------------------------------------------------
-
-import re as _re_chip
-
-
-# P2-23: small named-CSS-colour map so palette overrides using bare names
-# (``red``, ``navy``, …) get the same luminance-aware fg treatment as
-# ``hsl()``. assets.py:_sanitize_css_color already allows the full CSS3
-# named set, so without this map ``_chip_fg`` fell through to the white
-# default for every named colour (e.g. ``yellow`` chips rendered as
-# white-on-yellow). The map is intentionally limited to the high-contrast
-# common names; ``transparent`` / ``currentcolor`` stay on the white
-# fallback (they have no computable luminance).
-_NAMED_CSS_COLORS: dict[str, tuple[int, int, int]] = {
-    "aliceblue": (240, 248, 255), "antiquewhite": (250, 235, 215),
-    "aqua": (0, 255, 255), "aquamarine": (127, 255, 212),
-    "azure": (240, 255, 255), "beige": (245, 245, 220),
-    "bisque": (255, 228, 196), "black": (0, 0, 0),
-    "blanchedalmond": (255, 235, 205), "blue": (0, 0, 255),
-    "blueviolet": (138, 43, 226), "brown": (165, 42, 42),
-    "burlywood": (222, 184, 135), "cadetblue": (95, 158, 160),
-    "chartreuse": (127, 255, 0), "chocolate": (210, 105, 30),
-    "coral": (255, 127, 80), "cornflowerblue": (100, 149, 237),
-    "cornsilk": (255, 248, 220), "crimson": (220, 20, 60),
-    "cyan": (0, 255, 255), "darkblue": (0, 0, 139),
-    "darkcyan": (0, 139, 139), "darkgoldenrod": (184, 134, 11),
-    "darkgray": (169, 169, 169), "darkgreen": (0, 100, 0),
-    "darkgrey": (169, 169, 169), "darkkhaki": (189, 183, 107),
-    "darkmagenta": (139, 0, 139), "darkolivegreen": (85, 107, 47),
-    "darkorange": (255, 140, 0), "darkorchid": (153, 50, 204),
-    "darkred": (139, 0, 0), "darksalmon": (233, 150, 122),
-    "darkseagreen": (143, 188, 143), "darkslateblue": (72, 61, 139),
-    "darkslategray": (47, 79, 79), "darkslategrey": (47, 79, 79),
-    "darkturquoise": (0, 206, 209), "darkviolet": (148, 0, 211),
-    "deeppink": (255, 20, 147), "deepskyblue": (0, 191, 255),
-    "dimgray": (105, 105, 105), "dimgrey": (105, 105, 105),
-    "dodgerblue": (30, 144, 255), "firebrick": (178, 34, 34),
-    "floralwhite": (255, 250, 240), "forestgreen": (34, 139, 34),
-    "fuchsia": (255, 0, 255), "gainsboro": (220, 220, 220),
-    "ghostwhite": (248, 248, 255), "gold": (255, 215, 0),
-    "goldenrod": (218, 165, 32), "gray": (128, 128, 128),
-    "green": (0, 128, 0), "greenyellow": (173, 255, 47),
-    "grey": (128, 128, 128), "honeydew": (240, 255, 240),
-    "hotpink": (255, 105, 180), "indianred": (205, 92, 92),
-    "indigo": (75, 0, 130), "ivory": (255, 255, 240),
-    "khaki": (240, 230, 140), "lavender": (230, 230, 250),
-    "lavenderblush": (255, 240, 245), "lawngreen": (124, 252, 0),
-    "lemonchiffon": (255, 250, 205), "lightblue": (173, 216, 230),
-    "lightcoral": (240, 128, 128), "lightcyan": (224, 255, 255),
-    "lightgoldenrodyellow": (250, 250, 210),
-    "lightgray": (211, 211, 211), "lightgreen": (144, 238, 144),
-    "lightgrey": (211, 211, 211), "lightpink": (255, 182, 193),
-    "lightsalmon": (255, 160, 122), "lightseagreen": (32, 178, 170),
-    "lightskyblue": (135, 206, 250),
-    "lightslategray": (119, 136, 153),
-    "lightslategrey": (119, 136, 153),
-    "lightsteelblue": (176, 196, 222), "lightyellow": (255, 255, 224),
-    "lime": (0, 255, 0), "limegreen": (50, 205, 50),
-    "linen": (250, 240, 230), "magenta": (255, 0, 255),
-    "maroon": (128, 0, 0), "mediumaquamarine": (102, 205, 170),
-    "mediumblue": (0, 0, 205), "mediumorchid": (186, 85, 211),
-    "mediumpurple": (147, 112, 219), "mediumseagreen": (60, 179, 113),
-    "mediumslateblue": (123, 104, 238),
-    "mediumspringgreen": (0, 250, 154),
-    "mediumturquoise": (72, 209, 204),
-    "mediumvioletred": (199, 21, 133),
-    "midnightblue": (25, 25, 112), "mintcream": (245, 255, 250),
-    "mistyrose": (255, 228, 225), "moccasin": (255, 228, 181),
-    "navajowhite": (255, 222, 173), "navy": (0, 0, 128),
-    "oldlace": (253, 245, 230), "olive": (128, 128, 0),
-    "olivedrab": (107, 142, 35), "orange": (255, 165, 0),
-    "orangered": (255, 69, 0), "orchid": (218, 112, 214),
-    "palegoldenrod": (238, 232, 170), "palegreen": (152, 251, 152),
-    "paleturquoise": (175, 238, 238),
-    "palevioletred": (219, 112, 147), "papayawhip": (255, 239, 213),
-    "peachpuff": (255, 218, 185), "peru": (205, 133, 63),
-    "pink": (255, 192, 203), "plum": (221, 160, 221),
-    "powderblue": (176, 224, 230), "purple": (128, 0, 128),
-    "rebeccapurple": (102, 51, 153), "red": (255, 0, 0),
-    "rosybrown": (188, 143, 143), "royalblue": (65, 105, 225),
-    "saddlebrown": (139, 69, 19), "salmon": (250, 128, 114),
-    "sandybrown": (244, 164, 96), "seagreen": (46, 139, 87),
-    "seashell": (255, 245, 238), "sienna": (160, 82, 45),
-    "silver": (192, 192, 192), "skyblue": (135, 206, 235),
-    "slateblue": (106, 90, 205), "slategray": (112, 128, 144),
-    "slategrey": (112, 128, 144), "snow": (255, 250, 250),
-    "springgreen": (0, 255, 127), "steelblue": (70, 130, 180),
-    "tan": (210, 180, 140), "teal": (0, 128, 128),
-    "thistle": (216, 191, 216), "tomato": (255, 99, 71),
-    "turquoise": (64, 224, 208), "violet": (238, 130, 238),
-    "wheat": (245, 222, 179), "white": (255, 255, 255),
-    "whitesmoke": (245, 245, 245), "yellow": (255, 255, 0),
-    "yellowgreen": (154, 205, 50),
-}
-
-
-def _relative_luminance_rgb(r: float, g: float, b: float) -> float:
-    """WCAG relative luminance for an RGB triple where each channel is in [0, 1]."""
-    def _lin(v: float) -> float:
-        return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
-    return 0.2126 * _lin(r) + 0.7152 * _lin(g) + 0.0722 * _lin(b)
-
-
-def _contrast_ratio(lum_fg: float, lum_bg: float) -> float:
-    """WCAG contrast ratio between two relative luminances."""
-    light, dark = max(lum_fg, lum_bg), min(lum_fg, lum_bg)
-    return (light + 0.05) / (dark + 0.05)
-
-
-def _chip_fg(bg_css: str) -> str:
-    """Compute a readable foreground color for a chip with the given CSS background.
-
-    Picks black or white based on which gives the higher WCAG contrast ratio
-    against the background (P2-23: replaces the brittle luminance threshold
-    of 0.18, which had no margin near the boundary). Handles ``hsl()``,
-    ``rgb()``/``rgba()``, ``#hex`` (3/6/8-digit), and the common CSS named
-    colours; unparseable values fall back to ``#ffffff``.
-
-    P1-7: hex and ``rgb()``/``rgba()`` inputs are now parsed (previously
-    only ``hsl()`` and named colours were, so palette overrides using hex
-    like ``#ffff00`` fell through to ``#ffffff`` and produced invisible
-    white-on-yellow chips). The parse order and math mirror the JS port
-    ``graph.js:_chipFg`` exactly so a palette override yields the same fg
-    in the server-rendered concept page and the client-rendered graph view
-    (contract-runtime-parity invariant).
-
-    The dark-foreground choice is pure black (``#000000``) rather than a
-    softened ``#1a1a2e`` — pure black passes WCAG AA for every hue in the
-    auto-palette (verified across 0..360 deg at ``hsl(h, 62%, 48%)``).
-    """
-    if not isinstance(bg_css, str):
-        return "#ffffff"
-    s = bg_css.strip()
-    rgb: tuple[float, float, float] | None = None
-    m = _re_chip.match(r"hsla?\(\s*(\d+(?:\.\d+)?)\s*(?:deg|rad|turn|grad)?\s*,\s*(\d+(?:\.\d+)?)%\s*,\s*(\d+(?:\.\d+)?)%", s)
-    if m:
-        h = float(m.group(1)) % 360
-        sat = float(m.group(2)) / 100.0
-        l = float(m.group(3)) / 100.0
-        c = (1 - abs(2 * l - 1)) * sat
-        x = c * (1 - abs((h / 60) % 2 - 1))
-        m_ = l - c / 2
-        if h < 60:
-            r, g, b = c, x, 0
-        elif h < 120:
-            r, g, b = x, c, 0
-        elif h < 180:
-            r, g, b = 0, c, x
-        elif h < 240:
-            r, g, b = 0, x, c
-        elif h < 300:
-            r, g, b = x, 0, c
-        else:
-            r, g, b = c, 0, x
-        rgb = (r + m_, g + m_, b + m_)
-    else:
-        # P1-7: parse rgb()/rgba() (alpha is ignored — luminance is RGB).
-        m_rgb = _re_chip.match(r"rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)", s)
-        m_hex = _re_chip.match(
-            r"#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$", s, _re_chip.IGNORECASE
-        )
-        if m_rgb:
-            rgb = (
-                float(m_rgb.group(1)) / 255.0,
-                float(m_rgb.group(2)) / 255.0,
-                float(m_rgb.group(3)) / 255.0,
-            )
-        elif m_hex:
-            h = m_hex.group(1)
-            if len(h) == 3:
-                # Expand shorthand: #abc → #aabbcc.
-                h = "".join(ch * 2 for ch in h)
-            elif len(h) == 8:
-                # Strip alpha (#rrggbbaa) — luminance is RGB-only.
-                h = h[:6]
-            rgb = (
-                int(h[0:2], 16) / 255.0,
-                int(h[2:4], 16) / 255.0,
-                int(h[4:6], 16) / 255.0,
-            )
-        else:
-            named = _NAMED_CSS_COLORS.get(s.lower())
-            if named is not None:
-                rgb = (named[0] / 255.0, named[1] / 255.0, named[2] / 255.0)
-    if rgb is None:
-        return "#ffffff"
-    lum_bg = _relative_luminance_rgb(*rgb)
-    # P2-23: pick the higher-contrast foreground instead of using a brittle
-    # luminance threshold. Black has luminance 0, white has luminance 1.
-    contrast_black = _contrast_ratio(0.0, lum_bg)
-    contrast_white = _contrast_ratio(1.0, lum_bg)
-    return "#000000" if contrast_black >= contrast_white else "#ffffff"
-
-# ---------------------------------------------------------------------------
 # Bundle → graph JSON
 # ---------------------------------------------------------------------------
 
@@ -2122,13 +1931,112 @@ def _graph_grouping_metadata(concept: Concept) -> dict[str, str]:
     return out
 
 
+def render_graph_body(concept: Concept) -> str:
+    """The graph's exact body projection, shared by full data and lazy reads."""
+    return _decorate_content_scrollports(normalize_document_links(
+        _demote_headings(join_source_footnotes(markdown_to_html(concept.body), concept)),
+        concept_id_to_str(concept.id) + '.md', 'serve',
+    ))
+
+
+def _render_graph_documents(bundle: Bundle) -> tuple[dict[str, str], dict[str, Any]]:
+    """Content-pure graph HTML; never cache clock-sensitive metadata here."""
+    bodies = {
+        concept_id_to_str(c.id): render_graph_body(c)
+        for c in sorted(bundle.concepts.values(), key=lambda c: c.id)
+    }
+    documents = {
+        rel.as_posix(): {
+            "document": rel.as_posix(),
+            "html": normalize_document_links(
+                markdown_to_html(getattr(doc, 'body', doc.raw_text)), rel.as_posix(), 'serve',
+            ),
+        }
+        for rel, doc in sorted({**bundle.indexes, **bundle.logs}.items())
+        if doc.path.resolve().is_relative_to(bundle.root.resolve())
+    }
+    return bodies, documents
+
+
+def _graph_documents(bundle: Bundle, *, cached: bool) -> tuple[dict[str, str], dict[str, Any]]:
+    if not cached:
+        return _render_graph_documents(bundle)
+    from .retrieval import bundle_revision
+
+    def current_key():
+        # Called only under _derived_lock; covers every content-pure input.
+        return (bundle._source_generation, bundle_revision(bundle), bundle.root.resolve(),
+                tuple((rel, doc.path.resolve()) for rel, doc in sorted(
+                    {**bundle.indexes, **bundle.logs}.items())))
+
+    # _derived_lock owns only key capture, flight registration and publication.
+    # Never wait on a Future or notify its waiters while holding _derived_lock;
+    # no flight/Future lock is held when acquiring _derived_lock. Rendering runs
+    # on detached inputs, so retained mutations cannot mix generations mid-body.
+    with bundle._derived_lock:
+        key = current_key()
+        entry = getattr(bundle, '_graph_documents_cache', None)
+        owner = False
+        if entry is not None and entry[0] == key:
+            result = entry[1]
+            pending = None
+        else:
+            flights = getattr(bundle, '_graph_documents_inflight', None)
+            if flights is None:
+                flights = bundle._graph_documents_inflight = {}
+            pending = flights.get(key)
+            if pending is None:
+                concepts = {}
+                for cid, concept in bundle.concepts.items():
+                    detached = copy.copy(concept)
+                    detached.frontmatter = copy.deepcopy(concept.frontmatter)
+                    concepts[cid] = detached
+                snapshot = Bundle(root=bundle.root, concepts=concepts,
+                                  indexes={rel: copy.copy(doc) for rel, doc in bundle.indexes.items()},
+                                  logs={rel: copy.copy(doc) for rel, doc in bundle.logs.items()})
+                pending = flights[key] = Future()
+                owner = True
+    if owner:
+        try:
+            result = _render_graph_documents(snapshot)
+            with bundle._derived_lock:
+                # A stale flight still serves its captured snapshot to its own
+                # callers, but can never overwrite a newer generation's cache.
+                if current_key() == key:
+                    bundle._graph_documents_cache = (key, result)
+                del flights[key]
+        except BaseException as error:
+            with bundle._derived_lock:
+                flights.pop(key, None)
+            pending.set_exception(error)
+            raise
+        pending.set_result(result)
+    elif pending is not None:
+        result = pending.result()
+    bodies, documents = result
+    # One published entry per bundle; callers never own its mutable containers.
+    return dict(bodies), {path: dict(document) for path, document in documents.items()}
+
+
 def build_graph_data(
     bundle: Bundle,
     *,
     name: str | None = None,
     comment_summary: CommentSummaryV1 | None = None,
+    cache_bodies: bool = False,
+    include_bodies: bool = True,
+    metadata_now: Any = None,
+    structure: bool = False,
 ) -> dict[str, Any]:
     """Serialise a Bundle into the JSON shape consumed by the viewer.
+
+    Live callers may cache only content-pure body/document HTML with
+    ``cache_bodies``. Name, palette, graph structure, comment counts and
+    clock-sensitive metadata are always derived afresh. ``include_bodies=False``
+    skips that HTML entirely for structural consumers; portable payloads keep
+    the default full projection. ``structure=True`` additionally selects the
+    compact live-only field/relation transport; graph_response removes its
+    empty body/document placeholders. No portable caller selects this flag.
 
     Shape (consumed by ``viewer/static/graph.js``):
         {
@@ -2219,7 +2127,7 @@ def build_graph_data(
         _unresolved_by_src[link.source] = _unresolved_by_src.get(link.source, 0) + 1
 
     nodes: list[dict[str, Any]] = []
-    bodies: dict[str, str] = {}
+    bodies, documents = _graph_documents(bundle, cached=cache_bodies) if include_bodies else ({}, {})
     # Phase 3 PRE-PASS: degree per node, mirroring the dedup loop's
     # invariants (drop None targets, self-loops, dangling endpoints, and
     # duplicate (src,tgt) pairs). Computing it BEFORE the node loop lets
@@ -2254,9 +2162,8 @@ def build_graph_data(
         # renderer escapes raw HTML and neutralises dangerous URL schemes.
         # Apply heading demotion for consistent document outline across
         # all render targets (concept pages AND single-file/graph views).
-        bodies[cid_str] = _decorate_content_scrollports(
-            normalize_document_links(_demote_headings(join_source_footnotes(markdown_to_html(c.body), c)), cid_str + '.md', 'serve')
-        )
+        # Content-pure body HTML is acquired above; metadata_html below is
+        # deliberately recomputed at the request's current clock time.
         # Sanitize resource URL through _safe_url to prevent javascript:/data:
         # XSS via the graph view (graph.js assigns data.resource to a.href).
         safe_resource = ""
@@ -2311,13 +2218,22 @@ def build_graph_data(
                 "relations": governed["relations"],
                 "metadata": grouping_meta,
                 "okf_metadata": c.metadata,
-                "metadata_html": render_metadata(c, bundle, mode="graph"),
+                "metadata_html": "" if structure else render_metadata(c, bundle, mode="graph", now=metadata_now),
                 "generated_at": c.generated_at,
                 "graph_cluster": grouping_meta.get("graph_cluster", ""),
                 "source_system": grouping_meta.get("source_system", ""),
         }
         if comment_counts is not None:
             node_data["active_comment_count"] = comment_counts.get(cid_str, 0)
+        if structure:
+            # Live internal contract: only fields read by graph.js/Studio.
+            # Advisory HTML is fetched with the selected body. Comment-count
+            # presence means availability, so an available zero MUST survive.
+            for key in ("okf_metadata", "metadata_html", "generated_at", "body_chars", "color",
+                        "graph_cluster", "source_system"):
+                del node_data[key]
+            node_data = {key: value for key, value in node_data.items()
+                         if value or key in ("id", "label", "type", "active_comment_count")}
         nodes.append({"data": node_data})
 
     # Final node ID set for the dangling-endpoint invariant (layout-graph):
@@ -2450,6 +2366,17 @@ def build_graph_data(
         elif primary["label"] and not primary["label"].startswith("/"):
             data["label"] = primary["label"]
 
+    if structure:
+        for edge in edges:
+            data = edge["data"]
+            data["primary_relation_index"] = data["relations"].index(data.pop("primary_relation"))
+            del data["multiplicity"]  # exactly len(relations), restored by the client
+            data["relations"] = [
+                {key: value for key, value in relation.items()
+                 if key in ("id", "label", "type", "kind", "detail", "origin", "source_id")}
+                for relation in data["relations"]
+            ]
+
     external = [
         {
             "source": concept_id_to_str(e.source),
@@ -2468,20 +2395,19 @@ def build_graph_data(
     backlinks = {k: sorted(v) for k, v in sorted(backlinks.items())}
 
     return {
+        **({"structure_schema": 1, "document_paths": [
+            rel.as_posix() for rel, doc in sorted({**bundle.indexes, **bundle.logs}.items())
+            if doc.path.resolve().is_relative_to(bundle.root.resolve())
+        ]} if structure else {}),
         "name": name or bundle.name,
         "bundle_revision": bundle_revision(bundle),
         "nodes": nodes,
         "edges": edges,
-        "raw_relationship_count": sum(edge["data"]["multiplicity"] for edge in edges),
+        "raw_relationship_count": sum(len(edge["data"]["relations"]) for edge in edges),
         "external": external,
         "bodies": bodies,
         # Navigation documents are not graph concepts or synthetic nodes.
-        "documents": {
-            rel.as_posix(): {"document": rel.as_posix(),
-                            "html": normalize_document_links(markdown_to_html(getattr(doc, 'body', doc.raw_text)), rel.as_posix(), 'serve')}
-            for rel, doc in sorted({**bundle.indexes, **bundle.logs}.items())
-            if doc.path.resolve().is_relative_to(bundle.root.resolve())
-        },
+        "documents": documents,
         "types": types,
         "palette": palette,
         "backlinks": backlinks,
@@ -2495,206 +2421,150 @@ def build_graph_data(
 # Theme button (P2-74) + shared topbar nav fragment (P2-61)
 # ---------------------------------------------------------------------------
 
-# Resolved data-theme values (family + mode). viewer/static/theme.js is the
-# SOLE owner of theme state; these concrete values are the only ones painted
-# on <html> and the only ones with a wiki.css token block. KEEP IN SYNC with
-# theme.js (THEMES/LEGACY_THEMES), config.py (_ALLOWED_STUDIO_THEMES) and
-# viewer/assets.py (_ALLOWED_THEMES) — tests/test_theme_contract.py enforces
-# the parity. Technical and Swiss retain their established shared palette;
-# Purple and Coffee add optional editorial palettes. Every family has a
-# meaningful geometry/surface treatment in addition to colour (see wiki.css).
-_THEMES: tuple[str, ...] = (
-    "technical-light", "technical-dark", "swiss-light", "swiss-dark",
-    "purple-light", "purple-dark", "coffee-light", "coffee-dark",
+# Ledger appearance. viewer/static/theme.js is the SOLE owner of theme state;
+# these palettes are the only values painted on <html> as data-theme and the
+# only ones with a wiki.css token block. A reader picks one of the palettes or
+# "system" (Bone when the OS is light, Slate when it is dark). KEEP IN SYNC
+# with theme.js (PALETTES/CHOICES/LEGACY_THEMES), config.py
+# (_ALLOWED_STUDIO_THEMES) and viewer/assets.py (_ALLOWED_THEMES).
+_THEMES: tuple[str, ...] = ("bone", "slate", "clay", "plum")
+_THEME_CHOICES: tuple[str, ...] = (*_THEMES, "system")
+# Retired names (v2 family-mode themes, "auto", v1 aliases) map to the nearest
+# Ledger choice through _LEGACY_THEME_MIGRATIONS, imported from config.py
+# (the single table that theme.js LEGACY_THEMES mirrors for saved choices).
+# Bone is both the default choice and the first-paint palette: :root carries
+# its tokens, so a page that never runs theme.js still renders Bone.
+_DEFAULT_THEME = "bone"
+_DEFAULT_CONFIGURED_THEME = "bone"
+# Appearance menu entries: (choice, label, one-line description). The copy is
+# the Ledger package's (appearance/appearance.js THEMES); swatches read each
+# palette's own tokens by scoping data-theme on the swatch element.
+_APPEARANCE_OPTIONS: tuple[tuple[str, str, str], ...] = (
+    ("bone", "Bone", "Warm bone paper, ink text, oxide-red accent. "
+     "The default: calm for long reading in daylight."),
+    ("slate", "Slate", "Cool graphite with a muted steel blue. "
+     "The engineering read of Ledger."),
+    ("clay", "Clay", "Brown-black with a clay terracotta \u2014 "
+     "the original warm hue, drained of chroma."),
+    ("plum", "Plum", "Neutral dark with a faint violet cast and a dusty plum accent."),
+    ("system", "System", "Follows your device: Bone in light mode, Slate in dark mode."),
 )
-# Legacy v1 concrete theme values → new resolved theme: _LEGACY_THEME_MIGRATIONS
-# is imported from config.py (the single table, which theme.js LEGACY_THEMES
-# mirrors for localStorage["okf-theme"]).
-# Server-side default when no concrete theme is configured. This is a concrete
-# paint hint only; the configured preference is _DEFAULT_CONFIGURED_THEME and
-# theme.js resolves Technical Auto from the OS before the body can paint.
-_DEFAULT_THEME = "technical-light"
-_DEFAULT_CONFIGURED_THEME = "auto"
-_CONTRASTS: tuple[str, ...] = ("normal", "soft")
-_BORDERS: tuple[str, ...] = ("on", "off")
-_DENSITIES: tuple[str, ...] = ("comfortable", "compact")
-# Fresh-visitor defaults (Technical, Auto/System mode, Normal contrast,
-# Borders Off, Compact density). KEEP IN SYNC with theme.js DEFAULT_* and
-# viewer/assets.py _DEFAULT_CONFIG. Density is a user-only preference (no
-# configured value), so the server always paints the default.
-_DEFAULT_CONTRAST = "normal"
-_DEFAULT_BORDER = "off"
-_DEFAULT_DENSITY = "compact"
+_APPEARANCE_LABELS: dict[str, str] = {c: label for c, label, _ in _APPEARANCE_OPTIONS}
 
 
-def _theme_preference(config: dict[str, Any] | None) -> tuple[str, str, str]:
-    """Return the validated configured theme preference and modifiers.
+def _normalise_theme_choice(value: Any) -> str | None:
+    """Return a Ledger choice for ``value`` (mapping retired names) or None."""
+    if not isinstance(value, str):
+        return None
+    value = _LEGACY_THEME_MIGRATIONS.get(value, value)
+    return value if value in _THEME_CHOICES else None
+
+
+def _theme_preference(config: dict[str, Any] | None) -> str:
+    """Return the validated configured appearance choice.
 
     ``data-theme`` is deliberately not used here. It is a concrete first
-    paint hint and must never turn an absent configured Auto preference into an
-    explicit Light/Dark choice. ``viewer.assets.load_config`` already filters
-    user config, but this second boundary keeps render callers fail-closed when
-    supplied a hand-built config dictionary in tests or an embedding.
+    paint hint and must never turn a configured "system" into a pinned
+    palette. ``viewer.assets.load_config`` already filters user config, but
+    this second boundary keeps render callers fail-closed when supplied a
+    hand-built config dictionary in tests or an embedding.
     """
-    cfg = config or {}
-    theme_value = cfg.get("theme")
-    theme = (
-        theme_value if theme_value == "auto" or theme_value in _THEMES
-        else _DEFAULT_CONFIGURED_THEME
-    )
-    contrast_value = cfg.get("contrast")
-    contrast = contrast_value if contrast_value in _CONTRASTS else _DEFAULT_CONTRAST
-    border_value = cfg.get("border")
-    border = border_value if border_value in _BORDERS else _DEFAULT_BORDER
-    return theme, contrast, border
+    return _normalise_theme_choice((config or {}).get("theme")) or _DEFAULT_CONFIGURED_THEME
 
 
 def _resolve_initial_theme(value: str | None) -> str:
-    """Normalise a configured preference to a concrete first-paint theme.
+    """Normalise a configured choice to the concrete first-paint palette.
 
-    Accepts the new family-mode vocabulary directly. The retired legacy
-    concrete names (light/dark/pastel/sepia/midnight) are migrated to their
-    new resolved theme so an older viewer config.json keeps working. ``"auto"``
-    and invalid/absent values use the Technical-light paint hint. The caller
-    emits the original validated preference separately; theme.js owns the
-    follow-OS resolution and never infers preference from this paint hint.
+    ``"system"``, invalid and absent values paint Bone; theme.js resolves
+    "system" from the OS before the body paints and never infers a saved
+    preference from this paint hint.
     """
-    if value in _THEMES:
-        return value
-    if value and value in _LEGACY_THEME_MIGRATIONS:
-        return _LEGACY_THEME_MIGRATIONS[value]
-    return _DEFAULT_THEME
+    choice = _normalise_theme_choice(value)
+    return choice if choice in _THEMES else _DEFAULT_THEME
 
 
-def _theme_modifier_attrs(contrast: str = _DEFAULT_CONTRAST,
-                          border: str = _DEFAULT_BORDER) -> str:
-    """Root ``<html>`` modifier attributes for the configured preference.
+def _theme_config_html(theme: str) -> str:
+    """Emit the non-executable configured choice consumed by theme.js.
 
-    The server paints the configured contrast/border and the default density
-    so no-JS readers get the same defaults as a fresh scripted visitor and
-    the first paint matches what theme.js resolves when no saved user
-    preference exists. theme.js (parser-blocking in ``<head>``) still owns
-    the final values and overwrites them before the body paints.
+    Present on live, SPA, static, and single-file targets, and separate from
+    the concrete ``data-theme`` attribute so a configured "system" stays
+    "system" when the OS is dark.
     """
-    contrast = contrast if contrast in _CONTRASTS else _DEFAULT_CONTRAST
-    border = border if border in _BORDERS else _DEFAULT_BORDER
-    return (
-        f' data-okf-contrast="{contrast}" data-okf-border="{border}"'
-        f' data-okf-density="{_DEFAULT_DENSITY}"'
-    )
-
-
-def _theme_config_html(theme: str, contrast: str = _DEFAULT_CONTRAST,
-                       border: str = _DEFAULT_BORDER) -> str:
-    """Emit the non-executable configured preference consumed by theme.js.
-
-    This block is present on live, SPA, static, and single-file targets. It is
-    intentionally separate from the concrete ``data-theme`` attribute so a
-    Technical Auto configuration remains Auto when the OS is dark.
-    """
-    configured_theme = (
-        theme if theme == "auto" or theme in _THEMES else _DEFAULT_CONFIGURED_THEME
-    )
-    configured_contrast = contrast if contrast in _CONTRASTS else _DEFAULT_CONTRAST
-    configured_border = border if border in _BORDERS else _DEFAULT_BORDER
     payload = json.dumps(
-        {"theme": configured_theme, "contrast": configured_contrast, "border": configured_border},
+        {"theme": _normalise_theme_choice(theme) or _DEFAULT_CONFIGURED_THEME},
         separators=(",", ":"),
     )
     return f'<script type="application/json" id="okf-theme-config">{payload}</script>'
 
 
-def _appearance_control_html(initial_theme: str,
-                             initial_mode: str = "auto",
-                             initial_contrast: str = _DEFAULT_CONTRAST,
-                             initial_border: str = _DEFAULT_BORDER) -> str:
+def _appearance_swatch_html(choice: str) -> str:
+    """Four-colour palette preview: canvas, raised surface, ink, accent.
+
+    Each stripe reads the palette's own tokens because the swatch carries
+    that palette's ``data-theme``; "system" shows Bone and Slate halves.
+    """
+    stripes = "<i></i><i></i><i></i><i></i>"
+    if choice == "system":
+        return (
+            '<span class="okf-appearance__swatch okf-appearance__swatch--split" aria-hidden="true">'
+            f'<span data-theme="bone">{stripes}</span>'
+            f'<span data-theme="slate">{stripes}</span></span>'
+        )
+    return (
+        f'<span class="okf-appearance__swatch" data-theme="{choice}" aria-hidden="true">'
+        f'{stripes}</span>'
+    )
+
+
+def _appearance_control_html(appearance_choice: str = _DEFAULT_CONFIGURED_THEME) -> str:
     """Server-side Appearance control (no FOUC, keyboard-accessible).
 
-    Emits a native trigger plus a form with real labelled radio inputs for
-    Family, Mode, Contrast, Border, and Density. ``viewer/static/theme.js`` (loaded
-    before first paint) is the sole owner of preference state and wires
-    open/close, Arrow/Home/End/Escape/Tab behaviour. The server only seeds
-    the pre-JavaScript checked state from the configured preference.
+    Emits a native trigger plus a dialog form holding ONE native radio group:
+    Bone (default), Slate, Clay, Plum and System, each with a label, a
+    one-line description and a four-colour swatch. ``viewer/static/theme.js``
+    (loaded before first paint) is the sole owner of preference state and
+    wires open/close, Arrow/Home/End/Escape/Tab behaviour; the server only
+    seeds the pre-JavaScript checked state from the configured choice.
 
-    The trigger keeps the historical ``#okf-theme`` id so the existing
-    no-JS CSS (``body:not([data-okf-js]) #okf-theme { display:none }``) hides
+    The trigger keeps the historical ``#okf-theme`` id so the no-JS CSS hides
     it when JavaScript is unavailable; the menu starts ``hidden`` and is
     therefore inert without theme.js.
     """
-    theme = initial_theme if initial_theme in _THEMES else _DEFAULT_THEME
-    initial_contrast = (
-        initial_contrast if initial_contrast in _CONTRASTS else _DEFAULT_CONTRAST
-    )
-    initial_border = initial_border if initial_border in _BORDERS else _DEFAULT_BORDER
-    initial_mode = initial_mode if initial_mode in ("auto", "light", "dark") else "auto"
-    family = theme.rsplit("-", 1)[0]
-
-    def _opt(group: str, value: str, label: str, sub: str, checked: str) -> str:
-        is_checked = checked == "true"
-        input_id = f"okf-appearance-{group}-{value}"
-        preview = (
-            f'<span class="okf-appearance__preview okf-appearance__preview--{value}" '
-            f'aria-hidden="true"><span></span><span></span><span></span></span>'
-            if group == "family" else ""
+    choice = _normalise_theme_choice(appearance_choice) or _DEFAULT_CONFIGURED_THEME
+    options = []
+    for value, label, description in _APPEARANCE_OPTIONS:
+        checked = value == choice
+        input_id = f"okf-appearance-theme-{value}"
+        tag = ('<span class="okf-appearance__tag">Default</span>'
+               if value == _DEFAULT_THEME else "")
+        options.append(
+            f'<label for="{input_id}" class="okf-appearance__opt" data-okf-choice="{value}">'
+            f'<input id="{input_id}" type="radio" name="okf-appearance" value="{value}"'
+            f' data-okf-set="theme" data-okf-val="{value}"'
+            f' aria-describedby="{input_id}-sub"'
+            f' tabindex="{"0" if checked else "-1"}"{" checked" if checked else ""}>'
+            f'{_appearance_swatch_html(value)}'
+            '<span class="okf-appearance__text">'
+            f'<span class="okf-appearance__label">{label}{tag}</span>'
+            f'<span class="okf-appearance__sub" id="{input_id}-sub">{description}</span>'
+            '</span></label>'
         )
-        return (
-            f'<label for="{input_id}" class="okf-appearance__opt" aria-checked="{checked}">'
-            f'<input id="{input_id}" type="radio" name="okf-theme-{group}"'
-            f' value="{value}" data-okf-set="{group}" data-okf-val="{value}"'
-            f' aria-checked="{checked}" tabindex="{"0" if is_checked else "-1"}"'
-            f'{" checked" if is_checked else ""}>'
-            '<span class="okf-appearance__check" aria-hidden="true">\u2713</span>'
-            f'{preview}'
-            f'<span class="okf-appearance__label">{label}</span>'
-            f'<span class="okf-appearance__sub">{sub}</span>'
-            '</label>'
-        )
-
     return (
         '<button id="okf-theme" type="button" class="okf-btn okf-appearance-trigger" '
         'aria-haspopup="dialog" aria-expanded="false" '
         'aria-controls="okf-appearance-menu" '
-        'title="Appearance \u2014 theme, colour mode, contrast, borders, and density">'
-        f'<span class="okf-appearance-trigger__swatch okf-appearance-trigger__swatch--{_esc_attr_qs(family)}" aria-hidden="true"></span>'
+        'title="Appearance \u2014 colour palette">'
+        '<span class="okf-appearance-trigger__swatch" aria-hidden="true"></span>'
         '<span class="okf-appearance-trigger__label">'
         '<span class="okf-appearance-trigger__prefix">Appearance \u00b7 </span>'
-        f'<span class="okf-appearance-trigger__family">{family.title()}</span>'
+        f'<span class="okf-appearance-trigger__family">{_APPEARANCE_LABELS[choice]}</span>'
         '</span></button>'
         '<form id="okf-appearance-menu" role="dialog" aria-label="Appearance" hidden>'
-        '<h2 class="sr-only">Appearance</h2>'
-        '<fieldset class="okf-appearance__group" role="group" aria-labelledby="okf-appearance-mode-label">'
-        '<legend id="okf-appearance-mode-label" class="okf-appearance__legend">Colour mode</legend>'
-        + _opt("mode", "auto", "Auto", f"{family.title()} family + follow OS colour mode", "true" if initial_mode == "auto" else "false")
-        + _opt("mode", "light", "Light", "", "true" if initial_mode == "light" else "false")
-        + _opt("mode", "dark", "Dark", "", "true" if initial_mode == "dark" else "false")
-        + '</fieldset>'
-        '<fieldset class="okf-appearance__group" role="group" aria-labelledby="okf-appearance-density-label">'
-        '<legend id="okf-appearance-density-label" class="okf-appearance__legend">Density</legend>'
-        + _opt("density", "comfortable", "Comfortable", "more room in interface lists and controls", "true" if _DEFAULT_DENSITY == "comfortable" else "false")
-        + _opt("density", "compact", "Compact", "less interface space; reading measure unchanged", "true" if _DEFAULT_DENSITY == "compact" else "false")
-        + '</fieldset>'
-        '<details class="okf-appearance__advanced"><summary>Advanced appearance</summary>'
-        '<fieldset class="okf-appearance__group" role="group" aria-labelledby="okf-appearance-family-label">'
-        '<legend id="okf-appearance-family-label" class="okf-appearance__legend">Family</legend>'
-        + _opt("family", "technical", "Technical", "application default", "true" if family == "technical" else "false")
-        + _opt("family", "swiss", "Swiss", "hairline grid", "true" if family == "swiss" else "false")
-        + _opt("family", "purple", "Purple", "editorial violet", "true" if family == "purple" else "false")
-        + _opt("family", "coffee", "Coffee", "paper and espresso", "true" if family == "coffee" else "false")
-        + '</fieldset>'
-        '<fieldset class="okf-appearance__group" role="group" aria-labelledby="okf-appearance-contrast-label">'
-        '<legend id="okf-appearance-contrast-label" class="okf-appearance__legend">Contrast</legend>'
-        + _opt("contrast", "normal", "Normal", "standard surfaces", "true" if initial_contrast == "normal" else "false")
-        + _opt("contrast", "soft", "Soft", "quieter surfaces", "true" if initial_contrast == "soft" else "false")
-        + '</fieldset>'
-        '<fieldset class="okf-appearance__group" role="group" aria-labelledby="okf-appearance-border-label">'
-        '<legend id="okf-appearance-border-label" class="okf-appearance__legend">Borders</legend>'
-        + _opt("border", "on", "On", "visible frames", "true" if initial_border == "on" else "false")
-        + _opt("border", "off", "Off", "focus and status cues remain", "true" if initial_border == "off" else "false")
-        + '</fieldset>'
-        '</details>'
-        '<p class="okf-appearance__note">Density changes interface spacing, never reading width or minimum control targets.</p>'
-        '<button type="button" class="okf-appearance__reset" data-okf-action="reset">Reset to Technical Auto, compact, borders off</button>'
-        '</form>'
+        '<fieldset class="okf-appearance__group" role="radiogroup" '
+        'aria-labelledby="okf-appearance-legend">'
+        '<legend id="okf-appearance-legend" class="okf-appearance__legend">Appearance</legend>'
+        + "".join(options)
+        + '</fieldset></form>'
     )
 
 
@@ -2702,10 +2572,7 @@ def _nav_controls_html(
     *,
     root_prefix: str,
     graph_link: str,
-    initial_theme: str,
-    initial_mode: str = "auto",
-    initial_contrast: str = _DEFAULT_CONTRAST,
-    initial_border: str = _DEFAULT_BORDER,
+    appearance_choice: str = _DEFAULT_CONFIGURED_THEME,
     current_query: str = "",
     mode: str = "serve",
 ) -> str:
@@ -2734,7 +2601,7 @@ def _nav_controls_html(
         '</form>'
         f'<a class="okf-btn" href="{graph_link}">Graph</a>'
         f'<a class="okf-btn" href="{index_href}">Index</a>'
-          f'{_appearance_control_html(initial_theme, initial_mode, initial_contrast, initial_border)}'
+          f'{_appearance_control_html(appearance_choice)}'
         '</div>'
     )
 
@@ -2748,11 +2615,9 @@ def _application_shell_html(
     graph_href: str,
     current: str | None,
     mode: str,
-    initial_theme: str,
-    initial_mode: str,
-    initial_contrast: str,
-    initial_border: str,
+    appearance_choice: str = _DEFAULT_CONFIGURED_THEME,
     search_query: str = "",
+    studio_available: bool = True,
 ) -> str:
     """Bridge renderer-owned route state into the canonical shell model."""
     if current not in {None, "search", "index", "graph"}:
@@ -2765,46 +2630,51 @@ def _application_shell_html(
             index_href=index_href,
             graph_href=graph_href,
             current=current,  # type: ignore[arg-type]
-            studio_available=mode == "serve",
+            studio_available=mode == "serve" and studio_available,
             search_query=search_query,
         ),
-        _appearance_control_html(
-            initial_theme, initial_mode, initial_contrast, initial_border,
-        ),
+        _appearance_control_html(appearance_choice),
     )
 
 
-def _render_not_found_page(*, name: str, path: str, config: dict[str, Any]) -> str:
+def _render_not_found_page(*, name: str, path: str, config: dict[str, Any],
+                           studio_available: bool = True) -> str:
     """Minimal live document recovery using the canonical application shell.
 
     No concept lookup, suggestions, or query-string reflection belongs here.
     The server retains status, security headers, and Studio authority ownership.
     """
-    theme, contrast, border = _theme_preference(config)
-    initial_theme = _resolve_initial_theme(theme)
+    configured_theme = _theme_preference(config)
+    initial_theme = _resolve_initial_theme(configured_theme)
     shell = _application_shell_html(
         name=name, bundle_href="/", search_href="/__search", index_href="/",
         graph_href="/__graph", current=None, mode="serve",
-        initial_theme=initial_theme,
-        initial_mode="auto" if theme == "auto" else theme.rsplit("-", 1)[1],
-        initial_contrast=contrast, initial_border=border,
+        studio_available=studio_available,
+        appearance_choice=configured_theme,
     )
+    # The shared inline product icon from the BUILT-IN index template, so the
+    # recovery page does not request a missing /favicon.ico either.
+    icon = re.search(r'<link rel="icon"[^>]*>', load_template("index_page.html"))
     return (
         '<!doctype html><html lang="en"'
-        f' data-theme="{_esc_attr_qs(initial_theme)}"{_theme_modifier_attrs(contrast, border)}><head>'
+        f' data-theme="{_esc_attr_qs(initial_theme)}"><head>'
         '<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
         f'<title>Page not found — {_esc(name)}</title>'
-        '<link rel="stylesheet" href="/__static/wiki.css">'
+        + (icon.group(0) if icon else '')
+        + _ledger_fonts_head("/__static", mode="serve")
+        + '<link rel="stylesheet" href="/__static/wiki.css">'
         '<link rel="stylesheet" href="/__static/shell.css">'
-        '</head><body data-okf-mode="serve">'
+        + _theme_config_html(configured_theme)
+        + '</head><body class="okf-viewer okf-viewer--notfound" data-okf-mode="serve">'
         '<a class="okf-skip-link" href="#okf-main">Skip to content</a>'
         + shell
-        + '<main id="okf-main" class="okf-index" tabindex="-1">'
+        + '<main id="okf-main" class="okf-index okf-notfound" tabindex="-1">'
+        '<p class="okf-notfound__code">404 · Not found</p>'
         '<h1>Page not found</h1>'
         f'<p>The requested page <code>/{_esc(path)}</code> is not available.</p>'
-        '<p><a class="okf-btn" href="/">Home · Browse the index</a> '
+        '<p class="okf-notfound__actions"><a class="okf-btn" href="/">Home · Browse the index</a> '
         '<a class="okf-btn" href="/__search">Search this bundle</a></p>'
-        '</main><script src="/__static/wiki.js" defer></script></body></html>'
+        '</main><script src="/__static/readable-text.js" defer></script><script src="/__static/wiki.js" defer></script></body></html>'
     )
 
 
@@ -2824,7 +2694,8 @@ FEEDBACK_IMPORT_RETENTION = (
 
 
 def render_feedback_import_page(*, name: str, config: dict[str, Any], availability: str,
-                                max_note_bytes: int, preview_ttl_seconds: int) -> str:
+                                max_note_bytes: int, preview_ttl_seconds: int,
+                                studio_available: bool = True) -> str:
     """Local operator page for importing one portable feedback note (X2).
 
     Live-server only (never emitted by a build). ``availability`` is
@@ -2835,14 +2706,13 @@ def render_feedback_import_page(*, name: str, config: dict[str, Any], availabili
     """
     if availability not in {"available", *_FEEDBACK_IMPORT_BLOCKED}:
         raise ValueError(f"unsupported feedback import availability: {availability}")
-    theme, contrast, border = _theme_preference(config)
-    initial_theme = _resolve_initial_theme(theme)
+    configured_theme = _theme_preference(config)
+    initial_theme = _resolve_initial_theme(configured_theme)
     shell = _application_shell_html(
         name=name, bundle_href="/", search_href="/__search", index_href="/",
         graph_href="/__graph", current=None, mode="serve",
-        initial_theme=initial_theme,
-        initial_mode="auto" if theme == "auto" else theme.rsplit("-", 1)[1],
-        initial_contrast=contrast, initial_border=border,
+        studio_available=studio_available,
+        appearance_choice=configured_theme,
     )
     icon = re.search(r'<link rel="icon"[^>]*>', load_template("index_page.html"))
     page_config = json.dumps({
@@ -2881,16 +2751,17 @@ def render_feedback_import_page(*, name: str, config: dict[str, Any], availabili
         )
     return (
         f'<!DOCTYPE html>\n<html lang="en" data-theme="{_esc_attr_qs(initial_theme)}"'
-        f'{_theme_modifier_attrs(contrast, border)}>\n<head>\n'
+        f'>\n<head>\n'
         '<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
         f'<meta http-equiv="Content-Security-Policy" content="{_RESERVED_CSP}">\n'
         f'<title>Import a feedback note — {_esc(name)}</title>\n'
         + (icon.group(0) + '\n' if icon else '')
-        + '<link rel="stylesheet" href="/__static/wiki.css">\n'
+        + _ledger_fonts_head("/__static", mode="serve") +
+        '<link rel="stylesheet" href="/__static/wiki.css">\n'
         '<link rel="stylesheet" href="/__static/shell.css">\n'
         '<link rel="stylesheet" href="/__static/feedback-import.css">\n'
-        + _theme_config_html(theme, contrast, border) + '\n'
+        + _theme_config_html(configured_theme) + '\n'
         f'<script type="application/json" id="okf-feedback-import-config">{page_config}</script>\n'
         '</head>\n'
         '<body class="okf-viewer okf-viewer--feedback-import" data-okf-mode="serve" '
@@ -2919,7 +2790,7 @@ def render_feedback_import_page(*, name: str, config: dict[str, Any], availabili
         '</ul>\n</section>\n'
         '<div id="okf-fbi-live" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>\n'
         '</div>\n</main>\n'
-        '<script src="/__static/wiki.js" defer></script>\n'
+        '<script src="/__static/readable-text.js" defer></script><script src="/__static/wiki.js" defer></script>\n'
         '<script src="/__static/feedback-import.js" defer></script>\n'
         '</body>\n</html>\n'
     )
@@ -3123,17 +2994,43 @@ def _recent_row_reader_text(row: dict[str, str]) -> str:
     return f"{actor} {verb or action}".strip()
 
 
-def _recent_time_text(ts: str) -> str:
-    """Deterministic human time text for a recent row (build-time safe).
+def _recent_time_title(ts: str) -> str:
+    """Full UTC instant for a recent row (``title`` / assistive text).
 
-    Relative phrasing would go stale in static builds, so the visible text is
-    the event's real instant in UTC; the authored ``ts`` stays on the
-    ``datetime`` attribute. Unparseable values show the raw record.
+    ``YYYY-MM-DD HH:MM UTC``; unparseable values show the raw record.
     """
     instant = parse_instant(ts)
     if instant is None:
         return ts
     return instant.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+
+def _recent_time_text(ts: str, now: datetime | None = None) -> str:
+    """Relative time text for a recent row: the Ledger recency contract.
+
+    ``just now`` under a minute, then whole elapsed units rounded DOWN:
+    ``Nm ago`` (< 1 hour), ``Nh ago`` (< 1 day), ``Nd ago``. Future instants
+    (clock skew) read ``just now``. The exact instant stays on the
+    ``<time datetime>`` attribute and, as ``YYYY-MM-DD HH:MM UTC``, on its
+    ``title`` (:func:`_recent_time_title`). wiki.js re-renders the same text
+    against the reader's clock (``okfRelativeTime``), and the live Studio
+    rail uses the same format. Builds emit the UTC title as initial text
+    instead, keeping unchanged exports byte-identical across clocks and
+    useful without JavaScript. Unparseable values show the raw record
+    (nothing invented).
+    """
+    instant = parse_instant(ts)
+    if instant is None:
+        return ts
+    reference = now if now is not None else datetime.now(timezone.utc)
+    seconds = max(0.0, (reference - instant).total_seconds())
+    if seconds < 60:
+        return "just now"
+    if seconds < 3600:
+        return f"{int(seconds // 60)}m ago"
+    if seconds < 86400:
+        return f"{int(seconds // 3600)}h ago"
+    return f"{int(seconds // 86400)}d ago"
 
 
 def graph_export_svg(graph_data: dict[str, Any], *, title_id: str = "okf-graph-export-title", limit: int = 24) -> str:
@@ -3196,9 +3093,177 @@ def graph_export_svg(graph_data: dict[str, Any], *, title_id: str = "okf-graph-e
             f'<g class="okf-graph-thumb__edges">{"".join(edge_svg)}</g><g class="okf-graph-thumb__nodes">{"".join(node_svg)}</g></svg>')
 
 
+# The index hero's graph preview is a decorative miniature drawn ONLY for that
+# preview: an organic, deterministic force layout of the same graph payload,
+# rendered as Ledger records (neutral square dots sized by degree, hairline
+# edges, no type colour, icons, labels, count chips or arrowheads). The shared
+# canonical export (``graph_export_svg``) and its fixed layout are untouched.
+_PREVIEW_W = 560.0
+_PREVIEW_H = 250.0
+_PREVIEW_PAD = 12.0
+_PREVIEW_NODE_LIMIT = 80
+
+
+@functools.lru_cache(maxsize=16)
+def _organic_preview_layout(
+    ids: tuple[str, ...], pairs: tuple[tuple[int, int], ...],
+) -> tuple[tuple[float, float], ...]:
+    """Deterministic Fruchterman–Reingold layout fitted to the preview box.
+
+    Seeded on a golden-angle spiral with the best-connected records at the
+    centre (no randomness), so the same graph always yields the same picture
+    in every process. Cached: the index is re-rendered often in serve mode.
+    """
+    n = len(ids)
+    if n == 0:
+        return ()
+    if n == 1:
+        return ((_PREVIEW_W / 2, _PREVIEW_H / 2),)
+    half_w = _PREVIEW_W / 2 - _PREVIEW_PAD
+    half_h = _PREVIEW_H / 2 - _PREVIEW_PAD
+    degree = [0] * n
+    for a, b in pairs:
+        degree[a] += 1
+        degree[b] += 1
+    order = sorted(range(n), key=lambda i: (-degree[i], ids[i]))
+    golden = math.pi * (3 - math.sqrt(5))
+    pos = [[0.0, 0.0] for _ in range(n)]
+    for rank, i in enumerate(order):
+        radius = math.sqrt((rank + 0.5) / n)
+        angle = rank * golden
+        pos[i] = [radius * math.cos(angle) * half_w, radius * math.sin(angle) * half_h]
+    k = math.sqrt((4 * half_w * half_h) / n) * 0.8
+    k2 = k * k
+    temperature = half_w / 4
+    for _ in range(150):
+        disp = [[0.0, 0.0] for _ in range(n)]
+        for i in range(n):
+            xi, yi = pos[i]
+            di = disp[i]
+            for j in range(i + 1, n):
+                dx = xi - pos[j][0]
+                dy = yi - pos[j][1]
+                d2 = dx * dx + dy * dy
+                if d2 < 1e-4:
+                    dx, dy, d2 = 0.01 * (j - i), 0.01, 1e-4 * (1 + (j - i) ** 2)
+                force = k2 / d2
+                di[0] += dx * force
+                di[1] += dy * force
+                disp[j][0] -= dx * force
+                disp[j][1] -= dy * force
+        for a, b in pairs:
+            dx = pos[a][0] - pos[b][0]
+            dy = pos[a][1] - pos[b][1]
+            dist = math.hypot(dx, dy) or 1e-3
+            force = dist / k
+            disp[a][0] -= dx * force
+            disp[a][1] -= dy * force
+            disp[b][0] += dx * force
+            disp[b][1] += dy * force
+        for i in range(n):
+            # Weak gravity keeps isolated records near the cluster.
+            dx = disp[i][0] - pos[i][0] * 0.05
+            dy = disp[i][1] - pos[i][1] * 0.05 * (half_w / half_h)
+            length = math.hypot(dx, dy)
+            if length > temperature:
+                dx, dy = dx / length * temperature, dy / length * temperature
+            pos[i][0] = max(-half_w, min(half_w, pos[i][0] + dx))
+            pos[i][1] = max(-half_h, min(half_h, pos[i][1] + dy))
+        temperature = max(0.5, temperature * 0.96)
+    xs = [p[0] for p in pos]
+    ys = [p[1] for p in pos]
+    span_x = (max(xs) - min(xs)) or 1.0
+    span_y = (max(ys) - min(ys)) or 1.0
+    mid_x = (max(xs) + min(xs)) / 2
+    mid_y = (max(ys) + min(ys)) / 2
+    scale_x = (2 * half_w) / span_x
+    scale_y = (2 * half_h) / span_y
+    return tuple(
+        (round(_PREVIEW_W / 2 + (x - mid_x) * scale_x, 1),
+         round(_PREVIEW_H / 2 + (y - mid_y) * scale_y, 1))
+        for x, y in pos
+    )
+
+
+def _index_graph_preview_svg(graph_data: dict[str, Any]) -> str:
+    """Decorative organic miniature of the graph for the index hero only."""
+    raw_nodes = [n for n in graph_data.get("nodes", []) if isinstance(n, dict)]
+    seen: set[str] = set()
+    all_ids: list[str] = []
+    for node in raw_nodes:
+        node_id = str((node.get("data") or {}).get("id", ""))
+        if node_id and node_id not in seen:
+            seen.add(node_id)
+            all_ids.append(node_id)
+    if not all_ids:
+        return ""
+    neighbours: dict[str, set[str]] = {node_id: set() for node_id in all_ids}
+    for edge in graph_data.get("edges", []):
+        data = edge.get("data", {}) if isinstance(edge, dict) else {}
+        source, target = str(data.get("source", "")), str(data.get("target", ""))
+        if source in neighbours and target in neighbours and source != target:
+            neighbours[source].add(target)
+            neighbours[target].add(source)
+    kept = sorted(all_ids, key=lambda i: (-len(neighbours[i]), i))[:_PREVIEW_NODE_LIMIT]
+    ids = tuple(sorted(kept))
+    index = {node_id: i for i, node_id in enumerate(ids)}
+    pairs = tuple(sorted({
+        (min(index[a], index[b]), max(index[a], index[b]))
+        for a in ids for b in neighbours[a] if b in index
+    }))
+    positions = _organic_preview_layout(ids, pairs)
+    degree = [0] * len(ids)
+    for a, b in pairs:
+        degree[a] += 1
+        degree[b] += 1
+    edge_svg = "".join(
+        f'<line x1="{positions[a][0]}" y1="{positions[a][1]}" '
+        f'x2="{positions[b][0]}" y2="{positions[b][1]}"/>'
+        for a, b in pairs
+    )
+    # Dot size reads relative connectedness (4px leaf .. 11px best-connected).
+    max_degree = max(degree) or 1
+    node_svg = []
+    for i, node_id in enumerate(ids):
+        side = round(4.0 + 7.0 * (degree[i] / max_degree) ** 0.8, 1)
+        x, y = positions[i]
+        node_svg.append(
+            f'<rect class="okf-graph-thumb__dot" data-concept-id="{_esc_attr_qs(node_id)}" '
+            f'x="{x - side / 2:.1f}" y="{y - side / 2:.1f}" width="{side}" height="{side}"/>'
+        )
+    return (
+        '<svg class="okf-graph-preview" data-okf-graph-preview="organic-v1" '
+        f'viewBox="0 0 {_PREVIEW_W:.0f} {_PREVIEW_H:.0f}" aria-hidden="true" focusable="false">'
+        f'<g class="okf-graph-thumb__edges">{edge_svg}</g>'
+        f'<g class="okf-graph-thumb__nodes">{"".join(node_svg)}</g></svg>'
+    )
+
+
+def _graph_thumbnail_data(bundle: Bundle) -> dict[str, Any]:
+    """Live thumbnail input: identity/topology only, never graph payload HTML.
+
+    The miniature selects its small visible subset itself. Retain all identities
+    here for its exact degree ordering and caption count, not full node records.
+    """
+    ids = set(bundle.concepts)
+    pairs = set()
+    relationships = 0
+    for link in bundle.graph().edges:
+        if link.source in ids and link.target in ids:
+            pairs.add((link.source, link.target))
+            relationships += 1
+    return {
+        "nodes": [{"data": {"id": concept_id_to_str(cid)}} for cid in sorted(ids)],
+        "edges": [{"data": {"source": concept_id_to_str(source),
+                            "target": concept_id_to_str(target)}}
+                  for source, target in sorted(pairs)],
+        "raw_relationship_count": relationships,
+    }
+
+
 def _graph_thumbnail_html(graph_data: dict[str, Any], href: str) -> str:
-    """Wrap the shared canonical graph export for the index hero."""
-    svg = graph_export_svg(graph_data)
+    """The index hero's graph preview link (organic Ledger miniature)."""
+    svg = _index_graph_preview_svg(graph_data)
     if not svg:
         return ('<aside class="okf-graph-thumb okf-graph-thumb--empty" aria-label="Knowledge graph overview">'
                 f'<p>No concepts are available to map yet. <a href="{_esc_attr_qs(href)}">Open the graph</a>.</p></aside>')
@@ -3208,21 +3273,13 @@ def _graph_thumbnail_html(graph_data: dict[str, Any], href: str) -> str:
         for edge in graph_data.get("edges", [])
     ))
     relationship_label = "relationship" if relationship_count == 1 else "relationships"
-    # The canonical export remains a meaningful image everywhere else.  Only
-    # the copy nested inside the already-named preview link is decorative, so
-    # its title/description cannot pollute the link's computed name.
-    decorative_svg = re.sub(
-        r"<svg\b[^>]*>",
-        lambda match: re.sub(
-            r'\s(?:role|aria-labelledby)="[^"]*"', "", match.group(0)
-        )[:-1] + ' aria-hidden="true" focusable="false">',
-        svg,
-        count=1,
-    )
+    # The miniature is decorative (aria-hidden, no title/description) because
+    # it sits inside the already-named preview link; the canonical export
+    # stays the meaningful image on every other static graph surface.
     return ('<figure class="okf-graph-thumb"><a class="okf-graph-thumb__link" '
             f'href="{_esc_attr_qs(href)}">'
             '<span class="sr-only">Open knowledge graph — </span>'
-            f'{decorative_svg}'
+            f'{svg}'
             f'<figcaption><strong>Explore connections</strong><span>{concept_count} concepts · {relationship_count} {relationship_label}</span></figcaption></a></figure>')
 
 
@@ -3291,7 +3348,7 @@ def render_single_file(
         + ' data-okf-single-concept="' + _esc("/".join(cid)) + '">'
         + '<strong>' + _esc(concept.title) + '</strong></a>'
         + '<span>' + _esc(concept.type or "Concept") + ' · ' + _esc("/".join(cid)) + '</span>'
-        + ('<p>' + _esc(concept.description) + '</p>' if concept.description else '')
+        + ('<p>' + _esc(readable_text(concept.description)) + '</p>' if concept.description else '')
         + '</li>'
         for cid, concept in sorted(bundle.concepts.items())
     )
@@ -3301,7 +3358,15 @@ def render_single_file(
     # schema-versioned passage corpus used by portable search rather than a
     # second concept-only approximation.
     data["retrieval_corpus"] = _browser_passage_corpus(bundle, data.get("edges", []))
+    # The canonical chunk already contains the complete passage payload. Ship
+    # it once when using the built-in bootstrap, which restores the legacy
+    # payload property lazily before any BUNDLE consumer runs. Custom templates
+    # may predate that accessor: retain their original wire shape. Keep the
+    # shared corpus/export path and exact canonical bytes/hashes unchanged.
     template = load_template("single_file.html", bundle)
+    if template == load_template("single_file.html"):
+        for chunk in data["retrieval_corpus"]["chunks"]:
+            del chunk["payload"]
     if offline is not None:
         template = offline.single_file_template(template)
     template = inject_review_metadata(template, config.get('review_base_url'))
@@ -3323,7 +3388,9 @@ def render_single_file(
         '</head>',
         _single_source_revisions_script(bundle)
         + '</head>', 1)
-    css = (load_static("wiki.css", bundle) + "\n" + load_static("shell.css", bundle)
+    from .viewer.vendor import load_ledger_css
+    css = (load_ledger_css(inline=True) + "\n"
+           + load_static("wiki.css", bundle) + "\n" + load_static("shell.css", bundle)
            + "\n" + load_static("graph.css", bundle))
     # Bundle renderers.js too so the single-file detail panel gets
     # the same mermaid/hljs/KaTeX treatment as the wiki + graph views
@@ -3336,6 +3403,7 @@ def render_single_file(
     # search.js are preserved unchanged.
     theme_js = load_static("theme.js", bundle)
     js = (load_static("capture-readiness.js", bundle) + "\n" +
+          load_static("readable-text.js", bundle) + "\n" +
           load_static("portable-retrieval.js", bundle) + "\n" +
           load_static("graph.js", bundle) + "\n" +
           load_static("document-outline.js", bundle) + "\n" +
@@ -3345,11 +3413,8 @@ def render_single_file(
         # Opt-in only: the default single-file bundle is byte-for-byte unchanged.
         js += "\n" + load_static(PORTABLE_FEEDBACK_ASSET, bundle)
 
-    configured_theme, configured_contrast, configured_border = _theme_preference(config)
+    configured_theme = _theme_preference(config)
     initial_theme = _resolve_initial_theme(configured_theme)
-    initial_mode = (
-        "auto" if configured_theme == "auto" else configured_theme.rsplit("-", 1)[1]
-    )
     revision = bundle_revision(bundle)
     data_attrs = (
         'data-okf-mode="static" data-okf-enhance="0" data-okf-studio="0" '
@@ -3369,9 +3434,7 @@ def render_single_file(
 
     single_shell = render_single_file_shell(
         display_name,
-        _appearance_control_html(
-            initial_theme, initial_mode, configured_contrast, configured_border,
-        ),
+        _appearance_control_html(configured_theme),
     )
     html = (
         template
@@ -3382,20 +3445,15 @@ def render_single_file(
           .replace("__DATA_ATTRS__", data_attrs)
         .replace("__NOJS_RELATIONSHIPS__", nojs_relationships)
         .replace("__SINGLE_INDEX_CONCEPTS__", single_index_concepts)
+        .replace("__SEARCH_TYPE_CHIPS__", _search_type_chips_html(bundle))
         .replace("__GRAPH_THUMBNAIL__", _graph_thumbnail_html(data, "#okf-graph"))
         .replace("/*__VIEWER_CSS__*/", css)
-        .replace("__THEME_CONFIG__", _theme_config_html(
-            configured_theme, configured_contrast, configured_border,
-        ))
+        .replace("__THEME_CONFIG__", _theme_config_html(configured_theme))
         .replace("/*__THEME_HEAD_JS__*/", theme_js)
         .replace("/*__VIEWER_JS__*/", js)
         .replace("__INITIAL_THEME__", initial_theme)
-        .replace("__THEME_MODIFIER_ATTRS__", _theme_modifier_attrs(
-            configured_contrast, configured_border,
-        ))
-        .replace("__INITIAL_THEME_BUTTON__", _appearance_control_html(
-            initial_theme, initial_mode, configured_contrast, configured_border,
-        ))
+        .replace("__THEME_MODIFIER_ATTRS__", "")
+        .replace("__INITIAL_THEME_BUTTON__", _appearance_control_html(configured_theme))
         .replace("__INITIAL_LAYOUT__", initial_layout)
         .replace("__CDN_SCRIPTS__", cdn_scripts)
     )
@@ -3542,19 +3600,39 @@ def build_site(
             file=sys.stderr,
         )
 
+    from .config import OkfConfig
+    bundle_config = OkfConfig.load(bundle.root)
+    # Match serve's configured title before the legacy viewer-name/folder fallback.
+    name = name or bundle_config.viewer.title
+    session_roots = (source / ".okf-loom/session",
+                     source / bundle_config.studio.session_path)
+    publish_directory_modes = not any(destination.is_relative_to(path.resolve())
+                                      for path in session_roots)
+
     if target == "single-file":
-        out_dir.mkdir(parents=True, exist_ok=True)
+        out_dir.parent.mkdir(parents=True, exist_ok=True)
         single_kwargs: dict[str, Any] = {}
         if offline is not None:
             single_kwargs = {"assets": "offline", "_offline_assets": offline}
-        single = render_single_file(
-            bundle,
-            out_dir / "index.html",
-            name=name,
-            include_comment_summary=include_comment_summary,
-            include_portable_feedback=include_portable_feedback,
-            **single_kwargs,
-        )
+        with tempfile.TemporaryDirectory(prefix=".okf-build-", dir=str(out_dir.parent)) as tmp:
+            tmp_root = Path(tmp) / ".okf-build-tree"
+            tmp_root.mkdir(mode=0o700)
+            single = render_single_file(
+                bundle,
+                tmp_root / "index.html",
+                name=name,
+                include_comment_summary=include_comment_summary,
+                include_portable_feedback=include_portable_feedback,
+                **single_kwargs,
+            )
+            if out_dir.exists():
+                # Keep single-file rebuilds' existing contract: only replace
+                # index.html, preserving its metadata and unrelated siblings.
+                _atomic_write_bytes(out_dir / "index.html", (tmp_root / "index.html").read_bytes())
+            else:
+                from .io_utils import atomic_replace_tree
+                atomic_replace_tree(tmp_root, out_dir,
+                                    publish_directory_modes=publish_directory_modes)
         stats.update(single)
         stats["files"] = 1
         return stats
@@ -3583,10 +3661,12 @@ def build_site(
             bundle.root, allow_active_code=effective_allow,
         )
 
-    # Stage to a tmp dir, then atomically swap into place.
+    # Render behind a private parent, which remains 0700 even while the
+    # completed child receives public directory modes immediately before rename.
     out_dir.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".okf-build-", dir=str(out_dir.parent)) as tmp:
-        tmp_root = Path(tmp)
+        tmp_root = Path(tmp) / ".okf-build-tree"
+        tmp_root.mkdir(mode=0o700)
         _emit_site(bundle, tmp_root, mode=mode, name=display_name,
                    palette=palette, graph_data=graph_data, config=config,
                    plugin=plugin, comment_summary=comment_summary,
@@ -3609,10 +3689,8 @@ def build_site(
                 file_count += 1
                 total_bytes += p.stat().st_size
         from .io_utils import atomic_replace_tree as _replace_tree
-        if verifier is None:
-            _replace_tree(tmp_root, out_dir)
-        else:
-            _replace_tree(tmp_root, out_dir, verify_previous=verifier)
+        _replace_tree(tmp_root, out_dir, verify_previous=verifier,
+                      publish_directory_modes=publish_directory_modes)
 
     stats.update({
         "concepts": len(bundle.concepts),
@@ -3794,8 +3872,13 @@ def _emit_site(
             html = offline_assets.finalize_page(html)
         _atomic_write_text(path, html)
 
+    from .viewer.vendor import load_ledger_files
     static_dir = root / "__static"
     static_dir.mkdir(parents=True, exist_ok=True)
+    for rel, data in load_ledger_files().items():
+        target_path = static_dir / rel
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        _atomic_write_bytes(target_path, data)
     for asset_name in list_builtin_static():
         _atomic_write_text(static_dir / asset_name, load_static(asset_name, bundle))
     if portable_feedback is not None:
@@ -4105,6 +4188,27 @@ def _type_icons_block() -> str:
     return _TYPE_ICONS_BLOCK_CACHE
 
 
+def _search_type_chips_html(bundle: Bundle) -> str:
+    """Trusted, inert chips let portable rows clone the server's type anatomy."""
+    return '<template id="okf-search-type-chips">' + ''.join(
+        f'<span class="okf-search-result__type" data-type="{_esc_attr_qs(ctype)}">'
+        f'{type_icon_svg(ctype, size=14, cls="okf-type-icon")} {_esc(ctype)}</span>'
+        for ctype in sorted({c.type for c in bundle.concepts.values() if c.type})
+    ) + '</template>'
+
+
+def _ledger_fonts_head(static_prefix: str, *, mode: str) -> str:
+    """Preload upright fonts on HTTP-only targets, never file-capable static pages."""
+    from .viewer.vendor import LEDGER_FACES
+    prefix = _esc_attr_qs(static_prefix)
+    preloads = "".join(
+        f'<link rel="preload" href="{prefix}/{path}" as="font" '
+        'type="font/woff2" crossorigin>\n'
+        for _family, style, path in LEDGER_FACES if style == "normal"
+    ) if mode in ("serve", "spa") else ""
+    return preloads + f'<link rel="stylesheet" href="{prefix}/ledger-fonts.css">\n'
+
+
 def _static_prefix_for(mode: str, source_cid: ConceptId | None = None) -> str:
     """URL prefix for ``/__static`` from a given source path."""
     if mode in ("serve", "spa"):
@@ -4365,6 +4469,7 @@ def _render_concept_page(
     body_plugin: Any = None,
     comment_summary: CommentSummaryV1 | None = None,
     portable_feedback: dict[str, str] | None = None,
+    studio_available: bool = True,
 ) -> str:
     template = load_template("concept_page.html", bundle)
     if mode != 'serve':
@@ -4388,15 +4493,16 @@ def _render_concept_page(
     # concept's normalized raw source (the canonical source the renderer
     # consumed) — never served disk bytes, never the corpus revision.
     from .annotations import concept_content_rev
+    content_rev = concept_content_rev(concept.raw_text.replace("\r\n", "\n"))
     template = template.replace(
         '</head>',
         _rendered_outline_script(
-            body_html, cid_str,
-            concept_content_rev(concept.raw_text.replace("\r\n", "\n")))
+            body_html, cid_str, content_rev)
         + '</head>', 1)
 
-    palette_for = palette
-    type_color = palette_for.get(concept.type or "", type_color_for(concept.type))
+    # Ledger: content types are not colour-coded on the document surfaces.
+    # ``palette`` stays in the signature for callers (the full graph still
+    # reads it) but is not projected into the page.
 
     # Frontmatter table (exclude governed keys that get dedicated sections).
     _GOVERNED_KEYS = frozenset({"aliases", "entities", "provenance", "citations", "relations"})
@@ -4474,7 +4580,6 @@ def _render_concept_page(
         "id": concept_id_to_str(concept.id),
         "label": concept.title,
         "type": concept.type or "concept",
-        "color": palette_for.get(concept.type or "", type_color_for(concept.type)),
         "is_center": True,
     }
     neighbour_nodes = [
@@ -4482,7 +4587,6 @@ def _render_concept_page(
             "id": concept_id_to_str(c.id),
             "label": c.title,
             "type": c.type or "concept",
-            "color": palette_for.get(c.type or "", type_color_for(c.type)),
             "is_center": False,
         }
         for c in sorted(bundle.concepts.values(), key=lambda c: c.id)
@@ -4503,18 +4607,12 @@ def _render_concept_page(
     # only seeds the first paint.
     # P1-3: in static mode the Graph link must point at __graph.html (the
     # page is emitted at that path; the extensionless URL 404s).
-    configured_theme, configured_contrast, configured_border = _theme_preference(config)
+    configured_theme = _theme_preference(config)
     initial_theme = _resolve_initial_theme(configured_theme)
-    initial_mode = (
-        "auto" if configured_theme == "auto" else configured_theme.rsplit("-", 1)[1]
-    )
     nav_html = _nav_controls_html(
         root_prefix=root_prefix,
         graph_link=f"{root_prefix}__graph{'.html' if mode == 'static' else ''}",
-        initial_theme=initial_theme,
-        initial_mode=initial_mode,
-        initial_contrast=configured_contrast,
-        initial_border=configured_border,
+        appearance_choice=configured_theme,
         mode=mode,
     )
     bundle_href = "/" if mode in ("serve", "spa") else root_prefix
@@ -4524,16 +4622,41 @@ def _render_concept_page(
         search_href=f"{root_prefix}__search{'.html' if mode == 'static' else ''}",
         index_href=bundle_href,
         graph_href=f"{root_prefix}__graph{'.html' if mode == 'static' else ''}",
-        current="index",
+        # D1-017: a concept page is not the Index page, so no destination is
+        # announced as the current page (the breadcrumb carries location).
+        current=None,
         mode=mode,
-        initial_theme=initial_theme,
-        initial_mode=initial_mode,
-        initial_contrast=configured_contrast,
-        initial_border=configured_border,
+        studio_available=studio_available,
+        appearance_choice=configured_theme,
     )
+    if mode == "serve" and studio_available:
+        # The local viewbar has the same responsive geometry before Studio
+        # fills it. No-JS and portable readers must not inherit empty chrome.
+        first_heading = _ONTHISPAGE_HEADING_RE.search(body_html)
+        section_label = (
+            re.sub(r"\s+", " ", _html.unescape(re.sub(r"<[^>]+>", "", first_heading.group(3)))).strip()
+            if first_heading else ""
+        )
+        sections_placeholder = (
+            '<div class="okf-outline-jump" data-okf-outline-jump-placeholder aria-hidden="true">'
+            '<button type="button" class="okf-studiobtn okf-outline-jump__toggle" disabled tabindex="-1">'
+            '<span class="okf-outline-jump__label">Sections</span>'
+            f'<span class="okf-outline-jump__current">{_esc(section_label)}</span></button></div>'
+            if section_label else ""
+        )
+        shell_html += (
+            '<div class="okf-concept-viewbar" data-okf-viewbar-placeholder aria-hidden="true">'
+            '<div class="okf-viewswitch" role="group" aria-label="View mode">'
+            + "".join(
+                f'<button type="button" class="okf-viewswitch__btn'
+                f'{(" okf-focus-toggle" if label == "Focus view" else "")}" disabled tabindex="-1" '
+                f'aria-pressed="{str(label == "Rendered").lower()}">{label}</button>'
+                for label in ("Rendered", "Source", "Split", "Focus view")
+            )
+            + '</div>' + sections_placeholder + '</div>'
+        )
 
-    theme_attr = (f' data-theme="{initial_theme}"'
-                  + _theme_modifier_attrs(configured_contrast, configured_border))
+    theme_attr = (f' data-theme="{initial_theme}"')
     revision = bundle_revision(bundle)
     # Capture readiness is deliberately not server-seeded on document
     # surfaces. An absent surface state is nonterminal to
@@ -4547,7 +4670,8 @@ def _render_concept_page(
         f'data-okf-capture-revision="{_esc_attr_qs(revision)}"'
     )
 
-    css_link = f'<link rel="stylesheet" href="{static_prefix}/wiki.css">'
+    css_link = (_ledger_fonts_head(static_prefix, mode=mode) +
+                f'<link rel="stylesheet" href="{static_prefix}/wiki.css">')
     shell_css_link = f'<link rel="stylesheet" href="{static_prefix}/shell.css">'
     # theme.js is parser-blocking (no defer) in <head> so it resolves
     # data-theme BEFORE first paint (no FOUC for a stored non-default
@@ -4563,6 +4687,7 @@ def _render_concept_page(
     js_link = (
         f'<script src="{static_prefix}/capture-readiness.js" defer></script>\n'
         f'<script src="{static_prefix}/portable-retrieval.js" defer></script>\n'
+        f'<script src="{static_prefix}/readable-text.js" defer></script>\n'
         f'<script src="{static_prefix}/wiki.js" defer></script>'
     )
     document_outline_link = f'<script src="{static_prefix}/document-outline.js" defer></script>'
@@ -4598,7 +4723,7 @@ def _render_concept_page(
             f'<button type="button" class="okf-btn okf-context-copy okf-js-action" data-context-concept="{_esc_attr_qs(cid_str)}" '
             'aria-describedby="okf-context-action-note">Copy concept context</button>'
             f'<span id="okf-context-action-note" hidden>{context_note}</span>'
-            '<details class="okf-context-manual-options"><summary>More context options</summary>'
+            '<details class="okf-context-manual-options"><summary class="okf-btn">More context options</summary>'
             f'<a class="okf-btn" href="{_esc_attr_qs(local_href)}" '
             f'aria-label="Open canonical concept-only context pack for {_esc_attr_qs(concept.title)}">'
             'Open concept-only context pack</a>'
@@ -4615,10 +4740,11 @@ def _render_concept_page(
     # prev/next follow.
     entity_chips_html = _render_entity_chips(concept, mode=mode, root_prefix=root_prefix)
     long_document = len(_ONTHISPAGE_HEADING_RE.findall(body_html)) >= 8
+    # D1-012: Document details names THIS document's content revision (the
+    # corpus revision is the same on every page).
     infobox_html = _render_infobox(
         concept,
-        type_color=type_color,
-        revision=revision,
+        revision=content_rev,
         tags_html=tags_html,
         frontmatter_html=frontmatter_html,
         governed_html=governed_html,
@@ -4660,9 +4786,7 @@ def _render_concept_page(
         .replace("__ROOT_PREFIX__", _esc_attr_qs(root_prefix))
           .replace("__WIKI_CSS_LINK__", css_link)
           .replace("__SHELL_CSS_LINK__", shell_css_link)
-          .replace("__THEME_CONFIG__", _theme_config_html(
-              configured_theme, configured_contrast, configured_border,
-          ))
+          .replace("__THEME_CONFIG__", _theme_config_html(configured_theme))
           .replace("__THEME_HEAD_JS__", head_theme_js)
         .replace("__WIKI_JS_LINK__", _type_icons_block() + js_link)
         .replace("__DOCUMENT_OUTLINE_JS_LINK__", document_outline_link)
@@ -4670,8 +4794,11 @@ def _render_concept_page(
         .replace("__CONCEPT_ID__", _esc(cid_str))
         .replace("__BREADCRUMB_HTML__", breadcrumb_html)
         .replace("__CONCEPT_TYPE__", _esc(concept.type or "concept"))
-        .replace("__CONCEPT_TYPE_COLOR__", _esc(type_color))
-        .replace("__CONCEPT_TYPE_FG__", _esc(_chip_fg(type_color)))
+        # Legacy override templates may still carry the retired type-colour
+        # placeholders; they resolve to neutral Ledger tokens (the label on
+        # --text-3 reuses the canvas, which clears AA by construction).
+        .replace("__CONCEPT_TYPE_COLOR__", "var(--text-3)")
+        .replace("__CONCEPT_TYPE_FG__", "var(--bg)")
         .replace("__TYPE_ICON__", type_icon_svg(concept.type, size=18))
         .replace("__READTIME_HTML__", _readtime_html(concept.body))
         # P1-1 (iter-2): the subtitle is a SIBLING <p> after the h1, not a
@@ -4684,7 +4811,7 @@ def _render_concept_page(
          .replace("__CONCEPT_SUBTITLE__", subtitle_html)
          .replace("__CONTEXT_ACTION_HTML__", context_action_html)
         .replace("__ENTITY_CHIPS_HTML__", entity_chips_html)
-        .replace("__CONCEPT_DESCRIPTION__", _esc(concept.description))
+        .replace("__CONCEPT_DESCRIPTION__", _esc(readable_text(concept.description)))
         .replace("__CONCEPT_RESOURCE__", resource_html)
         # Phase 2: tags moved to the infobox; the header meta row now holds
         # only the resource link. __CONCEPT_TAGS__ is kept as a no-op for
@@ -4768,21 +4895,15 @@ def _render_link_list(
     # backlinks/outlinks list is deterministic (§3.2), not relying on
     # items[] insertion order (which mirrors graph.edges order, masked
     # by Bundle.load's sorted rglob for disk-loaded bundles).
-    # Phase 2: connection CARDS — each target renders with its type icon,
-    # a type-tinted accent, title + id, and the typed-relation chip with a
-    # direction arrow. The palette is resolved once per call (cached
-    # override read; cheap at page-render granularity).
-    try:
-        palette = resolve_palette(bundle)
-    except Exception:  # noqa: BLE001 — cards degrade to accentless
-        palette = {}
+    # Connection rows — each target renders with its type icon, title + id,
+    # and the typed-relation chip with a direction arrow. Ledger: no type
+    # colour is emitted; the icon and the id carry identity.
     arrow = "→" if kind == "out" else "←"
     comment_counts = comment_summary.get("counts", {}) if comment_summary else None
     for target_cid, rel_label in sorted(seen_targets.items()):
         concept = bundle.concepts.get(target_cid)
         title = concept.title if concept else concept_id_to_str(target_cid)
         ctype = concept.type if concept else None
-        color = palette.get(ctype or "", type_color_for(ctype))
         icon = type_icon_svg(ctype, size=16, cls="okf-type-icon")
         url = url_for_concept(target_cid, mode, source_cid=items[0][3])
         # P2-57: emit ``okf-rel-type`` (the chip class defined in wiki.css)
@@ -4803,8 +4924,8 @@ def _render_link_list(
                 f'aria-label="{_esc_attr_qs(label_text + " on " + title)}">{_esc(label_text)}</a>'
             )
         out.append(
-            f'<li class="okf-conn" data-concept-id="{_esc_attr_qs(cid_text)}" style="--okf-type-accent:{_esc(color)}">'
-            f'<span class="okf-conn__icon" style="color:{_esc(color)}" aria-hidden="true">{icon}</span>'
+            f'<li class="okf-conn" data-concept-id="{_esc_attr_qs(cid_text)}">'
+            f'<span class="okf-conn__icon" aria-hidden="true">{icon}</span>'
             f'<span class="okf-conn__body">'
             f'<a href="{_esc(url)}" class="okf-internal okf-conn__title">{_esc(title)}</a>'
             f' <span class="okf-muted okf-conn__id">{_esc(concept_id_to_str(target_cid))}</span>'
@@ -5096,10 +5217,6 @@ def _render_governed_keys(
     relations = concept.frontmatter.get("relations")
     if relations and isinstance(relations, list):
         from .paths import concept_id_from_str as _cid_from_str, ConceptIdError as _CidErr
-        try:
-            palette = resolve_palette(bundle)
-        except Exception:  # noqa: BLE001 — rows degrade to accentless
-            palette = {}
         rel_rows: list[str] = []
         for rel in relations:
             if not isinstance(rel, dict):
@@ -5122,13 +5239,10 @@ def _render_governed_keys(
                 tid = concept_id_to_str(target_concept.id)
                 ttype = target_concept.type
                 turl = url_for_concept(target_concept.id, mode, source_cid=concept.id)
-                tcolor = palette.get(ttype or "", type_color_for(ttype))
                 ticon = type_icon_svg(ttype, size=14, cls="okf-type-icon")
                 target_html = (
-                    f'<a class="okf-relation__target" href="{_esc(turl)}" '
-                    f'style="--okf-type-accent:{_esc(tcolor)}">'
-                    f'<span class="okf-relation__icon" style="color:{_esc(tcolor)}" '
-                    f'aria-hidden="true">{ticon}</span>'
+                    f'<a class="okf-relation__target" href="{_esc(turl)}">'
+                    f'<span class="okf-relation__icon" aria-hidden="true">{ticon}</span>'
                     f'<span class="okf-relation__title">{_esc(ttitle)}</span>'
                     f'<span class="okf-muted okf-relation__id">{_esc(tid)}</span>'
                     f'</a>'
@@ -5486,7 +5600,6 @@ _ONTHISPAGE_HEADING_RE = re.compile(
 def _render_infobox(
     concept: Concept,
     *,
-    type_color: str,
     revision: str,
     tags_html: str,
     frontmatter_html: str,
@@ -5509,25 +5622,23 @@ def _render_infobox(
     About/Classification retain explicit labels even when their values are
     sparse so the disclosure anatomy stays stable across concepts.
 
-    Type tint (layout-graph / contract-runtime parity): ``--okf-type-accent``
-    is set on the ``<details>`` itself (not only on the inline type label) so
-    the infobox's tinted left border and the governed relation rows resolve
-    to the concept's actual type colour. The header band sets the same var
-    on ``.okf-page__header``; because the infobox is a sibling (not a
-    descendant) it must carry its own declaration or it would silently fall
-    back to the generic ``--okf-accent``.
+    Ledger: content types are not colour-coded. The type is named in text
+    beside its icon; no per-type colour is emitted.
     """
     icon = type_icon_svg(concept.type, size=16, cls="okf-type-icon")
-    rev_short = revision[:8] if revision else ""
-    summary = (
-        f'<summary class="okf-infobox__summary">'
-        # The type NAME is text in the theme ink (wiki.css); the type colour
-        # stays on the icon through the infobox's --okf-type-accent. Type
-        # colours are mid-tone fills: as text they fell to 2.3:1.
-        f'<span class="okf-infobox__type">'
-        f'{icon} {_esc(concept.type or "concept")}</span>'
+    # Revisions carry a scheme prefix ("section-retrieval-v1:<hash>"); the
+    # first 8 characters of the whole string were the prefix itself, the same
+    # "section-" on every page. Shorten the hash; no hash shows no revision.
+    rev_short = revision.rpartition(":")[2][:8] if revision else ""
+    rev_html = (
         f'<span class="okf-infobox__rev" title="Content revision {_esc(revision)}">'
         f'rev\u00a0{_esc(rev_short)}</span>'
+    ) if rev_short else ""
+    summary = (
+        f'<summary class="okf-infobox__summary">'
+        f'<span class="okf-infobox__type">'
+        f'{icon} {_esc(concept.type or "concept")}</span>'
+        f'{rev_html}'
         f'</summary>'
     )
     body_parts: list[str] = []
@@ -5575,8 +5686,7 @@ def _render_infobox(
     return (
         '<details class="okf-page__infobox" id="okf-document-details" aria-labelledby="okf-infobox-label" '
         f'data-okf-long-document="{("true" if long_document else "false")}" data-okf-heading-threshold="8" '
-        f'data-okf-type-icon="{_esc(icon_key)}" '
-        f'style="--okf-type-accent:{_esc(type_color)}">'
+        f'data-okf-type-icon="{_esc(icon_key)}">'
         + summary.replace(
             '<span class="okf-infobox__type"',
             '<span class="okf-infobox__label" id="okf-infobox-label">Document details</span>'
@@ -5730,7 +5840,7 @@ def _reserved_document_links(rendered: str, document: str, mode: str,
 
 def render_reserved_document(document: str, body: str, *, mode: str,
                              config: dict[str, Any], bundle: Bundle | None = None,
-                             name: str | None = None) -> str:
+                             name: str | None = None, studio_available: bool = True) -> str:
     """Reserved Markdown (log) reading page in the shared application shell.
 
     The page is a real reading destination: language, viewport, theme, skip
@@ -5744,16 +5854,15 @@ def render_reserved_document(document: str, body: str, *, mode: str,
     prefix = '/__static' if serve_like else '../' * depth + '__static'
     suffix = '.html' if mode == 'static' else ''
     display = name or (bundle.root.name if bundle is not None else document)
-    configured_theme, configured_contrast, configured_border = _theme_preference(config)
+    configured_theme = _theme_preference(config)
     initial_theme = _resolve_initial_theme(configured_theme)
-    initial_mode = "auto" if configured_theme == "auto" else configured_theme.rsplit("-", 1)[1]
     home = '/' if serve_like else root_prefix + 'index.html'
     graph_href = f"{root_prefix}__graph{suffix}"
     shell_html = _application_shell_html(
         name=display, bundle_href=home, search_href=f"{root_prefix}__search{suffix}",
-        index_href=home, graph_href=graph_href, current="index", mode=mode,
-        initial_theme=initial_theme, initial_mode=initial_mode,
-        initial_contrast=configured_contrast, initial_border=configured_border,
+        index_href=home, graph_href=graph_href, current=None, mode=mode,
+        studio_available=studio_available,
+        appearance_choice=configured_theme,
     )
     rendered = _reserved_document_links(markdown_to_html(body), document, mode, bundle)
     heading = '' if re.search(r'<h1\b', rendered) else f'<h1>{_esc(document)}</h1>'
@@ -5779,16 +5888,16 @@ def render_reserved_document(document: str, body: str, *, mode: str,
         'Static viewer: read and copy. Live authoring is unavailable. '
         f'<a href="{_esc_attr_qs(home)}">Index</a>.</p>\n')
     page = (
-        f'<!DOCTYPE html>\n<html lang="en" data-theme="{initial_theme}"'
-        f'{_theme_modifier_attrs(configured_contrast, configured_border)}>\n<head>\n'
+        f'<!DOCTYPE html>\n<html lang="en" data-theme="{initial_theme}">\n<head>\n'
         '<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
         f'<meta http-equiv="Content-Security-Policy" content="{_RESERVED_CSP}">\n'
         f'<title>{_esc(document)} — {_esc(display)}</title>\n'
         + icon_html +
+        _ledger_fonts_head(prefix, mode=mode) +
         f'<link rel="stylesheet" href="{prefix}/wiki.css">\n'
         f'<link rel="stylesheet" href="{prefix}/shell.css">\n'
-        + _theme_config_html(configured_theme, configured_contrast, configured_border) + '\n'
+        + _theme_config_html(configured_theme) + '\n'
         + head_theme_js + '\n</head>\n'
         f'<body class="okf-viewer okf-viewer--reserved" {data_attrs}>\n'
         '<a href="#okf-main" class="okf-skip-link">Skip to content</a>\n'
@@ -5802,6 +5911,7 @@ def render_reserved_document(document: str, body: str, *, mode: str,
         f'<div class="okf-prose okf-reserved__body">{heading}{rendered}</div>\n'
         '</article>\n</main>\n'
         f'<script src="{prefix}/capture-readiness.js" defer></script>\n'
+        f'<script src="{prefix}/readable-text.js" defer></script>\n'
         f'<script src="{prefix}/wiki.js" defer></script>\n'
         f'<script src="{prefix}/renderers.js" defer></script>\n'
         '</body>\n</html>\n'
@@ -5820,6 +5930,7 @@ def _render_index_page(
     index_file,
     comment_summary: CommentSummaryV1 | None = None,
     engagement_events: list[dict[str, Any]] | None = None,
+    studio_available: bool = True,
 ) -> str:
     template = load_template("index_page.html", bundle)
     if mode != 'serve':
@@ -5834,9 +5945,20 @@ def _render_index_page(
     # container or delay the first browseable concept group.
     intro_remainder = ""
     title_anchor = ''
+    head_title = None
     if sub:
         title = f"{name} / {sub}"
         intro = normalize_document_links(markdown_to_html(index_file.body), sub + '/index.md', mode) if index_file else ''
+        # D1-016: a section index.md that opens with "# How-to guides" rendered
+        # a second, title-sized h1 under "<bundle> / how-to". As on the root
+        # index, the authored heading becomes the one page title.
+        authored_heading = re.match(r"\s*#\s+([^\n]+)\n", index_file.body) if index_file else None
+        if authored_heading:
+            title = authored_heading.group(1).strip()
+            head_title = f"{title} — {name}"
+            from .viewer.markdown import _slugify
+            title_anchor = ' id="' + _esc_attr_qs(_slugify(title)) + '"'
+            intro = re.sub(r'^\s*<h1\b[^>]*>.*?</h1>', '', intro, count=1, flags=re.DOTALL)
     else:
         title = name
         intro_md = ""
@@ -5890,7 +6012,8 @@ def _render_index_page(
     graph_thumbnail = ""
     if not sub:
         graph_thumbnail = ('<details class="okf-home-graph"><summary>Preview graph</summary>'
-                           + _graph_thumbnail_html(build_graph_data(bundle, name=name), graph_href_root)
+                           + _graph_thumbnail_html(_graph_thumbnail_data(bundle) if mode == 'serve'
+                                                   else build_graph_data(bundle, name=name), graph_href_root)
                            + '</details>')
     hero_v2 = _v2_spotlight_html(bundle, mode, graph_href_root) if not sub else ""
     hero_modifier = " okf-hero--split" if hero_v2 else ""
@@ -5957,8 +6080,9 @@ def _render_index_page(
                 f'<span><strong>{_esc(row["title"])}</strong> — '
                 f'{_esc(_recent_row_reader_text(row))}</span>'
                 '<span class="sr-only"> · </span>'
-                f'<time class="okf-recent__time" datetime="{_esc_attr_qs(row["ts"])}">'
-                f'{_esc(_recent_time_text(row["ts"]))}</time></a></li>'
+                f'<time class="okf-recent__time" datetime="{_esc_attr_qs(row["ts"])}" '
+                f'title="{_esc_attr_qs(_recent_time_title(row["ts"]))}">'
+                f'{_esc(_recent_time_text(row["ts"]) if mode == "serve" else _recent_time_title(row["ts"]))}</time></a></li>'
             )
         engagement_html = (
             '<section class="okf-recent" id="okf-recent-rail" '
@@ -6004,7 +6128,8 @@ def _render_index_page(
                 c.title.lower(), c.id,
             ),
         )
-        color = palette.get(t, type_color_for(t))
+        # Ledger: content types are not colour-coded. The group head names the
+        # type (and keeps its icon); no per-type colour is emitted.
         icon = type_icon_svg(t, size=15, cls="okf-type-icon")
         section_id = f"okf-type-{section_ids[t]}"
         type_nav_entries.append((section_id, icon, t, str(len(items))))
@@ -6017,7 +6142,8 @@ def _render_index_page(
             # explanation/explanation/x.html from there).
             sub_source = tuple(sub.split("/")) + ("index",) if sub else None
             url = url_for_concept(c.id, mode, source_cid=sub_source)
-            desc = _esc(c.description[:140] + ("…" if len(c.description) > 140 else ""))
+            description = readable_text(c.description)
+            desc = _esc(description[:140] + ("…" if len(description) > 140 else ""))
             # Card footer: outgoing/incoming counts + first few tags.
             meta_bits: list[str] = []
             if graph is not None:
@@ -6048,11 +6174,9 @@ def _render_index_page(
                     meta_html = f'<span class="okf-card__meta">{comment_link}</span>'
             # The li keeps the .okf-concept-list li a contract (first anchor
             # = concept link; studio.js stampConceptIds + presence rely on
-            # it) — the card look is CSS on top. The type chip (icon +
-            # textual label) is a <span>, NOT an <a>, so the first <a>
-            # remains the concept link. The icon inherits the type accent
-            # colour via a wrapper span; the textual label uses the AA-safe
-            # muted text token (not the raw accent — small text needs 4.5:1).
+            # it) — the inventory row look is CSS on top. The type chip (icon
+            # + textual label) is a <span>, NOT an <a>, so the first <a>
+            # remains the concept link. No type colour is emitted (Ledger).
             description_html = f' <span class="okf-concept-desc okf-card__desc">{desc}</span>' if desc else ""
             rows.append(
                 f'<li class="okf-card" data-concept-id="{_esc_attr_qs(cid_str)}" '
@@ -6060,9 +6184,9 @@ def _render_index_page(
                 # F7: the client recency sort reads the metadata owner's
                 # effective instant (canonical UTC), not the raw legacy key.
                 f'data-index-instant="{_esc_attr_qs(effective_instant_key(c.frontmatter))}" '
-                f'data-index-recommended="{recommended_ids.get(cid_str, 100)}" style="--okf-type-accent:{_esc(color)}">'
+                f'data-index-recommended="{recommended_ids.get(cid_str, 100)}">'
                 f'<span class="okf-card__type">'
-                f'<span class="okf-card__type-icon" style="color:{_esc(color)}">{type_icon_svg(t, size=13, cls="okf-type-icon")}</span>'
+                f'<span class="okf-card__type-icon">{type_icon_svg(t, size=13, cls="okf-type-icon")}</span>'
                 f'<span class="okf-card__type-label">{_esc(t)}</span>'
                 f'</span>'
                 f'<a href="{_esc(url)}" class="okf-internal okf-card__link">{_esc(c.title)}</a>'
@@ -6072,9 +6196,9 @@ def _render_index_page(
                 f'</li>'
             )
         groups_parts.append(
-            f'<section class="okf-section" id="{section_id}" data-index-section data-index-type="{_esc_attr_qs(t)}" style="--okf-type-accent:{_esc(color)}">'
-            f'<h2 class="okf-section__title"><span class="okf-section__icon" style="color:{_esc(color)}">{icon}</span>'
-            f'{_esc(t)} <span class="okf-section__count">{len(items)}</span></h2>'
+            f'<section class="okf-section" id="{section_id}" data-index-section data-index-type="{_esc_attr_qs(t)}">'
+            f'<h2 class="okf-section__title"><span class="okf-section__icon" aria-hidden="true">{icon}</span>'
+            f'<span class="okf-section__label">{_esc(t)}</span> <span class="okf-section__count">{len(items)}</span></h2>'
             f'<ul class="okf-concept-list okf-cardgrid">{"".join(rows)}</ul>'
             f'</section>'
         )
@@ -6136,7 +6260,7 @@ def _render_index_page(
     # type-nav is prepended to the groups so it sits between hero and cards.
     if type_nav_entries:
         nav_links = "".join(
-            f'<a href="#{_esc(sid)}" class="okf-type-nav__link">'
+            f'<a href="#{_esc(sid)}" class="okf-type-nav__link" data-index-type="{_esc_attr_qs(label)}">'
             f'{icon}<span class="okf-type-nav__label">{_esc(label)}</span>'
             f'<span class="okf-type-nav__count">{count}</span>'
             f'</a>'
@@ -6157,13 +6281,9 @@ def _render_index_page(
             groups_parts.insert(0, type_nav_html)
 
     theme_attr = ""
-    configured_theme, configured_contrast, configured_border = _theme_preference(config)
+    configured_theme = _theme_preference(config)
     initial_theme = _resolve_initial_theme(configured_theme)
-    initial_mode = (
-        "auto" if configured_theme == "auto" else configured_theme.rsplit("-", 1)[1]
-    )
-    theme_attr = (f' data-theme="{initial_theme}"'
-                  + _theme_modifier_attrs(configured_contrast, configured_border))
+    theme_attr = (f' data-theme="{initial_theme}"')
 
     # P1-10: emit data-okf-enhance on index pages too so wiki.js detects
     # static mode and gates typed-query live suggestions there (was only on
@@ -6184,7 +6304,8 @@ def _render_index_page(
                   f'data-okf-revision="{_esc_attr_qs(revision)}" data-okf-capture-revision="{_esc_attr_qs(revision)}" '
                   f'data-okf-concept-routes="{_esc_attr_qs(routes_json)}"')
 
-    css_link = f'<link rel="stylesheet" href="{static_prefix}/wiki.css">'
+    css_link = (_ledger_fonts_head(static_prefix, mode=mode) +
+                f'<link rel="stylesheet" href="{static_prefix}/wiki.css">')
     shell_css_link = f'<link rel="stylesheet" href="{static_prefix}/shell.css">'
     # theme.js in <head> before first paint (no FOUC); see concept page.
     head_theme_js = (
@@ -6192,6 +6313,7 @@ def _render_index_page(
         else f'<script src="{static_prefix}/theme.js"></script>'
     )
     js_link = (f'<script src="{static_prefix}/capture-readiness.js" defer></script>\n'
+               f'<script src="{static_prefix}/readable-text.js" defer></script>\n'
                f'<script src="{static_prefix}/wiki.js" defer></script>\n'
                f'<script src="{static_prefix}/index-browse.js" defer></script>')
     renderers_link = f'<script src="{static_prefix}/renderers.js" defer></script>'
@@ -6208,10 +6330,7 @@ def _render_index_page(
     nav_html = _nav_controls_html(
         root_prefix=root_prefix_for_nav,
         graph_link=graph_link,
-        initial_theme=initial_theme,
-        initial_mode=initial_mode,
-        initial_contrast=configured_contrast,
-        initial_border=configured_border,
+        appearance_choice=configured_theme,
         mode=mode,
     )
 
@@ -6231,12 +6350,12 @@ def _render_index_page(
         search_href=f"{root_prefix_for_nav}__search{'.html' if mode == 'static' else ''}",
         index_href=brand_href,
         graph_href=graph_link,
-        current="index",
+        # Index is the current page only on the bundle root index; a section
+        # index (/how-to/) links back to it (D1-017).
+        current=None if sub else "index",
         mode=mode,
-        initial_theme=initial_theme,
-        initial_mode=initial_mode,
-        initial_contrast=configured_contrast,
-        initial_border=configured_border,
+        studio_available=studio_available,
+        appearance_choice=configured_theme,
     )
 
     return (
@@ -6244,16 +6363,14 @@ def _render_index_page(
         .replace("__LANG__", "en")
         .replace("__THEME_ATTR__", theme_attr)
         .replace("__DATA_ATTRS__", data_attrs)
-        .replace("__HEAD_TITLE__", _esc(title))
+        .replace("__HEAD_TITLE__", _esc(head_title or title))
         .replace("__BUNDLE_NAME__", _esc(name))
         .replace("__BRAND_HREF__", _esc_attr_qs(brand_href))
         .replace("__BRAND_ARIA_CURRENT__", brand_aria)
         .replace("__STATIC_PREFIX__", static_prefix)
           .replace("__WIKI_CSS_LINK__", css_link)
           .replace("__SHELL_CSS_LINK__", shell_css_link)
-          .replace("__THEME_CONFIG__", _theme_config_html(
-              configured_theme, configured_contrast, configured_border,
-          ))
+          .replace("__THEME_CONFIG__", _theme_config_html(configured_theme))
           .replace("__THEME_HEAD_JS__", head_theme_js)
         .replace("__WIKI_JS_LINK__", _type_icons_block() + js_link)
         .replace("__RENDERERS_JS_LINK__", renderers_link)
@@ -6261,7 +6378,20 @@ def _render_index_page(
         .replace("__APPLICATION_SHELL__", shell_html)
         .replace("__INDEX_TITLE__", _esc(title))
         .replace('__INDEX_TITLE_ANCHOR__', title_anchor)
-          .replace("__HERO_MODIFIER__", hero_modifier)
+          .replace("__HERO_MODIFIER__", hero_modifier + (" okf-hero--feedback" if mode == "serve" and studio_available and index_file is not None else ""))
+          .replace("__PAGE_FEEDBACK_PLACEHOLDER__", (
+              # Both final layouts are reserved; theme.js marks whether this
+              # session may comment before first paint and shell.css keeps
+              # the matching one (read-only: View comments plus its note).
+              '<div class="okf-page-feedback" data-okf-page-feedback-placeholder aria-hidden="true">'
+              '<button type="button" class="okf-btn okf-page-feedback__comment" '
+              'data-okf-feedback-variant="comment" disabled tabindex="-1">Comment on this page</button>'
+              '<button type="button" class="okf-btn okf-btn--quiet okf-page-feedback__count" '
+              'data-okf-feedback-variant="read-only" disabled tabindex="-1">View comments</button>'
+              '<p class="okf-page-feedback__note" data-okf-feedback-variant="read-only">'
+              'This session is read-only: comments can be read here but not added.</p></div>'
+              if mode == "serve" and studio_available and index_file is not None else ""
+          ))
           .replace("__HERO_V2__", hero_v2)
           .replace("__INDEX_INTRO__", intro)
           .replace("__INDEX_INTRO_REMAINDER__", intro_remainder)
@@ -6369,6 +6499,7 @@ def _render_search_page(
     sections: dict[str, str] | None = None,
     section_navigation: dict[str, Any] | None = None,
     now: Any = None,
+    studio_available: bool = True,
 ) -> str:
     from datetime import datetime
     from .retrieval import bundle_revision
@@ -6425,17 +6556,12 @@ def _render_search_page(
     error_values = dict(getattr(error, "fields", {}) or {})
     error_fields = set(error_values)
     def marked_excerpt(value: str) -> str:
-        value = re.sub(r"!\[([^\]]*)\]\([^)]*\)", r"\1", value)
-        value = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", value)
-        value = re.sub(r"^\s{0,3}(?:#{1,6}|[-*+] |>+)\s*", "", value, flags=re.MULTILINE)
-        value = re.sub(r"```[^\n]*\n?|~~~[^\n]*\n?|```|~~~", "", value)
-        value = re.sub(r"`([^`\n]+)`", r"\1", value)
-        value = re.sub(r"\*\*([^*]+)\*\*", r"\1", value)
-        value = re.sub(r"(^|\s)\*([^*\n]+)\*(?=\s|[.,;:!?]|$)", r"\1\2", value)
-        terms = list(dict.fromkeys(re.findall(r"[\w-]+", query, flags=re.UNICODE)))[:32]
+        value = readable_text(value)
+        from .search import tokenize
+        terms = list(dict.fromkeys(tokenize(query)))[:32]
         if not terms:
             return _esc(value)
-        pattern = re.compile("(" + "|".join(re.escape(term) for term in sorted(terms, key=len, reverse=True)) + ")", re.IGNORECASE)
+        pattern = re.compile(r"(?<!\w)(" + "|".join(re.escape(term) for term in sorted(terms, key=len, reverse=True)) + r")(?!\w)", re.IGNORECASE)
         return "".join(f"<mark>{_esc(part)}</mark>" if index % 2 else _esc(part)
                        for index, part in enumerate(pattern.split(value)))
 
@@ -6517,7 +6643,7 @@ def _render_search_page(
         f'{query_invalid}'
         'autocomplete="off"><button type="submit" class="okf-search-submit">Search</button></div>'
         f'{query_error_html}</div>'
-        '<fieldset id="okf-search-mode" class="okf-search-modes"><legend>How should results be matched?</legend>'
+        '<fieldset id="okf-search-mode" class="okf-search-modes"><legend>How should results be matched? Choose one.</legend>'
         f'{mode_controls}</fieldset></div>'
         f'<details class="okf-search-filters"{" open" if active_filters else ""}><summary>{filters_label}</summary>'
         f'<div class="okf-search-filter-grid">{filter_fields}</div>'
@@ -6527,10 +6653,6 @@ def _render_search_page(
         f'{datalist("okf-search-concepts", concept_values)}</form>'
     )
 
-    try:
-        palette = resolve_palette(bundle)
-    except Exception:  # noqa: BLE001 — results degrade to accentless
-        palette = {}
     result_parts: list[str] = []
     for r in results:
         cid = r.get("concept_id") or r.get("id") or ""
@@ -6549,13 +6671,12 @@ def _render_search_page(
                 ctype = (c.type or "") if c else ""
             except Exception:  # noqa: BLE001 — type chip is decorative
                 ctype = ""
-        color = palette.get(ctype, type_color_for(ctype))
         icon = type_icon_svg(ctype, size=14, cls="okf-type-icon")
         type_chip = (
-            f'<span class="okf-search-result__type" style="--okf-type-accent:{_esc(color)}">'
+            f'<span class="okf-search-result__type">'
             f'{icon} {_esc(ctype)}</span>' if ctype else ""
         )
-        heading_suffix = f' <span class="okf-muted">{_esc(passage.get("heading"))}</span>' if passage.get("heading") else ""
+        heading_suffix = f' <span class="okf-muted">{_esc(readable_text(passage.get("heading")))}</span>' if passage.get("heading") else ""
         citation = str(passage.get("citation") or "")
         path = str(passage.get("path") or cid)
         reasons = r.get("reasons") or []
@@ -6592,7 +6713,9 @@ def _render_search_page(
         exact_evidence = (
             '<section class="okf-search-exact" aria-label="Exact passage evidence">'
             '<h4>What does the source say?</h4>'
-            f'<pre class="okf-search-source" aria-label="Exact canonical source passage">{_esc(str(desc)[:2000])}</pre>'
+            f'{structured_excerpt(str(desc)[:2000])}'
+            '<details class="okf-search-raw-source"><summary>Exact Markdown source</summary>'
+            f'<pre class="okf-search-source" aria-label="Exact canonical source passage">{_esc(str(desc)[:2000])}</pre></details>'
             f'<p class="okf-search-evidence"><code class="okf-search-citation">{_esc(citation)}</code><span class="okf-search-path">{_esc(path)}</span></p>'
             '</section>' if has_passage else
             '<p class="okf-search-no-passage">No exact passage or line citation is available. This result is supported only by canonical graph metadata.</p>'
@@ -6629,7 +6752,7 @@ def _render_search_page(
             if section_href else ""
         )
         result_parts.append(
-            f'<li><article class="okf-search-result" style="--okf-type-accent:{_esc(color)}" data-concept-id="{_esc_attr_qs(cid)}">'
+            f'<li><article class="okf-search-result" data-concept-id="{_esc_attr_qs(cid)}">'
             f'<h3><a href="{_esc(url)}" class="okf-internal">{_esc(title)}</a>{heading_suffix}</h3>'
             # iter1 P3-13: concept-id moved OUT of the <h3> so the heading
             # outline announces only the title (screen-reader heading-list
@@ -6638,7 +6761,9 @@ def _render_search_page(
             f'{passage_preview}'
             f'<p class="okf-search-evidence-summary">{_esc(evidence_summary)}</p>'
             '<div class="okf-search-result__actions">'
-              f'<a class="okf-btn okf-btn--primary okf-search-open" href="{_esc(url)}">Open</a>'
+              # Ledger: one filled primary per view (the Search submit); every
+              # row's Open is an outlined button.
+              f'<a class="okf-btn okf-search-open" href="{_esc(url)}">Open</a>'
               f'{section_action}'
               f'{cited_action}'
             f'</div>{passage_scope}'
@@ -6660,7 +6785,12 @@ def _render_search_page(
                         f'<h3>Search request error</h3><p>{_esc(error.message)}</p><ul>{field_rows}</ul>'
                         f'<p><a class="okf-btn" href="{clear_href}">Start a new search</a> <a href="{back_link}">Browse the index</a></p></div>')
     elif result_parts:
-        results_html = '<ol class="okf-search-results-list">' + "\n".join(result_parts) + '</ol>'
+        cap_notice = ""
+        if len(results) >= req_limit:
+            guidance = ("Increase Result limit in Filters to check for more matches."
+                        if req_limit < 100 else "Narrow your query or filters to find other matches.")
+            cap_notice = f'<p class="okf-search-limit-notice" role="status">Result limit reached ({int(req_limit)}). {guidance}</p>'
+        results_html = cap_notice + '<ol class="okf-search-results-list">' + "\n".join(result_parts) + '</ol>'
     elif not query and not active_filters:
         # F7: the empty-query suggestion head follows the metadata owner's
         # effective change instant, not the raw legacy ``timestamp`` key.
@@ -6672,17 +6802,22 @@ def _render_search_page(
                         f'<section><h3>Browse</h3><p>{browse_types}</p><p>{browse_tags}</p></section>'
                         '<section><h3>Try a search</h3><p><a href="?q=architecture&amp;mode=hybrid">architecture</a> or <a href="?q=decision&amp;mode=semantic">meaning of a decision</a></p></section></div>')
     else:
-        results_html = (f'<div class="okf-search-empty"><h3>No matching passages</h3><p>No evidence matched “{_esc(query)}” with the current filters.</p>'
-                        f'<p><a class="okf-btn" href="{clear_href}?q={_esc_attr_qs(query)}">Clear filters</a> <a href="{back_link}">Browse the index</a></p></div>')
+        empty_message = (f'No evidence matched “{_esc(query)}”' if query else 'No evidence matched')
+        empty_message += (' with the current filters.' if active_filters else ' using this match mode.')
+        empty_actions = f'<a class="okf-btn" href="{back_link}">Browse the index</a>'
+        if active_filters:
+            reset_query = urlencode({"q": query, "mode": req_mode, "limit": req_limit})
+            empty_actions = f'<a class="okf-btn" href="{clear_href}?{_esc_attr_qs(reset_query)}">Clear filters</a>' + empty_actions
+        elif req_mode != "hybrid":
+            broaden_query = urlencode({"q": query, "mode": "hybrid", "limit": req_limit})
+            empty_actions = f'<a class="okf-btn" href="{clear_href}?{_esc_attr_qs(broaden_query)}">Try Best overall</a>' + empty_actions
+        results_html = (f'<div class="okf-search-empty"><h3>No matching passages</h3><p>{empty_message}</p>'
+                        f'<div class="okf-search-empty__actions">{empty_actions}</div></div>')
 
     theme_attr = ""
-    configured_theme, configured_contrast, configured_border = _theme_preference(config)
+    configured_theme = _theme_preference(config)
     initial_theme = _resolve_initial_theme(configured_theme)
-    initial_mode = (
-        "auto" if configured_theme == "auto" else configured_theme.rsplit("-", 1)[1]
-    )
-    theme_attr = (f' data-theme="{initial_theme}"'
-                  + _theme_modifier_attrs(configured_contrast, configured_border))
+    theme_attr = (f' data-theme="{initial_theme}"')
 
     # P1-10: emit data-okf-enhance on the search page too so wiki.js
     # detects static mode there as well (the search page body also carries
@@ -6697,7 +6832,8 @@ def _render_search_page(
         f'data-okf-capture-query="{_esc_attr_qs(query)}" data-okf-revision="{_esc_attr_qs(bundle_revision(bundle))}"'
     )
 
-    css_link = f'<link rel="stylesheet" href="{static_prefix}/wiki.css">'
+    css_link = (_ledger_fonts_head(static_prefix, mode=mode) +
+                f'<link rel="stylesheet" href="{static_prefix}/wiki.css">')
     shell_css_link = f'<link rel="stylesheet" href="{static_prefix}/shell.css">'
     # theme.js in <head> before first paint (no FOUC); see concept page.
     head_theme_js = (
@@ -6705,6 +6841,7 @@ def _render_search_page(
         else f'<script src="{static_prefix}/theme.js"></script>'
     )
     js_link = (f'<script src="{static_prefix}/capture-readiness.js" defer></script>\n'
+               f'<script src="{static_prefix}/readable-text.js" defer></script>\n'
                f'<script src="{static_prefix}/wiki.js" defer></script>')
     renderers_link = f'<script src="{static_prefix}/renderers.js" defer></script>'
     # Current spec §9: in static mode also load the client-side
@@ -6716,9 +6853,15 @@ def _render_search_page(
         js_link = (
               f'<script src="{static_prefix}/capture-readiness.js" defer></script>\n'
               f'<script src="{static_prefix}/portable-retrieval.js" defer></script>\n'
+            f'<script src="{static_prefix}/readable-text.js" defer></script>\n'
             f'<script src="{static_prefix}/wiki.js" defer></script>\n'
             f'<script src="{static_prefix}/static-search.js" defer></script>'
         )
+
+    if mode == "static":
+        js_link = js_link.replace(
+            f'<script src="{static_prefix}/static-search.js" defer></script>',
+            f'<script src="{static_prefix}/portable-page.js" data-okf-runtime="static-search.js" defer></script>')
 
     # P2-61: shared topbar nav. Search page lives at the bundle root, so
     # the form posts back to itself and Graph/Index are root-relative.
@@ -6727,10 +6870,7 @@ def _render_search_page(
     nav_html = _nav_controls_html(
         root_prefix=root_prefix_for_nav,
         graph_link=graph_link,
-        initial_theme=initial_theme,
-        initial_mode=initial_mode,
-        initial_contrast=configured_contrast,
-        initial_border=configured_border,
+        appearance_choice=configured_theme,
         current_query=query,
         mode=mode,
     )
@@ -6742,10 +6882,8 @@ def _render_search_page(
         graph_href=graph_link,
         current="search",
         mode=mode,
-        initial_theme=initial_theme,
-        initial_mode=initial_mode,
-        initial_contrast=configured_contrast,
-        initial_border=configured_border,
+        studio_available=studio_available,
+        appearance_choice=configured_theme,
         search_query=query,
     )
 
@@ -6800,11 +6938,9 @@ def _render_search_page(
         .replace("__STATIC_PREFIX__", static_prefix)
           .replace("__WIKI_CSS_LINK__", css_link)
           .replace("__SHELL_CSS_LINK__", shell_css_link)
-          .replace("__THEME_CONFIG__", _theme_config_html(
-              configured_theme, configured_contrast, configured_border,
-          ))
+          .replace("__THEME_CONFIG__", _theme_config_html(configured_theme))
           .replace("__THEME_HEAD_JS__", head_theme_js)
-        .replace("__WIKI_JS_LINK__", _type_icons_block() + js_link)
+        .replace("__WIKI_JS_LINK__", _search_type_chips_html(bundle) + _type_icons_block() + js_link)
         .replace("__RENDERERS_JS_LINK__", renderers_link)
         .replace("__NAV_HTML__", nav_html)
         .replace("__APPLICATION_SHELL__", shell_html)
@@ -6832,6 +6968,7 @@ def _render_graph_page(
     name: str,
     config: dict[str, Any],
     offline_assets: Any = None,
+    studio_available: bool = True,
 ) -> str:
     template = load_template("graph_page.html", bundle)
     if mode != 'serve':
@@ -6840,14 +6977,10 @@ def _render_graph_page(
     data_url = "/__data/graph.json" if mode in ("serve", "spa") else "__data/graph.json"
     back_link = "/" if mode in ("serve", "spa") else "index.html"
     search_link = "/__search" if mode in ("serve", "spa") else "__search.html"
-    configured_theme, configured_contrast, configured_border = _theme_preference(config)
+    configured_theme = _theme_preference(config)
     initial_theme = _resolve_initial_theme(configured_theme)
-    initial_mode = (
-        "auto" if configured_theme == "auto" else configured_theme.rsplit("-", 1)[1]
-    )
     initial_layout = config.get("default_layout") or "cose"
-    theme_attr = (f' data-theme="{initial_theme}"'
-                  + _theme_modifier_attrs(configured_contrast, configured_border))
+    theme_attr = (f' data-theme="{initial_theme}"')
 
     # F7: the no-JS suggestion head follows the metadata owner's effective
     # change instant (dated first, newest first; unknown-time last, stable
@@ -6861,7 +6994,7 @@ def _render_graph_page(
         '</li>'
         for concept in recent
     )
-    graph_data = build_graph_data(bundle, name=name)
+    graph_data = build_graph_data(bundle, name=name, include_bodies=mode != 'serve')
     nojs_relationships = "".join(
         "<li>" + _esc(relation["label"]) + " — " + _esc(relation["type"])
         + ": " + _esc(relation["source"]) + " → " + _esc(relation["target"]) + "</li>"
@@ -6891,6 +7024,10 @@ def _render_graph_page(
     if offline_assets is not None:
         # X1: the same pinned chain, from verified local copies, in order.
         cdn_scripts = offline_assets.graph_scripts(static_prefix)
+    # External classic scripts defer in document order, including their UMD
+    # dependencies, before deferred graph.js. Keep the single-file chain
+    # parser-blocking: its inline graph bootstrap cannot participate in defer.
+    cdn_scripts = cdn_scripts.replace("<script ", "<script defer ")
 
     # P1-3: emit data-okf-mode on the graph page body so graph.js can
     # detect static mode and append .html to the Open-page href (the
@@ -6902,7 +7039,8 @@ def _render_graph_page(
                   f'data-okf-studio="{("1" if mode == "serve" else "0")}" '
                   f'data-okf-revision="{_esc_attr_qs(revision)}" data-okf-capture-revision="{_esc_attr_qs(revision)}" data-okf-capture-ready="loading"')
 
-    css_link = f'<link rel="stylesheet" href="{static_prefix}/wiki.css">'
+    css_link = (_ledger_fonts_head(static_prefix, mode=mode) +
+                f'<link rel="stylesheet" href="{static_prefix}/wiki.css">')
     shell_css_link = f'<link rel="stylesheet" href="{static_prefix}/shell.css">'
     graph_css_link = f'<link rel="stylesheet" href="{static_prefix}/graph.css">'
     # theme.js in <head> before first paint (no FOUC); see concept page.
@@ -6915,12 +7053,17 @@ def _render_graph_page(
     # progressive renderers (mermaid/hljs/KaTeX). graph.js dispatches
     # okf-loom:bodyPatched after each showDetail() so renderers.js re-scans.
     graph_js = (
+          f'<script src="{static_prefix}/readable-text.js" defer></script>\n' +
           f'<script src="{static_prefix}/capture-readiness.js" defer></script>\n' +
           (f'<script src="{static_prefix}/portable-retrieval.js" defer></script>\n'
          if mode in ("static", "spa") else "") +
         f'<script src="{static_prefix}/graph.js" defer></script>\n'
         f'<script src="{static_prefix}/renderers.js" defer></script>'
     )
+    if mode == "static":
+        graph_js = graph_js.replace(
+            f'<script src="{static_prefix}/graph.js" defer></script>',
+            f'<script src="{static_prefix}/portable-page.js" data-okf-runtime="graph.js" defer></script>')
     shell_html = _application_shell_html(
         name=name,
         bundle_href=back_link,
@@ -6929,10 +7072,8 @@ def _render_graph_page(
         graph_href=("/__graph" if mode in ("serve", "spa") else "__graph.html"),
         current="graph",
         mode=mode,
-        initial_theme=initial_theme,
-        initial_mode=initial_mode,
-        initial_contrast=configured_contrast,
-        initial_border=configured_border,
+        studio_available=studio_available,
+        appearance_choice=configured_theme,
     )
 
     return (
@@ -6946,16 +7087,12 @@ def _render_graph_page(
         .replace("__WIKI_CSS_LINK__", css_link)
           .replace("__SHELL_CSS_LINK__", shell_css_link)
           .replace("__GRAPH_CSS_LINK__", graph_css_link)
-          .replace("__THEME_CONFIG__", _theme_config_html(
-              configured_theme, configured_contrast, configured_border,
-          ))
+          .replace("__THEME_CONFIG__", _theme_config_html(configured_theme))
           .replace("__THEME_HEAD_JS__", head_theme_js)
         .replace("__GRAPH_JS_SRC__", graph_js)
         .replace("__CDN_SCRIPTS__", cdn_scripts)
         .replace("__INITIAL_THEME__", initial_theme)
-          .replace("__INITIAL_THEME_BUTTON__", _appearance_control_html(
-              initial_theme, initial_mode, configured_contrast, configured_border,
-          ))
+          .replace("__INITIAL_THEME_BUTTON__", _appearance_control_html(configured_theme))
         .replace("__APPLICATION_SHELL__", shell_html)
         .replace("__INITIAL_LAYOUT__", initial_layout)
         .replace("__GRAPH_DATA_URL__", data_url)

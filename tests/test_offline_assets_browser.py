@@ -191,6 +191,7 @@ def _assert_matches_cdn_golden(page, scope: str) -> None:
 
 def _assert_rich_rendered(page, scope: str) -> None:
     """Mermaid, KaTeX (with fonts) and highlight.js inside ``scope``."""
+    _assert_ledger_fonts(page)
     page.wait_for_function(
         """(scope) => {
           const root = document.querySelector(scope);
@@ -231,12 +232,57 @@ def _assert_rich_rendered(page, scope: str) -> None:
 
 
 def _assert_theme_swap_is_local(page, guard) -> None:
-    before = len(guard.requests)
-    page.evaluate("document.documentElement.setAttribute('data-theme', 'technical-dark')")
-    page.wait_for_function("""() => [...document.querySelectorAll('[data-okf-renderer-resource="stylesheet"]')]
-        .some(el => el.media === 'all' && /github-dark|okf-vendor-hljs-dark/.test(el.href || el.getAttribute('data-okf-href') || ''))
-        && document.documentElement.dataset.okfRenderersStatus === 'ready'""", timeout=15000)
-    assert all(guard.local(url) for url in guard.requests[before:])
+    # Ledger syntax is painted by wiki.css, not a light/dark vendor sheet.
+    # Also exercise a same-scheme swap: Mermaid embeds palette colours and
+    # must repaint Slate -> Clay even though both palettes are dark.
+    previous_colours = None
+    for palette in ("slate", "clay"):
+        before = len(guard.requests)
+        generation = page.evaluate("() => window.okfRendererReadiness.generation")
+        page.evaluate("palette => window.OKFLoomTheme.setTheme(palette)", palette)
+        page.wait_for_function("""({palette, generation}) => {
+            const state = window.okfRendererReadiness;
+            return document.documentElement.dataset.theme === palette
+                && state.status === 'ready' && state.themeName === palette
+                && state.generation > generation;
+        }""", arg={"palette": palette, "generation": generation}, timeout=15000)
+        colours = page.evaluate("""() => {
+            const root = getComputedStyle(document.documentElement);
+            const probe = document.createElement('span');
+            document.body.appendChild(probe);
+            const resolved = token => {
+                probe.style.color = root.getPropertyValue(token);
+                return getComputedStyle(probe).color;
+            };
+            const roles = ['.hljs-keyword', '.hljs-string', '.hljs-punctuation'];
+            const colours = roles.map((selector, i) => {
+                // The fixture has keys and strings. A punctuation probe
+                // inside real highlighted code covers the third role too.
+                let node = document.querySelector('code.hljs ' + selector);
+                const synthetic = !node;
+                if (synthetic) {
+                    node = document.createElement('span');
+                    node.className = selector.slice(1);
+                    document.querySelector('code.hljs').appendChild(node);
+                }
+                const pair = [getComputedStyle(node).color, resolved('--syn-' + (i + 1))];
+                if (synthetic) node.remove();
+                return pair;
+            });
+            const diagram = document.querySelector('div.mermaid svg .node rect');
+            const diagramColours = [getComputedStyle(diagram).fill, resolved('--surface-2')];
+            probe.remove();
+            return {syntax: colours, diagram: diagramColours};
+        }""")
+        assert all(actual == token for actual, token in colours["syntax"]), colours
+        assert colours["diagram"][0] == colours["diagram"][1], colours
+        if previous_colours is not None:
+            assert colours != previous_colours, "same-scheme palette swap did not repaint"
+        previous_colours = colours
+        assert all(guard.local(url) for url in guard.requests[before:])
+        assert page.locator('[data-okf-renderer-resource="stylesheet"]').evaluate_all("""nodes =>
+            nodes.every(el => !/github(?:-dark)?|okf-vendor-hljs-(?:light|dark)/.test(
+                el.href || el.getAttribute('data-okf-href') || ''))""")
 
 
 def _assert_graph_renders(page) -> None:
@@ -482,3 +528,95 @@ def test_guard_catches_the_default_cdn_build(tmp_path):
                                timeout=30000)
         assert any("cdn.jsdelivr.net" in url for url in guard.blocked)
         assert page.locator("div.mermaid svg").count() == 0
+
+
+def _assert_ledger_fonts(page):
+    # FontFaceSet.check alone can succeed with a fallback; require one loaded
+    # registered face per requested family/style as well as the browser check.
+    result = page.evaluate('''async () => {
+      const results = [];
+      for (const family of ['Public Sans', 'Azeret Mono']) {
+        for (const style of ['normal', 'italic']) {
+          const query = `${style} 400 16px "${family}"`;
+          const faces = await document.fonts.load(query, 'Ledger 012345');
+          results.push({family, style, loaded: faces.length,
+            check: document.fonts.check(query, 'Ledger 012345'),
+            match: faces.some(f => f.family.replaceAll('"', '') === family && f.style === style && f.status === 'loaded')});
+        }
+      }
+      return results;
+    }''')
+    assert len(result) == 4
+    assert all(row['loaded'] > 0 and row['check'] and row['match'] for row in result), result
+
+
+@pytest.mark.parametrize("target,assets", [("static", "offline"), ("spa", "offline"),
+                                           ("single-file", "offline"), ("static", "cdn"),
+                                           ("spa", "cdn"), ("single-file", "cdn")])
+def test_ledger_fonts_without_network(tmp_path, target, assets):
+    out = _build(tmp_path, target, assets)
+    with ExitStack() as stack:
+        # The single-file proof explicitly uses file://; CDN script requests
+        # may be attempted in CDN mode but must not be needed for any font.
+        base = None if target == "single-file" else _host(stack, tmp_path, out)
+        session = _session(stack, base)
+        url = (out / "index.html").as_uri() if base is None else base + "/rich.html"
+        session.goto(url)
+        _assert_ledger_fonts(session.page)
+        session.assert_no_csp_violation()
+        assert not any('font' in url or 'woff' in url for url in session.guard.blocked)
+        if assets == "offline":
+            session.guard.assert_offline()
+
+
+@pytest.mark.parametrize("assets", ["cdn", "offline"])
+def test_file_static_ledger_fonts_without_console_errors(tmp_path, assets):
+    # Plain content isolates Ledger delivery from CDN-only rich renderers and
+    # the graph page's documented file:// fetch limitation.
+    root = write_offline_fixture(tmp_path / "bundle", rich=False)
+    (root / "nested").mkdir()
+    (root / "nested" / "note.md").write_text(
+        "---\ntype: Note\ntitle: Nested note\n---\n\n# Nested note\n\nLedger font proof.\n",
+        encoding="utf-8")
+    out = tmp_path / "static"
+    build_site(Bundle.load(root), out, target="static", assets=assets)
+    with ExitStack() as stack:
+        session = _session(stack, None)
+        console_errors = []
+        session.page.on("console", lambda message: console_errors.append(message.text)
+                        if message.type == "error" else None)
+        for path in ("index.html", "nested/note.html"):
+            session.goto((out / path).as_uri())
+            _assert_ledger_fonts(session.page)
+            _assert_clean(session)
+            assert console_errors == [], (path, console_errors)
+
+
+def test_served_ledger_fonts_without_network(tmp_path):
+    bundle = write_offline_fixture(tmp_path / "bundle")
+    port = free_port()
+    base = f"http://127.0.0.1:{port}"
+    with ExitStack() as stack:
+        stack.enter_context(managed_server(
+            [sys.executable, "-m", "okf_loom", "serve", str(bundle), "--no-open", "--port", str(port)],
+            base, tmp_path / "serve.log"))
+        session = _session(stack, base)
+        session.goto(base + "/other")
+        expect(session.page.locator('link[rel="preload"][as="font"][type="font/woff2"][crossorigin]')).to_have_count(2)
+        assert session.page.evaluate("""() => {
+            const preload = document.querySelector('link[rel="preload"][as="font"]');
+            const stylesheet = document.querySelector('link[rel="stylesheet"]');
+            return !!(preload.compareDocumentPosition(stylesheet) & Node.DOCUMENT_POSITION_FOLLOWING);
+        }""")
+        for _family, _style, path in vendor.LEDGER_FACES:
+            response = session.page.request.get(base + "/__static/" + path)
+            assert response.status == 200
+            assert response.headers["content-type"] == "font/woff2"
+            assert response.body() == vendor.read_vendor_bytes(path)
+        for path in (*vendor.LEDGER_LICENSES, vendor.LOCK_NAME,
+                     "ledger-public-sans/unknown.woff2",
+                     "ledger-public-sans/%2e%2e/vendor.lock.json"):
+            assert session.page.request.get(base + "/__static/" + path).status == 404
+        _assert_ledger_fonts(session.page)
+        session.assert_no_csp_violation()
+        session.guard.assert_offline()

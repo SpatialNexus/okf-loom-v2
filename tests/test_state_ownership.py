@@ -332,12 +332,13 @@ def test_deferred_history_batch_failure_unwinds_snapshots_and_group_capacity(
     real_write = studio_module.atomic_write_bytes
     calls = 0
 
-    def fail_second(path: Path, raw: bytes) -> None:
+    def fail_second(path: Path, raw: bytes, *, mode: int | None = None) -> None:
         nonlocal calls
+        assert mode == 0o600
         calls += 1
         if calls == 2:
             raise OSError("history staging failed")
-        real_write(path, raw)
+        real_write(path, raw, mode=mode)
 
     monkeypatch.setattr(studio_module, "atomic_write_bytes", fail_second)
     with pytest.raises(OSError, match="history staging"):
@@ -592,6 +593,7 @@ def test_log_cross_process_appends_do_not_lose_entries(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("studio_mode", [False, True])
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_cross_process_plan_cas_has_one_success_one_conflict(
     tmp_path: Path, studio_mode: bool
 ) -> None:
@@ -611,6 +613,7 @@ def test_cross_process_plan_cas_has_one_success_one_conflict(
     assert sorted(output.get(timeout=1) for _ in processes) == [0, 1]
 
 
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_cross_process_index_create_cas_has_one_success_one_conflict(tmp_path: Path) -> None:
     _root(tmp_path)
     ctx = multiprocessing.get_context("spawn")
@@ -695,6 +698,7 @@ def test_post_persistence_finalization_failure_rolls_back_complete_envelope(
     assert not studio.last_logged_path.exists()
 
 
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_cross_process_group_manifest_merge_has_no_lost_members(tmp_path: Path) -> None:
     _root(tmp_path)
     ctx = multiprocessing.get_context("spawn")
@@ -717,6 +721,7 @@ def test_cross_process_group_manifest_merge_has_no_lost_members(tmp_path: Path) 
         ) == f"before {member['concept']}"
 
 
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_failed_finalization_sidecar_lock_preserves_second_writer_state(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -820,6 +825,7 @@ def test_cross_process_event_is_tailed_exactly_once(tmp_path: Path) -> None:
     assert not [event for event in second if event.get("type") == "cross-process-exact"]
 
 
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_deferred_group_capacity_is_reserved_across_processes(tmp_path: Path) -> None:
     _root(tmp_path)
     ctx = multiprocessing.get_context("spawn")
@@ -1025,6 +1031,7 @@ def test_durable_event_cursor_drains_cross_process_burst_across_rotation(
     assert batches[-2:] == [[], []]
 
 
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_owned_child_failure_path_stops_reaps_and_closes_deterministically(
     tmp_path: Path,
 ) -> None:

@@ -4,7 +4,7 @@
 
   Placeholders (str.replace):
       __LANG__             → document language
-      __THEME_ATTR__       → ` data-theme="<family>-<mode>"` (technical/swiss × light/dark)
+      __THEME_ATTR__       → ` data-theme="<palette>"` (bone | slate | clay | plum)
       __DATA_ATTRS__       → ` data-okf-mode="..." data-okf-enhance="..."` (P1-3)
                              graph.js reads data-okf-mode to decide whether
                              Open-page hrefs need a .html suffix.
@@ -12,11 +12,11 @@
       __BUNDLE_NAME__      → display name
       __STATIC_PREFIX__    → URL prefix for /__static/ assets
        __WIKI_CSS_LINK__    → <link rel="stylesheet" href="...wiki.css">
-       __THEME_CONFIG__     → CSP-safe configured theme/modifier preference JSON
+       __THEME_CONFIG__     → CSP-safe configured appearance JSON (choice: bone | slate | clay | plum | system)
       __GRAPH_CSS_LINK__   → <link rel="stylesheet" href="...graph.css">
       __GRAPH_JS_SRC__     → <script src="...graph.js" defer></script>
       __CDN_SCRIPTS__      → Cytoscape.js CDN tag (or empty if config.cdn=false)
-      __INITIAL_THEME__    → one of the eight concrete Technical/Swiss/Purple/Coffee light/dark themes
+      __INITIAL_THEME__    → the concrete first-paint Ledger palette (bone | slate | clay | plum)
       __INITIAL_LAYOUT__   → "cose" | "concentric" | ...
       __GRAPH_DATA_URL__   → URL to fetch graph.json from (or empty to inline)
       __BACK_LINK__        → URL back to the index
@@ -25,7 +25,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230c7373'/%3E%3Cpath d='M8 10h16M8 16h10M8 22h16' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='1' y='1' width='30' height='30' fill='%231d1a16' stroke='%23b0a696' stroke-width='2'/%3E%3Cpath d='M8 8h16M8 16h10M8 24h16' stroke='%23f6f3ed' stroke-width='4'/%3E%3C/svg%3E">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>__HEAD_TITLE__</title>
 __WIKI_CSS_LINK__
@@ -56,11 +56,9 @@ __APPLICATION_SHELL__
   <section class="okf-graph-tools" role="search" aria-labelledby="okf-find-graph-title">
     <h2 id="okf-find-graph-title">Find in graph</h2>
     <label class="okf-graph-tools__search">
-      <span>Concept title, id, or tag</span>
       <input id="okf-search" type="search" placeholder="Title, id, or tag" autocomplete="off" aria-label="Search graph concepts">
     </label>
     <label class="okf-graph-tools__filter">
-      <span>Type</span>
       <select id="okf-filter-type" aria-label="Filter graph by type">
         <option value="">All types</option>
       </select>

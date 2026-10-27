@@ -298,8 +298,8 @@ class ScenarioSpec(NamedTuple):
     The manifest is deliberately data-first: a reviewer can inspect the
     complete release matrix without launching a browser, while the runner
     below still executes every row by its ``action``.  ``resolved_theme`` is
-    the expected concrete paint state; public family and mode are seeded
-    independently before navigation (and Auto is derived).
+    the expected concrete paint state; one palette choice is seeded before
+    navigation (System is derived).
     """
 
     id: str
@@ -309,10 +309,10 @@ class ScenarioSpec(NamedTuple):
     target: str
     assertion: str
     coverage: tuple[str, ...]
-    resolved_theme: str | None = "technical-light"
-    theme_preference: str | None = "light"
-    contrast: str | None = "normal"
-    border: str | None = "on"
+    resolved_theme: str | None = "bone"
+    theme_preference: str | None = "bone"
+    contrast: str | None = None
+    border: str | None = None
     viewport: tuple[int, int] = (1440, 1000)
     javascript: bool = True
     color_scheme: str = "light"
@@ -324,14 +324,13 @@ class ScenarioSpec(NamedTuple):
     expected_event_fragments: tuple[str, ...] = ()
     locator: str | None = None
     full_page: bool = True
-    # Public theme state is represented as independent family/mode values.
-    # ``theme_preference`` remains a compatibility input for older matrix rows;
-    # manifest output normalizes it to the public mode only.
+    # Retain historical manifest column names for capture readers. They now
+    # carry the single Ledger choice and its scheme (or System), not axes.
     theme_family: str | None = None
     theme_mode: str | None = None
     storage: str = "seeded"
     bundle: str = "demo"
-    density: str = "comfortable"
+    density: str = "ledger"
     zoom_mechanism: str | None = None
     server_mode: str = "editable"
 
@@ -345,37 +344,35 @@ _SUPPORTING_ARTIFACTS = (
 
 
 _REQUIRED_COVERAGE = frozenset({
-    "appearance-soft-contrast-border-off", "studio-rail", "studio-overlays",
+    "appearance-palettes", "studio-rail", "studio-overlays",
     "studio-focus", "studio-split", "studio-mobile",
     "graph-map", "graph-lenses", "graph-typed-path", "graph-focus", "graph-mobile",
     "search-result", "search-no-result", "search-error", "search-manual-copy",
     "live", "static", "spa", "single-file", "no-js",
     "boot-success", "boot-blocked", "boot-failure",
     "forced-colors", "reduced-motion", "zoom-400",
-    "technical-auto", "technical-auto-default", "technical-auto-storage-denied",
-    "technical-auto-os-light", "technical-auto-os-dark",
+    "bone-default",
     *(f"F{number:02d}" for number in range(1, 25)),
     "viewport-1440", "viewport-1280", "viewport-390", "demo-bundle", "dense-docs-bundle",
     "index-empty", "index-filter-mismatch", "concept-outline", "concept-rendered",
     "concept-source", "concept-split", "concept-focus-view", "search-expanded",
-    "graph-keyboard-journey", "coffee-showcase", "compact-density",
+    "graph-keyboard-journey", "clay-showcase", "ledger-spacing",
     "studio-idle", "studio-error", "studio-retry", "studio-read-only-authority",
     "studio-proposal-enabled", "studio-unavailable", "zoom-200",
     "index-graph-thumbnail-desktop", "index-graph-thumbnail-mobile",
 })
 _VALID_SOURCES = frozenset({"live", "static", "spa", "single-file"})
 _VALID_THEMES = frozenset({
-    "technical-light", "technical-dark", "swiss-light", "swiss-dark",
-    "purple-light", "purple-dark", "coffee-light", "coffee-dark",
+    "bone", "slate", "clay", "plum",
 })
-_VALID_THEME_FAMILIES = frozenset({"technical", "swiss", "purple", "coffee"})
-_VALID_THEME_MODES = frozenset({"light", "dark", "auto"})
+_VALID_THEME_FAMILIES = frozenset({"bone", "slate", "clay", "plum", "system"})
+_VALID_THEME_MODES = frozenset({"light", "dark", "system"})
 _VALID_STORAGE_MODES = frozenset({"seeded", "none", "denied"})
 _VALID_BUNDLES = frozenset({"demo", "dense-docs", "empty-okf"})
-_VALID_DENSITIES = frozenset({"comfortable", "compact"})
+_VALID_DENSITIES = frozenset({"ledger"})
 _VALID_SERVER_MODES = frozenset({"editable", "read-only", "proposal-enabled"})
 _IMPLEMENTED_ACTIONS = frozenset({
-    "none", "theme", "parity", "appearance-modifiers", "appearance-overlay",
+    "none", "theme", "parity", "appearance-overlay",
     "studio-rail", "studio-mobile", "studio-split", "concept-rendered", "concept-source",
     "concept-focus-view", "concept-outline", "index-empty", "index-filter-mismatch",
     "graph-preview-name", "graph-map", "graph-lenses", "graph-focus", "graph-path",
@@ -430,8 +427,8 @@ def _oracle_contract_examples(label: str) -> tuple[dict[str, Any], dict[str, Any
         "F20": ({"forcedColors": True, "marks": 4, "nonColor": 4}, "nonColor"),
         "F21": ({"headings": ["Title", "Section"], "h1Count": 1}, "h1Count"),
         "F22": ({"unnamed": 0, "minimumTarget": 24, "undersized": 0}, "minimumTarget"),
-        "F23": ({"density": "compact", "scale": "0.9", "consumedHeight": 48}, "density"),
-        "F24": ({"showcase": "coffee-light", "stored": {"family": "coffee", "mode": "light"}, "runtimeFamily": "coffee", "runtimeMode": "light"}, "runtimeMode"),
+        "F23": ({"density": None, "consumedHeight": 48}, "consumedHeight"),
+        "F24": ({"showcase": "clay", "stored": "clay", "runtimeChoice": "clay"}, "runtimeChoice"),
     }
     passing, key = examples[label]
     rejecting = json.loads(json.dumps(passing))
@@ -467,35 +464,27 @@ ACCEPTANCE_ORACLE_REGISTRY = {
     "F20": lambda o: o.get("forcedColors") is True and o.get("marks", 0) > 0 and o.get("nonColor") == o.get("marks"),
     "F21": lambda o: o.get("h1Count") == 1 and bool(o.get("headings")) and all(_nonempty_string(v) for v in o["headings"]),
     "F22": lambda o: o.get("unnamed") == 0 and o.get("undersized") == 0 and o.get("minimumTarget", 0) >= 24,
-    "F23": lambda o: o.get("density") == "compact" and float(o.get("scale") or 1) < 1 and o.get("consumedHeight", 0) > 0,
-    "F24": lambda o: o.get("showcase") == "coffee-light" and o.get("stored") == {"family": "coffee", "mode": "light"} and o.get("runtimeFamily") == "coffee" and o.get("runtimeMode") == "light",
+    "F23": lambda o: o.get("consumedHeight", 0) > 0 and o.get("density") is None,
+    "F24": lambda o: o.get("showcase") == "clay" and o.get("stored") == "clay" and o.get("runtimeChoice") == "clay",
+
 }
 
 
+def _palette_scheme(theme: str | None) -> str:
+    return "light" if theme == "bone" else "dark"
+
+
 def _public_theme(spec: ScenarioSpec) -> tuple[str | None, str | None]:
-    """Resolve a scenario's public family/mode pair without inventing Auto.
-
-    The old matrix used strings such as ``technical-auto``.  Runtime and
-    manifest contracts use independent public values instead: ``family`` is
-    ``technical`` and ``mode`` is ``auto``; the concrete paint result remains
-    in ``resolved_theme``.
-    """
-
-    if spec.theme_family is not None or spec.theme_mode is not None:
-        if spec.theme_family is None or spec.theme_mode is None:
-            raise ValueError(f"scenario {spec.id} has an incomplete public theme pair")
-        return spec.theme_family, spec.theme_mode
-    preference = spec.theme_preference
-    if preference is None:
-        return (None, None) if not spec.javascript else ("technical", "auto")
-    if preference == "technical-auto":
-        return "technical", "auto"
-    if preference in _VALID_THEME_MODES:
-        return "technical", preference
-    if "-" in preference:
-        family, mode = preference.rsplit("-", 1)
-        return family, mode
-    raise ValueError(f"scenario {spec.id} has an invalid public theme preference")
+    """Compatibility manifest columns now describe choice and scheme/System."""
+    choice = spec.theme_family or spec.theme_preference
+    if choice is None:
+        return (None, None) if not spec.javascript else ("bone", "light")
+    if choice not in (*_VALID_THEMES, "system"):
+        raise ValueError(f"scenario {spec.id} has an invalid public theme preference")
+    scheme = "system" if choice == "system" else _palette_scheme(choice)
+    if spec.theme_mode is not None and spec.theme_mode != scheme:
+        raise ValueError(f"scenario {spec.id} has a contradictory palette/scheme")
+    return choice, scheme
 
 
 def _scenario_theme_preference(spec: ScenarioSpec) -> tuple[str | None, str | None]:
@@ -516,75 +505,32 @@ def _has_explicit_theme_preference(spec: ScenarioSpec) -> bool:
 
 
 def _theme_scenario(theme: str) -> ScenarioSpec:
-    family, mode = theme.rsplit("-", 1)
     return ScenarioSpec(
-        id=f"theme-{theme}",
-        artifact=f"theme-{theme}.png",
-        source="live",
-        route="/",
-        target="document",
-        assertion=f"document root resolves data-theme={theme} with {family}/{mode} preference",
-        coverage=("live",),
-        resolved_theme=theme,
-        theme_preference=mode,
-        action="theme",
-        color_scheme="dark" if mode == "dark" else "light",
-        theme_family=family,
-        theme_mode=mode,
+        id=f"theme-{theme}", artifact=f"theme-{theme}.png", source="live",
+        route="/", target="document", assertion=f"root resolves {theme}",
+        coverage=("live",), resolved_theme=theme, theme_preference=theme,
+        action="theme", color_scheme=_palette_scheme(theme),
     )
 
 
-def _technical_auto_scenario(source: str, os_mode: str, storage: str) -> ScenarioSpec:
+def _default_theme_scenario(source: str, os_mode: str, storage: str) -> ScenarioSpec:
     storage_label = "default" if storage == "none" else "storage-denied"
-    route = "/" if source == "live" else "/index.html"
     return ScenarioSpec(
-        id=f"theme-technical-auto-{storage_label}-os-{os_mode}-{source}",
-        artifact=f"theme-technical-auto-{storage_label}-os-{os_mode}-{source}.png",
-        source=source,
-        route=route,
-        target="document",
-        assertion=(
-            f"public family=technical and mode=auto resolve to technical-{os_mode} "
-            f"on {source} with {storage_label} storage"
-        ),
-        coverage=(
-            "technical-auto", f"technical-auto-{storage_label}",
-            f"technical-auto-os-{os_mode}", source,
-        ),
-        resolved_theme=f"technical-{os_mode}",
-        theme_preference="auto",
-        contrast="normal",
-        border="on",
-        color_scheme=os_mode,
-        action="theme",
-        theme_family="technical",
-        theme_mode="auto",
-        storage=storage,
+        id=f"theme-default-{storage_label}-os-{os_mode}-{source}",
+        artifact=f"theme-default-{storage_label}-os-{os_mode}-{source}.png",
+        source=source, route="/" if source == "live" else "/index.html",
+        target="document", assertion="Bone remains default regardless of OS or storage denial",
+        coverage=("bone-default", source), resolved_theme="bone",
+        theme_preference="bone", color_scheme=os_mode, action="theme", storage=storage,
     )
 
 
 SCENARIO_SPECS: tuple[ScenarioSpec, ...] = (
-      _theme_scenario("technical-light"),
-      _theme_scenario("technical-dark"),
-      _theme_scenario("swiss-light"),
-      _theme_scenario("swiss-dark"),
-      _theme_scenario("purple-light"),
-      _theme_scenario("purple-dark"),
-      _theme_scenario("coffee-light"),
-      _theme_scenario("coffee-dark"),
+    *(_theme_scenario(theme) for theme in ("bone", "slate", "clay", "plum")),
     ScenarioSpec(
-        "theme-technical-auto", "theme-technical-auto.png", "live", "/", "document",
-        "public family=technical and mode=auto resolve to technical-light with no saved storage",
-        ("live", "technical-auto", "technical-auto-default", "technical-auto-os-light"),
-        "technical-light", "auto", "normal", "on", action="theme",
-        theme_family="technical", theme_mode="auto", storage="none",
-    ),
-    ScenarioSpec(
-        "appearance-soft-contrast-border-off", "appearance-soft-contrast-border-off.png",
-        "live", "/tables/orders", "document",
-        "Appearance reports Soft Contrast and Border Off as semantic root modifiers",
-        ("appearance-soft-contrast-border-off", "live"), "technical-light", "light",
-        "soft", "off", action="appearance-modifiers",
+        "appearance-palettes", "appearance-palettes.png", "live", "/tables/orders", "document",
+        "Appearance exposes five palettes with a native checked radio",
+        ("appearance-palettes", "live"), action="appearance-overlay",
     ),
     ScenarioSpec(
         "studio-rail", "studio-rail.png", "live", "/tables/orders", "document",
@@ -755,10 +701,10 @@ SCENARIO_SPECS: tuple[ScenarioSpec, ...] = (
                  "one Search evidence disclosure is expanded with query state retained", ("F09", "F10", "F11", "F21", "search-expanded", "viewport-1440", "dense-docs-bundle"), action="search-expanded", bundle="dense-docs"),
     ScenarioSpec("f20-forced-colors-dense", "f20-forced-colors-dense-1440.png", "live", "/__graph", "graph",
                  "dense graph remains distinguishable in forced colors", ("F20", "F22", "forced-colors", "viewport-1440", "dense-docs-bundle"), forced_colors=True, action="graph-map", full_page=False, bundle="dense-docs"),
-    ScenarioSpec("f23-compact-density", "f23-compact-density-1280.png", "live", "/__search?q=orders", "search",
-                 "compact density is runtime-owned and Search remains readable", ("F23", "compact-density", "viewport-1280", "demo-bundle"), viewport=(1280, 800), density="compact", action="search-result"),
-    ScenarioSpec("f24-coffee-showcase", "f24-coffee-showcase-1440.png", "live", "/", "document",
-                 "Coffee Light is captured as the editorial showcase", ("F24", "coffee-showcase", "viewport-1440", "demo-bundle"), resolved_theme="coffee-light", theme_preference="light", theme_family="coffee", theme_mode="light", action="theme"),
+    ScenarioSpec("f23-ledger-spacing", "f23-ledger-spacing-1280.png", "live", "/__search?q=orders", "search",
+                 "Ledger spacing keeps Search readable", ("F23", "ledger-spacing", "viewport-1280", "demo-bundle"), viewport=(1280, 800), density="ledger", action="search-result"),
+    ScenarioSpec("f24-clay-showcase", "f24-clay-showcase-1440.png", "live", "/", "document",
+                 "Clay is captured as the dark editorial palette", ("F24", "clay-showcase", "viewport-1440", "demo-bundle"), resolved_theme="clay", theme_preference="clay", action="theme"),
     ScenarioSpec("studio-error-retry", "studio-error-retry-1440.png", "live", "/tables/orders", "document",
                  "Studio data error exposes a bounded Retry action", ("studio-error", "studio-retry", "F14", "viewport-1440", "demo-bundle"), action="studio-error-retry"),
     ScenarioSpec("studio-read-only-authority", "studio-read-only-authority-1440.png", "live", "/tables/orders", "document",
@@ -770,10 +716,21 @@ SCENARIO_SPECS: tuple[ScenarioSpec, ...] = (
     ScenarioSpec("zoom-200", "zoom-200.png", "live", "/tables/orders", "document",
                  "real Chrome page zoom is 200 percent with task-equivalent outline access", ("zoom-200", "F04", "demo-bundle"), viewport=(1440, 900), zoom_percent=200, action="zoom-200", zoom_mechanism="chrome-page-zoom-keyboard"),
 ) + tuple(
-    _technical_auto_scenario(source, os_mode, storage)
+    _default_theme_scenario(source, os_mode, storage)
     for source in ("live", "static", "spa", "single-file")
     for os_mode in ("light", "dark")
     for storage in ("none", "denied")
+) + tuple(
+    ScenarioSpec(
+        id=f"theme-system-os-{os_mode}-{source}",
+        artifact=f"theme-system-os-{os_mode}-{source}.png", source=source,
+        route="/" if source == "live" else "/index.html", target="document",
+        assertion="System resolves from OS without persisting the resolved palette",
+        coverage=("system", source), resolved_theme="slate" if os_mode == "dark" else "bone",
+        theme_preference="system", color_scheme=os_mode, action="theme",
+    )
+    for source in ("live", "static", "spa", "single-file")
+    for os_mode in ("light", "dark")
 )
 
 
@@ -782,12 +739,11 @@ def _scenario_row(spec: ScenarioSpec) -> dict[str, Any]:
     width, height = spec.viewport
     row["viewport"] = {"width": width, "height": height}
     family, mode = _public_theme(spec)
-    # Public serialization keeps Auto split into independent values.  A
-    # concrete ``technical-light``/``technical-dark`` value is paint output,
-    # not a public preference token.
+    # Retain manifest column names for capture consumers; the preference
+    # is now a single Ledger choice, not a family/mode pair.
     row["theme_family"] = family
     row["theme_mode"] = mode
-    row["theme_preference"] = mode
+    row["theme_preference"] = family
     for key in ("coverage", "expected_http_status", "expected_event_fragments"):
         row[key] = list(row[key])
     return row
@@ -1188,19 +1144,59 @@ def _static_served_proof(base: str, root: Path, probe: str) -> list[dict[str, ob
     return proof
 
 
+def _live_runtime_assets(
+    runtime: "ImmutableRuntimeWorkspace", paths: list[str],
+) -> set[tuple[str, str, int]]:
+    """Raw assets plus the pinned font CSS derived from this immutable tree.
+
+    Unlike sealed-build assets (including offline KaTeX CSS), live generated
+    assets have no output file in the raw input inventory. Never admit a lock
+    hash alone: the selected runtime's vendor loader verifies every font/OFL
+    input and the derived size/hash before we can compare the served bytes.
+    """
+    assets = {(Path(str(row["path"])).name, str(row["sha256"]), int(row["bytes"]))
+              for row in runtime.inventory}
+    name = "ledger-fonts.css"
+    if not any(Path(urllib.parse.urlparse(path).path).name == name for path in paths):
+        return assets
+    runtime.verify()
+    vendor_module = runtime.root / "scripts/okf_loom/viewer/vendor.py"
+    vendor_root = vendor_module.with_suffix("")
+    runtime.audit("derive-live-asset", inputs=(vendor_module, vendor_root))
+    # An isolated process avoids importing the caller's checkout or cached
+    # modules when a different commit owns the materialized runtime.
+    code = (
+        "import runpy,sys\n"
+        "vendor=runpy.run_path(sys.argv[1])\n"
+        "sys.stdout.buffer.write(vendor['load_ledger_css']().encode('utf-8'))\n"
+    )
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", code, str(vendor_module)], cwd=runtime.root,
+            env=_env(runtime=runtime), capture_output=True, timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise CapturePreconditionError("derived live asset verification failed") from exc
+    if result.returncode:
+        raise CapturePreconditionError("derived live asset does not match the immutable runtime")
+    runtime.verify()
+    assets.add((name, hashlib.sha256(result.stdout).hexdigest(), len(result.stdout)))
+    return assets
+
+
 def _live_served_proof(base: str, runtime: "ImmutableRuntimeWorkspace") -> list[dict[str, object]]:
     entrypoint = _fetch_bytes(base + "/")
     rows = [{"path": "/", "role": "entrypoint", "bytes": len(entrypoint),
              "sha256": hashlib.sha256(entrypoint).hexdigest()}]
     urls = sorted(set(match.decode("utf-8") for match in re.findall(
         rb'(?:src|href)="([^"?#]+\.(?:css|js)(?:\?[^"#]*)?)"', entrypoint)))
-    runtime_hashes = {(Path(str(row["path"])).name, str(row["sha256"])) for row in runtime.inventory}
+    runtime_assets = _live_runtime_assets(runtime, urls)
     for relative in urls:
         url = urllib.parse.urljoin(base + "/", relative)
         data = _fetch_bytes(url)
         digest = hashlib.sha256(data).hexdigest()
         name = Path(urllib.parse.urlparse(url).path).name
-        if (name, digest) not in runtime_hashes:
+        if (name, digest, len(data)) not in runtime_assets:
             raise CapturePreconditionError("served live asset does not match the immutable runtime")
         rows.append({"path": urllib.parse.urlparse(url).path, "role": "critical-asset",
                      "bytes": len(data), "sha256": digest})
@@ -1231,8 +1227,10 @@ def _verify_server_provenance(record: dict[str, Any], *, runtime: "ImmutableRunt
                for row in record["served_bytes"]):
             raise CapturePreconditionError("served static assets do not match the sealed build inventory")
     else:
-        runtime_assets = {(Path(str(row["path"])).name, str(row["sha256"]), int(row["bytes"]))
-                          for row in runtime.inventory}
+        runtime_assets = _live_runtime_assets(
+            runtime, [str(row["path"]) for row in record["served_bytes"]
+                      if row.get("role") == "critical-asset"],
+        )
         for row in record["served_bytes"]:
             if row.get("role") == "critical-asset" and (
                 Path(str(row["path"])).name, str(row["sha256"]), int(row["bytes"])
@@ -1396,19 +1394,34 @@ class _LiveServer:
             command.append("--enable-proposal-review")
         self.runtime.audit("serve", executable=command[0], cwd=root, inputs=(self.bundle,))
         state_parent = next(
-            (candidate for candidate in (Path("/tmp"), Path("/var/tmp"))
+            (candidate for candidate in (Path(tempfile.gettempdir()),)
              if candidate.is_dir() and not candidate.resolve().is_relative_to(root.resolve(strict=True))),
             None,
         )
         if state_parent is None:
             raise CapturePreconditionError("no mutable state authority is available outside immutable runtime")
+        approved_parent = (None if state_parent in (Path("/tmp"), Path("/var/tmp"))
+                           else state_parent)
         try:
-            from okf_loom.session_authority import temporary_session_authority
-            self._state_authority = temporary_session_authority(
-                prefix=f"okf-live-{self.mode}-", parent=state_parent)
+            from okf_loom.session_authority import resolve_session_authority
+            # TMPDIR need not be a system temporary ancestor. Use the existing
+            # explicit private-parent admission in both this owner and child.
+            state_root = Path(tempfile.mkdtemp(
+                prefix=f"okf-live-{self.mode}-", dir=state_parent))
+            try:
+                state_root.chmod(0o700)
+                self._state_authority = resolve_session_authority(
+                    state_root, approved_root=approved_parent, create=False)
+            except BaseException:
+                state_root.rmdir()
+                raise
             self.state_root = self._state_authority.display_path
             env = _env(runtime=self.runtime)
             env["OKF_LOOM_SESSION_ROOT"] = str(self.state_root)
+            if approved_parent is not None:
+                env["OKF_LOOM_SESSION_TRUSTED_ROOT"] = str(approved_parent)
+            else:
+                env.pop("OKF_LOOM_SESSION_TRUSTED_ROOT", None)
             env["OKF_LOOM_IMMUTABLE_ROOT"] = str(root.resolve(strict=True))
             try:
                 reservation.release_for_spawn()
@@ -1806,13 +1819,9 @@ def _artifact_record(
         "viewport": {"width": width, "height": height},
         "resolved_theme": theme_state.get("resolved_theme") or "unresolved",
         "theme_resolution": theme_state.get("resolution") or "unavailable",
-        "modifiers": {
-            "contrast": theme_state.get("contrast") or "unresolved",
-            "border": theme_state.get("border") or "unresolved",
-        },
         "theme_family": family or "unresolved",
         "theme_mode": mode or "unresolved",
-        "theme_preference": mode or "unresolved",
+        "theme_preference": family or "unresolved",
         "storage": spec.storage,
         "theme_state": json.loads(json.dumps(theme_state, sort_keys=True)),
         "capture_kind": runtime_metadata.get("captureKind") or "production-ready",
@@ -2312,22 +2321,11 @@ def _theme_seed_script(spec: ScenarioSpec) -> str | None:
     family, mode = _scenario_theme_preference(spec)
     if family is None or mode is None:
         return None
-    values = {
-        "family": family, "mode": mode,
-        "contrast": spec.contrast or "normal", "border": spec.border or "on",
-    }
-    encoded = json.dumps(values, sort_keys=True)
-    return (
-        "(() => { const p=" + encoded + "; "
-        "localStorage.setItem('okf-theme-family',p.family);"
-        "localStorage.setItem('okf-theme-mode',p.mode);"
-        "localStorage.setItem('okf-theme-contrast',p.contrast);"
-        "localStorage.setItem('okf-theme-border',p.border);"
-        "localStorage.removeItem('okf-theme'); })();"
-    )
+    return "localStorage.setItem('okf-loom.appearance', " + json.dumps(family) + ");"
 
 
 _THEME_STORAGE_KEYS = (
+    "okf-loom.appearance", "okf-theme-density",
     "okf-theme-family", "okf-theme-mode", "okf-theme-contrast", "okf-theme-border", "okf-theme",
 )
 
@@ -2363,11 +2361,9 @@ def _theme_state(page: Any, *, javascript: bool) -> dict[str, Any]:
               return {
                   resolved_theme: root.getAttribute('data-theme'),
                   runtime_resolved_theme: t && typeof t.getResolvedTheme === 'function' ? t.getResolvedTheme() : null,
-                  resolved_mode: t && typeof t.getResolvedMode === 'function' ? t.getResolvedMode() : null,
-                  contrast: root.getAttribute('data-okf-contrast'),
-                border: root.getAttribute('data-okf-border'),
-                family: t && typeof t.getFamily === 'function' ? t.getFamily() : null,
-                  mode: t && typeof t.getMode === 'function' ? t.getMode() : null,
+                  resolved_mode: t && typeof t.getScheme === 'function' ? t.getScheme() : null,
+                  choice: t && typeof t.getChoice === 'function' ? t.getChoice() : null,
+                  mode: t && typeof t.getChoice === 'function' ? (t.getChoice() === 'system' ? 'system' : t.getScheme()) : null,
                   ready: root.classList.contains('okf-theme-ready'),
                   resolution: t ? 'resolved' : 'unavailable',
                   storageAccess, storageKeys,
@@ -2379,9 +2375,7 @@ def _theme_state(page: Any, *, javascript: bool) -> dict[str, Any]:
         "resolved_theme": root.get_attribute("data-theme"),
         "runtime_resolved_theme": None,
         "resolved_mode": None,
-        "contrast": root.get_attribute("data-okf-contrast"),
-        "border": root.get_attribute("data-okf-border"),
-        "family": None, "mode": None, "ready": False,
+        "choice": None, "mode": None, "ready": False,
         "storageAccess": None, "storageKeys": None,
         "resolution": "server-painted-hint",
     }
@@ -2404,33 +2398,23 @@ def _assert_theme_state(page: Any, spec: ScenarioSpec) -> dict[str, Any]:
             })
         if expected and (
             state.get("runtime_resolved_theme") != expected
-            or state.get("resolved_mode") != expected.rsplit("-", 1)[1]
+            or state.get("resolved_mode") != _palette_scheme(expected)
         ):
             raise CaptureFailure({
                 "code": "theme-resolution-mismatch", "phase": "theme-assertion", "scenario": spec.id,
-                "expected": {"theme": expected, "mode": expected.rsplit("-", 1)[1]},
+                "expected": {"theme": expected, "mode": _palette_scheme(expected)},
                 "actual": {
                     "theme": state.get("runtime_resolved_theme"),
                     "mode": state.get("resolved_mode"),
                 },
             })
         expected_family, expected_mode = _scenario_theme_preference(spec)
-        if state.get("family") != expected_family or state.get("mode") != expected_mode:
+        if state.get("choice") != expected_family or state.get("mode") != expected_mode:
             raise CaptureFailure({
                 "code": "theme-preference-mismatch", "phase": "theme-assertion",
                 "scenario": spec.id,
-                "expected": {"family": expected_family, "mode": expected_mode},
-                "actual": {"family": state.get("family"), "mode": state.get("mode")},
-            })
-        if (
-            (spec.contrast is not None and state.get("contrast") != spec.contrast)
-            or (spec.border is not None and state.get("border") != spec.border)
-        ):
-            raise CaptureFailure({
-                "code": "theme-modifier-mismatch", "phase": "theme-assertion",
-                "scenario": spec.id,
-                "expected": {"contrast": spec.contrast, "border": spec.border},
-                "actual": {"contrast": state.get("contrast"), "border": state.get("border")},
+                "expected": {"choice": expected_family, "mode": expected_mode},
+                "actual": {"choice": state.get("choice"), "mode": state.get("mode")},
             })
         if spec.storage == "denied" and state.get("storageAccess") != "denied":
             raise CaptureFailure({
@@ -2552,36 +2536,18 @@ def _prepare_scenario(
         and _has_explicit_theme_preference(spec) and family and mode
     ):
         page.evaluate(
-            """([family,mode,contrast,border]) => {
-              const t=window.OKFLoomTheme;
-              if(!t) throw new Error('theme owner unavailable');
-              t.setFamily(family); t.setMode(mode); t.setContrast(contrast); t.setBorder(border);
-            }""",
-            [
-                family, mode,
-                spec.contrast, spec.border,
-            ],
+            "choice => { if(!window.OKFLoomTheme) throw new Error('theme owner unavailable'); window.OKFLoomTheme.setTheme(choice); }",
+            family,
         )
         page.wait_for_function(
-            """([theme,contrast,border]) => document.documentElement.getAttribute('data-theme')===theme &&
-              document.documentElement.getAttribute('data-okf-contrast')===contrast &&
-              document.documentElement.getAttribute('data-okf-border')===border""",
-            arg=[spec.resolved_theme, spec.contrast, spec.border],
-            timeout=5_000,
+            "theme => document.documentElement.getAttribute('data-theme') === theme",
+            arg=spec.resolved_theme, timeout=5_000,
         )
 
     action = spec.action
     if action in {"none", "theme", "parity"}:
         if action == "parity":
             page.wait_for_function("() => document.body && document.body.innerText.trim().length > 0", timeout=5_000)
-    elif action == "appearance-modifiers":
-        page.locator("#okf-theme").click(timeout=5_000)
-        page.locator('input[data-okf-set="contrast"][data-okf-val="soft"]').check(force=True)
-        page.locator('input[data-okf-set="border"][data-okf-val="off"]').check(force=True)
-        page.wait_for_function(
-            "() => document.documentElement.dataset.okfContrast==='soft' && document.documentElement.dataset.okfBorder==='off'",
-            timeout=5_000,
-        )
     elif action == "appearance-overlay":
         page.locator("#okf-theme").click(timeout=5_000)
         page.wait_for_function(
@@ -2746,8 +2712,8 @@ def _prepare_scenario(
             F20:(()=>{const marks=qa('[data-type],[data-relation],.okf-node-index__item').filter(visible),nonColor=marks.filter(n=>text(n)||n.getAttribute('aria-label')||n.getAttribute('data-type')||n.getAttribute('data-relation'));return {pass:matchMedia('(forced-colors: active)').matches&&marks.length>0&&nonColor.length===marks.length,forcedColors:matchMedia('(forced-colors: active)').matches,marks:marks.length,nonColor:nonColor.length};})(),
             F21:{pass:qa('h1').length===1&&qa('h1,h2').every(n=>text(n).length>0),h1Count:qa('h1').length,headings:qa('h1,h2').map(text).slice(0,12)},
             F22:(()=>{const unnamed=controls.filter(n=>!names[controls.indexOf(n)]),targets=controls.map(rect),undersized=targets.filter(r=>r.width<24||r.height<24);return {pass:unnamed.length===0&&undersized.length===0,unnamed:unnamed.length,minimumTarget:targets.reduce((m,r)=>Math.min(m,r.width,r.height),Infinity),undersized:undersized.length};})(),
-            F23:(()=>{const sample=q('.okf-search-result'),r=sample&&sample.getBoundingClientRect();return {pass:document.documentElement.dataset.okfDensity==='compact'&&parseFloat(root.getPropertyValue('--okf-density-scale')||'1')<1&&r&&r.height>0,density:document.documentElement.dataset.okfDensity,scale:root.getPropertyValue('--okf-density-scale'),consumedHeight:r&&r.height};})(),
-            F24:(()=>{let stored=null;try{stored={family:localStorage.getItem('okf-theme-family'),mode:localStorage.getItem('okf-theme-mode')}}catch(_){ }const T=window.OKFLoomTheme;return {pass:document.documentElement.dataset.theme==='coffee-light'&&stored&&stored.family==='coffee'&&stored.mode==='light'&&T&&T.getFamily()==='coffee'&&T.getMode()==='light',showcase:document.documentElement.dataset.theme,stored,runtimeFamily:T&&T.getFamily(),runtimeMode:T&&T.getMode(),technicalDefaultContract:'technical/auto covered by technical-auto scenarios'};})()
+            F23:(()=>{const sample=q('.okf-search-result'),r=sample&&sample.getBoundingClientRect();return {pass:!document.documentElement.dataset.okfDensity&&r&&r.height>0,density:document.documentElement.getAttribute('data-okf-density'),consumedHeight:r&&r.height};})(),
+            F24:(()=>{let stored=null;try{stored=localStorage.getItem('okf-loom.appearance')}catch(_){ }const T=window.OKFLoomTheme;return {pass:document.documentElement.dataset.theme==='clay'&&stored==='clay'&&T&&T.getChoice()==='clay',showcase:document.documentElement.dataset.theme,stored,runtimeChoice:T&&T.getChoice()};})()
           };
           return Object.fromEntries(criteria.map(k=>[k,all[k]]));
         }""", criteria)
@@ -3872,7 +3838,9 @@ def _validate_capture_set(
                 f"success artifact {artifact.get('file', '<unknown>')} lacks production readiness provenance"
             )
         family, mode = _public_theme(spec)
-        if artifact.get("theme_family") != (family or "unresolved") or artifact.get("theme_mode") != (mode or "unresolved"):
+        if (artifact.get("theme_family") != (family or "unresolved")
+                or artifact.get("theme_mode") != (mode or "unresolved")
+                or artifact.get("theme_preference") != (family or "unresolved")):
             raise CapturePreconditionError(
                 f"artifact {artifact.get('file', '<unknown>')} has a non-canonical public theme state"
             )
@@ -3896,10 +3864,10 @@ def _validate_capture_set(
             if (
                 theme_state.get("ready") is not True
                 or theme_state.get("resolution") != "resolved"
-                or theme_state.get("family") != family
+                or theme_state.get("choice") != family
                 or theme_state.get("mode") != mode
                 or theme_state.get("runtime_resolved_theme") != spec.resolved_theme
-                or theme_state.get("resolved_mode") != (spec.resolved_theme or "").rsplit("-", 1)[-1]
+                or theme_state.get("resolved_mode") != _palette_scheme(spec.resolved_theme)
             ):
                 raise CapturePreconditionError(
                     f"artifact {artifact.get('file', '<unknown>')} lacks resolved runtime theme proof"
@@ -4323,8 +4291,6 @@ def _run_capture(args: argparse.Namespace, *, root: Path,
                     context.add_init_script(_storage_denied_script())
                 elif seed and spec.javascript:
                     context.add_init_script(seed)
-                if spec.javascript and spec.density == "compact":
-                    context.add_init_script("localStorage.setItem('okf-theme-density','compact')")
                 if spec.target == "graph" and spec.javascript:
                     context.add_init_script("localStorage.setItem('okfGraphTourDone','1')")
                 page = context.new_page()

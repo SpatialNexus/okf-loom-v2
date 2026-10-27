@@ -48,9 +48,8 @@ def _production_shaped_row(
     family, mode = capture._public_theme(spec)
     theme_state = {
         "resolved_theme": spec.resolved_theme, "runtime_resolved_theme": spec.resolved_theme,
-        "resolved_mode": (spec.resolved_theme or "").rsplit("-", 1)[-1],
-        "family": family, "mode": mode, "ready": True, "resolution": "resolved",
-        "contrast": spec.contrast, "border": spec.border,
+        "resolved_mode": capture._palette_scheme(spec.resolved_theme),
+        "choice": family, "mode": mode, "ready": True, "resolution": "resolved",
         "storageAccess": "denied" if spec.storage == "denied" else "available",
         "storageKeys": [],
     }
@@ -364,12 +363,11 @@ def test_release_scenario_manifest_covers_the_final_theme_and_surface_matrix() -
     scenarios = manifest["scenarios"]
     assert len(scenarios) == len({row["id"] for row in scenarios})
     assert {row["resolved_theme"] for row in scenarios if row["resolved_theme"]} >= {
-        "technical-light", "technical-dark", "swiss-light", "swiss-dark",
-        "purple-light", "purple-dark", "coffee-light", "coffee-dark",
+        "bone", "slate", "clay", "plum",
     }
     covered = {coverage for row in scenarios for coverage in row["coverage"]}
     assert {
-        "appearance-soft-contrast-border-off", "studio-rail", "studio-overlays",
+        "appearance-palettes", "studio-rail", "studio-overlays",
         "studio-focus", "studio-split", "studio-mobile",
         "graph-map", "graph-lenses", "graph-typed-path", "graph-focus", "graph-mobile",
         "search-result", "search-no-result", "search-error", "search-manual-copy",
@@ -391,7 +389,7 @@ def test_release_scenario_manifest_exposes_complete_f01_f24_capture_contract() -
     assert {
         "index-empty", "index-filter-mismatch", "concept-outline", "concept-rendered",
         "concept-source", "concept-split", "concept-focus-view", "search-expanded",
-        "graph-keyboard-journey", "coffee-showcase", "compact-density",
+        "graph-keyboard-journey", "clay-showcase", "ledger-spacing",
         "studio-idle", "studio-error", "studio-retry", "studio-read-only-authority",
         "studio-proposal-enabled", "studio-unavailable",
     } <= covered
@@ -484,6 +482,7 @@ def test_live_server_cleans_start_failure_normal_exit_and_kill_fallback(monkeypa
             popen_envs.append(kwargs["env"])
             state_roots.append(Path(kwargs["env"]["OKF_LOOM_SESSION_ROOT"]))
             assert state_roots[-1].is_dir()
+            assert state_roots[-1].parent == Path(tempfile.gettempdir())
             assert stat.S_IMODE(state_roots[-1].stat().st_mode) == 0o700
             return process
         monkeypatch.setattr(capture.subprocess, "Popen", popen)
@@ -573,6 +572,103 @@ def test_server_provenance_rejects_wrong_cwd_and_wrong_assets(tmp_path: Path) ->
                    {**base["served_bytes"][1], "sha256": "b" * 64}]}
     with pytest.raises(capture.CapturePreconditionError, match="served live assets"):
         capture._verify_server_provenance(wrong_asset, runtime=runtime)
+
+
+@pytest.fixture
+def ledger_runtime(tmp_path: Path):
+    from okf_loom.viewer import vendor
+
+    root = tmp_path / "runtime"
+    vendor_root = root / "scripts/okf_loom/viewer/vendor"
+    inputs = (vendor.LOCK_NAME, *vendor.LEDGER_LICENSES,
+              *(face[2] for face in vendor.LEDGER_FACES))
+    for relative in inputs:
+        target = vendor_root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(vendor.VENDOR_ROOT / relative, target)
+    shutil.copy2(ROOT / "scripts/okf_loom/viewer/vendor.py", vendor_root.with_suffix(".py"))
+    css = vendor.load_ledger_css(vendor_root).encode("utf-8")
+    runtime = capture.ImmutableRuntimeWorkspace.for_test(root, tmp_path)
+    return runtime, vendor_root, css
+
+
+def _ledger_served_record(runtime, css: bytes) -> dict:
+    return {
+        "id": "live-font-test", "kind": "sealed-live-studio", "started_by_runner": True,
+        "cwd": str(runtime.root), "pid": 123, "head": runtime.head, "tree": runtime.tree,
+        "readiness": "http-200-owned-process", "served_bytes": [
+            {"path": "/", "role": "entrypoint", "bytes": 10, "sha256": "a" * 64},
+            {"path": "/__static/ledger-fonts.css", "role": "critical-asset",
+             "bytes": len(css), "sha256": hashlib.sha256(css).hexdigest()},
+        ],
+    }
+
+
+def test_live_font_provenance_derives_only_from_immutable_inputs(ledger_runtime, monkeypatch) -> None:
+    from okf_loom.viewer import vendor
+
+    runtime, vendor_root, css = ledger_runtime
+    assert all(Path(str(row["path"])).name != "ledger-fonts.css" for row in runtime.inventory)
+    # The physical caller and any process-cached loader are not the authority.
+    monkeypatch.setattr(vendor, "load_ledger_css", lambda *_a: pytest.fail("used caller's loader"))
+    entrypoint = b'<link href="/__static/ledger-fonts.css" rel="stylesheet">'
+    monkeypatch.setattr(capture, "_fetch_bytes", lambda url: entrypoint if url.endswith("/") else css)
+    proof = capture._live_served_proof("http://127.0.0.1:1", runtime)
+    record = _ledger_served_record(runtime, css)
+    assert proof[1] == record["served_bytes"][1]
+    capture._verify_server_provenance({**record, "served_bytes": proof}, runtime=runtime)
+    assert runtime.accesses[-1]["inputs"] == [str(vendor_root.with_suffix(".py")), str(vendor_root)]
+
+
+@pytest.mark.parametrize("damage", [
+    "served-bytes", "served-size", "unknown-asset", "missing-font", "missing-ofl",
+    "changed-font", "changed-ofl", "derived-pin", "missing-pin", "missing-lock",
+    "unlisted-input", "input-drift", "symlink-input",
+])
+def test_live_font_provenance_fails_closed(ledger_runtime, monkeypatch, damage: str) -> None:
+    runtime, vendor_root, css = ledger_runtime
+    font = vendor_root / "ledger-public-sans/PublicSans-Variable.woff2"
+    ofl = vendor_root / "ledger-public-sans/LICENSE"
+    lock_path = vendor_root / "vendor.lock.json"
+    if damage in {"missing-font", "missing-ofl", "missing-lock"}:
+        {"missing-font": font, "missing-ofl": ofl, "missing-lock": lock_path}[damage].unlink()
+    elif damage in {"changed-font", "changed-ofl", "input-drift"}:
+        target = ofl if damage == "changed-ofl" else font
+        data = target.read_bytes()
+        target.write_bytes(bytes([data[0] ^ 1]) + data[1:])
+    elif damage in {"derived-pin", "missing-pin"}:
+        lock = json.loads(lock_path.read_bytes())
+        if damage == "missing-pin":
+            del lock["derived"]["ledger-fonts.css"]
+        else:
+            lock["derived"]["ledger-fonts.css"]["sha256"] = "0" * 64
+        lock_path.write_text(json.dumps(lock))
+    elif damage == "symlink-input":
+        target = vendor_root.parent / "linked-font"
+        font.rename(target)
+        font.symlink_to(target)
+    if damage not in {"unlisted-input", "input-drift"}:
+        # Admit the damaged tree itself: vendor pins must independently fail,
+        # rather than relying only on detection of post-admission mutation.
+        runtime = capture.ImmutableRuntimeWorkspace.for_test(runtime.root, runtime.source_root)
+    elif damage == "unlisted-input":
+        runtime.inventory = tuple(row for row in runtime.inventory
+                                  if row["path"] != font.relative_to(runtime.root).as_posix())
+    record = _ledger_served_record(runtime, css)
+    if damage == "served-bytes":
+        css = b"!" + css[1:]
+        record = _ledger_served_record(runtime, css)
+    elif damage == "served-size":
+        record["served_bytes"][1]["bytes"] += 1
+    elif damage == "unknown-asset":
+        record["served_bytes"][1]["path"] = "/__static/unpinned-fonts.css"
+    entrypoint = ('<link href="' + record["served_bytes"][1]["path"] + '" rel="stylesheet">').encode()
+    monkeypatch.setattr(capture, "_fetch_bytes", lambda url: entrypoint if url.endswith("/") else css)
+    if damage != "served-size":
+        with pytest.raises(capture.CapturePreconditionError):
+            capture._live_served_proof("http://127.0.0.1:1", runtime)
+    with pytest.raises(capture.CapturePreconditionError):
+        capture._verify_server_provenance(record, runtime=runtime)
 
 
 def test_server_readiness_reports_owned_process_failure() -> None:
@@ -939,9 +1035,27 @@ def test_system_temp_ancestor_cannot_be_the_session_authority(candidate: Path) -
         before.st_dev, before.st_ino, before.st_mtime_ns)
 
 
-def test_private_child_below_system_temp_is_accepted_and_sanitized_with_root_retained() -> None:
+@pytest.fixture
+def approved_temp_parent(tmp_path: Path, monkeypatch):
+    """Keep mkdtemp proofs on TMPDIR while retaining real private admission.
+
+    temporary_session_authority's legacy convenience API only admits /tmp and
+    /var/tmp. These allocation/lifetime tests approve their own private ancestor;
+    the separate system-ancestor rejection test still checks the default policy.
+    """
+    from okf_loom import session_authority
+    resolve = session_authority.resolve_session_authority
+    monkeypatch.setattr(session_authority, "resolve_session_authority",
+                        lambda candidate, **kwargs: resolve(
+                            candidate, approved_root=tmp_path, **kwargs))
+    return tmp_path
+
+
+def test_private_child_below_system_temp_is_accepted_and_sanitized_with_root_retained(
+    tmp_path: Path, approved_temp_parent,
+) -> None:
     from okf_loom.session_authority import temporary_session_authority
-    authority = temporary_session_authority(prefix="okf-authority-proof-", parent=Path("/tmp"))
+    authority = temporary_session_authority(prefix="okf-authority-proof-", parent=tmp_path)
     root = authority.display_path
     assert authority.mode == 0o700
     try:
@@ -1508,7 +1622,9 @@ def test_retention_registry_rejects_unsafe_existing_file(
     shutil.rmtree(state)
 
 
-def test_live_state_authority_uses_finalizer_free_mkdtemp(monkeypatch, tmp_path: Path) -> None:
+def test_live_state_authority_uses_finalizer_free_mkdtemp(
+    monkeypatch, tmp_path: Path, approved_temp_parent,
+) -> None:
     from okf_loom import session_authority
     calls = []
     real_mkdtemp = tempfile.mkdtemp
@@ -1519,7 +1635,7 @@ def test_live_state_authority_uses_finalizer_free_mkdtemp(monkeypatch, tmp_path:
 
     monkeypatch.setattr(session_authority.tempfile, "mkdtemp", mkdtemp)
     authority = session_authority.temporary_session_authority(
-        prefix="okf-live-proof-", parent=Path("/tmp"))
+        prefix="okf-live-proof-", parent=tmp_path)
     root = authority.display_path
     try:
         assert calls and calls[0][1]["prefix"] == "okf-live-proof-"
@@ -1816,47 +1932,32 @@ def test_exact_clean_candidate_runner_uses_own_root_and_public_validation(tmp_pa
     ).stdout == primary_status
 
 
-def test_technical_auto_matrix_covers_public_auto_storage_and_os_for_every_target() -> None:
+def test_default_matrix_covers_storage_and_os_for_every_target() -> None:
     rows = capture.release_scenario_manifest()["scenarios"]
-    auto = [row for row in rows if row["theme_family"] == "technical" and row["theme_mode"] == "auto"]
-    assert len(auto) >= 16
-    assert {row["source"] for row in auto} >= {"live", "static", "spa", "single-file"}
-    assert {row["storage"] for row in auto} >= {"none", "denied"}
-    assert {row["color_scheme"] for row in auto} >= {"light", "dark"}
-    assert {row["resolved_theme"] for row in auto} >= {"technical-light", "technical-dark"}
-    assert all(row["theme_preference"] == "auto" for row in auto)
-    assert all("technical-auto" not in row["theme_preference"] for row in auto)
-    assert all(
-        capture._theme_seed_script(
-            next(item for item in capture.SCENARIO_SPECS if item.id == row["id"])
-        ) is None
-        for row in auto if row["storage"] in {"none", "denied"}
-    )
+    defaults = [row for row in rows if "bone-default" in row["coverage"]]
+    assert len(defaults) >= 16
+    assert {row["source"] for row in defaults} == {"live", "static", "spa", "single-file"}
+    assert {row["storage"] for row in defaults} == {"none", "denied"}
+    assert {row["color_scheme"] for row in defaults} == {"light", "dark"}
+    assert all(row["resolved_theme"] == "bone" for row in defaults)
+    for row in defaults:
+        spec = next(item for item in capture.SCENARIO_SPECS if item.id == row["id"])
+        assert capture._theme_seed_script(spec) is None
 
 
 @pytest.mark.parametrize("storage,os_mode", [("none", "light"), ("denied", "dark")])
-def test_technical_auto_runtime_assertion_checks_storage_and_resolved_os_theme(storage: str, os_mode: str) -> None:
-    spec = next(
-        item for item in capture.SCENARIO_SPECS
-        if item.source == "live" and item.storage == storage
-        and item.color_scheme == os_mode and item.theme_mode == "auto"
-    )
+def test_default_runtime_assertion_checks_storage_and_palette(storage: str, os_mode: str) -> None:
+    spec = capture._default_theme_scenario("live", os_mode, storage)
 
     class ThemePage:
         def evaluate(self, _script, *_args):
-            return {
-                "resolved_theme": f"technical-{os_mode}",
-                "runtime_resolved_theme": f"technical-{os_mode}",
-                "resolved_mode": os_mode,
-                "contrast": "normal", "border": "on",
-                "family": "technical", "mode": "auto", "ready": True,
-                "resolution": "resolved",
-                "storageAccess": "denied" if storage == "denied" else "available",
-                "storageKeys": [] if storage == "none" else None,
-            }
+            return {"resolved_theme": "bone", "runtime_resolved_theme": "bone",
+                    "resolved_mode": "light", "choice": "bone", "mode": "light",
+                    "ready": True, "resolution": "resolved",
+                    "storageAccess": "denied" if storage == "denied" else "available",
+                    "storageKeys": [] if storage == "none" else None}
 
-    state = capture._assert_theme_state(ThemePage(), spec)
-    assert state["mode"] == "auto" and state["resolved_mode"] == os_mode
+    assert capture._assert_theme_state(ThemePage(), spec)["resolved_theme"] == "bone"
 
 
 def test_failure_matrix_routes_to_typed_fallback_and_success_never_downgrades(
@@ -1866,8 +1967,8 @@ def test_failure_matrix_routes_to_typed_fallback_and_success_never_downgrades(
     monkeypatch.setattr(
         capture, "_assert_theme_state",
         lambda _page, _spec: {
-            "resolved_theme": "technical-light", "resolution": "resolved",
-            "family": "technical", "mode": "auto", "contrast": "normal", "border": "on",
+            "resolved_theme": "bone", "resolution": "resolved",
+            "choice": "bone", "mode": "auto",
             "ready": True,
         },
     )
@@ -1904,9 +2005,9 @@ def test_release_bundle_precondition_rejects_historical_screenshot_inputs(tmp_pa
 
 
 def test_artifact_provenance_binds_revision_tree_inventory_viewport_target_theme_and_assertion(tmp_path: Path) -> None:
-    image = tmp_path / "theme-technical-light.png"
+    image = tmp_path / "theme-bone.png"
     image.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\0" * 8 + (1).to_bytes(4, "big") + (1).to_bytes(4, "big"))
-    spec = next(item for item in capture.SCENARIO_SPECS if item.id == "theme-technical-light")
+    spec = next(item for item in capture.SCENARIO_SPECS if item.id == "theme-bone")
     row = capture._artifact_record(
         image,
         spec,
@@ -1915,16 +2016,17 @@ def test_artifact_provenance_binds_revision_tree_inventory_viewport_target_theme
         input_inventory=[{"path": "scripts/capture_ui_overhaul.py", "type": "regular", "tracked": True}],
         input_inventory_digest="inventory-1",
         runtime={"generation": 4, "metadata": {"revision": "bundle-1", "pageRevision": "bundle-1", "readinessPhase": "ready"}},
-        theme_state={"resolved_theme": "technical-light", "contrast": "normal", "border": "on", "resolution": "resolved"},
+        theme_state={"resolved_theme": "bone", "choice": "bone", "resolution": "resolved"},
         browser={"engine": "chromium", "javascript": True, "zoom_percent": 100},
     )
     assert row["head"] == "head-1" and row["tree"] == "tree-1" and row["clean"] is True
     assert row["input_inventory_digest"] == "inventory-1"
     assert row["viewport"] == {"width": 1440, "height": 1000}
     assert row["target"] == "document" and row["scenario"] == spec.id
-    assert row["resolved_theme"] == "technical-light"
+    assert row["resolved_theme"] == "bone"
     assert row["theme_resolution"] == "resolved"
-    assert row["modifiers"] == {"contrast": "normal", "border": "on"}
+    assert "modifiers" not in row
+    assert row["theme_state"]["choice"] == "bone"
     assert row["browser_assertion"] == spec.assertion
     assert row["runtime"]["revision"] == "bundle-1"
 
@@ -2087,7 +2189,7 @@ def test_authored_bundle_file_drift_remains_release_fatal(tmp_path: Path, monkey
 def test_final_capture_validation_rejects_missing_or_mismatched_expected_revision(tmp_path: Path) -> None:
     inventory = [{"path": "source.py", "type": "regular", "tracked": True}]
     digest = capture._digest(inventory)
-    spec = next(item for item in capture.SCENARIO_SPECS if item.id == "theme-technical-light")
+    spec = next(item for item in capture.SCENARIO_SPECS if item.id == "theme-bone")
     image = tmp_path / spec.artifact
     image.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\0" * 8 + (1).to_bytes(4, "big") + (1).to_bytes(4, "big"))
     row = capture._artifact_record(
@@ -2096,7 +2198,7 @@ def test_final_capture_validation_rejects_missing_or_mismatched_expected_revisio
         expected_revision="bundle-1", input_inventory=inventory,
         input_inventory_digest=digest,
             runtime={"generation": 1, "metadata": {"revision": "bundle-1", "pageRevision": "bundle-1"}},
-        theme_state={"resolved_theme": "technical-light", "resolution": "resolved", "contrast": "normal", "border": "on"},
+        theme_state={"resolved_theme": "bone", "resolution": "resolved"},
         browser={"engine": "chromium", "javascript": True},
     )
     row["file"] = spec.artifact
@@ -2110,7 +2212,7 @@ def test_final_capture_validation_rejects_missing_or_mismatched_expected_revisio
         family, mode = capture._public_theme(scenario)
         clone["theme_family"] = family or "unresolved"
         clone["theme_mode"] = mode or "unresolved"
-        clone["theme_preference"] = mode or "unresolved"
+        clone["theme_preference"] = family or "unresolved"
         clone["runtime"] = dict(row["runtime"])
         if scenario.action in {"boot-blocked", "boot-failure"}:
             clone["readiness"] = "fallback-dom"
@@ -2342,7 +2444,7 @@ def test_graph_focus_preparation_is_action_only_and_reaches_capture_readiness(tm
 
 
 def test_capture_spec_preserves_production_typed_diagnostics(tmp_path: Path) -> None:
-    spec = next(item for item in capture.SCENARIO_SPECS if item.id == "theme-technical-light")
+    spec = next(item for item in capture.SCENARIO_SPECS if item.id == "theme-bone")
 
     class ProductionFailure(RuntimeError):
         diagnostic = {"code": "hidden", "phase": "readiness", "target": "document"}
@@ -2488,16 +2590,16 @@ def test_no_js_capture_rejects_missing_expected_source_revision(tmp_path: Path) 
 
 
 def test_js_capture_spec_passes_and_requires_expected_source_revision(tmp_path: Path) -> None:
-    spec = next(item for item in capture.SCENARIO_SPECS if item.id == "theme-technical-light")
+    spec = next(item for item in capture.SCENARIO_SPECS if item.id == "theme-bone")
 
     class RuntimePage:
         def evaluate(self, _script, *_args):
             if "okfCaptureRevision" in _script:
                 return {"body": "bundle-1", "root": "bundle-1"}
             return {
-                "resolved_theme": "technical-light", "contrast": "normal", "border": "on",
-                "runtime_resolved_theme": "technical-light", "resolved_mode": "light",
-                "family": "technical", "mode": "light", "ready": True,
+                "resolved_theme": "bone",
+                "runtime_resolved_theme": "bone", "resolved_mode": "light",
+                "choice": "bone", "mode": "light", "ready": True,
                 "resolution": "resolved", "storageAccess": "available", "storageKeys": [],
             }
 
@@ -2523,20 +2625,20 @@ def test_js_capture_spec_passes_and_requires_expected_source_revision(tmp_path: 
     assert seen["expected_revision"] == "bundle-1"
     assert row["runtime"]["revision"] == "bundle-1"
     assert row["theme_state"]["mode"] == "light"
-    assert row["theme_state"]["runtime_resolved_theme"] == "technical-light"
+    assert row["theme_state"]["runtime_resolved_theme"] == "bone"
 
 
 def test_js_capture_does_not_accept_recorded_revision_without_matching_runtime_page(tmp_path: Path) -> None:
-    spec = next(item for item in capture.SCENARIO_SPECS if item.id == "theme-technical-light")
+    spec = next(item for item in capture.SCENARIO_SPECS if item.id == "theme-bone")
 
     class WrongRuntimePage:
         def evaluate(self, script, *_args):
             if "okfCaptureRevision" in script:
                 return {"body": "bundle-other", "root": "bundle-other"}
             return {
-                "resolved_theme": "technical-light", "runtime_resolved_theme": "technical-light",
-                "resolved_mode": "light", "contrast": "normal", "border": "on",
-                "family": "technical", "mode": "light", "ready": True,
+                "resolved_theme": "bone", "runtime_resolved_theme": "bone",
+                "resolved_mode": "light",
+                "choice": "bone", "mode": "light", "ready": True,
                 "resolution": "resolved", "storageAccess": "available", "storageKeys": [],
             }
 
@@ -2558,7 +2660,7 @@ def test_js_capture_does_not_accept_recorded_revision_without_matching_runtime_p
 
 
 def test_artifact_record_rejects_revision_that_was_only_recorded(tmp_path: Path) -> None:
-    spec = next(item for item in capture.SCENARIO_SPECS if item.id == "theme-technical-light")
+    spec = next(item for item in capture.SCENARIO_SPECS if item.id == "theme-bone")
     image = tmp_path / spec.artifact
     image.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\0" * 8 + (1).to_bytes(4, "big") + (1).to_bytes(4, "big"))
     with pytest.raises(capture.CaptureFailure) as caught:
@@ -2569,7 +2671,7 @@ def test_artifact_record_rejects_revision_that_was_only_recorded(tmp_path: Path)
             input_inventory=[{"path": "source.py", "type": "regular", "tracked": True}],
             input_inventory_digest="i",
             runtime={"generation": 1, "metadata": {"revision": "bundle-1"}},
-            theme_state={"resolved_theme": "technical-light", "resolution": "resolved", "contrast": "normal", "border": "on"},
+            theme_state={"resolved_theme": "bone", "resolution": "resolved"},
             browser={"engine": "chromium", "javascript": True},
         )
     assert caught.value.diagnostic["code"] == "revision-missing"
@@ -2662,7 +2764,7 @@ def test_exact_root_compatibility_values_do_not_change_runner_behavior() -> None
 
 def test_bundle_admission_is_strictly_root_confined(tmp_path: Path) -> None:
     assert capture._validate_release_bundle(Path("samples/demo_bundle")) == (ROOT / "samples/demo_bundle").resolve()
-    with tempfile.TemporaryDirectory(prefix="okf-bundle-outside-", dir="/tmp") as name:
+    with tempfile.TemporaryDirectory(prefix="okf-bundle-outside-", dir=tmp_path) as name:
         outside = Path(name)
         for unsafe in (outside.resolve(), Path("../outside"), Path("nested/../samples/demo_bundle")):
             with pytest.raises(capture.CapturePreconditionError, match="inside sealed checkout"):
@@ -2671,7 +2773,7 @@ def test_bundle_admission_is_strictly_root_confined(tmp_path: Path) -> None:
 
 def test_bundle_admission_rejects_symlink_escape(tmp_path: Path) -> None:
     link = ROOT / "capture-root-escape-test"
-    with tempfile.TemporaryDirectory(prefix="okf-symlink-outside-", dir="/tmp") as name:
+    with tempfile.TemporaryDirectory(prefix="okf-symlink-outside-", dir=tmp_path) as name:
         try:
             link.symlink_to(name, target_is_directory=True)
             with pytest.raises(capture.CapturePreconditionError, match="inside sealed checkout"):
@@ -2682,7 +2784,7 @@ def test_bundle_admission_rejects_symlink_escape(tmp_path: Path) -> None:
 
 def test_import_global_mutation_cannot_redirect_repository_authority(monkeypatch, tmp_path: Path) -> None:
     physical = ROOT.resolve()
-    with tempfile.TemporaryDirectory(prefix="okf-root-mutation-", dir="/tmp") as outside_name:
+    with tempfile.TemporaryDirectory(prefix="okf-root-mutation-", dir=tmp_path) as outside_name:
       outside = Path(outside_name)
       for name in ("ROOT", "DEFAULT_BUNDLE", "DEFAULT_DENSE_BUNDLE", "DEFAULT_EMPTY_BUNDLE",
                    "_AUTHORITY", "_repo_root", "REPOSITORY_ROOT", "_sealed_repository_root",
@@ -3515,3 +3617,13 @@ def test_real_studio_retry_holds_stale_request_until_canonical_success_then_fenc
                 assert evidence["staleFenced"] and observed == persisted
             finally:
                 browser.close()
+
+
+def test_system_capture_matrix_uses_only_the_new_storage_choice():
+    rows = [spec for spec in capture.SCENARIO_SPECS if spec.theme_preference == "system"]
+    assert len(rows) == 8
+    for spec in rows:
+        script = capture._theme_seed_script(spec)
+        assert "okf-loom.appearance" in script and '"system"' in script
+        assert "okf-theme-family" not in script and "okf-theme-mode" not in script
+        assert spec.resolved_theme == ("slate" if spec.color_scheme == "dark" else "bone")

@@ -1,6 +1,7 @@
 # OKF Viewer — Extension & Override Points
 
-The viewer supports five extension mechanisms. All override files live under
+The viewer supports four active extension mechanisms; §3 records the retired
+type-colour override. All override files live under
 `<bundle_root>/.okf-loom/viewer/`, so a bundle can be self-contained without
 forking okf-loom.
 
@@ -41,6 +42,36 @@ Two built-in elements carry behaviour that an override should keep:
 - In `single_file.html`, `#okf-single-index` and `#detail-content` are the
   destinations of the concept-list links (`?selected=<id>#detail-content`).
 
+Live shell markup includes inert launcher and document viewbar/Sections
+placeholders only when the server has attached Studio; index feedback also
+requires an actual `index.md` document. Their final responsive size is reserved
+before first paint only when the parser-blocking theme runtime has marked
+JavaScript available. Inactive Studio sessions, documentless indexes, portable
+and no-JS targets reserve no inactive Studio space. Studio fills those slots in
+place (removing any feedback placeholder it cannot fill), while
+`document-outline.js` owns the Sections control.
+The index feedback placeholder carries both the comment and the read-only
+layout; the theme runtime marks the session's comment capability from the
+Studio bootstrap so the matching one is reserved. The live loading notice stays
+visible until a successful boot, outside document flow and anchored below the
+top bar, so settling boot does not displace authored content. If Studio cannot
+boot, including when its module never runs, the notice joins the flow below the
+bar and the unfilled placeholders collapse.
+Custom templates without the placeholders keep the legacy client mount path.
+
+At 640px and narrower (viewports taller than 480px) `wiki.js` scrolls the
+`.okf-topbar.okf-shell` chrome away while the reader scrolls down. It keeps
+the state on `<html data-okf-chrome="revealed|compact">` (absent on wider
+screens and on the graph route) and publishes `--okf-chrome-shift-top` and
+`--okf-chrome-shift-bar`; `shell.css` moves the bar and view bar by
+`transform` only, keeping a viewbar `.okf-outline-jump` row pinned. Any
+change to `window.OKFOverlayStack` dispatches `okf-loom:overlaychange` on
+`window`, and an open overlay keeps the chrome revealed. Starting
+`okfCaptureReadiness` sets `data-okf-capture` on `<html>`, which forces the
+revealed chrome for the rest of the page. A `shell.css` override that drops
+these rules keeps the bar sticky.
+
+
 ## 2. Static asset overrides
 
 Drop a file at `.okf-loom/viewer/static/<file>` to replace the built-in asset.
@@ -56,37 +87,19 @@ page surfaces. Each file replacement wins at its documented cascade position.
 .okf-loom/viewer/static/wiki.css   ← replaces the bundled stylesheet
 ```
 
-## 3. Type palette overrides
+## 3. Retired type palette overrides
 
-`.okf-loom/viewer/palette.json` maps a concept type to any CSS colour. It is
-**merged over** the auto-generated palette (which hashes each type name to
-a stable HSL hue — no BigQuery-specific hardcoding).
+Type-colour overrides in `.okf-loom/viewer/palette.json` are **retired and
+ignored by Ledger**. Content types use neutral labels and icons on every
+built-in surface; graph lenses use a muted ramp derived from the active
+appearance palette, not colours assigned to types.
 
-```json
-{
-  "BigQuery Table": "#3b82f6",
-  "Reference": "#10b981",
-  "custom_type": "#a855f7"
-}
-```
-
-**Security (P1-41).** Palette values are interpolated into inline
-`style="background:<color>"` attributes in the rendered HTML. HTML-escaping
-alone does not stop CSS injection (a value like
-`red;position:fixed;top:0` has no HTML-unsafe characters), so two layers
-of defence apply:
-
-1. **Gate.** Palette overrides are only loaded when the **effective
-   active-code gate** (see §5) is open — i.e. the bundle declares
-   `allow_active_code: true` AND the operator consents. When the gate is
-   closed, only the auto-generated palette is used; a bundle cannot
-   recolour the UI on its own.
-2. **Validation.** Even with the gate open, every value must match a strict
-   CSS-colour allowlist (`#rgb` / `#rrggbb` / `#rrggbbaa` hex,
-   `rgb()` / `rgba()` / `hsl()` / `hsla()`, or a named CSS colour).
-   Values that do not match (e.g. `red;position:fixed;top:0`,
-   `url(data:...)`, `javascript:...`) are dropped fail-closed; the key is
-   not emitted. A benign palette should not ship broken CSS anyway.
+Existing files need not be deleted. The loader may still merge validated
+values into compatibility data under the active-code gate, but built-in
+renderers do not interpolate them into inline styles or paint them. This
+is not an appearance configuration mechanism: select Bone, Slate, Clay,
+Plum or System through `config.json` (§4) or the Appearance control.
+Custom executable templates, styles and plugins remain subject to §5.
 
 ## 4. Viewer config
 
@@ -96,14 +109,14 @@ of defence apply:
 |------------------|---------|-----------|------------------------------------------------|
 | `name`           | string  | bundle dir name | Display name for the viewer / browser title. |
 | `default_layout` | string  | `"cose"`  | Initial Cytoscape layout: `cose` / `concentric` / `breadthfirst` / `circle` / `grid`. |
-| `theme`          | string  | `"technical-light"` | First-paint concrete theme painted on `<html data-theme>`: `technical-light` / `technical-dark` / `swiss-light` / `swiss-dark`. `viewer/static/theme.js` (the sole owner of theme state) honours a saved user preference and Auto/OS resolution at boot; otherwise this value. A user's validated choice persists to `localStorage["okf-theme-family"]` / `["okf-theme-mode"]` (never the server default). |
+| `theme` | string | `"bone"` | `bone` / `slate` / `clay` / `plum` / `system`. Saved reader choice > configured choice > Bone. `theme.js` alone owns `data-theme` and `localStorage["okf-loom.appearance"]`; System resolves Bone/Slate from the OS before paint and follows changes live. Old light names → Bone, Technical/Swiss dark → Slate, Coffee dark → Clay, Purple dark → Plum, auto → System; v1 aliases still load. Retired contrast/border/density settings are ignored. |
 | `cdn`            | bool    | `true`    | If `false`, omit the Cytoscape.js CDN `<script>` tags from the single-file viewer and the `/__graph` page (for fully offline packaging — supply your own copy in that case). Markdown is rendered server-side by okf-loom's own stdlib renderer, so there is no client-side markdown parser to gate. |
 
 ```json
 {
   "name": "Acme OKF",
   "default_layout": "breadthfirst",
-  "theme": "swiss-dark",
+  "theme": "slate",
   "cdn": true
 }
 ```
@@ -344,3 +357,108 @@ Track wiring against the current spec; do not depend on reserved kinds until the
 
 All three mechanisms compose: a bundle can ship a custom `wiki.css`, a
 `ViewerPlugin`, and a `register("panel", …)` extension at the same time.
+
+## 7. Live graph acquisition seam
+
+Live, static and SPA graph pages load their external classic vendor scripts
+with `defer`, in dependency order: Cytoscape → layout-base → cose-base →
+cytoscape-fcose → dagre → cytoscape-dagre → graph.js. This applies to CDN and
+verified offline assets alike; CDN integrity and crossorigin pins are unchanged.
+Overrides must not rely on these globals during parsing. `theme.js` remains
+parser-blocking for first-paint appearance. Single-file output retains its
+parser-blocking vendor chain ahead of its inline graph runtime.
+
+On live graph pages, `window.okfGraphData` is a promise for the compact
+`/__data/graph.json?view=structure` projection (or its admitted client form). Whichever of graph.js or studio.js needs it
+first creates it; the other reuses it. Failed initial acquisition clears the
+promise for retry; pagehide clears it and fences late Studio completions.
+An accepted initial acquisition also emits the event below, so a BFCache
+restart reconciles Studio without a second request. This is an acquisition
+seam, not a mutable graph-state API;
+Studio does not depend on the diagnostic `window.__okfLoomGraph` hook.
+
+Graph.js retains ownership of refresh aborts, deadlines and latest-wins
+admission. Only an accepted refresh replaces the promise and emits
+`okf-loom:graph-data` with the accepted projection as `event.detail`; Studio
+reconciles that event instead of issuing another graph request. Non-graph live
+pages use `?view=structure` (no bodies or reserved-document HTML) when visible
+connection/comment chips or index recency need it, or lazily when the command
+palette opens. Accepted structural live updates refresh those consumers.
+Pagehide fences pending Studio acquisitions; persisted pageshow reacquires
+structure for those consumers under the same lazy refresh rules, while graph.js
+retains ownership of graph-page structure acquisition.
+
+Live index inventory/statistics and document Connections reconcile separately
+from graph acquisition. Content notifications (`changed`, `created`, `removed`,
+`graph`), resync and reconnect coalesce for 250 ms, then re-read the current
+page's existing HTML GET. Only those derived regions are patched; authored
+bodies, Studio/bootstrap authority, menus and composers are not replaced.
+Keyed cards/links, reader ordering/filtering, disclosure state, focus, selection
+and scroll survive reconciliation. Reads use the same ingress as the page,
+including public read-only and `--no-edit`; no additional data route or authority
+is introduced. New notifications invalidate pending reads immediately; navigation
+and pagehide abort/fence them, and persisted pageshow resyncs the regions.
+
+Portable viewers retain their existing transport: single-file uses embedded
+`window.BUNDLE`; static/SPA graph pages read their emitted graph JSON. This
+seam adds no assets, origins, CSP permissions or portable requests.
+
+The live graph HTTP transport caches final bytes and their strong ETag separately
+for full and structure views, including over-size refusals. Source generation,
+name, palette, comment-summary revision and exact metadata-expiry transitions
+invalidate those bytes. The full/tool view stays byte-compatible. The internal structure view has
+`structure_schema:1`: nodes omit unused advisory metadata, duplicated grouping
+keys and empty/zero defaults (but preserve available zero comment counts);
+edges carry each read relation record once, including OKF provenance `origin`
+and `source_id`, inherit source/target/direction from their edge, and identify the
+primary by `primary_relation_index`.
+Graph.js restores its ordinary relation objects before validation. Reserved
+`document_paths` preserve index/log link routing without rendered documents.
+Structure has a 16 MiB cap; full JSON retains 4 MiB, for at most 20 MiB of cached
+wire bytes per Bundle. Per-view single-flight keeps identical public/local reads
+from multiplying cold graph work. These are transport bounds, not a general
+HTTP-thread or temporary-allocation bound.
+
+Only live data URLs select lazy HTML. Selection reads
+`/__data/graph-body?id=…&revision=…`, whose escaped body and advisory HTML match
+the old full projection, not the plugin/annotation `/__data/doc` projection.
+The latter re-parses canonical source and builds annotation/graph data, so it is
+not the graph's body transport. Body reads share retrieval's bounded executor
+and 4 MiB cap. The client admits two reads, at most one latest queued selection,
+a 10 s timeout, and a 32-entry/8 MiB LRU per accepted graph acquisition.
+Selection, graph refresh, pagehide and BFCache restoration fence late bodies;
+pagehide aborts reads and drops the cache. An accepted refresh invalidates even
+same-content-revision advisory HTML (metadata expiry can change independently).
+Capture's graph adapter reports selected-body work as `transitionPending`, or
+a `graph-body` terminal failure; no-selection captures need no bodies. Hover
+cards and the command palette show identity/metrics only and make no body read.
+Portable embedded/full-data paths, markup, CSP and network behaviour are unchanged.
+The live index thumbnail now receives only identities/topology and relationship
+counts rather than constructing rendered node metadata or document bodies; its
+visible miniature and count semantics are unchanged.
+
+Single-file serialization stores each retrieval chunk's `canonical_chunk` once,
+without a second serialized `payload`. Before viewer scripts run, the bootstrap
+provides the existing enumerable `window.BUNDLE.retrieval_corpus.chunks[i].payload`
+property as a lazy JSON parse, cached on first access as an ordinary mutable
+property. Assignment before first access is also supported. Overrides reading
+`window.BUNDLE` see the same shape and exact values; the literal embedded JSON
+is a private transport, not the runtime API. Canonical bytes, hashes, strict
+retrieval validation, rendered `bodies`, CSP and static/SPA exports are unchanged.
+Custom single-file templates that differ from the built-in template retain the
+original serialized `payload` as well, so older bootstraps remain compatible;
+they do not receive this size reduction.
+
+Ledger fonts (Public Sans and Azeret Mono, normal/italic) are verified vendored
+assets, not external network dependencies. For live, static and SPA pages,
+`ledger-fonts.css` references relative WOFF2 files under
+`__static/ledger-public-sans/` and `__static/ledger-azeret-mono/`; static/SPA
+builds copy the faces and SIL OFL `LICENSE` files into those directories even
+in CDN mode. Publish both directories with the site and permit `font-src 'self'`
+in a compatible CSP. The stylesheet also carries the full OFL notices.
+
+Only single-file output embeds all four faces as base64 data URLs and needs
+`font-src data:` for Ledger. All targets use `font-display: swap`, so text can
+paint in a fallback face before the fonts arrive. Only serve and SPA preload
+the two upright faces; static pages omit font preloads to avoid CORS errors
+when opened via `file://`. Do not widen script policy.

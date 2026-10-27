@@ -45,7 +45,8 @@ is owned by `session_authority.py` and Studio; see the
 | GET | `/__context` | Read-only deterministic schema-v1 Agent Context Pack as JSON or Markdown. |
 | GET | `/__raw/<concept_id>` | Raw markdown body. |
 | GET | `/__data/summary?id=` | One concept's identity card (title, type, description, type colour/icon, link and relation counts) for link previews. |
-| GET | `/__data/graph.json` | Graph JSON for external tools. |
+| GET | `/__data/graph.json` | Full graph JSON for tools; `?view=structure` is the compact live client contract. |
+| GET | `/__data/graph-body?id=&revision=` | One revision-bound graph detail body and advisory metadata. |
 | GET | `/__data/content.json` | Full content index JSON. |
 | GET | `/__data/doc?id=` | One concept's rendered data plus canonical annotation source/revision and DOM projection map. |
 | GET | `/__data/page?document=` | Bounded canonical Markdown page read, including indexes/logs; see document targets below. |
@@ -134,6 +135,15 @@ Root index page. Renders the bundle-root `index.md` (hand-authored
 or generated) plus the type-grouped concept listing. The studio
 bootstrap (token + asset links) is injected into the `</head>`.
 
+The root inventory has its own 8 MiB HTML response cap (oversize returns `413`),
+independent of the 4 MiB retrieval/full-graph JSON cap and the 16 MiB
+structure-view cap. It lists every concept, so
+5,000 ordinary cards can exceed 4 MiB even with a tiny graph thumbnail. The
+thumbnail uses only identities/topology/counts and renders its existing small
+subset; it does not construct rendered graph metadata or document bodies.
+This larger allowance does not apply to other HTML routes and is not a bound
+on concurrent rendering work or temporary allocations.
+
 ## `/<concept_id>`
 
 Concept page. `concept_id` is the dotted path without `.md`
@@ -153,7 +163,9 @@ segments are validated; `..`, `.`, and NUL bytes return 404.
 ## `/__graph`
 
 Full-page Cytoscape.js force-directed graph of the whole bundle.
-The graph data comes from `/__data/graph.json`.
+Live graph data comes from `/__data/graph.json?view=structure`; selected
+concept HTML loads on demand from the revision-bound `/__data/graph-body`.
+Portable viewers keep their emitted/embedded full graph data.
 
 ## `/__search`
 
@@ -265,6 +277,79 @@ Graph JSON: nodes (one per concept) + edges (one per internal link,
 including wikilinks with `form="wikilink"`). Same shape as
 [`graph --format json`](cli.md#graph).
 
+With no `view` parameter, returns the full projection including rendered concept
+`bodies` and reserved `documents`; this full/tool projection is unchanged.
+Exactly one `view=structure` selects an internal compact client contract, with
+`structure_schema:1`, no rendered bodies/documents/advisory metadata, and only
+graph/Studio fields and relation provenance. Empty/zero defaults may be absent
+(an available zero `active_comment_count` remains explicit). Grouping lives in `metadata`, not
+also in duplicated top-level node keys. Each edge's relation list retains
+`id`, `label`, `type`, `kind`, `origin`, `source_id`, and optional `detail`;
+`source_id` may be null. Source/target/direction are inherited from the edge
+(`direction:outgoing`), multiplicity is the list length,
+and `primary_relation_index` references its primary member instead of duplicating
+it. `document_paths` lists reserved reading destinations without their HTML.
+Graph.js expands this transport before its ordinary validation. Any other
+`view` value, including an empty value, or repeated `view` parameters returns
+`400 {"ok": false, "error": "invalid_request"}`. Unknown query parameters are
+ignored, including cache-busters alongside `view=structure`.
+
+Both views send `Cache-Control: private, no-cache` and a strong `ETag` computed
+from the final response bytes, not merely the bundle revision: comment counts
+and clock-sensitive metadata can change independently. Browsers may store the
+response but must revalidate; shared caches must not store it. A matching
+`If-None-Match` on GET/HEAD (including weak `W/` comparison, comma-separated
+validators, multiple header fields or `*`) returns `304` with no body and the
+same ETag, cache policy and security headers.
+
+The live server retains one final serialized response per view for the current
+bundle generation, display name, palette, comment-summary revision and metadata
+expiry interval. Repeated reads reuse those exact bytes and ETag, without graph
+rebuilding or JSON encoding. Expiry intervals change at the authored instant,
+not at a rounded clock bucket. Concurrent identical reads coalesce independently
+per view, so a slow full-body render does not hold up structure reads.
+
+Full JSON retains its 4 MiB cap; structure has a separate **16 MiB** cap.
+Measured synthetic 5,000-concept structure is about 7.9 MB after slimming (versus
+23.7 MB previously), so 4 MiB is insufficient even without bodies. A conservative lower bound
+from mandatory graph records refuses certainly oversized graphs before rendering
+or encoding; other responses are checked before encoding when their projected
+size already proves refusal, then against their exact UTF-8 bytes. Refusals are
+cached too, but sent with `Cache-Control: no-store` and status `413`:
+
+```json
+{"ok":false,"error":{"code":"response_too_large","message":"This bundle's graph is too large to display (limit 16 MiB). Open a smaller bundle or use a portable build.","fields":{}}}
+```
+
+There is no viewer-dependent cache key or visibility change. At most two accepted
+wire responses (20 MiB total) are retained per loaded Bundle, in addition to the
+existing rendered-document cache. All viewers, including the public read-only
+tunnel, share the same response and per-view single-flight. Cold graph work is
+therefore paid once per edit/metadata-expiry/comment-summary generation, not once
+per viewer. The pre-encoding lower bound and exact UTF-8 check refuse oversized
+data without byte-cutting. These bounds do not limit all cold allocations, old
+in-flight generations or HTTP threads; the larger cap is not general admission
+control. The graph page displays the JSON error message rather than only its
+HTTP status. Portable builds do not use this live transport cache or cap.
+
+## `/__data/graph-body?id=<concept_id>&revision=<bundle_revision>`
+
+Read-only, serve-only graph detail HTML. Exactly one `id` and `revision` are
+required; unknown/duplicate parameters return `400`, absent/malformed concepts
+`404`, and a graph revision different from the loaded snapshot `409`.
+Success returns `{id,bundle_revision,html,metadata_html}` with
+`Cache-Control: private, no-cache`. Body HTML is exactly the full graph's
+escaped, heading-demoted, source-footnoted and link-normalized projection;
+advisory HTML uses the graph metadata renderer. It does not run concept-page
+plugins, read raw source, build annotation projections, or render other bodies.
+It captures one loaded Bundle generation, uses the existing bounded retrieval
+executor/deadline, and retains the normal 4 MiB JSON cap (`413`); capacity/timeout
+returns typed `503`. Errors carry no-store where rendering/admission fails.
+There is no new authority or viewer-dependent visibility: the route is equally
+readable locally and through the public read-only ingress. Portable viewers
+never call it. Clients discard late results across selections, accepted graph
+updates, pagehide and BFCache restoration; selected-body capture waits explicitly.
+
 ## `/__data/content.json`
 
 Full content index JSON: every concept's id, type, title,
@@ -281,8 +366,9 @@ OKF 0.2 adds `metadata` (normalized read-only fields) and `metadata_html`
 (escaped advisory presentation). Existing raw frontmatter, annotation source,
 projection, and revision contracts remain distinct and unchanged. Generation,
 verification, lifecycle, and computation display never grants mutation authority
-or runs an executor/attester. Graph nodes expose `okf_metadata`, `metadata_html`,
-and `generated_at` without replacing the older grouping `metadata` field.
+or runs an executor/attester. Full graph nodes expose `okf_metadata`,
+`metadata_html`, and `generated_at` without replacing the older grouping
+`metadata` field; the compact live view loads advisory HTML only on selection.
 
 ```json
 {
@@ -449,6 +535,13 @@ active-code gate is open (bundle declares
 `viewer.allow_active_code: true` AND operator consent via
 `--allow-active-code` / `OKF_LOOM_ALLOW_ACTIVE_CODE`). Path traversal is
 rejected (`..` and separators after normalisation; NUL bytes).
+
+Successful static responses send `Cache-Control: private, no-cache` and a strong
+`ETag` computed from the final served bytes, including generated CSS and admitted
+overrides. GET/HEAD `If-None-Match` uses the same weak comparison and validator
+list rules as graph JSON above; a match returns body-free `304` with the ETag,
+cache policy and security headers retained. Asset allowlists, containment,
+active-code admission and vendor integrity checks still run before revalidation.
 
 ## `/<path>.<media ext>`
 

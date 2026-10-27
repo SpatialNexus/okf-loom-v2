@@ -62,7 +62,7 @@ MARKDOWN_TERM = "zebrafinch"
 MARKDOWN_CONCEPT = """---
 type: Reference
 title: Ledger conventions
-description: How settled payments reach the ledger.
+description: Every `ledger-sync` and **settled** payment.
 ---
 
 # Ledger conventions
@@ -138,7 +138,9 @@ def _assert_clean(page) -> None:
 
 def _assert_marks_are_query_terms(page, container: str) -> None:
     """Highlighting wraps only word text, never a metacharacter."""
-    marks = page.locator(f"{container} mark").all_inner_texts()
+    # Evidence now has a second readable preview inside a closed disclosure;
+    # check the text of those hidden marks too, not their empty innerText.
+    marks = page.locator(f"{container} mark").all_text_contents()
     assert all(text.strip() and not re.search(r"[\[\]().*\\]", text) for text in marks), marks
 
 
@@ -215,6 +217,73 @@ def test_live_suggestion_evidence_reads_as_plain_text_around_the_highlighted_mat
     _assert_clean(page)
 
 
+def test_search_suggestion_empty_and_recent_states(live_url: str, page) -> None:
+    page.goto(live_url + "/tables/orders")
+    search = page.locator(".okf-shell__search-form input[name='q']")
+    search.focus()
+    live = page.get_by_role("listbox", name="Search suggestions")
+    expect(live).to_be_hidden()  # the only visit is the current page
+    page.goto(live_url + "/")
+    search = page.locator(".okf-shell__search-form input[name='q']")
+    search.focus()
+    live = page.get_by_role("listbox", name="Search suggestions")
+    expect(live).to_be_visible()
+    expect(live.get_by_role("option")).to_have_count(1)
+    assert live.get_by_role("option").get_attribute("data-href") == "/tables/orders"
+    search.fill("zzqxv")
+    expect(live.locator(".okf-search-live__empty")).to_have_text("No matching pages")
+    expect(live.get_by_role("option")).to_have_count(1)
+    expect(live.get_by_role("option")).to_have_text("View all results")
+    assert live.get_by_role("option").evaluate("n => getComputedStyle(n).borderBottomWidth") == "0px"
+
+
+def test_search_preview_and_concept_summary_are_readable_but_copy_keeps_source(markdown_url: str, page) -> None:
+    page.goto(markdown_url + "/__search?q=" + MARKDOWN_TERM)
+    result = page.locator('.okf-search-result[data-concept-id="references/ledger_conventions"]')
+    preview = result.locator(".okf-search-snippet").first
+    expect(preview).to_be_visible()
+    assert "ledger-sync --zebrafinch with care and legacy strict rules" in preview.inner_text()
+    for syntax in ("**", "](", "`", "~~", "__strict", "<img", "onerror", ".md"):
+        assert syntax not in preview.inner_text()
+    source = result.locator("[data-copy-passage]").get_attribute("data-excerpt")
+    assert "**settled**" in source and "`ledger-sync --zebrafinch`" in source
+    result.locator(".okf-search-disclosure > summary").click()
+    evidence_preview = result.locator(".okf-search-disclosure .okf-search-snippet")
+    expect(evidence_preview).to_be_visible()
+    assert evidence_preview.evaluate("n => getComputedStyle(n).webkitLineClamp") == "none"
+    raw = result.locator(".okf-search-source")
+    expect(raw).not_to_be_visible()
+    result.get_by_text("Exact Markdown source", exact=True).click()
+    expect(raw).to_have_text(source)
+    assert result.locator("img, script").count() == 0
+    page.goto(markdown_url + "/")
+    expect(page.locator('.okf-card[data-concept-id="references/ledger_conventions"] .okf-card__desc')).to_have_text(
+        "Every ledger-sync and settled payment.")
+    _assert_clean(page)
+
+
+@pytest.mark.parametrize("theme", ["bone", "slate"])
+@pytest.mark.parametrize("forced", [False, True], ids=["normal", "forced-colors"])
+def test_search_suggestion_selection_keeps_every_row_height(live_url: str, page, theme: str, forced: bool) -> None:
+    page.add_init_script(f"localStorage.setItem('okf-loom.appearance', '{theme}')")
+    if forced:
+        page.emulate_media(forced_colors="active")
+    page.goto(live_url + "/")
+    search = page.locator(".okf-shell__search-form input[name='q']")
+    search.fill("orders")
+    live = page.get_by_role("listbox", name="Search suggestions")
+    expect(live).to_be_visible()
+    options = live.get_by_role("option")
+    heights = options.evaluate_all("nodes => nodes.map(n => n.getBoundingClientRect().height)")
+    assert len(heights) > 1
+    for index in range(len(heights)):
+        search.press("ArrowDown")
+        expect(options.nth(index)).to_have_attribute("aria-selected", "true")
+        expect(search).to_have_attribute("aria-activedescendant", options.nth(index).get_attribute("id"))
+        assert options.evaluate_all("nodes => nodes.map(n => n.getBoundingClientRect().height)") == heights
+        assert options.nth(index).evaluate("n => getComputedStyle(n, '::before').content") in ("none", "normal")
+
+
 @pytest.mark.parametrize("query", QUERIES, ids=QUERY_IDS)
 def test_live_search_page_box_treats_metacharacters_as_text(live_url: str, page, query: str) -> None:
     page.goto(live_url + "/__search")
@@ -233,6 +302,61 @@ def test_live_search_page_box_treats_metacharacters_as_text(live_url: str, page,
     page.locator(".okf-search-submit").click()
     page.wait_for_url(lambda url: _query_of(url) == [FOLLOW_UP])
     expect(page.locator(".okf-search-result").first).to_be_visible()
+    _assert_clean(page)
+
+
+@pytest.mark.parametrize("width,height", [(768, 1024), (1024, 1366)])
+def test_search_result_title_is_a_44px_coarse_target(live_url: str, page, width: int, height: int) -> None:
+    context = page.context.browser.new_context(viewport={"width": width, "height": height}, has_touch=True)
+    try:
+        touch_page = context.new_page()
+        touch_page.goto(live_url + "/__search?q=orders")
+        title = touch_page.locator(".okf-search-result h3 > a").first
+        expect(title).to_be_visible()
+        box = title.bounding_box()
+        assert box["height"] >= 44 and box["width"] >= 44, box
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("surface", ["live", "static"])
+def test_search_limit_notice_and_empty_actions(live_url: str, static_url: str, page, surface: str) -> None:
+    url = live_url + "/__search" if surface == "live" else static_url + "/__search.html"
+    page.goto(url + "?q=orders&limit=1")
+    expect(page.locator(".okf-search-limit-notice")).to_be_visible()
+    expect(page.locator(".okf-search-limit-notice")).to_contain_text("Result limit" if surface == "live" else "Showing 1 of")
+    page.goto(url + "?q=zzqxv")
+    empty = page.locator(".okf-search-empty")
+    expect(empty.get_by_role("link", name="Clear filters")).to_have_count(0)
+    expect(empty.get_by_role("link", name="Try Best overall")).to_be_visible()
+    links = empty.locator(".okf-search-empty__actions a")
+    assert links.count() == 2
+    boxes = [link.bounding_box() for link in links.all()]
+    assert boxes[1]["x"] - boxes[0]["x"] - boxes[0]["width"] >= 8
+    page.goto(url + "?q=zzqxv&tag=missing")
+    expect(page.locator(".okf-search-empty").get_by_role("link", name="Clear filters")).to_be_visible()
+
+
+def test_portable_unavailable_search_still_echoes_query_in_both_fields(static_url: str, page) -> None:
+    page.route("**/__data/passages-manifest.json", lambda route: route.fulfill(status=503, body="unavailable"))
+    page.goto(static_url + "/__search.html?q=orders")
+    expect(page.locator("body")).to_have_attribute("data-okf-capture-ready", "unavailable")
+    expect(page.locator("#okf-search-query")).to_have_value("orders")
+    expect(page.locator('.okf-topbar input[name="q"]')).to_have_value("orders")
+
+
+def test_portable_search_verifies_evidence_on_plain_http_nonlocalhost(static_url: str, page) -> None:
+    # Transport stays on our owned loopback server, but the browser evaluates
+    # the document and its scripts as an ordinary, non-secure LAN origin.
+    origin = static_url.replace("127.0.0.1", "portable.test")
+    page.route(origin + "/**", lambda route: route.fulfill(
+        response=route.fetch(url=route.request.url.replace(origin, static_url))))
+    page.goto(origin + "/__search.html?q=orders")
+    expect(page.locator("body")).to_have_attribute("data-okf-capture-ready", "ready")
+    assert page.evaluate("() => isSecureContext") is False
+    assert page.evaluate("() => !!crypto.subtle") is False
+    expect(page.locator(".okf-search-result").first).to_be_visible()
+    assert page.evaluate("() => window.okfPortableProvider.passages.length") > 0
     _assert_clean(page)
 
 

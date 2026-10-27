@@ -485,6 +485,7 @@ def _hold_lock(path: str, ready, release) -> None:
         ready.set(); release.wait(2)
 
 
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_repository_lock_timeout_is_cross_process(tmp_path: Path) -> None:
     fs, repo = _repo(tmp_path)
     ctx = multiprocessing.get_context("fork")

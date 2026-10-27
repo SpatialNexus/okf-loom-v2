@@ -1,188 +1,264 @@
 /* Local operator page: import one portable feedback note (X2).
  * Served only by the live server on /__feedback-import; never copied into
- * a build. Uses the shared theme tokens so every family and mode applies. */
+ * a build. Ledger structure on the shared tokens, so Bone/Slate/Clay/Plum
+ * all apply: square corners, hairline hierarchy, a 2px --border-strong top
+ * rule where a record starts, no shadows or tinted washes. Notices carry
+ * their status as a 2px left bar plus a status-hued mono label (text and
+ * bars only, never fills); the message itself stays ink. Every colour is a
+ * token. */
 .okf-fbi {
   flex: 1;
   width: 100%;
   max-width: var(--okf-maxw);
   margin: 0 auto;
-  padding: 28px var(--okf-space-6) 64px;
+  padding: 32px var(--okf-space-6) 64px;
   box-sizing: border-box;
 }
 .okf-fbi__lane {
   display: grid;
-  gap: var(--okf-space-5);
-  max-width: var(--okf-prose-maxw);
+  gap: var(--section-gap, 40px);
+  max-width: var(--okf-article-maxw);
   margin: 0 auto;
   min-width: 0;
 }
-.okf-fbi__header { display: grid; gap: var(--okf-space-2); }
+.okf-fbi__header { display: grid; gap: 10px; }
 .okf-fbi__kind { margin: 0; }
+.okf-fbi__kind .okf-reserved__kind {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-label);
+  font-size: var(--label-size, 9.5px);
+  font-weight: var(--label-weight, 500);
+  letter-spacing: var(--label-track, 0.16em);
+  text-transform: uppercase;
+}
 .okf-fbi__title {
   margin: 0;
-  font-family: var(--okf-font-display);
-  font-size: var(--okf-text-xl);
-  line-height: 1.15;
-  letter-spacing: -0.015em;
+  font-family: var(--font-display);
+  font-size: var(--h1-size, 34px);
+  font-weight: var(--h1-weight, 700);
+  line-height: var(--h1-lh, 1.12);
+  letter-spacing: var(--h1-track, -0.022em);
 }
-.okf-fbi__lede { margin: 0; color: var(--okf-fg-muted); }
+.okf-fbi__lede { margin: 0; max-width: 60ch; color: var(--text-2); font-size: 15px; line-height: 1.6; }
 
+/* A panel is a record: the panel surface, a 1px outline and a 2px
+ * --border-strong top rule. */
 .okf-fbi__panel {
   display: grid;
   gap: var(--okf-space-4);
   min-width: 0;
-  padding: var(--okf-space-5);
-  border: 1px solid var(--okf-border);
-  border-radius: var(--okf-radius);
-  background: var(--okf-bg-elev);
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-top: 2px solid var(--border-strong);
+  border-radius: 0;
+  background: var(--surface);
+  box-shadow: none;
 }
 .okf-fbi__panel[hidden] { display: none; }
 .okf-fbi__panel-title {
   margin: 0;
-  font-family: var(--okf-font-display);
-  font-size: var(--okf-text-lg);
+  font-family: var(--font-display);
+  font-size: var(--h2-size, 21px);
+  font-weight: var(--h2-weight, 700);
+  letter-spacing: var(--h2-track, -0.012em);
   line-height: 1.2;
 }
 .okf-fbi__panel-title:focus:not(:focus-visible) { outline: none; }
-.okf-fbi__result[aria-busy="true"] .okf-fbi__panel-title { color: var(--okf-fg-muted); }
+.okf-fbi__result[aria-busy="true"] .okf-fbi__panel-title { color: var(--text-2); }
 
 .okf-fbi__field { display: grid; gap: var(--okf-space-2); }
-.okf-fbi__field > label { font-weight: 650; }
+.okf-fbi__field > label { font-weight: 600; font-size: 13px; }
+/* Ledger field: --input-bg fill, 1px --input-border outline, square. */
 .okf-fbi__file {
   box-sizing: border-box;
   width: 100%;
   min-height: 44px;
-  padding: var(--okf-space-2);
-  border: 1px dashed var(--okf-border-strong);
-  border-radius: var(--okf-radius-sm);
-  background: var(--okf-bg-inset);
-  color: var(--okf-fg);
+  padding: 5px;
+  border: 1px solid var(--input-border);
+  border-radius: 0;
+  background: var(--input-bg);
+  color: var(--input-text);
   font: inherit;
+  font-size: 13px;
 }
+.okf-fbi__file:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .okf-fbi__file::file-selector-button {
-  min-height: 36px;
+  min-height: var(--ctl-h, 32px);
   margin-right: var(--okf-space-3);
-  padding: 4px var(--okf-space-3);
-  border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-sm);
-  background: var(--okf-bg-elev);
-  color: var(--okf-fg);
+  padding: 4px 13px;
+  border: 1px solid var(--btn-border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--btn-text);
   font: inherit;
-  font-weight: 650;
+  font-size: var(--btn-size, 12.5px);
+  font-weight: var(--btn-weight, 600);
   cursor: pointer;
 }
-.okf-fbi__file:hover::file-selector-button { background: var(--okf-hover-fill); }
-.okf-fbi__file:disabled { opacity: 0.6; cursor: not-allowed; }
+.okf-fbi__file:hover::file-selector-button { background: var(--btn-hover-bg); }
+.okf-fbi__file:disabled { border-color: var(--border); color: var(--text-3); cursor: not-allowed; }
+.okf-fbi__file:disabled::file-selector-button { border-color: var(--border); color: var(--text-3); cursor: not-allowed; }
 .okf-fbi__hint, .okf-fbi__cause, .okf-fbi__match {
   margin: 0;
-  color: var(--okf-fg-muted);
-  font-size: var(--okf-text-sm);
+  color: var(--text-2);
+  font-size: 13px;
   overflow-wrap: anywhere;
 }
+.okf-fbi__match { padding-left: 12px; border-left: 2px solid var(--okf-ok); }
 
+/* Notices: 2px status bar + a status-hued mono label; ink message. */
 .okf-fbi__notice {
   margin: 0;
-  padding: var(--okf-space-3);
-  border-left: 4px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-sm);
-  background: var(--okf-bg-inset);
+  padding: 8px 0 8px 12px;
+  border: 0;
+  border-left: 2px solid var(--border-strong);
+  border-radius: 0;
+  background: transparent;
   color: var(--okf-fg);
-  font-size: var(--okf-text-sm);
-  line-height: 1.5;
+  font-size: 13.5px;
+  line-height: 1.55;
   overflow-wrap: anywhere;
+}
+.okf-fbi__notice::before {
+  display: block;
+  margin-bottom: 2px;
+  font-family: var(--font-label);
+  font-size: var(--label-size, 9.5px);
+  font-weight: var(--label-weight, 500);
+  letter-spacing: var(--label-track, 0.16em);
+  text-transform: uppercase;
 }
 .okf-fbi__notice p { margin: 0; }
 .okf-fbi__notice p + p { margin-top: var(--okf-space-1); }
-.okf-fbi__notice--info { border-left-color: var(--okf-info); background: var(--okf-info-bg); }
-.okf-fbi__notice--warn { border-left-color: var(--okf-warn); background: var(--okf-warn-bg); }
-.okf-fbi__notice--error { border-left-color: var(--okf-error); background: var(--okf-error-bg); font-weight: 650; }
-.okf-fbi__notice--ok { border-left-color: var(--okf-ok); background: var(--okf-ok-bg); }
+.okf-fbi__notice--info { border-left-color: var(--okf-info); }
+.okf-fbi__notice--info::before { content: "Note"; color: var(--okf-info); }
+.okf-fbi__notice--warn { border-left-color: var(--okf-warn); }
+.okf-fbi__notice--warn::before { content: "Check"; color: var(--okf-warn); }
+.okf-fbi__notice--error { border-left-color: var(--okf-error); font-weight: 600; }
+.okf-fbi__notice--error::before { content: "Error"; color: var(--okf-error); }
+.okf-fbi__notice--ok { border-left-color: var(--okf-ok); }
+.okf-fbi__notice--ok::before { content: "Done"; color: var(--okf-ok); }
 .okf-fbi__notice .okf-fbi__cause { color: var(--okf-fg); font-weight: 400; }
 
 .okf-fbi__note { display: grid; gap: var(--okf-space-3); min-width: 0; }
+/* Facts are a field list: mono heads, hairline rows. */
 .okf-fbi__facts {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
-  gap: var(--okf-space-1) var(--okf-space-4);
+  gap: 0;
   margin: 0;
-  font-size: var(--okf-text-sm);
+  font-size: 13px;
+  border-top: 1px solid var(--border-strong);
 }
-.okf-fbi__facts dt { color: var(--okf-fg-muted); font-weight: 650; }
-.okf-fbi__facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
-.okf-fbi code { font-size: 0.92em; overflow-wrap: anywhere; }
+.okf-fbi__facts :is(dt, dd) { padding: 6px 0; border-bottom: 1px solid var(--border); }
+.okf-fbi__facts dt {
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 400;
+}
+.okf-fbi__facts dd { margin: 0; padding-left: var(--okf-space-4); min-width: 0; overflow-wrap: anywhere; }
+.okf-fbi code { font-family: var(--font-mono); font-size: 0.9em; overflow-wrap: anywhere; }
 /* A command-line flag stays one token (never "--no-" / "edit"). */
 .okf-fbi code.okf-fbi__flag { white-space: nowrap; overflow-wrap: normal; }
 .okf-fbi__claim {
   display: inline-block;
+  margin-left: 4px;
   padding: 0 6px;
-  border: 1px solid var(--okf-border-strong);
-  border-radius: var(--okf-radius-pill);
-  color: var(--okf-fg-muted);
-  font-size: var(--okf-text-xs);
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
+  color: var(--text-2);
+  font-family: var(--font-label);
+  font-size: var(--label-size, 9.5px);
+  font-weight: var(--label-weight, 500);
+  letter-spacing: var(--label-track, 0.16em);
   text-transform: uppercase;
   vertical-align: 1px;
 }
 .okf-fbi__subhead {
   margin: 0;
-  color: var(--okf-fg-muted);
-  font-size: var(--okf-text-xs);
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-strong);
+  color: var(--text-2);
+  font-family: var(--font-label);
+  font-size: var(--label-size, 9.5px);
+  font-weight: var(--label-weight, 500);
+  letter-spacing: var(--label-track, 0.16em);
   text-transform: uppercase;
 }
 .okf-fbi__body {
   margin: 0;
-  padding: var(--okf-space-3);
-  border: 1px solid var(--okf-border);
-  border-radius: var(--okf-radius-sm);
-  background: var(--okf-bg);
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--bg-2);
+  font-size: 14px;
+  line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 .okf-fbi__quote {
   margin: 0;
   padding: var(--okf-space-1) var(--okf-space-3);
-  border-left: 3px solid var(--okf-border-strong);
-  color: var(--okf-fg-muted);
+  border-left: 2px solid var(--border-strong);
+  color: var(--text-2);
   font-style: italic;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
 .okf-fbi__actions { display: flex; flex-wrap: wrap; gap: var(--okf-space-2); }
-.okf-fbi__actions .okf-btn {
+/* Scoped under .okf-fbi so these win over wiki.css's page-level
+ * `body.okf-viewer .okf-btn` (32px) where the touch floor applies. */
+.okf-fbi .okf-fbi__actions .okf-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
+  min-height: var(--ctl-h, 32px);
   padding-inline: var(--okf-space-4);
+  border-radius: 0;
   text-decoration: none;
 }
-.okf-fbi__actions .okf-btn[aria-disabled="true"] { opacity: 0.65; cursor: progress; }
+.okf-fbi .okf-fbi__actions .okf-btn[aria-disabled="true"] { border-style: dashed; cursor: progress; }
 
-.okf-fbi__help { color: var(--okf-fg-muted); font-size: var(--okf-text-sm); }
+.okf-fbi__help { color: var(--text-2); font-size: 13.5px; line-height: 1.6; }
 .okf-fbi__help-title {
   margin: 0 0 var(--okf-space-2);
-  color: var(--okf-fg);
-  font-size: var(--okf-text-base);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-strong);
+  color: var(--text-2);
+  font-family: var(--font-label);
+  font-size: var(--label-size, 9.5px);
+  font-weight: var(--label-weight, 500);
+  letter-spacing: var(--label-track, 0.16em);
+  text-transform: uppercase;
 }
-.okf-fbi__help ul { margin: 0; padding-left: 1.25rem; display: grid; gap: var(--okf-space-1); }
-
-html[data-okf-density="compact"] .okf-fbi__panel { gap: var(--okf-space-3); padding: var(--okf-space-4); }
+.okf-fbi__help ul { margin: 0; padding-left: 1.25rem; display: grid; gap: var(--okf-space-2); max-width: 66ch; }
 
 @media (max-width: 640px) {
-  .okf-fbi { padding: var(--okf-space-4) var(--okf-space-4) var(--okf-space-7); }
+  .okf-fbi { padding: var(--okf-space-5) var(--okf-space-4) var(--okf-space-7); }
+  .okf-fbi__lane { gap: var(--okf-space-6); }
+  .okf-fbi__title { font-size: 28px; }
   .okf-fbi__panel { padding: var(--okf-space-4); }
   .okf-fbi__facts { grid-template-columns: minmax(0, 1fr); }
-  .okf-fbi__facts dd + dt { margin-top: var(--okf-space-2); }
-  .okf-fbi__actions .okf-btn { flex: 1 1 auto; }
+  .okf-fbi__facts dt { padding-bottom: 0; border-bottom: 0; }
+  .okf-fbi__facts dd { padding-top: 2px; padding-left: 0; }
+  .okf-fbi .okf-fbi__actions .okf-btn { flex: 1 1 auto; min-height: 44px; }
+}
+@media (pointer: coarse) {
+  .okf-fbi .okf-fbi__actions .okf-btn,
+  .okf-fbi__file::file-selector-button { min-height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .okf-fbi * { transition: none !important; animation: none !important; }
 }
 @media (forced-colors: active) {
-  .okf-fbi__panel, .okf-fbi__notice, .okf-fbi__claim { border: 1px solid CanvasText; }
-  .okf-fbi__actions .okf-btn[aria-disabled="true"] { color: GrayText; }
+  .okf-fbi__panel, .okf-fbi__claim { border: 1px solid CanvasText; }
+  .okf-fbi__notice { border-left: 2px solid CanvasText; }
+  .okf-fbi .okf-fbi__actions .okf-btn[aria-disabled="true"] { color: GrayText; }
 }

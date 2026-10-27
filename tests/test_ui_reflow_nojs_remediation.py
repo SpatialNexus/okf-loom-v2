@@ -12,6 +12,7 @@ import http.server
 import json
 import os
 import re
+import shutil
 import tempfile
 from pathlib import Path
 import socket
@@ -63,8 +64,15 @@ def _load_capture_module():
 def chromium(request, monkeypatch):
     # Parameterized ids ("...[200]") share one opt-in through the function name.
     test_name = getattr(request.node, "originalname", None) or request.node.name
-    if os.environ.get("OKF_TEST_HEADED_ZOOM") == "1" and test_name in HEADED_ZOOM_TESTS:
-        monkeypatch.setenv("OKF_CAPTURE_REAL_BROWSER_ZOOM", "1")
+    if test_name in HEADED_ZOOM_TESTS:
+        if not os.environ.get("DISPLAY"):
+            if shutil.which("xvfb-run"):
+                pytest.fail("Real page zoom needs X11: run this file with xvfb-run -a "
+                            "and OKF_TEST_HEADED_ZOOM=1 (see CONTRIBUTING.md)")
+            pytest.skip("Real page zoom requires headed X11 Chrome; DISPLAY is unset "
+                        "and xvfb-run is not installed (Wayland alone cannot drive xdotool)")
+        if os.environ.get("OKF_TEST_HEADED_ZOOM") == "1":
+            monkeypatch.setenv("OKF_CAPTURE_REAL_BROWSER_ZOOM", "1")
     with sync_playwright() as playwright:
         browser = launch_chromium(playwright)
         try:

@@ -7,7 +7,10 @@ through these helpers. The pattern is:
        as the target (so ``os.replace`` is atomic on POSIX — same
        filesystem). The tmp file is created mode 0600 by ``mkstemp``, so
        it is private even on shared hosts.
-    2. Write the content via ``os.fdopen``.
+    2. Write and flush the content via ``os.fdopen``. Preserve an existing
+       target's owner and permission bits, or apply 0666 masked by the current
+       umask (snapshotted at first use) for new content. An explicit ``mode`` overrides preservation (use
+       ``mode=0o600`` for private state, even if a prior file was wider).
     3. ``os.replace(tmp, path)`` to swap into place atomically.
     4. On ANY exception during write or replace, ``os.unlink`` the tmp
        file in a ``finally`` block — no orphans left behind.
@@ -420,17 +423,85 @@ def ensure_self_ignored(dirpath: str | Path) -> None:
         return
     try:
         dirpath.mkdir(parents=True, exist_ok=True)
-        atomic_write_text(gi, SELF_IGNORE)
+        atomic_write_text(gi, SELF_IGNORE, mode=0o600)
     except OSError:
         pass  # best-effort: a read-only checkout must not break serving
 
 
-def atomic_write_text(path: str | Path, text: str, *, encoding: str = "utf-8") -> None:
-    """Atomically write ``text`` to ``path`` (tmp + os.replace).
+_UMASK_LOCK = threading.Lock()
+_CACHED_UMASK: int | None = None
 
-    The tmp file is created in the same directory as ``path`` (so the
-    rename is atomic on POSIX) with mode 0600 via ``mkstemp``. Parents
-    are created if missing. On any exception, the tmp file is unlinked.
+
+def _process_umask() -> int:
+    """Snapshot the umask at first use, without changing the parent's mask.
+
+    Serialize first use so even concurrent new-file writes launch at most one
+    isolated child on hosts without procfs. Never call os.umask in the parent:
+    a lock here would not protect unrelated server threads.
+    """
+    global _CACHED_UMASK
+    with _UMASK_LOCK:
+        if _CACHED_UMASK is None:
+            _CACHED_UMASK = _read_process_umask()
+        return _CACHED_UMASK
+
+
+def _read_process_umask() -> int:
+    """Read Linux procfs, or the inherited mask in an isolated Python child."""
+    try:
+        for line in Path("/proc/self/status").read_text(encoding="ascii").splitlines():
+            if line.startswith("Umask:"):
+                mask = int(line.split()[1], 8)
+                if 0 <= mask <= 0o777:
+                    return mask
+    except (OSError, ValueError, IndexError):
+        pass
+    import subprocess
+    import sys
+    return int(subprocess.check_output(
+        [sys.executable, "-I", "-S", "-c", "import os; print(oct(os.umask(0)))"],
+        text=True,
+    ).strip(), 8)
+
+
+def _set_atomic_metadata(fd: int, path: Path, mode: int | None) -> None:
+    """Apply final metadata only after flushing, while the temp fd is open.
+
+    Preserve ownership when permitted, otherwise try retaining the group alone.
+    Chown precedes chmod because it can clear privilege bits. Rewritten content
+    never retains setuid, nor setgid if the original ownership could not be kept.
+    Explicit modes always win: private rewrites never preserve a wider mode.
+    """
+    try:
+        previous = path.stat()
+    except FileNotFoundError:
+        previous = None
+    ownership_preserved = True
+    if previous is not None:
+        current = os.fstat(fd)
+        if (current.st_uid, current.st_gid) != (previous.st_uid, previous.st_gid):
+            try:
+                os.fchown(fd, previous.st_uid, previous.st_gid)
+            except PermissionError:
+                ownership_preserved = False
+                try:
+                    os.fchown(fd, -1, previous.st_gid)
+                except PermissionError:
+                    pass  # Shared content remains writable as the writing user.
+    if mode is None:
+        mode = (previous.st_mode & (0o3777 if ownership_preserved else 0o1777)
+                if previous is not None else 0o666 & ~_process_umask())
+    os.fchmod(fd, mode)
+
+
+def atomic_write_text(path: str | Path, text: str, *, encoding: str = "utf-8",
+                      mode: int | None = None) -> None:
+    """Atomically write text, retaining permissions and ownership when possible.
+
+    New content uses 0666 & ~umask, snapshotted at first use. Explicit ``mode``
+    overrides both defaults, even on replacement: private callers must pass
+    ``mode=0o600``. The same-directory temp stays 0600 until fully written.
+    Parents are created if missing; errors unlink the temp without publishing.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -438,6 +509,8 @@ def atomic_write_text(path: str | Path, text: str, *, encoding: str = "utf-8") -
     try:
         with os.fdopen(fd, "w", encoding=encoding) as f:
             f.write(text)
+            f.flush()
+            _set_atomic_metadata(f.fileno(), path, mode)
         os.replace(tmp, path)
     except BaseException:
         # BaseException so we also clean up on KeyboardInterrupt.
@@ -448,7 +521,7 @@ def atomic_write_text(path: str | Path, text: str, *, encoding: str = "utf-8") -
         raise
 
 
-def atomic_write_bytes(path: str | Path, data: bytes) -> None:
+def atomic_write_bytes(path: str | Path, data: bytes, *, mode: int | None = None) -> None:
     """Atomically write ``data`` to ``path`` (binary). See ``atomic_write_text``."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -456,6 +529,8 @@ def atomic_write_bytes(path: str | Path, data: bytes) -> None:
     try:
         with os.fdopen(fd, "wb") as f:
             f.write(data)
+            f.flush()
+            _set_atomic_metadata(f.fileno(), path, mode)
         os.replace(tmp, path)
     except BaseException:
         try:
@@ -465,8 +540,9 @@ def atomic_write_bytes(path: str | Path, data: bytes) -> None:
         raise
 
 
-def durable_atomic_write_text(path: str | Path, text: str, *, encoding: str = "utf-8") -> None:
-    """Atomically replace a durability-critical file and fsync file + directory."""
+def durable_atomic_write_text(path: str | Path, text: str, *, encoding: str = "utf-8",
+                              mode: int | None = None) -> None:
+    """Write with atomic_write_text's modes, plus fsync of file and directory."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(prefix=".okf-", suffix=".tmp", dir=str(path.parent))
@@ -474,6 +550,7 @@ def durable_atomic_write_text(path: str | Path, text: str, *, encoding: str = "u
         with os.fdopen(fd, "w", encoding=encoding) as fh:
             fh.write(text)
             fh.flush()
+            _set_atomic_metadata(fh.fileno(), path, mode)
             os.fsync(fh.fileno())
         os.replace(tmp, path)
         dir_fd = os.open(path.parent, os.O_RDONLY)
@@ -489,8 +566,29 @@ def durable_atomic_write_text(path: str | Path, text: str, *, encoding: str = "u
         raise
 
 
+def _set_tree_directory_modes(parent_fd: int, name: str, mode: int, *,
+                              root_mode: int | None = None) -> None:
+    """Set completed build directories bottom-up, never following symlinks.
+
+    The caller keeps the tree inside a private staging parent until publication;
+    neither that parent nor recovery/state directories are part of this walk.
+    """
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+    fd = os.open(name, flags, dir_fd=parent_fd)
+    try:
+        with os.scandir(fd) as entries:
+            for entry in entries:
+                if entry.is_symlink():
+                    raise ValueError(f"build staging must not use symlinks: {entry.name}")
+                if entry.is_dir(follow_symlinks=False):
+                    _set_tree_directory_modes(fd, entry.name, mode)
+        os.fchmod(fd, mode if root_mode is None else root_mode)
+    finally:
+        os.close(fd)
+
+
 def atomic_replace_tree(src: str | Path, dst: str | Path, *,
-                        verify_previous=None) -> None:
+                        verify_previous=None, publish_directory_modes: bool = False) -> None:
     """Publish a staged directory, retaining prior output if rollback fails.
 
     Individual renames are atomic, not the pair: readers may briefly see no
@@ -509,6 +607,12 @@ def atomic_replace_tree(src: str | Path, dst: str | Path, *,
     and with ``"quarantined"`` (``backup_fd``, ``"previous"``) between the two
     renames; raising there rolls the old tree back. ``None`` is the unchanged
     legacy path.
+
+    ``publish_directory_modes`` opts completed build output into 0777 & ~umask
+    for every directory, preserving an existing destination root's permission
+    bits. The caller must render inside a private staging parent: modes are set
+    under the publication lock immediately before rename, after verification.
+    The default leaves modes alone (including private callers).
     """
     import fcntl
     import shutil
@@ -540,12 +644,17 @@ def atomic_replace_tree(src: str | Path, dst: str | Path, *,
                 backup_name = candidate
                 backup_fd = os.open(backup_name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
                                     dir_fd=dst_fd)
+                os.fchmod(backup_fd, 0o700)  # Drop an inherited setgid bit, too.
             try:
                 if backup_fd is not None:
                     retain = True
                     os.rename(dst.name, "previous", src_dir_fd=dst_fd, dst_dir_fd=backup_fd)
                     if verify_previous is not None:
                         verify_previous(backup_fd, "previous", "quarantined")
+                if publish_directory_modes:
+                    mode = 0o777 & ~_process_umask()
+                    root_mode = previous.st_mode & 0o7777 if previous is not None else mode
+                    _set_tree_directory_modes(src_fd, src.name, mode, root_mode=root_mode)
                 os.rename(src.name, dst.name, src_dir_fd=src_fd, dst_dir_fd=dst_fd)
             except BaseException as publish_error:
                 if backup_fd is not None:

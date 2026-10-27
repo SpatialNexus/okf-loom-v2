@@ -222,6 +222,7 @@ def test_publication_rejects_nested_parent_and_post_rename_substitution(tmp_path
 
 @pytest.mark.parametrize("action", ["canonical_same_inode_swap", "stage_same_inode_swap",
     "canonical_hardlink", "stage_symlink", "nested_parent"])
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_publication_process_substitution_at_check_exchange_seam(tmp_path: Path,
                                                                  action: str) -> None:
     import multiprocessing
@@ -243,6 +244,7 @@ def test_publication_process_substitution_at_check_exchange_seam(tmp_path: Path,
     assert worker.exitcode == 0
 
 
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_recovery_does_not_clean_paused_pre_wal_creator(tmp_path: Path) -> None:
     import multiprocessing
     from test_proposal_apply import _ready_transaction

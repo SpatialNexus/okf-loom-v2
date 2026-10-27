@@ -17,7 +17,9 @@ Modes:
     names), keep only the locked files, verify each file's
     size/SHA-256/SHA-384 and, once every package verified, write them
     atomically into ``--dest`` (default: the repo vendor folder). Auxiliary
-    files (notices) are repository-authored and never fetched.
+    files (notices) are repository-authored and never fetched. Ledger font
+    snapshots are verified and copied from the checked-in vendor tree, not
+    downloaded from npm; their provenance and derived CSS pin stay unchanged.
 
 ``--init-lock`` (network; maintainers bumping a pin)
     Build a fresh lock from the pins below: registry metadata supplies each
@@ -28,7 +30,9 @@ Modes:
     in ``--dest`` (``THIRD-PARTY-NOTICES.txt`` plus any other file of the
     current lock's ``auxiliary`` manifest) are re-hashed into the new lock.
     Regenerate and review the notices BEFORE running it. Writes the files and
-    the lock to ``--dest``. Review the diff before committing.
+    the lock to ``--dest``. The local Ledger font snapshots and derived CSS
+    pin are preserved from the current lock, with their inputs in ``--dest``
+    verified before any network use. Review the diff before committing.
 """
 from __future__ import annotations
 
@@ -343,9 +347,46 @@ def _hljs_language_sets() -> tuple[dict, list[str], list[str]]:
     return reference, sorted(full), sorted(common)
 
 
+def _ledger_snapshots(root: Path, lock: dict) -> tuple[list[dict], dict[str, bytes], dict]:
+    """Preserve the local font packages only after verifying their locked inputs."""
+    required: dict[str, set[str]] = {}
+    for family, _style, path in vendor.LEDGER_FACES:
+        required.setdefault(family, set()).update((path, path.rsplit("/", 1)[0] + "/LICENSE"))
+    packages = [package for package in lock["packages"] if package.get("name") in required]
+    if len(packages) != len(required) or {package["name"] for package in packages} != set(required):
+        raise SystemExit("current lock must contain both local Ledger font snapshots")
+    verified: dict[str, bytes] = {}
+    try:
+        with vendor.VendorTree(root) as tree:
+            for package in packages:
+                if package.get("version") != "ledger-snapshot" or package.get("license") != "OFL-1.1" \
+                        or not package.get("provenance") or not package.get("upstream") \
+                        or "tarball" in package or "integrity" in package:
+                    raise SystemExit(f"{package['name']}: expected a locally sourced Ledger snapshot, not npm")
+                files = package.get("files", [])
+                if len(files) != len(required[package["name"]]) \
+                        or {entry["dest"] for entry in files} != required[package["name"]]:
+                    raise SystemExit(f"{package['name']}: local Ledger snapshot inputs are incomplete")
+                for entry in files:
+                    data = tree.read(entry["dest"])
+                    vendor._check_entry(entry, data)
+                    verified[entry["dest"]] = data
+        derived = vendor.derive_ledger_css(verified)
+        pin = (lock.get("derived") or {}).get(vendor.LEDGER_DERIVED, {})
+        if pin.get("size") != len(derived) or pin.get("sha256") != vendor.sha256_hex(derived):
+            raise SystemExit("derived Ledger stylesheet does not match its pinned hash")
+    except vendor.OfflineAssetsError as exc:
+        raise SystemExit(f"local Ledger snapshot verification failed: {exc}") from None
+    return packages, verified, pin
+
+
 def init_lock(dest: Path) -> dict:
     pins = vendor.source_sri_pins()
     auxiliary = _auxiliary_entries(dest)  # before any network use
+    # A new destination may have the local files but not yet a lock. Otherwise
+    # its own lock is authoritative; do not silently replace a damaged lock.
+    current = vendor.load_lock(dest if (dest / vendor.LOCK_NAME).exists() else None)
+    local_packages, local_files, ledger_pin = _ledger_snapshots(dest, current)
     reference, all_languages, common = _hljs_language_sets()
     packages = []
     verified: dict[str, bytes] = {}
@@ -378,6 +419,8 @@ def init_lock(dest: Path) -> dict:
         packages.append({"name": pin["name"], "version": pin["version"],
                          "license": dist["license"], "tarball": dist["tarball"],
                          "integrity": dist["integrity"], "files": files})
+    packages.extend(local_packages)
+    verified.update(local_files)
     lock = {"schema": 1, "packages": packages, "reference_packages": [reference],
             "auxiliary": auxiliary,
             "parity": {"highlightjs_languages": all_languages,
@@ -392,6 +435,7 @@ def init_lock(dest: Path) -> dict:
     }
     lock["derived"] = {rel: {"size": len(data), "sha256": vendor.sha256_hex(data)}
                        for rel, data in sorted(derived.items())}
+    lock["derived"][vendor.LEDGER_DERIVED] = ledger_pin
     # Nothing is written until every package verified.
     for rel, data in verified.items():
         _atomic_write(dest / rel, data)
@@ -402,7 +446,13 @@ def init_lock(dest: Path) -> dict:
 def fetch(dest: Path) -> None:
     lock = vendor.load_lock()
     pending: list[tuple[str, bytes]] = []
+    local_packages: list[dict] = []
+    if any(package.get("version") == "ledger-snapshot" for package in lock["packages"]):
+        local_packages, local_files, _pin = _ledger_snapshots(vendor.VENDOR_ROOT, lock)
+        pending.extend(local_files.items())
     for package in lock["packages"]:
+        if package in local_packages:
+            continue
         sources = {entry["src"] for entry in package["files"]}
         members = _download(package["tarball"], package["integrity"], sources.__contains__)
         for entry in package["files"]:

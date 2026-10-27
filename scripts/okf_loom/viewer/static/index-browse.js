@@ -8,10 +8,22 @@
   var clear = controls.querySelector("[data-index-clear]");
   var status = controls.querySelector("[data-index-status]");
   var noMatch = document.querySelector("[data-index-no-match]");
-  var sections = Array.prototype.slice.call(document.querySelectorAll(".okf-section[data-index-section]"));
-  var conceptCount = sections.reduce(function (count, section) {
-    return count + section.querySelectorAll(".okf-card").length;
-  }, 0);
+  var sections;
+  var chips;
+  var conceptCount;
+  function readInventory() {
+    sections = Array.prototype.slice.call(document.querySelectorAll(".okf-section[data-index-section]"));
+    chips = Array.prototype.slice.call(document.querySelectorAll(".okf-type-nav__link[data-index-type]"));
+    conceptCount = sections.reduce(function (count, section) {
+      return count + section.querySelectorAll(".okf-card").length;
+    }, 0);
+  }
+  // The type chips stay jump links (they work without JS). With JS they also
+  // report the active Type filter: the chip of the filtered type carries
+  // aria-current="true" (wiki.css draws the 2px accent bar), and following a
+  // chip whose group the filter currently hides switches the filter to that
+  // type first, so the jump never lands on a hidden section.
+  readInventory();
 
   function compare(a, b, key) {
     if (key === "recent") {
@@ -57,8 +69,26 @@
       section.hidden = !cards.some(function (card) { return !card.hidden; });
     });
     if (noMatch) noMatch.hidden = !(conceptCount > 0 && !!selected && visible === 0);
+    chips.forEach(function (chip) {
+      if (selected && chip.dataset.indexType === selected) chip.setAttribute("aria-current", "true");
+      else chip.removeAttribute("aria-current");
+    });
     status.textContent = visible + (visible === 1 ? " concept shown." : " concepts shown.");
   }
+  document.addEventListener("click", function (event) {
+    var chip = event.target.closest(".okf-type-nav__link[data-index-type]");
+    if (!chip || !type.value || type.value === chip.dataset.indexType) return;
+    var known = Array.prototype.some.call(type.options, function (option) {
+      return option.value === chip.dataset.indexType;
+    });
+    if (!known) return;
+    type.value = chip.dataset.indexType;
+    apply();
+  });
+  window.addEventListener("okf-loom:derivedPatched", function () {
+    readInventory();
+    apply();
+  });
   order.addEventListener("change", apply);
   type.addEventListener("change", apply);
   clear.addEventListener("click", function () {

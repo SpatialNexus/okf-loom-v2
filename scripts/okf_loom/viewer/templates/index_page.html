@@ -4,7 +4,7 @@
 
   Placeholders (str.replace):
       __LANG__           → document language
-        __THEME_ATTR__     → ` data-theme="technical-light|technical-dark|swiss-light|swiss-dark|purple-light|purple-dark|coffee-light|coffee-dark"` (or empty)
+        __THEME_ATTR__     → ` data-theme="bone|slate|clay|plum"` (first-paint Ledger palette)
       __HEAD_TITLE__     → <title> text
       __BUNDLE_NAME__    → display name
   __STATIC_PREFIX__  → URL prefix for /__static/ assets
@@ -13,7 +13,7 @@
                        so typed-query live suggestions stay gated while
                        recent pages keep working)
   __WIKI_CSS_LINK__  → <link rel="stylesheet" href="...wiki.css">
-  __THEME_CONFIG__   → CSP-safe configured theme/modifier preference JSON
+  __THEME_CONFIG__   → CSP-safe configured appearance choice JSON
   __WIKI_JS_LINK__   → <script src="...wiki.js" defer></script>
   __RENDERERS_JS_LINK__ → <script src="...renderers.js" defer></script>
                        (progressive renderers + markdown UX enhancers
@@ -38,7 +38,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230c7373'/%3E%3Cpath d='M8 10h16M8 16h10M8 22h16' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='1' y='1' width='30' height='30' fill='%231d1a16' stroke='%23b0a696' stroke-width='2'/%3E%3Cpath d='M8 8h16M8 16h10M8 24h16' stroke='%23f6f3ed' stroke-width='4'/%3E%3C/svg%3E">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>__HEAD_TITLE__</title>
 __WIKI_CSS_LINK__
@@ -62,13 +62,14 @@ __APPLICATION_SHELL__
 <main id="okf-main" class="okf-index">
   <header class="okf-hero__HERO_MODIFIER__">
     <h1 class="okf-index__title"__INDEX_TITLE_ANCHOR__>__INDEX_TITLE__</h1>
+    __PAGE_FEEDBACK_PLACEHOLDER__
     <div class="okf-index__intro okf-prose">__INDEX_INTRO__</div>
     __HERO_STATS__
+    __INDEX_ENGAGEMENT__
     <div class="okf-hero__visual">
       __HERO_V2__
       __GRAPH_THUMBNAIL__
     </div>
-    __INDEX_ENGAGEMENT__
   </header>
 
   __INDEX_BROWSE_CONTROLS__

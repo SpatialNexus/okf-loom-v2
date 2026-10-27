@@ -127,6 +127,59 @@
     });
   }
 
+  // ---- Recency: relative time text (Ledger) ------------------------------
+  // One format for every "Recently changed" row, shared with render.py
+  // (_recent_time_text / _recent_time_title) and published for the live
+  // Studio rail as window.OKFLoomRecency:
+  //   text  = "just now" (< 1 min), else whole elapsed units rounded DOWN:
+  //           "Nm ago" (< 1 h), "Nh ago" (< 1 day), "Nd ago"; future
+  //           instants (clock skew) read "just now"; unparseable "" (callers
+  //           keep the raw record).
+  //   title = the instant in UTC as "YYYY-MM-DD HH:MM UTC".
+  // The <time datetime> attribute keeps the authored instant. Server text is
+  // relative to the render; this re-renders it against the reader's clock
+  // (static builds never show stale build-time phrasing once scripts run).
+  function okfRelativeTime(ts, now) {
+    var then = Date.parse(ts);
+    if (typeof ts !== "string" || isNaN(then)) return "";
+    var reference = typeof now === "number" ? now : Date.now();
+    var seconds = Math.max(0, (reference - then) / 1000);
+    if (seconds < 60) return "just now";
+    if (seconds < 3600) return Math.floor(seconds / 60) + "m ago";
+    if (seconds < 86400) return Math.floor(seconds / 3600) + "h ago";
+    return Math.floor(seconds / 86400) + "d ago";
+  }
+  function okfUtcTitle(ts) {
+    var then = Date.parse(ts);
+    if (typeof ts !== "string" || isNaN(then)) return "";
+    return new Date(then).toISOString().slice(0, 16).replace("T", " ") + " UTC";
+  }
+  function refreshRecencyTimes() {
+    var now = Date.now();
+    Array.prototype.forEach.call(
+      document.querySelectorAll("time.okf-recent__time[datetime]"),
+      function (node) {
+        var ts = node.getAttribute("datetime");
+        var text = okfRelativeTime(ts, now);
+        if (!text) return;
+        if (node.textContent !== text) node.textContent = text;
+        var title = okfUtcTitle(ts);
+        if (title && node.getAttribute("title") !== title) node.setAttribute("title", title);
+      }
+    );
+  }
+  try {
+    window.OKFLoomRecency = Object.freeze({
+      relativeTime: okfRelativeTime,
+      utcTitle: okfUtcTitle,
+      refresh: refreshRecencyTimes
+    });
+  } catch (e) { /* frozen/locked window: the page still refreshes itself */ }
+  refreshRecencyTimes();
+  if (document.querySelector(".okf-viewer--index")) {
+    window.setInterval(refreshRecencyTimes, 60000);
+  }
+
   // ---- Static/live concept-URL parity (P1 recent-pages navigation) -----
   // Mirrors the established P1-9 convention in renderLocalGraph below: the
   // server emits data-okf-portable-root on <body> = the relative path from
@@ -146,9 +199,9 @@
   }
 
   // ---- Local graph widget (concept page sidebar) -----------------------
-  // P2-62: previously rendered unlabeled coloured dots (decorative). Now
-  // renders a vertical pill list of 1-hop neighbour titles, each coloured
-  // by type, with a colour swatch + truncated label. Keyboard accessible.
+  // P2-62: a vertical list of 1-hop neighbour titles, each with a neutral
+  // square marker + truncated label (Ledger: types are not colour-coded).
+  // Keyboard accessible.
   // The data is embedded by the server in <div id="okf-local-graph" data-graph="...">.
   function renderLocalGraph() {
     var container = document.getElementById("okf-local-graph");
@@ -207,7 +260,7 @@
 
       var swatch = document.createElement("span");
       swatch.className = "okf-local-graph__swatch";
-      swatch.style.background = n.color || "var(--okf-accent)";
+      swatch.setAttribute("aria-hidden", "true");
       btn.appendChild(swatch);
 
       var lbl = document.createElement("span");
@@ -435,9 +488,11 @@
     try { localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, RECENT_MAX))); }
     catch (e) { /* private mode / quota — recent pages is a nicety, not critical */ }
   }
-  function recordRecent(id, title, type, typeColor, iconKey) {
+  function recordRecent(id, title, type, iconKey) {
     if (!id || !title) return;
-    var entry = { id: id, title: title, type: type || "", type_color: typeColor || "", icon: iconKey || "" };
+    // type_color stays in the stored shape (always empty) so entries written
+    // by older builds and by this one share one schema.
+    var entry = { id: id, title: title, type: type || "", type_color: "", icon: iconKey || "" };
     var list = loadRecent().filter(function (e) { return e.id !== id; });
     list.unshift(entry);
     saveRecent(list);
@@ -450,12 +505,9 @@
     var h1 = document.querySelector(".okf-page__title");
     var title = h1 ? (h1.textContent || "").trim() : "";
     if (!title) title = cid;
-    var typeColor = "";
     var iconKey = "";
     var infobox = document.querySelector(".okf-page__infobox");
     if (infobox) {
-      var accent = infobox.style.getPropertyValue("--okf-type-accent");
-      if (accent) typeColor = accent.trim();
       // The renderer emits the resolved icon key on the infobox element so
       // the recent-page entry can carry the same icon as a fresh search hit.
       if (infobox.dataset.okfTypeIcon) iconKey = infobox.dataset.okfTypeIcon;
@@ -463,24 +515,13 @@
     var type = "";
     var typeEl = document.querySelector(".okf-infobox__type");
     if (typeEl) type = (typeEl.textContent || "").trim();
-    recordRecent(cid, title, type, typeColor, iconKey);
+    recordRecent(cid, title, type, iconKey);
   })();
 
-  // Build a tinted type chip element from a result's type/type_color. The
-  // chip reuses the .okf-type-chip base shape via .okf-search-live__type; the
-  // colour is applied as an opaque tint background + type-colour text. Safe:
-  // only hex/rgb from the server payload are accepted (the regex gate keeps
-  // arbitrary CSS / url() out of the inline style), and the type name is
-  // rendered via textContent.
-  var _SAFE_COLOR = /^(#[0-9a-fA-F]{3,8}|rgb\([^)]*\)|rgba\([^)]*\)|oklch\([^)]*\)|hsl\([^)]*\)|[a-z]+)$/i;
-  function safeColor(c) { return typeof c === "string" && _SAFE_COLOR.test(c.trim()) ? c.trim() : ""; }
-  function tintFor(color) {
-    // A readable translucent tint background for a solid type colour; falls
-    // back to the muted inset chip when no colour is available.
-    var c = safeColor(color);
-    if (!c) return null;
-    return "color-mix(in srgb, " + c + " 16%, var(--okf-bg-inset))";
-  }
+  // Type chips (search suggestions, recent pages, link popover) carry the
+  // type ICON + NAME only. Ledger does not colour-code content types, so a
+  // payload's type_color is deliberately ignored and never reaches an inline
+  // style; the chip's neutral outlined look is wiki.css.
   // Phase 2 search-chip type-icon parity (plan §3.4): the chip must carry
   // the SAME type icon the rest of the UI uses, not text/colour only. The
   // icon-key → SVG-inner-markup map is shipped once per page by the server
@@ -533,7 +574,7 @@
     svg.appendChild(wrapper);
     return svg;
   }
-  function makeTypeChip(typeName, typeColor, iconKey) {
+  function makeTypeChip(typeName, iconKey) {
     var chip = document.createElement("span");
     chip.className = "okf-search-live__type";
     var label = typeName || "concept";
@@ -547,11 +588,6 @@
     labelNode.className = "okf-search-live__type-label";
     labelNode.textContent = label;
     chip.appendChild(labelNode);
-    var tint = tintFor(typeColor);
-    if (tint) {
-      chip.style.background = tint;
-      chip.style.color = safeColor(typeColor);
-    }
     return chip;
   }
 
@@ -561,15 +597,7 @@
   // whole query-term words (>=2 chars) case-insensitively, bounded so a
   // tiny term can't mark tens of thousands of spans in a huge passage.
   function highlightPattern(query) {
-    var terms = (query || "")
-      .toLowerCase()
-      .split(/[^0-9a-z]+/i)
-      .filter(function (t) { return t.length >= 2; })
-      .slice(0, 8);
-    if (!terms.length) return null;
-    return new RegExp("(" + terms.map(function (t) {
-      return t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    }).join("|") + ")", "gi");
+    return window.okfHighlightPattern(query);
   }
 
   function appendHighlighted(parent, text, query) {
@@ -598,40 +626,7 @@
   // pipes and tag-like HTML drop, and backslash escapes resolve. This is
   // presentation only; safety still comes from appendHighlighted building
   // text nodes (never innerHTML).
-  var ENTITY_TEXT = { amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", nbsp: " ", mdash: "\u2014", ndash: "\u2013", hellip: "\u2026" };
-  function readableExcerpt(markdown) {
-    var escaped = [];
-    var text = String(markdown || "")
-      .replace(/\\([!-\/:-@\[-`{-~])/g, function (_, ch) { escaped.push(ch); return "\uE000" + (escaped.length - 1) + "\uE001"; })
-      .replace(/^[ \t]{0,3}(?:`{3,}|~{3,})[^\n]*$/gm, " ")
-      .replace(/^[ \t]*\|?[ \t]*:?-{3,}:?[ \t]*(?:\|[ \t]*:?-{3,}:?[ \t]*)*\|?[ \t]*$/gm, " ")
-      .replace(/^[ \t]*\|(.*)\|[ \t]*$/gm, function (_, cells) {
-        return cells.split("|").map(function (c) { return c.trim(); }).filter(Boolean).join(" \u00b7 ");
-      })
-      .replace(/^[ \t]{0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/gm, " ")
-      .replace(/^[ \t]{0,3}(?:>[ \t]?)+/gm, "")
-      .replace(/^[ \t]{0,3}#{1,6}[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/gm, "$1")
-      .replace(/^[ \t]*(?:[-*+]|\d{1,9}[.)])[ \t]+(?:\[[ xX]\][ \t]+)?/gm, "")
-      .replace(/<!--[\s\S]*?-->/g, " ")
-      .replace(/<((?:https?|mailto):[^<>\s]+)>/gi, "$1")
-      .replace(/<\/?[A-Za-z][\w:-]*(?:\s[^<>]*)?\/?>/g, " ")
-      .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
-      .replace(/\[([^\]]+)\]\((?:[^()\s]|\([^()\s]*\))*(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)/g, "$1")
-      .replace(/!?\[([^\]]+)\]\[[^\]]*\]/g, "$1")
-      .replace(/\[\^[^\]\s]+\]/g, "")
-      .replace(/(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/g, "$2")
-      .replace(/(\*{1,3}|~~)(?=\S)([\s\S]*?\S)\1/g, "$2")
-      .replace(/(^|[^0-9A-Za-z_])(_{1,3})(?=\S)([\s\S]*?\S)\2(?![0-9A-Za-z_])/g, "$1$3")
-      .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, function (all, name) {
-        if (name.charAt(0) === "#") {
-          var code = name.charAt(1).toLowerCase() === "x" ? parseInt(name.slice(2), 16) : parseInt(name.slice(1), 10);
-          return code > 0 && code < 0x110000 ? String.fromCodePoint(code) : all;
-        }
-        return Object.prototype.hasOwnProperty.call(ENTITY_TEXT, name.toLowerCase()) ? ENTITY_TEXT[name.toLowerCase()] : all;
-      })
-      .replace(/\uE000(\d+)\uE001/g, function (_, i) { return escaped[Number(i)]; });
-    return text.replace(/\s+/g, " ").trim();
-  }
+  function readableExcerpt(markdown) { return window.okfReadableText(markdown); }
 
   // Keep the first matched term inside the short evidence line: when the
   // match sits past the visible budget, start the window a little before it
@@ -673,7 +668,7 @@
     opt.setAttribute("aria-label", (it.title || cid) + (it.type ? ", " + it.type : "") + (cid ? ", " + cid : ""));
     var head = document.createElement("span");
     head.className = "okf-search-live__head";
-    head.appendChild(makeTypeChip(it.type, it.type_color, it.icon));
+    head.appendChild(makeTypeChip(it.type, it.icon));
     var title = document.createElement("span");
     title.className = "okf-search-live__title";
     appendHighlighted(title, it.title || cid, query);
@@ -712,6 +707,13 @@
     container.textContent = "";
     if (!items) items = [];
     var shown = items.slice(0, 8);
+    if (!shown.length) {
+      var empty = document.createElement("div");
+      empty.className = "okf-search-live__empty";
+      empty.setAttribute("role", "presentation");
+      empty.textContent = "No matching pages";
+      container.appendChild(empty);
+    }
     // Group by type when there are many results (>6) so the box reads as
     // type-banded sections rather than a flat monoculture; otherwise a flat
     // list (lighter for 1-6 hits). Group headers are dividers, NOT options.
@@ -748,24 +750,17 @@
   }
 
   // Recent-pages panel for an empty query (shown on focus / cleared input).
-  // Renders a "Recent pages" group header + one option per recent visit, or
-  // a quiet empty state when the reader has no history yet. All options are
+  // Exclude the current page and stay closed with no other visits. Options are
   // real role=option nodes so the existing combobox keyboard model owns them.
   function renderRecent(container, input) {
     container.textContent = "";
-    var recent = loadRecent();
+    var recent = loadRecent().filter(function (it) { return it.id !== document.body.dataset.okfConcept; });
+    container.hidden = !recent.length;
+    if (!recent.length) return;
     container.appendChild(makeGroupHeader("Recent pages", "recent"));
-    if (!recent.length) {
-      var empty = document.createElement("div");
-      empty.className = "okf-search-live__empty";
-      empty.textContent = "No recent pages yet. Pages you open appear here.";
-      container.appendChild(empty);
-    } else {
-      recent.forEach(function (it) {
-        container.appendChild(makeOption(container, input, it, "", it.id));
-      });
-    }
-    container.hidden = false;
+    recent.forEach(function (it) {
+      container.appendChild(makeOption(container, input, it, "", it.id));
+    });
   }
 
   // ---- Deterministic Context Pack copy --------------------------------
@@ -1404,7 +1399,37 @@
   // hover's response may render; hidePopover also invalidates in-flight
   // responses so a popover can't reappear after mouseout.
   var popoverSeq = 0;
-   function showPopover(target, x, y) {
+  // Place the card beside its link, never over it (WCAG 2.4.11: a focused
+  // link and its ring stay visible): below the link's box when it fits, else
+  // above, else to the right or left. The pointer only picks the horizontal
+  // start of a hover card. When no spot clears the link, a focus-opened card
+  // stays closed; a hover card is clamped into the viewport.
+  function placePopover(p, anchor, pointerX, byFocus) {
+    var GAP = 8, EDGE = 12;
+    var vw = window.innerWidth, vh = window.innerHeight;
+    // Measure at the origin: a fixed card near the right edge shrink-wraps.
+    p.style.left = "0px";
+    p.style.top = "0px";
+    var card = p.getBoundingClientRect();
+    var w = card.width, h = card.height;
+    var box = anchor.getBoundingClientRect();
+    function clampX(x) { return Math.max(EDGE, Math.min(x, vw - w - EDGE)); }
+    function clampY(y) { return Math.max(EDGE, Math.min(y, vh - h - EDGE)); }
+    var startX = clampX(typeof pointerX === "number" ? pointerX : box.left);
+    var spot = null;
+    if (box.bottom + GAP + h <= vh - EDGE) spot = { left: startX, top: box.bottom + GAP };
+    else if (box.top - GAP - h >= EDGE) spot = { left: startX, top: box.top - GAP - h };
+    else if (box.right + GAP + w <= vw - EDGE) spot = { left: box.right + GAP, top: clampY(box.top) };
+    else if (box.left - GAP - w >= EDGE) spot = { left: box.left - GAP - w, top: clampY(box.top) };
+    if (!spot) {
+      if (byFocus) { p.style.display = "none"; return; }
+      spot = { left: startX, top: clampY(box.bottom + GAP) };
+    }
+    p.style.left = spot.left + "px";
+    p.style.top = spot.top + "px";
+  }
+
+   function showPopover(target, anchor, pointerX, byFocus) {
     var seq = ++popoverSeq;
     // /__raw/<id> is the body only (no frontmatter), so a preview built from
     // it showed the id as the title and a generic type. /__data/summary is
@@ -1419,22 +1444,14 @@
         // only (never innerHTML from fetched/server data). A hostile
         // summary response cannot inject markup or script.
         p.textContent = "";
-        // Type band: tinted chip in the concept's type colour (deterministic
-        // crc32->hue fallback mirrors server stable_hue so the band reads as
-        // type identity; the icon/name disambiguate curated hues). Colour is
-        // gated by safeColor before it reaches the inline style.
+        // Type band: the type icon + name as a neutral outlined micro-label
+        // (Ledger: content types are not colour-coded).
         var typeEl = document.createElement("span");
         typeEl.className = "okf-popover__type";
         var typeName = typeof fm.type === "string" && fm.type ? fm.type : "concept";
         var typeIcon = makeTypeIconSvg(fm.icon);
         if (typeIcon) typeEl.appendChild(typeIcon);
         typeEl.appendChild(document.createTextNode(typeName));
-        var tColor = safeColor(fm.type_color) || typeColorJs(typeName);
-        // Only the tint takes the type colour; the name keeps the theme ink
-        // (wiki.css), because a mid-tone type colour as text fails 4.5:1.
-        if (tColor) {
-          typeEl.style.background = "color-mix(in srgb, " + tColor + " 16%, var(--okf-bg-inset))";
-        }
         var titleEl = document.createElement("h4");
         titleEl.textContent = typeof fm.title === "string" && fm.title ? fm.title : target;
         p.appendChild(typeEl);
@@ -1442,7 +1459,7 @@
         if (typeof fm.description === "string" && fm.description) {
           var d = document.createElement("div");
           d.className = "okf-popover__body";
-          d.textContent = fm.description;
+          d.textContent = readableExcerpt(fm.description);
           p.appendChild(d);
         }
         // Link/relation counts (plan §3.4): internal body links and typed
@@ -1473,51 +1490,9 @@
           p.appendChild(row);
         }
         p.style.display = "block";
-        // Position near cursor (or focus point), clamped to viewport.
-        var rect = p.getBoundingClientRect();
-        var px = Math.min((x || 12) + 12, window.innerWidth - rect.width - 12);
-        var py = Math.min((y || 12) + 12, window.innerHeight - rect.height - 12);
-        p.style.left = Math.max(12, px) + "px";
-        p.style.top = Math.max(12, py) + "px";
+        placePopover(p, anchor, pointerX, byFocus);
       })
       .catch(function () {});
-  }
-
-  // Deterministic type colour for the popover band, mirroring the server's
-  // stable_hue fallback (crc32(name) % 360 -> hsl). Used ONLY for the hover
-  // preview tint (the type name + concept icon carry identity); it never
-  // reaches the search-suggestion chips (those use the server type_color).
-  function typeColorJs(typeName) {
-    var name = String(typeName || "concept");
-    var crc = crc32Str(name) >>> 0;
-    var hue = crc % 360;
-    return "hsl(" + hue + ", 62%, 48%)";
-  }
-  function crc32Str(str) {
-    var table = crc32Str._t;
-    if (!table) {
-      table = new Uint32Array(256);
-      for (var n = 0; n < 256; n++) {
-        var c = n;
-        for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-        table[n] = c >>> 0;
-      }
-      crc32Str._t = table;
-    }
-    var crc = 0xFFFFFFFF;
-    for (var i = 0; i < str.length; i++) {
-      var code = str.charCodeAt(i);
-      if (code > 0xFF) {
-        // utf-8 encode codepoints > 255 (mirror zlib.crc32 over utf-8 bytes)
-        var bytes = unescape(encodeURIComponent(String.fromCharCode(code)));
-        for (var j = 0; j < bytes.length; j++) {
-          crc = (crc >>> 8) ^ table[(crc ^ bytes.charCodeAt(j)) & 0xFF];
-        }
-      } else {
-        crc = (crc >>> 8) ^ table[(crc ^ code) & 0xFF];
-      }
-    }
-    return (crc ^ 0xFFFFFFFF) >>> 0;
   }
 
   function hidePopover() {
@@ -1525,7 +1500,7 @@
     if (popover) popover.style.display = "none";
   }
 
-  function scheduleShow(target, x, y) {
+  function scheduleShow(target, anchor, pointerX, byFocus) {
     if (popoverTimer) clearTimeout(popoverTimer);
     // Phase 2 P1 race fix (cache-invalidation-invariants): a NEW hover must
     // invalidate any EARLIER hover's in-flight fetch IMMEDIATELY — before this
@@ -1541,7 +1516,7 @@
     popoverSeq++;
     var delay = REDUCED_MOTION ? 0 : 200;   // P2-70: ~200ms (was 350ms)
     popoverTimer = setTimeout(function () {
-      showPopover(target, x, y);
+      showPopover(target, anchor, pointerX, byFocus);
     }, delay);
   }
   function cancelShow() {
@@ -1574,13 +1549,12 @@
       if (hoverBoundLinks.has(a)) return;
       hoverBoundLinks.add(a);
       a.addEventListener("mouseenter", function (e) {
-        scheduleShow(target, e.clientX, e.clientY);
+        scheduleShow(target, a, e.clientX, false);
       });
       a.addEventListener("mouseleave", cancelShow);
       // Keyboard parity (P2-70): focus shows, blur hides.
-      a.addEventListener("focus", function (e) {
-        var rect = a.getBoundingClientRect();
-        scheduleShow(target, rect.left, rect.bottom);
+      a.addEventListener("focus", function () {
+        scheduleShow(target, a, null, true);
       });
       a.addEventListener("blur", cancelShow);
     });
@@ -1655,6 +1629,134 @@
       h.appendChild(a);
     });
   }
+
+  // ---- Scroll-away chrome on phones ------------------------------------
+  // At <=640px (sticky viewports), and on short coarse viewports such as a
+  // landscape phone (844x390: 145px of 390px), the top bar and the live
+  // document view bar under it cost a third to a half of the screen. While the reader scrolls
+  // down past them they slide away and only the view bar's Sections row stays
+  // pinned (nothing stays on pages without Sections); scrolling up, reaching
+  // the top, keyboard focus in the chrome, an open overlay, or a capture
+  // bring the whole chrome back. State lives on <html data-okf-chrome>;
+  // shell.css owns the presentation (transforms only, so nothing shifts).
+  // Other viewports never get the attribute (the query must match
+  // shell.css), and the graph route keeps its own full-screen layout.
+  (function scrollAwayChrome() {
+    var shell = document.querySelector(".okf-topbar.okf-shell");
+    if (!shell || !window.matchMedia || document.body.classList.contains("okf-viewer--graph")) return;
+    var root = document.documentElement;
+    var query = window.matchMedia("(max-width: 640px) and (min-height: 481px), " +
+      "(min-width: 641px) and (max-height: 500px) and (pointer: coarse)");
+    var GUTTER = 4;   // view-bar surface kept above the pinned Sections row
+    var TRAVEL = 10;  // one-direction scroll distance before the state flips
+    var state = "", lastY = 0, travel = 0, frame = 0, compactHeight = 0;
+
+    function scrollTop() { return Math.max(0, window.scrollY || window.pageYOffset || 0); }
+    function boxHeight(node) {
+      return node && node.getClientRects().length ? node.getBoundingClientRect().height : 0;
+    }
+    // Publishes the shifts that move the top bar wholly above the viewport
+    // and the view bar up to its Sections row; returns the full stack height.
+    function measure() {
+      var bar = document.querySelector(".okf-concept-viewbar");
+      var topHeight = boxHeight(shell), barHeight = boxHeight(bar), offset = barHeight;
+      var kept = bar && bar.querySelector(".okf-outline-jump");
+      if (kept && kept.getClientRects().length) {
+        offset = Math.max(0, kept.getBoundingClientRect().top - bar.getBoundingClientRect().top - GUTTER);
+      }
+      root.style.setProperty("--okf-chrome-shift-top", -topHeight + "px");
+      root.style.setProperty("--okf-chrome-shift-bar", -(topHeight + offset) + "px");
+      compactHeight = barHeight - offset;
+      return topHeight + barHeight;
+    }
+    // The full chrome must stay: during a capture, under any registered
+    // overlay (menus, palette, Studio dialog), and while the live Studio
+    // loading notice is anchored below the bar.
+    function held() {
+      if (root.hasAttribute("data-okf-capture")) return true;
+      if (window.OKFOverlayStack && window.OKFOverlayStack.depth() > 0) return true;
+      var notice = document.querySelector("body > .okf-live-studio-fallback");
+      return !!(notice && notice.getClientRects().length && getComputedStyle(notice).position === "absolute");
+    }
+    function apply(next, animate) {
+      if (!state || next === state) return;
+      if (animate) root.setAttribute("data-okf-chrome-motion", "");
+      else root.removeAttribute("data-okf-chrome-motion");
+      state = next;
+      root.setAttribute("data-okf-chrome", next);
+      if (window.okfDocumentOutline && typeof window.okfDocumentOutline.updateOcclusion === "function") {
+        window.okfDocumentOutline.updateOcclusion();
+      }
+    }
+    function onScroll() {
+      frame = 0;
+      if (!state) return;
+      var y = scrollTop(), delta = y - lastY;
+      lastY = y;
+      if (y <= 1 || held()) { travel = 0; apply("revealed", y <= 1); return; }
+      if (!delta) return;
+      travel = (delta > 0) === (travel > 0) ? travel + delta : delta;
+      if (travel >= TRAVEL && state === "revealed" && y > measure()) apply("compact", true);
+      else if (travel <= -TRAVEL && state === "compact") apply("revealed", true);
+    }
+    function sync() {
+      if (query.matches && !state) {
+        state = "revealed";
+        root.setAttribute("data-okf-chrome", state);
+      } else if (!query.matches && state) {
+        state = "";
+        root.removeAttribute("data-okf-chrome");
+        root.removeAttribute("data-okf-chrome-motion");
+        if (window.okfDocumentOutline && typeof window.okfDocumentOutline.updateOcclusion === "function") {
+          window.okfDocumentOutline.updateOcclusion();
+        }
+      }
+      lastY = scrollTop();
+      travel = 0;
+    }
+
+    window.addEventListener("scroll", function () {
+      if (state && !frame) frame = requestAnimationFrame(onScroll);
+    }, { passive: true });
+    if (query.addEventListener) query.addEventListener("change", sync);
+    else if (query.addListener) query.addListener(sync);
+    // Keyboard (or programmatic) focus entering hidden chrome brings it all
+    // back; the pinned Sections row is already on screen and never moves
+    // under the reader's finger. shell.css reveals synchronously too, so the
+    // control is visible before the browser scrolls to it.
+    document.addEventListener("focusin", function (event) {
+      var bar = document.querySelector(".okf-concept-viewbar");
+      var target = event.target;
+      if (state === "compact" && target && target.closest &&
+          (shell.contains(target) || (bar && bar.contains(target) && !target.closest(".okf-outline-jump")))) {
+        apply("revealed", false);
+      }
+    });
+    window.addEventListener("okf-loom:overlaychange", function () {
+      if (state === "compact" && held()) apply("revealed", false);
+    });
+    // Geometry is re-measured whenever compact is entered or a jump is
+    // prepared; the published shifts also follow viewport resizes.
+    window.addEventListener("resize", function () { if (state === "compact") measure(); });
+    sync();
+
+    window.okfShellChrome = Object.freeze({
+      get state() { return state || "static"; },
+      // The height of chrome occluding the document top, given the full
+      // sticky stack height.
+      occlusion: function (full) { return state === "compact" ? compactHeight : full; },
+      // Heading jumps: past the full chrome the jump lands under the pinned
+      // row alone, so settle compact first (no slide); near the top keep the
+      // full chrome. document-outline.js then scrolls and calls settle().
+      prepareJump: function (target) {
+        if (!state || !target || held()) return;
+        var full = measure();
+        var top = target.getBoundingClientRect().top + scrollTop();
+        apply(top - compactHeight - 16 > full ? "compact" : "revealed", false);
+      },
+      settle: function () { lastY = scrollTop(); travel = 0; },
+    });
+  })();
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function () {

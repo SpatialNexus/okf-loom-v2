@@ -22,99 +22,244 @@
   "use strict";
   document.body.setAttribute("data-okf-js", "1");
 
-  // Theme state (family/mode/Auto/OS, persistence, the Appearance popover)
-  // is owned ENTIRELY by viewer/static/theme.js. This file is a READ-ONLY
-  // consumer: it resolves a canvas palette from the active data-theme and
-  // re-syncs the canvas on `okf-loom:themeChanged`. It never reads or writes
-  // localStorage for theme and never sets data-theme.
+  // Theme state (the Ledger palette choice, System/OS resolution,
+  // persistence, the Appearance popover) is owned ENTIRELY by
+  // viewer/static/theme.js. This file is a READ-ONLY consumer: it resolves
+  // the canvas colours from the active palette's tokens and re-syncs the
+  // canvas on `okf-loom:themeChanged`. It never reads or writes localStorage
+  // for theme and never sets data-theme.
 
-  // ---- Canvas colour constants (P2-5 iter-2) -------------------------------
-  // Cytoscape canvas styles CANNOT read CSS custom properties directly, so
-  // these JS literals follow the design tokens declared in wiki.css :root
-  // and the [data-theme="…"] blocks. KEEP IN SYNC WITH wiki.css TOKENS -
-  // the CSS file is the authoritative source; this block exists so a token
-  // change has ONE obvious place to update in JS. Technical and Swiss retain
-  // their shared-within-a-mode foundation; Purple and Coffee carry their own
-  // editorial/paper canvas palettes. Per resolved theme:
-  //   nodeText     node label text. = --okf-fg.
-  //   nodeBorder   node border. Light-family themes reuse --okf-fg; dark-
-  //                family themes use --okf-bg so the border reads strong
-  //                against the elevated canvas surface.
-  //   bridgeBorder bridge/focus node border. = --okf-fg in every theme.
-  //   edge         edge line + arrow. Technical = semantic slate (#5e6e85
-  //                light, #64748b dark); Swiss = --okf-border-strong
-  //                (#0f172a/#e2e8f0).
-  //   edgeLabel    edge label text. Review feedback: darkened well past
-  //                --okf-fg-muted (light was #64748b ~4.6:1 → #334155
-  //                ~10.4:1) so relationship labels stay legible when the
-  //                auto-fit zooms the graph out. Each theme's value is a
-  //                strengthened take on its fg-muted.
-  //   edgeLabelBg  edge label background (opaque so labels stay readable
-  //                over nodes). = --okf-bg-elev (light family) or --okf-bg
-  //                (dark family).
-  //   select       selection colour. = --okf-select (contrast ratios are
-  //                documented in wiki.css).
-  var _LIGHT = {
-    nodeText: "#0f172a", nodeBorder: "#0f172a", bridgeBorder: "#0f172a",
-    edgeLabel: "#334155", edgeLabelBg: "#f3f5f7",
-    select: "#0b6f6f",
+  // ---- Canvas colours: resolved from the Ledger tokens --------------------
+  // Cytoscape paints on <canvas> and cannot read CSS custom properties, so
+  // the graph reads the active palette's tokens (the wiki.css palette
+  // blocks) with getComputedStyle. The resolved set is cached per data-theme
+  // and dropped on every palette change, so nodes, labels, edges, halos,
+  // badges, glyphs, the minimap and the lens ramps all repaint from the
+  // palette actually on screen. There is no per-theme colour table here: a
+  // palette is defined entirely by its tokens.
+  //   node        --graph-node        neutral round node fill
+  //   nodeIcon    --graph-node-icon   type glyph stroke
+  //   nodeBorder  --border-strong     1.5px node stroke
+  //   nodeText    --graph-label       node label ink
+  //   halo        --graph-halo        label halo and relationship-label plate
+  //   edge        --graph-edge        edge line and arrowhead
+  //   edgeLabel   --text-3            muted relationship label ink (AA on the halo)
+  //   select      --accent            the selected node's 4px stroke / edge
+  //   cue         --text              path, search and bridge marks (ink)
+  //   raised      --surface-2         neutral hub / hover / focus halos
+  //   surface     --surface           the selected/hovered label's plate
+  //   chip        --bg-2              count-chip fill
+  //   warn/error/info --status-*      status markers: strokes and glyphs only
+  var GRAPH_TOKENS = {
+    canvas: "--graph-bg", node: "--graph-node", nodeIcon: "--graph-node-icon",
+    nodeBorder: "--border-strong", nodeText: "--graph-label", halo: "--graph-halo",
+    edge: "--graph-edge", edgeLabel: "--text-3", select: "--accent", cue: "--text",
+    muted: "--text-3", raised: "--surface-2", surface: "--surface", chip: "--bg-2",
+    warn: "--status-warn", error: "--status-error", info: "--status-info"
   };
-  var _DARK = {
-    nodeText: "#e2e8f0", nodeBorder: "#0b1220", bridgeBorder: "#e2e8f0",
-    edgeLabel: "#cbd5e1", edgeLabelBg: "#0b1220",
-    select: "#3ec9c9",
+  // Last-resort values (Bone) for an embedder that loads graph.js without the
+  // Ledger stylesheet; every viewer surface resolves the tokens above.
+  var GRAPH_TOKEN_FALLBACK = {
+    canvas: "#f6f3ed", node: "#d2cabd", nodeIcon: "#1d1a16", nodeBorder: "#b0a696",
+    nodeText: "#1d1a16", halo: "#f6f3ed", edge: "#a39a8b", edgeLabel: "#675f55",
+    select: "#a3573a", cue: "#1d1a16", muted: "#6a6258", raised: "#e3ddd2", surface: "#fbf9f5",
+    chip: "#eae5dc", warn: "#7f5410", error: "#9e2f2a", info: "#36597e"
   };
-  var _PURPLE_LIGHT = {
-    nodeText: "#241b36", nodeBorder: "#241b36", bridgeBorder: "#241b36",
-    edgeLabel: "#4a3d59", edgeLabelBg: "#f5f2f9",
-    select: "#5b2a86",
-  };
-  var _PURPLE_DARK = {
-    nodeText: "#f1eafa", nodeBorder: "#181222", bridgeBorder: "#f1eafa",
-    edgeLabel: "#d8cce4", edgeLabelBg: "#181222",
-    select: "#c69cf2",
-  };
-  var _COFFEE_LIGHT = {
-    nodeText: "#33241b", nodeBorder: "#33241b", bridgeBorder: "#33241b",
-    edgeLabel: "#59483c", edgeLabelBg: "#f6f1e8",
-    select: "#7b3f20",
-  };
-  var _COFFEE_DARK = {
-    nodeText: "#f4e7d7", nodeBorder: "#211711", bridgeBorder: "#f4e7d7",
-    edgeLabel: "#d9c9ba", edgeLabelBg: "#211711",
-    select: "#e6aa72",
-  };
-  // Build a per-theme palette: family/mode canvas base plus a graph edge hue.
-  function _palette(base, edge) {
-    var p = Object.assign({}, base);
-    p.edge = edge;
-    return p;
+
+  // Colour arithmetic for the palette-derived lens ramp. Parses the token
+  // values (hex/rgb; anything else is resolved by the canvas engine) and
+  // works in OKLab so equal steps read as equal steps.
+  var _colourCtx = null;
+  function parseColour(value) {
+    var s = String(value || "").trim();
+    if (!s) return null;
+    var m = s.match(/^#([0-9a-f]{3,8})$/i);
+    if (m) {
+      var h = m[1];
+      if (h.length === 3 || h.length === 4) h = h.split("").map(function (ch) { return ch + ch; }).join("");
+      if (h.length !== 6 && h.length !== 8) return null;
+      return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16),
+        h.length === 8 ? parseInt(h.slice(6, 8), 16) / 255 : 1];
+    }
+    m = s.match(/^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:\s*[,/]\s*([\d.]+)(%?))?\s*\)$/i);
+    if (m) return [+m[1], +m[2], +m[3], m[4] == null ? 1 : (m[5] ? m[4] / 100 : +m[4])];
+    try {
+      if (!_colourCtx) { var cv = document.createElement("canvas"); cv.width = cv.height = 1; _colourCtx = cv.getContext("2d"); }
+      if (!_colourCtx) return null;
+      _colourCtx.fillStyle = "#010203"; _colourCtx.fillStyle = s;
+      var out = String(_colourCtx.fillStyle);
+      if (out === "#010203" || out === s) return null;
+      return parseColour(out);
+    } catch (e) { return null; }
   }
-  var GRAPH_COLORS = {
-    // Technical light and dark deliberately use a semantic slate: the
-    // Technical family's decorative border tokens are too quiet for graph
-    // topology. Swiss mirrors its family --okf-border-strong exactly. Edge
-    // opacity remains weight-mapped; only the Technical base hue is lifted.
-    // Soft Light dimmed the light canvas to #f3f5f7, so the light slate is
-    // darkened from #64748b (4.35:1 there) to #5e6e85 (4.75:1 on the canvas,
-    // 4.50:1 on --okf-bg); the dark slate is unchanged.
-    //   technical-light #5e6e85 (lifted) / swiss-light #0f172a (token)
-      //   technical-dark  #64748b (lifted) / swiss-dark  #e2e8f0 (token)
-      //   purple light/dark #76518d / #a583c0; coffee light/dark #8d5a3c / #b78358
-      "technical-light": _palette(_LIGHT, "#5e6e85"),
-      "swiss-light": _palette(_LIGHT, "#0f172a"),
-      "technical-dark": _palette(_DARK, "#64748b"),
-      "swiss-dark": _palette(_DARK, "#e2e8f0"),
-      "purple-light": _palette(_PURPLE_LIGHT, "#76518d"),
-      "purple-dark": _palette(_PURPLE_DARK, "#a583c0"),
-      "coffee-light": _palette(_COFFEE_LIGHT, "#8d5a3c"),
-      "coffee-dark": _palette(_COFFEE_DARK, "#b78358"),
-      };
+  function colourHex(rgb) {
+    return "#" + rgb.slice(0, 3).map(function (v) {
+      var c = Math.max(0, Math.min(255, Math.round(v))).toString(16);
+      return c.length === 1 ? "0" + c : c;
+    }).join("");
+  }
+  function _srgbToLinear(v) { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+  function _linearToSrgb(v) { return 255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055); }
+  function luminance(rgb) {
+    return 0.2126 * _srgbToLinear(rgb[0]) + 0.7152 * _srgbToLinear(rgb[1]) + 0.0722 * _srgbToLinear(rgb[2]);
+  }
+  function contrastRatio(a, b) {
+    var la = luminance(a), lb = luminance(b);
+    return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+  }
+  function toOklab(rgb) {
+    var r = _srgbToLinear(rgb[0]), g = _srgbToLinear(rgb[1]), b = _srgbToLinear(rgb[2]);
+    var l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+    var m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+    var s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+    return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+      1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+      0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s];
+  }
+  // OKLab -> sRGB (0..255), or null when the colour is outside the gamut.
+  function fromOklab(lab) {
+    var l = Math.pow(lab[0] + 0.3963377774 * lab[1] + 0.2158037573 * lab[2], 3);
+    var m = Math.pow(lab[0] - 0.1055613458 * lab[1] - 0.0638541728 * lab[2], 3);
+    var s = Math.pow(lab[0] - 0.0894841775 * lab[1] - 1.2914855480 * lab[2], 3);
+    var lin = [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+      -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+      -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s];
+    if (lin.some(function (v) { return v < -0.0005 || v > 1.0005; })) return null;
+    return lin.map(function (v) { return _linearToSrgb(Math.max(0, Math.min(1, v))); });
+  }
+  // Lightness/chroma/hue -> sRGB, shedding chroma until the colour fits.
+  function oklchRgb(L, C, h) {
+    L = Math.max(0, Math.min(1, L));
+    for (var c = C; c >= 0; c -= 0.004) {
+      var rgb = fromOklab([L, c * Math.cos(h), c * Math.sin(h)]);
+      if (rgb) return rgb;
+    }
+    return fromOklab([L, 0, 0]) || [L * 255, L * 255, L * 255];
+  }
 
-  // Resolve the palette for the CURRENT data-theme (technical-light fallback).
+  // Mix `from` toward `toward` (in sRGB steps of 5%) until it reaches
+  // `ratio` against `bg`; returns `from` unchanged when it already does.
+  function liftToContrast(from, toward, bg, ratio) {
+    for (var t = 0; t <= 1.0001; t += 0.05) {
+      var mixed = [0, 1, 2].map(function (i) { return Math.round(from[i] + (toward[i] - from[i]) * t); });
+      if (contrastRatio(mixed, bg) >= ratio) return mixed;
+    }
+    return toward.slice(0, 3);
+  }
+
+  // The lens ramp: a MUTED colour set derived from the active palette, so a
+  // lens keeps its meaning without breaking the one-accent rule.
+  //   categorical  8 low-chroma hues stepped by the golden angle from the
+  //                accent hue, near the neutral node's lightness
+  //                (themes/communities, groups). Dark palettes lift the
+  //                node lightness; a light palette (Bone) steps just below
+  //                its node at a lower chroma, because the same chroma at
+  //                paper lightness reads as pastel candy rather than as
+  //                the muted tints the dark palettes get.
+  //   sequence(t)  neutral node (t=0) -> a muted accent (t=1), in OKLab
+  //                (freshness, bridging, importance).
+  //   relation     the categorical hues at the edge's lightness (typed
+  //                edges under the Relations/Flow intent).
+  // Every fill keeps the type glyph (--graph-node-icon) at >= 4.5:1.
+  var GOLDEN_ANGLE = 2.399963;
+  function buildLensRamp(pal) {
+    var icon = pal.rgb.nodeIcon, node = toOklab(pal.rgb.node), acc = toOklab(pal.rgb.select);
+    var edge = toOklab(pal.rgb.edge), dark = pal.dark;
+    var accH = Math.atan2(acc[2], acc[1]), accC = Math.hypot(acc[1], acc[2]);
+    function legible(L, C, h) {
+      var rgb = oklchRgb(L, C, h);
+      for (var i = 0; i < 20 && contrastRatio(rgb, icon) < 4.5; i++) {
+        L += dark ? -0.02 : 0.02;
+        rgb = oklchRgb(L, C, h);
+      }
+      return rgb;
+    }
+    var catL = node[0] + (dark ? 0.12 : -0.07), catC = dark ? 0.05 : 0.034;
+    var categorical = [], relation = [];
+    for (var k = 0; k < 8; k++) {
+      categorical.push(colourHex(legible(catL, catC, accH + k * GOLDEN_ANGLE)));
+      relation.push(colourHex(liftToContrast(oklchRgb(edge[0], 0.07, accH + k * GOLDEN_ANGLE), pal.rgb.muted, pal.rgb.canvas, 3.05)));
+    }
+    var hiL = node[0] + (dark ? 0.16 : -0.11), hiC = Math.min(accC * 0.75, 0.09);
+    var lo = node, hi = [hiL, hiC * Math.cos(accH), hiC * Math.sin(accH)];
+    var cache = {};
+    function sequence(t) {
+      t = Math.max(0, Math.min(1, Number(t) || 0));
+      var key = Math.round(t * 100);
+      if (cache[key]) return cache[key];
+      var u = key / 100, lab = [lo[0] + (hi[0] - lo[0]) * u, lo[1] + (hi[1] - lo[1]) * u, lo[2] + (hi[2] - lo[2]) * u];
+      return (cache[key] = colourHex(legible(lab[0], Math.hypot(lab[1], lab[2]), Math.atan2(lab[2], lab[1]))));
+    }
+    return { categorical: categorical, relation: relation, sequence: sequence, empty: pal.canvas };
+  }
+
+  var _graphPaletteCache = null, _graphPaletteKey = null;
+  function invalidateGraphPalette() { _graphPaletteCache = null; _graphPaletteKey = null; }
+  // Resolve the palette for the CURRENT data-theme (cached until the next
+  // palette change). Callers must treat the result as read-only.
   function graphPalette() {
-    var t = document.documentElement.getAttribute("data-theme") || "technical-light";
-    return Object.assign({}, GRAPH_COLORS[t] || GRAPH_COLORS["technical-light"]);
+    var key = document.documentElement.getAttribute("data-theme") || "bone";
+    if (_graphPaletteCache && _graphPaletteKey === key) return _graphPaletteCache;
+    var cs = null;
+    try { cs = window.getComputedStyle(document.documentElement); } catch (e) {}
+    var pal = { theme: key, rgb: {} };
+    Object.keys(GRAPH_TOKENS).forEach(function (name) {
+      var rgb = parseColour(cs ? cs.getPropertyValue(GRAPH_TOKENS[name]) : "") || parseColour(GRAPH_TOKEN_FALLBACK[name]);
+      pal.rgb[name] = rgb;
+      pal[name] = colourHex(rgb);
+    });
+    pal.dark = luminance(pal.rgb.canvas) < 0.2;
+    // Edges are meaningful graphics (WCAG 1.4.11): keep --graph-edge's hue
+    // but lift it toward --text-3 until it clears 3:1 on the canvas. The
+    // Ledger edge tokens sit near 2.5:1, so every palette takes a small,
+    // palette-derived lift rather than a hard-coded colour.
+    pal.rgb.edge = liftToContrast(pal.rgb.edge, pal.rgb.muted, pal.rgb.canvas, 3.05);
+    pal.edge = colourHex(pal.rgb.edge);
+    pal.font = (cs && cs.getPropertyValue("--font-body").trim()) || "\"Public Sans\", sans-serif";
+    pal.mono = (cs && cs.getPropertyValue("--font-mono").trim()) || "\"Azeret Mono\", monospace";
+    // Stateful-cue names shared with the synchronisers below.
+    pal.edgeLabelBg = pal.halo;
+    pal.bridgeBorder = pal.cue;
+    pal.ramp = buildLensRamp(pal);
+    _graphPaletteCache = pal; _graphPaletteKey = key;
+    return pal;
+  }
+
+  // Forced colours (Windows High Contrast). The browser never adjusts canvas
+  // pixels, so the graph resolves the active system colours itself from a
+  // probe (forced-color-adjust:none keeps the keyword's own value instead of
+  // the forced `color`) and paints the canvas from them. Chrome reports
+  // Highlight with 0.8 alpha; the canvas paints the opaque system colour so
+  // strokes never blend into a non-system tint. Cached per sync pass;
+  // syncGraphTheme invalidates it on every palette/media change.
+  var SYSTEM_COLOUR_KEYWORDS = {
+    canvas: "Canvas", text: "CanvasText", highlight: "Highlight", link: "LinkText", gray: "GrayText", buttonText: "ButtonText", buttonFace: "ButtonFace"
+  };
+  var _systemColourCache = null;
+  function invalidateSystemColours() { _systemColourCache = null; }
+  function systemColours() {
+    if (_systemColourCache) return _systemColourCache;
+    var out = {}, host = document.body || document.documentElement, probe = document.createElement("span");
+    probe.style.position = "fixed";
+    probe.style.visibility = "hidden";
+    probe.style.forcedColorAdjust = "none";
+    host.appendChild(probe);
+    Object.keys(SYSTEM_COLOUR_KEYWORDS).forEach(function (name) {
+      probe.style.color = SYSTEM_COLOUR_KEYWORDS[name];
+      var value = window.getComputedStyle(probe).color;
+      var rgb = value.match(/^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/);
+      out[name] = rgb ? "rgb(" + Math.round(+rgb[1]) + ", " + Math.round(+rgb[2]) + ", " + Math.round(+rgb[3]) + ")" : value;
+    });
+    probe.remove();
+    return (_systemColourCache = out);
+  }
+  // The ink baked into SVG glyph and badge data URIs: the Ledger palette, or
+  // the system pair while forced colours own the canvas. Normal mode returns
+  // graphPalette() itself, so its URIs are byte-identical to the palette's.
+  function graphInk() {
+    if (!FORCED_COLORS) return graphPalette();
+    var sys = systemColours();
+    return { nodeIcon: sys.text, nodeText: sys.text, nodeBorder: sys.text, chip: sys.canvas, halo: sys.canvas, error: sys.text };
   }
 
   // ---- Config from data-* attributes (CSP-safe; no inline script) ------
@@ -161,14 +306,46 @@
   var graphTools=document.querySelector(".okf-graph-tools");
   var graphToolsHome=graphTools&&document.createComment("okf graph tools home");
   if(graphTools&&graphTools.parentNode)graphTools.parentNode.insertBefore(graphToolsHome,graphTools);
+  /* M1-002: on short coarse viewports (graph.css "short coarse" block) the
+     Find band and the phone presence row fold behind one Tools disclosure at
+     the end of the pane-tab row, so the canvas keeps the viewport. Elsewhere
+     CSS hides the toggle and the band is always shown. Opening it moves focus
+     to the search field, the band's first control. */
+  var graphToolsToggle=null;
+  function setGraphToolsOpen(open,focusField){document.body.toggleAttribute("data-okf-graph-tools-open",open);if(graphToolsToggle)graphToolsToggle.setAttribute("aria-expanded",open?"true":"false");if(open&&focusField){var field=document.getElementById("okf-search");if(field)field.focus({preventScroll:true});}}
+  function graphToolsFolded(){return !!(graphToolsToggle&&graphToolsToggle.offsetParent!==null&&!document.body.hasAttribute("data-okf-graph-tools-open"));}
+  /* An active Find filter fades the canvas, so the folded band must not hide
+     its cause: the toggle names it in text ("Tools · 2", forced-colour safe)
+     and in its accessible name. applyFilters reports every filter pass. */
+  var graphToolsQuery="";
+  function syncGraphToolsCue(count,query){graphToolsQuery=query||"";if(!graphToolsToggle)return;var cue=graphToolsQuery?" · "+count:"";if(graphToolsToggle.textContent!=="Tools"+cue)graphToolsToggle.textContent="Tools"+cue;if(graphToolsQuery)graphToolsToggle.setAttribute("aria-label","Tools"+cue+", Find active: "+(count||"no")+" match"+(count===1?"":"es")+" for “"+graphToolsQuery+"”");else graphToolsToggle.removeAttribute("aria-label");}
+  /* When the short layout starts matching (rotation, resize) the band stays
+     open if it holds focus or a query, so neither disappears unexplained.
+     Edge-triggered: viewport scroll and timer syncs never reopen a closed band. */
+  var shortGraphMedia=window.matchMedia?window.matchMedia("(max-width: 900px) and (max-height: 700px) and (pointer: coarse)"):null,shortGraphActive=false;
+  function reconcileGraphTools(){var now=!!(shortGraphMedia&&shortGraphMedia.matches),entered=now&&!shortGraphActive;shortGraphActive=now;if(!entered||!graphToolsToggle||document.body.hasAttribute("data-okf-graph-tools-open"))return;var field=document.getElementById("okf-search");if(graphToolsQuery||(field&&field.value.trim())||graphTools.contains(document.activeElement))setGraphToolsOpen(true,false);}
+  if(paneNav&&graphTools&&!window.BUNDLE){if(!graphTools.id)graphTools.id="okf-graph-tools";graphToolsToggle=document.createElement("button");graphToolsToggle.type="button";graphToolsToggle.className="okf-graph-tools-toggle";graphToolsToggle.setAttribute("aria-expanded","false");graphToolsToggle.setAttribute("aria-controls",graphTools.id);graphToolsToggle.textContent="Tools";paneNav.appendChild(graphToolsToggle);graphToolsToggle.addEventListener("click",function(){setGraphToolsOpen(!document.body.hasAttribute("data-okf-graph-tools-open"),true);});}
     (function buildMobileSecondaryChrome(){var topbar=document.querySelector(".okf-topbar");if(!topbar||!graphTools)return;mobileSecondary=document.createElement("section");mobileSecondary.className="okf-mobile-secondary";mobileSecondary.setAttribute("aria-label","Graph tools and status");mobileSecondaryRow=document.createElement("div");mobileSecondaryRow.className="okf-mobile-secondary__summary";mobileSecondaryToggle=document.createElement("button");mobileSecondaryToggle.type="button";mobileSecondaryToggle.className="okf-mobile-secondary__toggle";mobileSecondaryToggle.setAttribute("aria-expanded","false");mobileSecondaryToggle.setAttribute("aria-controls","okf-mobile-secondary-controls");mobileSecondaryToggle.textContent="More tools";mobileSecondaryPanel=document.createElement("div");mobileSecondaryPanel.id="okf-mobile-secondary-controls";mobileSecondaryPanel.className="okf-mobile-secondary__controls";mobileSecondaryPanel.hidden=true;mobileSecondary.appendChild(mobileSecondaryRow);mobileSecondary.appendChild(mobileSecondaryPanel);topbar.appendChild(mobileSecondary);mobileSecondaryToggle.addEventListener("click",function(){var open=mobileSecondaryPanel.hidden;mobileSecondaryPanel.hidden=!open;mobileSecondaryToggle.setAttribute("aria-expanded",open?"true":"false");mobileSecondaryToggle.textContent=open?"Fewer tools":"More tools";});})();
   function syncCriticalMobileChrome(narrow){if(!mobileSecondaryRow)return;var focused=document.activeElement,moved=false,topbar=document.querySelector(".okf-topbar");function place(parent,node,before){if(!parent||!node)return;if(node.parentNode===parent&&node.nextSibling===before)return;parent.insertBefore(node,before);moved=true;}function placeAfter(anchor,node){if(!anchor||!anchor.parentNode||!node)return;if(node.parentNode===anchor.parentNode&&node.previousSibling===anchor)return;anchor.parentNode.insertBefore(node,anchor.nextSibling);moved=true;}if(narrow){/* Keep three explicit chrome layers in source and visual order: brand,
      pane tabs, then secondary utilities. Search/filter/reset remain available
      behind More graph tools instead of consuming the graph's initial viewport. */place(topbar,paneNav,mobileSecondary);placeAfter(graphToolsHome,graphTools);mobileSecondary.hidden=true;place(mobileSecondaryRow,mobileSecondaryToggle,null);place(topbar.querySelector('.okf-topbar__brand'),mobileModeIndicator,null);}else{placeAfter(paneNavHome,paneNav);placeAfter(graphToolsHome,graphTools);if(mobileModeIndicator&&mobileModeHome)placeAfter(mobileModeHome,mobileModeIndicator);}/* Reparenting an active control can make browsers drop focus. Restore the
      same connected control without scrolling; idempotent syncs do no focus work. */if(moved&&focused&&focused!==document.body&&focused.isConnected&&document.activeElement!==focused&&typeof focused.focus==="function"){try{focused.focus({preventScroll:true});}catch(e){focused.focus();}}}
-    function syncEffectiveViewport(){var viewport=window.visualViewport,width=viewport?viewport.width:window.innerWidth,narrow=width<=640;document.body.style.setProperty("--okf-effective-vw",Math.max(1,width)+"px");document.body.style.setProperty("--okf-effective-left",Math.max(0,viewport?viewport.offsetLeft:0)+"px");document.body.toggleAttribute("data-okf-narrow-reflow",narrow);syncCriticalMobileChrome(narrow);if(!narrow&&paneNav&&paneNavHome&&paneNavHome.parentNode)paneNavHome.parentNode.insertBefore(paneNav,paneNavHome.nextSibling);}
+    /* The narrow chrome follows the visual viewport (pinch zoom keeps it on
+     screen) but never exceeds the initial containing block. When a mobile
+     viewport shrinks in place (390 -> 320, or a rotation), the previous px
+     width briefly overflows; mobile browsers then zoom out to fit it, and
+     visualViewport.width reports the stale wider value back. Clamping to
+     documentElement.clientWidth, which content overflow cannot widen, breaks
+     that loop so the page returns to scale 1 at the new width. */
+    function readLiveViewportWidth(){var viewport=window.visualViewport,root=document.documentElement,width=viewport?viewport.width:window.innerWidth,layout=root?root.clientWidth:0;return layout>0?Math.min(width,layout):width;}
+    function syncEffectiveViewport(){reconcileGraphTools();var viewport=window.visualViewport,width=readLiveViewportWidth(),narrow=width<=640;document.body.style.setProperty("--okf-effective-vw",Math.max(1,width)+"px");document.body.style.setProperty("--okf-effective-left",Math.max(0,viewport?viewport.offsetLeft:0)+"px");document.body.toggleAttribute("data-okf-narrow-reflow",narrow);syncCriticalMobileChrome(narrow);if(!narrow&&paneNav&&paneNavHome&&paneNavHome.parentNode&&paneNavHome.nextSibling!==paneNav)paneNavHome.parentNode.insertBefore(paneNav,paneNavHome.nextSibling);}
+  if(shortGraphMedia){if(shortGraphMedia.addEventListener)shortGraphMedia.addEventListener("change",reconcileGraphTools);else if(shortGraphMedia.addListener)shortGraphMedia.addListener(reconcileGraphTools);}
   syncEffectiveViewport();window.addEventListener("resize",syncEffectiveViewport);window.addEventListener("load",syncEffectiveViewport);window.addEventListener("pageshow",function(event){if(event.persisted)syncEffectiveViewport();});setTimeout(syncEffectiveViewport,0);setTimeout(syncEffectiveViewport,120);setTimeout(syncEffectiveViewport,500);if(window.visualViewport){window.visualViewport.addEventListener("resize",syncEffectiveViewport);window.visualViewport.addEventListener("scroll",syncEffectiveViewport);}
   var DATA_URL = (graphEl && graphEl.getAttribute("data-graph-url")) || window.OKF_LOOM_GRAPH_DATA_URL || null;
+  var LIVE_GRAPH = DATA_URL === "/__data/graph.json" && document.body.dataset.okfMode === "serve";
+  var GRAPH_REQUEST_URL = LIVE_GRAPH ? DATA_URL + "?view=structure" : DATA_URL;
+  var cancelGraphBodies = null;
+  var detailBodyPending = false, detailBodyError = null;
   var CONCEPT_PREFIX = (graphEl && graphEl.getAttribute("data-concept-prefix")) || window.OKF_CONCEPT_PAGE_PREFIX || "/";
   var INITIAL_LAYOUT = (graphEl && graphEl.getAttribute("data-initial-layout")) || window.OKF_LOOM_INITIAL_LAYOUT || "cose";
   // P1-3: build mode (serve|spa|static) is emitted on <body data-okf-mode>
@@ -179,9 +356,9 @@
   var MODE = (document.body && document.body.getAttribute("data-okf-mode")) || "serve";
   var IS_SINGLE = !!window.BUNDLE;
   var mobileModeIndicator=null,mobileModeHome=null;
-  if(mobileSecondaryRow){var brand=document.querySelector(".okf-topbar__brand"),studioSummarizesLive=MODE==="serve"&&document.querySelector('[data-okf-studio-capability="available"]');mobileModeIndicator=MODE==="serve"?liveStatus:null;if(!mobileModeIndicator&&!studioSummarizesLive){mobileModeIndicator=document.createElement("span");mobileModeIndicator.setAttribute("role","status");}if(mobileModeIndicator){mobileModeIndicator.tabIndex=0;mobileModeIndicator.textContent=IS_SINGLE?"Local":(MODE==="static"?"Static":"Live");mobileModeIndicator.classList.add("okf-mobile-mode");if(brand){brand.appendChild(mobileModeIndicator);mobileModeHome=document.createComment("okf mode home");brand.insertBefore(mobileModeHome,mobileModeIndicator);}}syncEffectiveViewport();}
+  if(mobileSecondaryRow){var brand=document.querySelector(".okf-topbar__brand"),studioSummarizesLive=MODE==="serve"&&document.querySelector('[data-okf-studio-capability="available"]');mobileModeIndicator=MODE==="serve"?liveStatus:null;if(!mobileModeIndicator&&!studioSummarizesLive){mobileModeIndicator=document.createElement("span");mobileModeIndicator.setAttribute("role","status");}if(mobileModeIndicator){/* A status word, not a control: no Tab stop (the serve live status keeps its own). */mobileModeIndicator.textContent=IS_SINGLE?"Local":(MODE==="static"?"Static":"Live");mobileModeIndicator.classList.add("okf-mobile-mode");if(brand){brand.appendChild(mobileModeIndicator);mobileModeHome=document.createComment("okf mode home");brand.insertBefore(mobileModeHome,mobileModeIndicator);}}syncEffectiveViewport();}
     var graphLayout = document.querySelector(".okf-layout");
-    function isCompactGraphViewport(){var viewport=window.visualViewport;return (viewport?viewport.width:window.innerWidth)<=900;}
+    function isCompactGraphViewport(){return readLiveViewportWidth()<=900;}
   function setMobilePane(name, focusPane) {
     if (!graphLayout || ["graph", "concepts", "details"].indexOf(name) < 0) return;
     // Pane-local scrollports own traversal; retired list scroll must not move
@@ -290,7 +467,9 @@
   }
     window.addEventListener("pagehide",function(){
       graphPageActive = false;
+      if (cancelGraphBodies) cancelGraphBodies();
       graphRequestGeneration++;
+      if (DATA_URL === "/__data/graph.json") window.okfGraphData = null;
       if (graphInitialController) graphInitialController.abort();
       if (graphRefreshController) graphRefreshController.abort();
       if (graphRefreshDebounceTimer) clearTimeout(graphRefreshDebounceTimer);
@@ -345,6 +524,7 @@
   } catch (e) {}
     function publishGraphSelection(conceptId, source) {
       teardownGraphLifecycle(conceptId ? "selection-rebind" : "selection-clear", { invalidateProvider: false });
+      detailBodyPending = false; detailBodyError = null;
       selectedConceptId = conceptId || null;
       if (latestGraphInteractionSnapshot) latestGraphInteractionSnapshot = Object.freeze(Object.assign({}, latestGraphInteractionSnapshot, { selected: selectedConceptId }));
     selectionGeneration++;
@@ -583,126 +763,8 @@
   // This file only READS data-theme via graphPalette() and re-syncs the
   // canvas when theme.js dispatches `okf-loom:themeChanged` (see init).
 
-  // ---- Luminance-aware chip foreground (P0-4 / P2-23) ------------------
-  // Port of render.py:_chip_fg(): parses a CSS colour (hsl/hex/rgb/named)
-  // and picks the foreground (black or white) with the higher WCAG
-  // contrast ratio against the background. Previously the graph-view type
-  // chip hardwired #fff (failed on yellow/green/cyan) and the threshold
-  // approach had no margin near the luminance boundary; named CSS colours
-  // bypassed the luminance check entirely.
-  var _NAMED_CSS_COLORS = {
-    aliceblue: [240, 248, 255], antiquewhite: [250, 235, 215],
-    aqua: [0, 255, 255], aquamarine: [127, 255, 212], azure: [240, 255, 255],
-    beige: [245, 245, 220], bisque: [255, 228, 196], black: [0, 0, 0],
-    blanchedalmond: [255, 235, 205], blue: [0, 0, 255], blueviolet: [138, 43, 226],
-    brown: [165, 42, 42], burlywood: [222, 184, 135], cadetblue: [95, 158, 160],
-    chartreuse: [127, 255, 0], chocolate: [210, 105, 30], coral: [255, 127, 80],
-    cornflowerblue: [100, 149, 237], cornsilk: [255, 248, 220], crimson: [220, 20, 60],
-    cyan: [0, 255, 255], darkblue: [0, 0, 139], darkcyan: [0, 139, 139],
-    darkgoldenrod: [184, 134, 11], darkgray: [169, 169, 169], darkgreen: [0, 100, 0],
-    darkgrey: [169, 169, 169], darkkhaki: [189, 183, 107], darkmagenta: [139, 0, 139],
-    darkolivegreen: [85, 107, 47], darkorange: [255, 140, 0], darkorchid: [153, 50, 204],
-    darkred: [139, 0, 0], darksalmon: [233, 150, 122], darkseagreen: [143, 188, 143],
-    darkslateblue: [72, 61, 139], darkslategray: [47, 79, 79], darkslategrey: [47, 79, 79],
-    darkturquoise: [0, 206, 209], darkviolet: [148, 0, 211], deeppink: [255, 20, 147],
-    deepskyblue: [0, 191, 255], dimgray: [105, 105, 105], dimgrey: [105, 105, 105],
-    dodgerblue: [30, 144, 255], firebrick: [178, 34, 34], floralwhite: [255, 250, 240],
-    forestgreen: [34, 139, 34], fuchsia: [255, 0, 255], gainsboro: [220, 220, 220],
-    ghostwhite: [248, 248, 255], gold: [255, 215, 0], goldenrod: [218, 165, 32],
-    gray: [128, 128, 128], green: [0, 128, 0], greenyellow: [173, 255, 47],
-    grey: [128, 128, 128], honeydew: [240, 255, 240], hotpink: [255, 105, 180],
-    indianred: [205, 92, 92], indigo: [75, 0, 130], ivory: [255, 255, 240],
-    khaki: [240, 230, 140], lavender: [230, 230, 250], lavenderblush: [255, 240, 245],
-    lawngreen: [124, 252, 0], lemonchiffon: [255, 250, 205], lightblue: [173, 216, 230],
-    lightcoral: [240, 128, 128], lightcyan: [224, 255, 255],
-    lightgoldenrodyellow: [250, 250, 210], lightgray: [211, 211, 211],
-    lightgreen: [144, 238, 144], lightgrey: [211, 211, 211], lightpink: [255, 182, 193],
-    lightsalmon: [255, 160, 122], lightseagreen: [32, 178, 170], lightskyblue: [135, 206, 250],
-    lightslategray: [119, 136, 153], lightslategrey: [119, 136, 153],
-    lightsteelblue: [176, 196, 222], lightyellow: [255, 255, 224], lime: [0, 255, 0],
-    limegreen: [50, 205, 50], linen: [250, 240, 230], magenta: [255, 0, 255],
-    maroon: [128, 0, 0], mediumaquamarine: [102, 205, 170], mediumblue: [0, 0, 205],
-    mediumorchid: [186, 85, 211], mediumpurple: [147, 112, 219],
-    mediumseagreen: [60, 179, 113], mediumslateblue: [123, 104, 238],
-    mediumspringgreen: [0, 250, 154], mediumturquoise: [72, 209, 204],
-    mediumvioletred: [199, 21, 133], midnightblue: [25, 25, 112], mintcream: [245, 255, 250],
-    mistyrose: [255, 228, 225], moccasin: [255, 228, 181], navajowhite: [255, 222, 173],
-    navy: [0, 0, 128], oldlace: [253, 245, 230], olive: [128, 128, 0],
-    olivedrab: [107, 142, 35], orange: [255, 165, 0], orangered: [255, 69, 0],
-    orchid: [218, 112, 214], palegoldenrod: [238, 232, 170], palegreen: [152, 251, 152],
-    paleturquoise: [175, 238, 238], palevioletred: [219, 112, 147], papayawhip: [255, 239, 213],
-    peachpuff: [255, 218, 185], peru: [205, 133, 63], pink: [255, 192, 203],
-    plum: [221, 160, 221], powderblue: [176, 224, 230], purple: [128, 0, 128],
-    rebeccapurple: [102, 51, 153], red: [255, 0, 0], rosybrown: [188, 143, 143],
-    royalblue: [65, 105, 225], saddlebrown: [139, 69, 19], salmon: [250, 128, 114],
-    sandybrown: [244, 164, 96], seagreen: [46, 139, 87], seashell: [255, 245, 238],
-    sienna: [160, 82, 45], silver: [192, 192, 192], skyblue: [135, 206, 235],
-    slateblue: [106, 90, 205], slategray: [112, 128, 144], slategrey: [112, 128, 144],
-    snow: [255, 250, 250], springgreen: [0, 255, 127], steelblue: [70, 130, 180],
-    tan: [210, 180, 140], teal: [0, 128, 128], thistle: [216, 191, 216],
-    tomato: [255, 99, 71], turquoise: [64, 224, 208], violet: [238, 130, 238],
-    wheat: [245, 222, 179], white: [255, 255, 255], whitesmoke: [245, 245, 245],
-    yellow: [255, 255, 0], yellowgreen: [154, 205, 50]
-  };
-  function _chipFg(bgCss) {
-    if (!bgCss) return "#ffffff";
-    var s = String(bgCss).trim();
-    var rgb = null;
-    var mHsl = s.match(/^hsla?\(\s*(\d+(?:\.\d+)?)\s*(?:deg|rad|turn|grad)?\s*,\s*(\d+(?:\.\d+)?)%\s*,\s*(\d+(?:\.\d+)?)%/);
-    var mRgb = s.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/);
-    var mHex = s.match(/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
-    if (mHsl) {
-      var h = parseFloat(mHsl[1]) % 360;
-      var sat = parseFloat(mHsl[2]) / 100;
-      var l = parseFloat(mHsl[3]) / 100;
-      rgb = _hslToRgb(h, sat, l);
-    } else if (mRgb) {
-      rgb = [parseFloat(mRgb[1]) / 255, parseFloat(mRgb[2]) / 255, parseFloat(mRgb[3]) / 255];
-    } else if (mHex) {
-      var hex = mHex[1];
-      if (hex.length === 3) {
-        hex = hex.charAt(0) + hex.charAt(0) + hex.charAt(1) + hex.charAt(1) + hex.charAt(2) + hex.charAt(2);
-      } else if (hex.length === 8) {
-        // P1-7: strip alpha (#rrggbbaa) - luminance is RGB-only (parity
-        // with the Python port in render.py:_chip_fg).
-        hex = hex.slice(0, 6);
-      }
-      rgb = [
-        parseInt(hex.slice(0, 2), 16) / 255,
-        parseInt(hex.slice(2, 4), 16) / 255,
-        parseInt(hex.slice(4, 6), 16) / 255,
-      ];
-    } else if (_NAMED_CSS_COLORS[s.toLowerCase()]) {
-      var nc = _NAMED_CSS_COLORS[s.toLowerCase()];
-      rgb = [nc[0] / 255, nc[1] / 255, nc[2] / 255];
-    } else {
-      return "#ffffff";
-    }
-    var lum = _relativeLuminance(rgb[0], rgb[1], rgb[2]);
-    // P2-23: pick the higher-contrast foreground (black vs white) instead
-    // of a brittle luminance threshold. Pure black has luminance 0, pure
-    // white has luminance 1.
-    var contrastBlack = (lum + 0.05) / 0.05;        // (lum_bg + 0.05) / (0 + 0.05)
-    var contrastWhite = 1.05 / (lum + 0.05);        // (1 + 0.05) / (lum_bg + 0.05)
-    return contrastBlack >= contrastWhite ? "#000000" : "#ffffff";
-  }
-  function _hslToRgb(h, s, l) {
-    var c = (1 - Math.abs(2 * l - 1)) * s;
-    var x = c * (1 - Math.abs((h / 60) % 2 - 1));
-    var m_ = l - c / 2;
-    var r, g, b;
-    if (h < 60) { r = c; g = x; b = 0; }
-    else if (h < 120) { r = x; g = c; b = 0; }
-    else if (h < 180) { r = 0; g = c; b = x; }
-    else if (h < 240) { r = 0; g = x; b = c; }
-    else if (h < 300) { r = x; g = 0; b = c; }
-    else { r = c; g = 0; b = x; }
-    return [r + m_, g + m_, b + m_];
-  }
-  function _relativeLuminance(r, g, b) {
-    function lin(v) { return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
-    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-  }
+  // Content types are not colour-coded (Ledger), so the graph has no type
+  // chip fills and needs no luminance-picked chip foreground.
   // Theme boot/cycle ownership REMOVED — theme.js resolves the saved
   // preference + Auto/OS and owns the Appearance control. graph.js only
   // re-syncs the canvas when the resolved theme changes (see init).
@@ -729,8 +791,16 @@
       ids[id] = true;
     });
     var edgeIds={}, edgePairs={};
-    edges.forEach(function (edge) {
+    edges.forEach(function (edge, edgeIndex) {
       var data = edge && edge.data, source = data && data.source, target = data && data.target;
+      if (raw.structure_schema === 1 && data) {
+        data = Object.assign({}, data);
+        edge = edges[edgeIndex] = { data: data };
+        if (!Array.isArray(data.relations) || !Number.isInteger(data.primary_relation_index) || data.primary_relation_index < 0 || data.primary_relation_index >= data.relations.length) throw Object.assign(new Error("Graph primary relation index is invalid."), { okfPhase: "graph-schema" });
+        data.relations = data.relations.map(function (relation) { return Object.assign({}, relation, { source: source, target: target, direction: "outgoing" }); });
+        data.primary_relation = data.relations[data.primary_relation_index];
+        delete data.primary_relation_index;
+      }
       if (typeof source !== "string" || typeof target !== "string" || !ids[source] || !ids[target]) throw Object.assign(new Error("Graph edge endpoints must reference current nodes."), { okfPhase: "graph-schema" });
       if(data.id==null)data.id=legacyEdgeId(source,target);
       var pairKey=endpointKey(source,target);
@@ -757,7 +827,9 @@
         if (!ids[id] || !Array.isArray(supplied[id]) || supplied[id].some(function (other) { return typeof other !== "string" || !ids[other]; })) throw Object.assign(new Error("Graph maps must contain current node IDs."), { okfPhase: "graph-schema" });
       });
     });
-    return Object.assign({}, raw, { bundle_revision: revision.trim(), nodes: nodes, edges: edges, outgoing: outgoing, backlinks: backlinks });
+    var candidate = Object.assign({}, raw, { bundle_revision: revision.trim(), nodes: nodes, edges: edges, outgoing: outgoing, backlinks: backlinks });
+    delete candidate.structure_schema;
+    return candidate;
   }
 
   function publishGraphTerminal(code, phase, error) {
@@ -769,13 +841,23 @@
   function acquireBundle(controller) {
     if (window.BUNDLE) return Promise.resolve(window.BUNDLE);
     if (!DATA_URL) return Promise.reject(new Error("no bundle data"));
-    return fetch(DATA_URL, { signal: controller.signal, cache: "no-store", headers: { Accept: "application/json" } }).catch(function (error) {
+    // Live graph and Studio share initial acquisition, regardless of script
+    // order. Portable DATA_URL/window.BUNDLE paths retain their own transport.
+    if (DATA_URL === "/__data/graph.json" && window.okfGraphData) return window.okfGraphData;
+    var acquisition = fetch(GRAPH_REQUEST_URL, { signal: controller.signal, cache: "no-cache", headers: { Accept: "application/json" } }).catch(function (error) {
       if (error && error.name === "AbortError") throw error;
       throw Object.assign(new Error("Graph data request failed."), { okfPhase: "graph-fetch", okfCode: "network-failure", cause: error });
     }).then(function (r) {
-      if (!r.ok) throw Object.assign(new Error("HTTP " + r.status), { okfPhase: "graph-http", okfCode: "network-failure" });
+      if (!r.ok) return r.json().catch(function () { return null; }).then(function (data) {
+        throw Object.assign(new Error(data && data.error && data.error.message || "HTTP " + r.status), { okfPhase: "graph-http", okfCode: "network-failure" });
+      });
       return r.json().catch(function (error) { throw Object.assign(new Error("Graph JSON is malformed."), { okfPhase: "graph-json", okfCode: "network-failure", cause: error }); });
     });
+    if (DATA_URL === "/__data/graph.json") {
+      window.okfGraphData = acquisition;
+      acquisition.catch(function () { if (window.okfGraphData === acquisition) window.okfGraphData = null; });
+    }
+    return acquisition;
   }
 
   function startInitialAcquisition() {
@@ -785,7 +867,12 @@
     graphInitialController = controller;
     return acquireBundle(controller).then(function (bundle) {
       if (!graphPageActive || controller.signal.aborted || own !== graphRequestGeneration) return;
-      init(graphCandidate(bundle));
+      bundle = graphCandidate(bundle);
+      init(bundle);
+      if (DATA_URL === "/__data/graph.json") {
+        window.okfGraphData = Promise.resolve(bundle);
+        window.dispatchEvent(new CustomEvent("okf-loom:graph-data", { detail: bundle }));
+      }
     }).catch(function (err) {
       if (!graphPageActive || controller.signal.aborted || own !== graphRequestGeneration || (err && err.name === "AbortError")) return;
     // Surface the stack in the console — a swallowed init error is
@@ -845,6 +932,10 @@
     }
 
     function init(bundle) {
+      // Viewport reads can flush layout after chrome writes. The viewport
+      // cannot resize during this synchronous init task; later fits read live.
+      var initialMobileViewport = readMobileGraphViewport();
+      if (cancelGraphBodies) cancelGraphBodies();
       if (graphMountGeneration++) teardownGraphLifecycle("graph-remount", { invalidateProvider: true });
       graphBundleRevision = String(bundle.bundle_revision || bundle.revision || "");
       singleSourceRevisions =
@@ -854,12 +945,6 @@
         ? window.okfPortableRetrieval.parseSourceRevisions(
             (document.getElementById("okf-single-source-revisions") || {}).textContent || "")
         : null;
-      // Static/portable payloads historically carried the directory slug
-      // while serve mode received the configured display title.  Promote a
-      // slug to the same product-facing human form instead of exposing an
-      // implementation filename in one runtime only.
-      var brandTitle=document.querySelector(".okf-topbar__brand strong"),payloadName=String(bundle.name||"");
-      if(brandTitle&&/^[a-z0-9_-]+$/.test(payloadName)){brandTitle.textContent="OKF "+payloadName.replace(/[_-]+/g," ").replace(/\b\w/g,function(c){return c.toUpperCase();});}
       if (typeof window.cytoscape !== "function") {
         publishGraphCaptureReady("unavailable", true);
       window.okfGraphCaptureState = function () { return { initialized: true, nodeCount: 0, payloadNodeCount: Array.isArray(bundle.nodes) ? bundle.nodes.length : 0, layoutRequired: false, layoutSettled: true, layoutGeneration: 0, appliedLayoutGeneration: 0, terminalCode: "unavailable", terminalPhase: "graph-cytoscape" }; };
@@ -876,9 +961,65 @@
 
       var palette = bundle.palette || {};
       var bodies = bundle.bodies || {};
+      // Serve-only lazy HTML. Two active reads, one latest queued selection,
+      // 8 MiB / 32-entry LRU per accepted graph, and a 10 s read deadline.
+      // Abort never releases admission until the underlying promise settles.
+      var bodyEpoch = 0, bodyActive = 0, bodyQueue = [], bodyControllers = new Set();
+      var bodyCache = new Map(), bodyCacheBytes = 0, bodyFlights = new Map();
+      cancelGraphBodies = function () {
+        bodyEpoch++; detailBodyPending = false; detailBodyError = null;
+        bodyControllers.forEach(function (controller) { controller.abort(); });
+        bodyQueue.splice(0).forEach(function (job) { job.reject(new DOMException("Superseded", "AbortError")); });
+        bodyCache.clear(); bodyCacheBytes = 0; bodyFlights.clear();
+      };
+      function pumpGraphBodies() {
+        while (bodyActive < 2 && bodyQueue.length) startGraphBody(bodyQueue.shift());
+      }
+      function startGraphBody(job) {
+        bodyActive++;
+        var controller = new AbortController(); bodyControllers.add(controller);
+        var timer = setTimeout(function () { controller.abort(); }, Number((window.OKF_LOOM_TEST_DEADLINES || {}).graphBody || 10000));
+        fetch("/__data/graph-body?id=" + encodeURIComponent(job.id) + "&revision=" + encodeURIComponent(job.revision),
+          { signal: controller.signal, cache: "no-cache", headers: { Accept: "application/json" } })
+          .then(function (response) { if (!response.ok) { var error = new Error("Concept body unavailable."); error.status = response.status; throw error; } return response.json(); })
+          .then(function (doc) {
+            if (controller.signal.aborted || job.epoch !== bodyEpoch) throw new DOMException("Superseded", "AbortError");
+            if (!doc || doc.id !== job.id || doc.bundle_revision !== job.revision || typeof doc.html !== "string" || typeof doc.metadata_html !== "string") throw new Error("Concept body revision is invalid.");
+            var bytes = 2 * (doc.html.length + doc.metadata_html.length);
+            if (bytes <= 8 * 1024 * 1024) {
+              bodyCache.set(job.id, { doc: doc, bytes: bytes }); bodyCacheBytes += bytes;
+              while (bodyCache.size > 32 || bodyCacheBytes > 8 * 1024 * 1024) {
+                var oldest = bodyCache.keys().next().value;
+                bodyCacheBytes -= bodyCache.get(oldest).bytes; bodyCache.delete(oldest);
+              }
+            }
+            job.resolve(doc);
+          }).catch(job.reject).finally(function () {
+            clearTimeout(timer); bodyControllers.delete(controller); bodyActive--;
+            if (bodyFlights.get(job.id) === job.promise) bodyFlights.delete(job.id);
+            pumpGraphBodies();
+          });
+      }
+      function readGraphBody(id) {
+        if (bodyCache.has(id)) {
+          var entry = bodyCache.get(id); bodyCache.delete(id); bodyCache.set(id, entry);
+          return Promise.resolve(entry.doc);
+        }
+        if (bodyFlights.has(id)) return bodyFlights.get(id);
+        bodyQueue.splice(0).forEach(function (job) { job.reject(new DOMException("Superseded", "AbortError")); bodyFlights.delete(job.id); });
+        var job = { id: id, revision: graphBundleRevision, epoch: bodyEpoch };
+        job.promise = new Promise(function (resolve, reject) { job.resolve = resolve; job.reject = reject; });
+        bodyFlights.set(id, job.promise); bodyQueue.push(job); pumpGraphBodies();
+        return job.promise;
+      }
       // Reserved documents (root/directory indexes, logs): {document, html}
       // reading records. They are never nodes and never selectable.
-      var reservedDocuments = bundle.documents || {};
+      var reservedDocuments = graphDocuments(bundle);
+      function graphDocuments(candidate) {
+        var documents = candidate.documents || {};
+        (candidate.document_paths || []).forEach(function (path) { documents[path] = { document: path }; });
+        return documents;
+      }
       var external = bundle.external || [];
       var conceptPagePrefix = CONCEPT_PREFIX;
 
@@ -1026,34 +1167,35 @@
     // size override never destroys the original mapping (state-ownership).
     // Phase 3: node glyphs. The server ships icon_paths (icon-key → SVG
     // inner markup, one source of truth with the wiki) + a per-node icon
-    // key. Each key becomes a white-stroke SVG data-URI drawn on the
-    // type-coloured node. Shapes stay sparse — the icon is the real
-    // differentiator; shape only marks the big structural families.
+    // key. Each key becomes an SVG data-URI stroked in the palette's
+    // --graph-node-icon and drawn on the neutral round node. The cache is
+    // keyed by glyph AND ink, so a palette change regenerates every glyph
+    // (refreshNodeGlyphs) instead of reusing another palette's stroke.
     var ICON_PATHS = bundle.icon_paths || {};
     var _iconUriCache = {};
     function iconDataUri(key) {
       if (!key || !ICON_PATHS[key]) key = "file";
       if (!ICON_PATHS[key]) return null;
-      if (_iconUriCache[key]) return _iconUriCache[key];
+      var ink = graphInk().nodeIcon, cacheKey = key + "|" + ink;
+      if (_iconUriCache[cacheKey]) return _iconUriCache[cacheKey];
       // Explicit width/height give the glyph an intrinsic size. Without it,
       // Chrome drew the image about twice too large on HiDPI canvases
       // (devicePixelRatio 2) and the node clipped it to its top-left corner.
       var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"'
-        + ' stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        + ' stroke="' + ink + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
         + ICON_PATHS[key] + '</svg>';
       var uri = "data:image/svg+xml;utf8," + encodeURIComponent(svg);
-      _iconUriCache[key] = uri;
+      _iconUriCache[cacheKey] = uri;
       return uri;
     }
-    var SHAPE_FOR_ICON = {
-      database: "barrel", table: "barrel",            // data at rest
-      server: "round-hexagon",                          // running systems
-      branch: "round-diamond",                          // decisions
-    };
-    function shapeForIcon(key) { return SHAPE_FOR_ICON[key] || "ellipse"; }
+    // Ledger graph nodes are round records: the glyph carries the type, the
+    // shape never does (DESIGN.md "Graph": neutral round nodes).
+    function shapeForIcon() { return "ellipse"; }
 
     function elemFor(n) {
-      var base = n.data.color || palette[n.data.type] || typeColorFor(n.data.type);
+      // Content types are not colour-coded: every node starts on the neutral
+      // --graph-node fill; a lens may recolour it from the muted ramp.
+      var base = graphPalette().node;
       // Review feedback: smaller base node sizes. With the MAX_ZOOM clamp the
       // old 32..80 range rendered as giant discs on small bundles, colliding
       // with labels/edges (reviewer blocker 1). 22..44 reads cleanly.
@@ -1096,25 +1238,29 @@
     function commentCountText(count) { return count > 99 ? "99+" : String(count); }
     function commentPhrase(count) { return count + " active comment" + (count === 1 ? "" : "s"); }
     function commentBadgeDataUri(count) {
-      // A compact outlined speech bubble keeps comments structurally distinct
-      // from the circular broken-link underlay. Exact counts remain in HTML;
-      // only this bounded canvas copy is capped.
+      // A square outlined count chip with a mono figure (Ledger badge): band
+      // fill, 1.2px --border-strong rule, ink figure. Its square silhouette
+      // stays distinct from the broken-link triangle and the round node.
+      // Exact counts remain in HTML; only this bounded canvas copy is capped.
+      // (SVG images cannot reach page fonts, so the mono stack falls back to
+      // the platform monospace inside the data URI.)
       var text = commentCountText(count);
-      var width = text.length > 2 ? 34 : 26;
-      var badgePalette = graphPalette();
-      var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="22" viewBox="0 0 ' + width + ' 22">' +
-        '<path d="M2 2h' + (width - 4) + 'v14H10l-5 4v-4H2z" fill="' + badgePalette.edgeLabelBg + '" stroke="' + badgePalette.select + '" stroke-width="2"/>' +
-        '<text x="' + (width / 2) + '" y="12.5" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="' + badgePalette.nodeText + '">' + text + '</text></svg>';
+      var width = 26;
+      var badgePalette = graphInk();
+      var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="18" viewBox="0 0 ' + width + ' 18">' +
+        '<path d="M1 1H' + (width - 1) + 'V17H1Z" fill="' + badgePalette.chip + '" stroke="' + badgePalette.nodeBorder + '" stroke-width="1.2"/>' +
+        '<text x="' + (width / 2) + '" y="12.6" text-anchor="middle" font-family="Azeret Mono,ui-monospace,monospace" font-size="9.5" font-weight="500" fill="' + badgePalette.nodeText + '">' + text + '</text></svg>';
       return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
     }
     function brokenBadgeDataUri() {
-      // Persistent shape + glyph channel for the canvas warning. This is a
-      // filled triangle rather than the comment speech bubble or selection
-      // ring, so broken+comment+selected+hub states remain distinguishable.
-      var badgePalette=graphPalette();
+      // Persistent shape + glyph channel for the canvas warning: an outlined
+      // triangle and "!" in the muted error hue (status hues mark strokes and
+      // glyphs, never fills), on the halo so it reads over edges. The shape
+      // keeps broken+comment+selected+hub states distinguishable.
+      var badgePalette=graphInk();
       var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="20" viewBox="0 0 22 20">' +
-        '<path d="M11 1 21 19H1Z" fill="#b91c1c" stroke="'+badgePalette.edgeLabelBg+'" stroke-width="1.5"/>' +
-        '<text x="11" y="15" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="900" fill="'+badgePalette.edgeLabelBg+'">!</text></svg>';
+        '<path d="M11 1.5 20.5 18.5H1.5Z" fill="'+badgePalette.halo+'" stroke="'+badgePalette.error+'" stroke-width="1.6" stroke-linejoin="miter"/>' +
+        '<text x="11" y="15.5" text-anchor="middle" font-family="Azeret Mono,ui-monospace,monospace" font-size="10" font-weight="700" fill="'+badgePalette.error+'">!</text></svg>';
       return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
     }
     // edgeVisible(e): true only when BOTH endpoints are currently shown.
@@ -1126,6 +1272,13 @@
       data.bundleLabel=data.multiplicity>1?String(data.multiplicity):"";
       return data;
     }
+    // The relation type an edge is drawn as: its primary relation's canonical
+    // type (an untyped legacy edge falls back to its label). Body links are
+    // type "link" and draw as the plain solid edge; every other type is a
+    // typed relation that carries a dash (and, under the Relations intent, a
+    // muted hue). Anchor text never keys the encoding.
+    function edgePrimaryType(data){var relations=Array.isArray(data.relations)?data.relations:[],primary=data.primary_relation||relations[Number(data.primary_relation_index)||0]||relations[0];return primary&&primary.type?String(primary.type):String(data.label||"");}
+    function isTypedRelation(type){return !!type&&type!=="link";}
     function edgeRelations(edge){var relations=edge.data("relations");return Array.isArray(relations)&&relations.length?relations:[{id:edge.id()+"__relation",type:edge.data("label")||"link",label:edge.data("label")||"related",kind:edge.data("label")?"relation":"body_link",direction:"outgoing",source:edge.data("source"),target:edge.data("target")}];}
     // Relationship filters intentionally use one normalized dimension:
     // canonical relation `type`. Labels remain explanatory legend/detail text.
@@ -1195,8 +1348,9 @@
     (function () {
       var counts = {};
       bundle.edges.forEach(function (e) {
+        var primaryType = edgePrimaryType(e.data);
+        if (primaryType && !relationLabelSet[primaryType]) { relationLabelSet[primaryType] = true; relationLabelList.push(primaryType); }
         (e.data.relations || []).forEach(function(relation){
-          [relation.type,relation.label].forEach(function(value){if(value&&!relationLabelSet[value]){relationLabelSet[value]=true;relationLabelList.push(value);}});
           [e.data.source, e.data.target].forEach(function (nid) {
             incidentLabeled[nid] = (incidentLabeled[nid] || 0) + 1;
             counts[nid] = counts[nid] || {};
@@ -1278,7 +1432,7 @@
       incidentLabeled = {}; nodeRelLabel = {}; relationLabelSet = {}; relationLabelList = [];
       var counts = {};
       candidate.edges.forEach(function (e) {
-        var d=e.data||{}, label=d.label;
+        var d=e.data||{}, label=edgePrimaryType(d);
         if (!label) return;
         if (!relationLabelSet[label]) { relationLabelSet[label]=true; relationLabelList.push(label); }
         [d.source,d.target].forEach(function (id) {
@@ -1594,41 +1748,52 @@
       for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
       return h;
     }
-    // Deterministic type-colour fallback for nodes whose data.color / palette
-    // entry is missing (live SSE before palette refresh, or incomplete data).
-    // Reuses hashHue with the SAME HSL sat/light as the server's
-    // stable_hue → hsl(hue, 62%, 48%) so the fallback is deterministic,
-    // non-gray, and visually consistent with the server's hash-fallback path.
-    // (The exact hue may differ from the server's crc32 for the same name,
-    // but the server always sets data.color for pre-rendered nodes, so this
-    // fallback only fires transiently — any deterministic non-gray colour is
-    // the contract, not a fixed gray.)
-    function typeColorFor(typeName) {
-      return "hsl(" + hashHue(typeName || "concept") + ", 62%, 48%)";
-    }
+    // Lens colours come from the palette-derived muted ramp (graphPalette()
+    // .ramp); there is no type palette on the canvas. A group without a name
+    // stays on the neutral node fill.
+    function neutralNodeColor() { return graphPalette().node; }
     function groupColor(g) {
-      if (!g) return typeColorFor("concept");
-      // Review feedback: when grouping BY TYPE, group colour === the stable
-      // node palette so "Colour by: Group" with "Group by: Type" matches the
-      // palette and never drifts between presets (reviewer blocker 5).
-      if (controlState.groupBy === "type" && palette[g]) return palette[g];
-      return "hsl(" + hashHue(g) + ", 58%, 55%)";
+      if (!g) return neutralNodeColor();
+      // Explicit "Colour by selected group": categorical muted hues. The
+      // index follows the sorted group list so the first eight groups never
+      // share a hue; names outside the list fall back to a stable hash.
+      var cat = graphPalette().ramp.categorical, idx = groupList.indexOf(g);
+      return cat[(idx >= 0 ? idx : hashHue(g)) % cat.length];
     }
-    // Relation-type edge colour (slightly darker/saturated for line contrast).
-    // Phase 3: typed edges are ALWAYS hue-coded, quietly — full saturation
-    // is reserved for the explicit Relations/Focus intent (strong=true).
-    // The muted variant keeps the default canvas calm while still letting
-    // "same relationship = same colour" register peripherally.
+    // Relation-type edge colour. Typed edges always carry their dash pattern
+    // (the non-colour channel); hue is a lens encoding reserved for the
+    // explicit Relations/Flow intent (strong=true). Otherwise every edge is
+    // the neutral --graph-edge.
     function relColor(label, strong) {
-      return strong
-        ? "hsl(" + hashHue(label) + ", 64%, 42%)"
-        : "hsl(" + hashHue(label) + ", 38%, 56%)";
+      var pal = graphPalette();
+      if (!strong) return pal.edge;
+      return pal.ramp.relation[hashHue(label) % pal.ramp.relation.length];
     }
     function relDashClass(label) { return "okf-reld-" + (hashHue(label) % 3 + 1); }
+    // Forced-colours lens cues: the lens encoding without hue. A category
+    // index picks one of eight node shapes (the same index the categorical
+    // ramp uses), an ordered value one of five stroke weights; undated
+    // concepts are dotted. The canvas layer and the legend/index keys read
+    // the same cue, so they always agree.
+    function lensShapeCue(i) { return "shape-" + ((((Number(i) || 0) % 8) + 8) % 8); }
+    function lensLevelCue(t) { return "level-" + Math.round(Math.max(0, Math.min(1, Number(t) || 0)) * 4); }
+    function recencyCue(days) { return isFinite(days) ? lensLevelCue(1 - Math.min(1, days / 180)) : "undated"; }
+    function groupCue(g) {
+      if (!g) return "";
+      var idx = groupList.indexOf(g);
+      return lensShapeCue(idx >= 0 ? idx : hashHue(g));
+    }
+    function lensKeyTitle(cue, name) {
+      return (FORCED_COLORS ? (cue === "shape" ? "Shape: " : "Outline: ") : "Colour: ") + name;
+    }
+    function setForcedCue(el, cue) {
+      if (cue) el.setAttribute("data-forced-cue", cue);
+      else el.removeAttribute("data-forced-cue");
+    }
     function importanceColor(w) {
-      // Muted slate (low) → saturated teal (high). Single hue so it reads as
-      // one ordered scale, not a categorical palette (a11y: ordered ramp).
-      return "hsl(186, " + (18 + 52 * w).toFixed(0) + "%, " + (78 - 34 * w).toFixed(0) + "%)";
+      // Neutral (low) → muted accent (high): one ordered ramp, not a
+      // categorical palette (a11y: ordered scale).
+      return graphPalette().ramp.sequence(w);
     }
 
     // ---- Layout tuning derived from the spacing/separation/strength knobs
@@ -1684,6 +1849,32 @@
       };
     }
 
+      // Label precedence (D2-006). The selected, hovered or toured concept's
+      // name is the one the reader is looking at: its node joins the top
+      // layer (above its own incident edges and every neighbour), its label
+      // sits on an opaque --surface plate with a hairline --border-strong rule
+      // and shows more of the title. Every other label yields to it through
+      // cullOverlappingLabels(), which hides (never moves) the lower-priority
+      // label or count chip in an overlap. Culled text keeps its geometry, so
+      // fitting and hit-testing do not change when a label is culled.
+      var LABEL_PRECEDENCE = "node:selected, node.okf-hover, node.okf-tour-target";
+      var LABEL_CULLED = "node.okf-label-culled, edge.okf-label-culled";
+      var LABEL_CULLED_STYLE = { "text-opacity": 0, "text-background-opacity": 0, "text-outline-opacity": 0, "text-border-opacity": 0 };
+      var PRECEDENCE_LABEL_WIDTH = 220;
+      function labelPlateStyle(pal) {
+        return {
+          "color": pal.nodeText, "text-background-color": pal.surface, "text-background-opacity": 1,
+          "text-background-padding": 3, "text-border-width": 1, "text-border-color": pal.nodeBorder,
+          "text-border-opacity": 1, "text-max-width": PRECEDENCE_LABEL_WIDTH,
+          "z-compound-depth": "top", "z-index": 40
+        };
+      }
+      // Cytoscape's cascade is last-rule-wins, so every pass that appends a
+      // base "node" label rule re-appends these after it.
+      function labelPrecedenceRules(style, pal) {
+        return style.selector(LABEL_PRECEDENCE).style(labelPlateStyle(pal)).selector(LABEL_CULLED).style(LABEL_CULLED_STYLE);
+      }
+
       // Compute the initial (default-preset) grouping so the first layout is
       // already grouped-by-type rather than a flat hairball.
       applyGrouping();
@@ -1701,9 +1892,8 @@
           selector: "node",
           style: {
             "background-color": "data(color)",
-            // Phase 3 node glyphs: type icon (white stroke SVG data-URI)
-            // centered on the coloured node; shape marks the structural
-            // family (barrel = data, hexagon = service, diamond = decision).
+            // Phase 3 node glyphs: type icon (an SVG data-URI stroked in
+            // --graph-node-icon) centred on the neutral round node.
             "shape": "data(shape)",
             // Resolve image values in JS. Cytoscape treats data(...) inside a
             // multi-background array as a literal URL in some 3.x builds,
@@ -1711,8 +1901,8 @@
             "background-image": function (n) {
               return [n.data("iconUrl") || "none", n.data("commentBadgeUrl") || "none", n.data("brokenBadgeUrl") || "none"];
             },
-            "background-width": ["55%", "34px", "22px"],
-            "background-height": ["55%", "22px", "20px"],
+            "background-width": ["55%", "26px", "22px"],
+            "background-height": ["55%", "18px", "20px"],
             "background-position-x": ["50%", "100%", "0%"],
             "background-position-y": ["50%", "0%", "0%"],
             "background-clip": ["node", "none", "none"],
@@ -1720,6 +1910,7 @@
             "bounds-expansion": 18,
             "label": "data(label)",
               "color": INITIAL_GRAPH_PALETTE.nodeText,
+              "font-family": INITIAL_GRAPH_PALETTE.font,
             // Review feedback: node names read "near-microscopic" at the
             // widened max spread (the auto-fit zooms the big graph out, so the
             // rendered size is font-size × zoom; measured max-range zoom is
@@ -1746,23 +1937,30 @@
             // drove the label-collision pile-up.
             "text-wrap": "ellipsis",
             "text-max-width": 90,
-            // Review feedback: a soft label plate keeps node names legible over
-            // edges and neighbouring nodes (reviewer blocker 1 collisions). The
-            // plate opacity is theme-driven — see syncLabelColour — so light
-            // themes drop the plate entirely (the canvas already has enough
-            // contrast for fg-on-bg-elev labels) while dark themes keep the
-            // 0.85 plate so labels stay crisp over edges at high spread.
+            // Ledger labels: --graph-label ink on a --graph-halo outline, so
+            // names stay legible over edges and neighbours without a plate.
+            // The (square) plate colour is still set so selected/hovered
+            // labels can raise a full halo plate (syncLabelColour).
+              "text-outline-color": INITIAL_GRAPH_PALETTE.halo,
+            "text-outline-width": 2,
+            "text-outline-opacity": 1,
               "text-background-color": INITIAL_GRAPH_PALETTE.edgeLabelBg,
-            "text-background-opacity": 0.85,
+            "text-background-opacity": 0,
             "text-background-padding": 2,
-            "text-background-shape": "roundrectangle",
+            "text-background-shape": "rectangle",
             "width": "data(vizSize)",
             "height": "data(vizSize)",
-            "border-width": 1,
+            // Neutral round record: 1.5px --border-strong stroke.
+            "border-width": 1.5,
               "border-color": INITIAL_GRAPH_PALETTE.nodeBorder,
+            // Cytoscape underlays are round-rectangles; a zero corner radius
+            // makes every halo (hub, hover, search, path, bridge) square.
+            "underlay-shape": "round-rectangle",
+            "underlay-corner-radius": 0,
           },
         },
         {
+          // The accent's one canvas use: the selected node's 4px stroke.
           selector: "node:selected",
             style: { "border-width": 4, "border-color": INITIAL_GRAPH_PALETTE.select },
         },
@@ -1808,14 +2006,18 @@
             // instead of rendering as faint noise; they return on zoom-in. This
             // preserves Relations/Focus semantics (labels are still emitted via
             // .okf-show-label) and only changes WHEN they paint.
+            // D2-010: relationship labels are secondary text, so they read
+            // in the muted --text-3 ink at a regular weight (still AA on the
+            // 0.9 halo plate in every palette).
             "font-size": 11,
-            "font-weight": 600,
+            "font-weight": 500,
               "color": INITIAL_GRAPH_PALETTE.edgeLabel,
+              "font-family": INITIAL_GRAPH_PALETTE.font,
             "text-rotation": "autorotate",
               "text-background-color": INITIAL_GRAPH_PALETTE.edgeLabelBg,
             "text-background-opacity": 0.9,
             "text-background-padding": 2,
-            "text-background-shape": "roundrectangle",
+            "text-background-shape": "rectangle",
             "min-zoomed-font-size": 9,
           },
         },
@@ -1823,11 +2025,16 @@
           { selector: "edge.okf-show-label, edge.okf-density-detail-label", style: { "label": "data(label)" } },
           // A compact count chip is always visible for bundled parallel
           // relationships; selecting it opens the lossless semantic list.
+          // Ledger chip: square, band fill, 1px --border-strong rule, mono
+          // figure in ink, never rotated.
           { selector: "edge.okf-multi-edge", style: {
-            "label": "data(bundleLabel)", "font-size": 10, "font-weight": 700,
-            "text-background-opacity": 1, "text-background-padding": 4,
-            "text-background-shape": "roundrectangle", "text-border-width": 1,
-              "text-border-color": INITIAL_GRAPH_PALETTE.select,
+            "label": "data(bundleLabel)", "font-size": 10, "font-weight": 500,
+              "font-family": INITIAL_GRAPH_PALETTE.mono, "color": INITIAL_GRAPH_PALETTE.nodeText,
+            "text-rotation": "none",
+              "text-background-color": INITIAL_GRAPH_PALETTE.chip,
+            "text-background-opacity": 1, "text-background-padding": 3,
+            "text-background-shape": "rectangle", "text-border-width": 1,
+              "text-border-color": INITIAL_GRAPH_PALETTE.nodeBorder,
             "text-border-opacity": 1
           } },
           { selector: "node.okf-density-overview-zero", style: {
@@ -1844,14 +2051,16 @@
           } },
           // P1 edge highlight: edges incident to the selected node pop above
           // the de-emphasized default edge noise. Restores full opacity + a
-          // modest width bump. z-compound-depth top keeps incident edges above
-          // non-incident ones so they are never visually buried. The colour
-          // is left to the base edge / relation encoding — this is a
-          // PROMINENCE cue, not a new colour variable.
+          // modest width bump. A raised z-index keeps incident edges above
+          // non-incident ones so they are never visually buried, while edges
+          // still pass BEHIND every node and label (a top-layer fan of
+          // incident edges used to strike through the names it connects).
+          // The colour is left to the base edge / relation encoding — this
+          // is a PROMINENCE cue, not a new colour variable.
           { selector: "edge.okf-incident", style: {
               "opacity": 1,
               "width": 3,
-              "z-compound-depth": "top",
+              "z-index": 10,
           } },
           // P1 progressive disclosure: non-backbone edges are display:none so
           // they are excluded from BOTH rendering AND layout (cleaner initial
@@ -1864,23 +2073,28 @@
         { selector: "edge.okf-reld-1", style: { "line-style": "dashed", "line-dash-pattern": [6, 3] } },
         { selector: "edge.okf-reld-2", style: { "line-style": "dashed", "line-dash-pattern": [2, 3] } },
         { selector: "edge.okf-reld-3", style: { "line-style": "dashed", "line-dash-pattern": [10, 3, 2, 3] } },
-        // Phase 3: degree-zero concepts read as "not yet linked" — dashed
-        // outline + reduced opacity (fcose tiles them into a tray).
+        // Phase 3: degree-zero concepts read as "not yet linked" — a dashed
+        // stroke in the muted warning hue (status hues mark strokes, never
+        // fills); fcose tiles them into a tray.
         { selector: "node.okf-orphan", style: {
             "border-style": "dashed",
             "border-width": 2,
-            "opacity": 0.75,
+              "border-color": INITIAL_GRAPH_PALETTE.warn,
+            "opacity": 0.85,
         } },
-        // Phase 3: top-decile hub halo. A soft accent underlay marks the
-        // small set of structurally central nodes; non-colour-only cue
-        // (shape/size/icon still carry identity), and it composes with
-        // .okf-bridge / .okf-focus-root / .okf-presence-halo (those set
-        // their own underlay/border and win on z-index). Computed
-        // deterministically by degree rank (see applyVisualEncoding).
+        // Phase 3: top-decile hub halo. A square --surface-2 underlay marks
+        // the small set of structurally central nodes (neutral, never the
+        // accent); non-colour-only cue (size/icon still carry identity), and
+        // it composes with .okf-bridge / .okf-focus-root / .okf-presence-halo
+        // (those set their own underlay/border and win on z-index). Computed
+        // deterministically by degree rank (see applyVisualEncoding). The
+        // 3px padding keeps the square above the label, which starts 4px
+        // below the disc (a 7px halo cut through the first letters).
         { selector: "node.okf-hub", style: {
-                "underlay-color": INITIAL_GRAPH_PALETTE.select,
-            "underlay-opacity": 0.10,
-            "underlay-padding": 7,
+                "underlay-color": INITIAL_GRAPH_PALETTE.raised,
+            "underlay-opacity": 1,
+            "underlay-padding": 3,
+            "underlay-corner-radius": 0,
         } },
         // Phase 3: broken-link indicator. Nodes whose outgoing links
         // include unresolved targets (broken/missing per SPEC §5.3, as
@@ -1901,30 +2115,34 @@
         // soft halo. Separate class from `.dim` so filters and hover
         // compose instead of fighting.
         { selector: ".okf-hover-dim", style: { "opacity": 0.18 } },
-          { selector: "node.okf-search-match", style: { "underlay-color": INITIAL_GRAPH_PALETTE.select, "underlay-opacity": 0.28, "underlay-padding": 7, "border-width": 3 } },
+          { selector: "node.okf-search-match", style: { "underlay-color": INITIAL_GRAPH_PALETTE.raised, "underlay-opacity": 1, "underlay-padding": 7, "border-width": 3, "border-color": INITIAL_GRAPH_PALETTE.cue } },
         { selector: "node.okf-search-nonmatch", style: { "opacity": 0.25 } },
         { selector: "node.okf-hover", style: {
             "width": function (ele) { return (Number(ele.data("vizSize")) || 32) * 1.15; },
             "height": function (ele) { return (Number(ele.data("vizSize")) || 32) * 1.15; },
             "transition-property": REDUCED_MOTION ? "none" : "width height underlay-opacity",
             "transition-duration": REDUCED_MOTION ? "0ms" : "120ms",
-              "underlay-color": INITIAL_GRAPH_PALETTE.select,
-            "underlay-opacity": 0.18,
+              "underlay-color": INITIAL_GRAPH_PALETTE.raised,
+            "underlay-opacity": 1,
             "underlay-padding": 8,
         } },
-        // Phase 4 path tracing (shift-click): the chain lights up in the
-        // selection accent; everything off-path fades further than hover.
+        // Phase 4 path tracing (shift-click): the chain is drawn in ink
+        // (--text), heavier and solid; everything off-path fades further
+        // than hover. The accent stays reserved for the selected node.
         { selector: ".okf-path-dim", style: { "opacity": 0.12 } },
         { selector: "node.okf-path", style: {
             "border-width": 3,
-              "border-color": INITIAL_GRAPH_PALETTE.select,
-              "underlay-color": INITIAL_GRAPH_PALETTE.select,
-            "underlay-opacity": 0.14,
+              "border-color": INITIAL_GRAPH_PALETTE.cue,
+              "underlay-color": INITIAL_GRAPH_PALETTE.raised,
+            "underlay-opacity": 1,
             "underlay-padding": 6,
         } },
+        // The hovered directional edge dashes so its flow reads (path and
+        // selected edges below keep their solid stroke).
+        { selector: "edge.okf-edge-flow", style: { "line-style": "dashed" } },
         { selector: "edge.okf-path", style: {
-              "line-color": INITIAL_GRAPH_PALETTE.select,
-              "target-arrow-color": INITIAL_GRAPH_PALETTE.select,
+              "line-color": INITIAL_GRAPH_PALETTE.cue,
+              "target-arrow-color": INITIAL_GRAPH_PALETTE.cue,
             "width": 4.5,
             "opacity": 1,
             "line-style": "solid",
@@ -1944,16 +2162,18 @@
         // heavy double-black ring (reviewer blocker 1). Still a non-colour-only
         // SHAPE/halo cue; cross-group bridge edges stay dashed.
         { selector: "node.okf-bridge", style: {
-              "underlay-color": INITIAL_GRAPH_PALETTE.select,
-            "underlay-opacity": 0.16,
+              "underlay-color": INITIAL_GRAPH_PALETTE.raised,
+            "underlay-opacity": 1,
             "underlay-padding": 6,
             "border-width": 2,
+              "border-color": INITIAL_GRAPH_PALETTE.bridgeBorder,
         } },
         { selector: "edge.okf-bridge-edge", style: { "line-style": "dashed" } },
-        // Focus root: strong selection halo so the focused node is unmistakable.
+        // Focus root: the focused (selected) node keeps the accent stroke over
+        // a wide neutral square halo so it is unmistakable.
         { selector: "node.okf-focus-root", style: {
-              "underlay-color": INITIAL_GRAPH_PALETTE.select,
-            "underlay-opacity": 0.38,
+              "underlay-color": INITIAL_GRAPH_PALETTE.raised,
+            "underlay-opacity": 1,
             "underlay-padding": 14,
             "border-width": 4,
               "border-color": INITIAL_GRAPH_PALETTE.select,
@@ -1961,24 +2181,61 @@
         } },
         // Non-neighbour dim during focus is stronger (~12%); reviewer asked ≤30%.
         { selector: ".dim", style: { opacity: 0.12 } },
+        // A node's opacity does not reach its underlay, so the structural
+        // hub and bridge halos fade with their faded node explicitly instead
+        // of leaving solid squares on a ghosted canvas (D2-014). The
+        // strongest fade is last, so it wins when fades combine.
+        { selector: "node.okf-hub.okf-search-nonmatch, node.okf-bridge.okf-search-nonmatch", style: { "underlay-opacity": 0.25 } },
+        { selector: "node.okf-hub.okf-hover-dim, node.okf-bridge.okf-hover-dim", style: { "underlay-opacity": 0.18 } },
+        { selector: "node.okf-hub.dim, node.okf-hub.okf-path-dim, node.okf-bridge.dim, node.okf-bridge.okf-path-dim", style: { "underlay-opacity": 0.12 } },
         // iter1 CRI-004: presence halo. When the agent's presence.focus
         // points at a concept, graph.js adds this class to that node so the
         // agent is spatially visible on the canvas, not just in the status
-        // chip. The border uses the selection (--okf-select) teal so the
-        // halo is theme-aware and distinct from auto-generated node fills.
+        // chip. The border uses the muted info hue (a status stroke) so the
+        // agent's focus never reads as the reader's own selection.
         { selector: ".okf-presence-halo", style: {
             "border-width": 4,
-              "border-color": INITIAL_GRAPH_PALETTE.select,
-            "border-opacity": 0.9,
+              "border-color": INITIAL_GRAPH_PALETTE.info,
+            "border-opacity": 1,
             "z-index": 20,
           } },
+        // The selected node's 4px accent stroke wins over every state cue
+        // above (path, search, bridge, orphan, presence).
+        { selector: "node:selected", style: { "border-width": 4, "border-style": "solid", "border-color": INITIAL_GRAPH_PALETTE.select } },
+        // Label precedence and culling (labelPrecedenceRules owns both).
+        { selector: LABEL_PRECEDENCE, style: labelPlateStyle(INITIAL_GRAPH_PALETTE) },
+        { selector: LABEL_CULLED, style: LABEL_CULLED_STYLE },
       ],
-      // Seed with a cheap grid; the real tuned layout runs once via
-      // runLayoutNow() AFTER the panel exists, so its overlay-aware fit can
-      // measure the panel footprint and its layoutstop re-fits a settled graph
-      // (fixes the init over-zoom + off-centre cluster).
-      layout: layoutOpts("grid", { animate: false, fit: false }),
+      // The deterministic circle/sparse/mobile seed below replaces ALL node
+      // positions before runLayoutNow(). Do not compute a discarded grid (and
+      // its label-aware bounding boxes) during element creation. The tuned
+      // layout still runs once after the chrome exists, through its sole owner.
+      layout: { name: "preset", animate: false, fit: false },
     });
+    // Canvas metrics/label textures are keyed by the font-family string, not
+    // by FontFace load state. A style().update() with the same string therefore
+    // keeps fallback measurements AND textures. Re-key through the supported
+    // stylesheet API once after late Ledger faces settle: a repeated generic
+    // fallback is typographically identical, but invalidates both cache layers.
+    // Never await fonts on the first-frame/layout path or rerun the layout.
+    if (document.fonts) {
+      var lateSans = INITIAL_GRAPH_PALETTE.font.indexOf("Public Sans") >= 0 && !document.fonts.check('600 13px "Public Sans"');
+      var lateMono = INITIAL_GRAPH_PALETTE.mono.indexOf("Azeret Mono") >= 0 && !document.fonts.check('500 10px "Azeret Mono"');
+      var fontMountGeneration = graphMountGeneration;
+      if (lateSans || lateMono) document.fonts.ready.then(function () {
+        if (fontMountGeneration !== graphMountGeneration || cy.destroyed()) return;
+        var sansLoaded = lateSans && document.fonts.check('600 13px "Public Sans"');
+        var monoLoaded = lateMono && document.fonts.check('500 10px "Azeret Mono"');
+        if (!sansLoaded && !monoLoaded) return;
+        var pal = graphPalette(), style = cy.style();
+        if (sansLoaded) style.selector("node, edge").style("font-family", pal.font + ", sans-serif");
+        // This later selector preserves the distinct bundled-edge mono face
+        // even when the new base edge rule was appended after its original rule.
+        style.selector("edge.okf-multi-edge").style("font-family", pal.mono + (monoLoaded ? ", monospace" : ""));
+        style.update();
+        cy.forceRender();
+      });
+    }
     // Review feedback: clamp zoom. cy.fit on a small/collapsed cluster used to
     // over-zoom (font-size scales with zoom → giant labels). maxZoom caps both
     // user and programmatic zoom; overlayAwareFit() also respects it.
@@ -1986,43 +2243,45 @@
     try { cy.maxZoom(MAX_ZOOM); cy.minZoom(0.06); } catch (e) {}
     var nativeGetElementById=cy.getElementById.bind(cy);
     cy.getElementById=function(id){var found=nativeGetElementById(id);if(found&&found.length)return found;if(typeof id==="string"&&id.indexOf("__")>=0){var endpointMatch=cy.edges().filter(function(edge){return edge.data("source")+"__"+edge.data("target")===id;});if(endpointMatch.length===1)return endpointMatch;}return found;};
-    // Bridge/focus glow + bridge border mirror the theme select colour.
-      function syncBridgeColour() {
-        var pal = graphPalette();
-        cy.style().selector("node.okf-bridge").style("underlay-color", pal.select).update();
-        cy.style().selector("node.okf-bridge").style("border-color", pal.bridgeBorder).update();
-        cy.style().selector("node.okf-focus-root").style("underlay-color", pal.select).update();
-        cy.style().selector("node.okf-focus-root").style("border-color", pal.select).update();
-      }
-
       // Stateful graph cues are not all covered by the base node/edge rules:
       // Cytoscape resolves class selectors after those base rules. Keep their
-      // theme-dependent accent in one consumer-side synchronizer so a theme
-      // event repaints the active path, hover/search/hub/bridge halos, focus,
-      // selection, and bundled-edge count chips as one transaction.
+      // palette-dependent colours in one consumer-side synchronizer so a
+      // palette event repaints the active path, hover/search/hub/bridge
+      // halos, focus, presence, orphans and bundled-edge count chips as one
+      // transaction. Halos are the neutral raised surface; path, search and
+      // bridge marks are ink; the accent stays on the selection.
       function syncStatefulGraphColours(pal) {
         cy.style()
-          .selector("node.okf-search-match, node.okf-hover, node.okf-hub, node.okf-path, node.okf-focus-root, .okf-presence-halo")
-          .style("underlay-color", pal.select)
+          .selector("node.okf-search-match, node.okf-hover, node.okf-hub, node.okf-path, node.okf-focus-root, node.okf-bridge, node.okf-tour-target")
+          .style("underlay-color", pal.raised)
+          // Widths ride along: a base "node" rule appended by an earlier pass
+          // (forced colours) must never thin these cues back to 1.5px.
+          .selector("node.okf-orphan")
+          .style({ "border-color": pal.warn, "border-width": 2, "border-style": "dashed" })
           .selector("node.okf-bridge")
-          .style({ "underlay-color": pal.select, "border-color": pal.bridgeBorder })
-          .selector("node.okf-focus-root, node.okf-path, .okf-presence-halo")
-          .style("border-color", pal.select)
-          .selector("edge.okf-path, edge:selected")
+          .style({ "border-color": pal.cue, "border-width": 2 })
+          .selector("node.okf-search-match, node.okf-path")
+          .style({ "border-color": pal.cue, "border-width": 3, "border-style": "solid" })
+          .selector(".okf-presence-halo")
+          .style({ "border-color": pal.info, "border-width": 4 })
+          .selector("node.okf-focus-root")
+          .style({ "border-color": pal.select, "border-width": 4, "border-style": "solid" })
+          .selector("edge.okf-path")
+          .style({ "line-color": pal.cue, "target-arrow-color": pal.cue })
+          .selector("edge:selected")
           .style({ "line-color": pal.select, "target-arrow-color": pal.select })
           .selector("edge.okf-multi-edge")
-          .style("text-border-color", pal.select)
+          .style({ "text-border-color": pal.nodeBorder, "text-background-color": pal.chip, "color": pal.nodeText })
+          .selector("node:selected")
+          .style({ "border-color": pal.select, "border-width": 4, "border-style": "solid" })
           .update();
       }
 
-    // The theme tweaks the label colour.
-    // P2-72: edge label text-background was hardcoded #ffffff (failed in
-    //   dark mode). P3-11: also re-sync on prefers-color-scheme change so
-    //   users with no explicit theme follow OS colour scheme toggles.
-    // P2-5 (iter-2): all literals now read from the GRAPH_COLORS constants
-    //   block (mirrors wiki.css theme tokens). Selection border + edge
-    //   selection line/arrow are also re-synced here so a theme change
-    //   updates them to the active theme's --okf-select value.
+    // Palette synchronisation. Every colour the canvas paints comes from
+    // graphPalette() (the active palette's resolved tokens), so a
+    // palette change re-applies labels, halos, strokes, edges, badges,
+    // glyphs and the minimap here; repaintLensColours() recolours the lens
+    // encoding itself (see syncGraphTheme).
     function syncBadgeDataUris() {
       // Badge SVG data URLs capture resolved theme values. Rebuild every
       // theme-dependent layer even while forced colours own Cytoscape's
@@ -2041,96 +2300,209 @@
     }
     function syncLabelColour() {
       var pal = graphPalette();
-      cy.style().selector("node").style("color", pal.nodeText).update();
-      cy.style().selector("node").style("border-color", pal.nodeBorder).update();
-      cy.style().selector("node").style("text-background-color", pal.edgeLabelBg).update();
-      // Phase 3 light/dark label plate policy: in LIGHT themes the node
-      // label reads as fg-on-bg-elev (already a high-contrast pairing in
-      // every theme family), so the plate is dropped entirely — the
-      // default canvas reads calmer without semi-transparent boxes under
-      // every node. DARK themes keep the 0.85 plate because dark-on-dark
-      // labels crossing dark edges need the disambiguator. Plate COLOR is
-      // still set above so a theme switch flips cleanly between modes
-      // without a transient unstyled state.
-      var isDark = /-dark$/.test(document.documentElement.getAttribute("data-theme") || "");
-      cy.style().selector("node").style("text-background-opacity", isDark ? 0.85 : 0).update();
-      cy.style().selector("node:selected, node.okf-hover, node.okf-tour-target").style({
+      // Commit the complete label palette once, not a whole-graph style pass
+      // for each selector. Stateful cues still follow these base rules.
+      labelPrecedenceRules(cy.style().selector("node").style({
         "color": pal.nodeText,
+        "border-color": pal.nodeBorder,
+        // Ledger labels: --graph-label on a --graph-halo outline in every
+        // palette. Light palettes need nothing more; on the dark palettes
+        // light labels crossing light edges also get a square --graph-halo
+        // plate at 0.85 so they stay crisp at high spread. The selected,
+        // hovered or toured node's name gets an opaque --surface plate
+        // (labelPrecedenceRules, appended last).
+        "text-outline-color": pal.halo,
+        "text-outline-width": 2,
         "text-background-color": pal.edgeLabelBg,
-        "text-background-opacity": isDark ? 1 : 0.92
-      }).update();
-      cy.style().selector("node.okf-hover-dim, node.dim").style({
+        "text-background-opacity": pal.dark ? 0.85 : 0
+      }).selector("node.okf-hover-dim, node.dim").style({
         "color": pal.nodeText,
         "text-background-color": pal.edgeLabelBg
-      }).update();
-      cy.style().selector("node.okf-tour-target").style({
-        "border-color": pal.select, "border-width": 5,
-        "underlay-color": pal.select, "underlay-opacity": 0.28, "underlay-padding": 10
-      }).update();
-      cy.style().selector("edge").style("line-color", pal.edge).update();
-      cy.style().selector("edge").style("target-arrow-color", pal.edge).update();
-      cy.style().selector("edge").style("text-background-color", pal.edgeLabelBg).update();
-      cy.style().selector("edge").style("color", pal.edgeLabel).update();
-      cy.style().selector("node:selected").style("border-color", pal.select).update();
-      cy.style().selector("edge:selected").style("line-color", pal.select).update();
-        cy.style().selector("edge:selected").style("target-arrow-color", pal.select).update();
-        syncStatefulGraphColours(pal);
-        syncBridgeColour();
-      }
+      }).selector("node.okf-tour-target").style({
+        "border-color": pal.cue, "border-width": 5,
+        "underlay-color": pal.raised, "underlay-opacity": 1, "underlay-padding": 10
+      }).selector("edge").style({
+        "line-color": pal.edge,
+        "target-arrow-color": pal.edge,
+        "text-background-color": pal.edgeLabelBg,
+        "color": pal.edgeLabel
+      })
+      // Typed edges carry their (lens) colour in data(relColor); restore the
+      // mapping a forced-colours pass replaced with a system colour.
+      .selector("edge.okf-rel-edge").style({ "line-color": "data(relColor)", "target-arrow-color": "data(relColor)" }), pal).update();
+      syncStatefulGraphColours(pal);
+    }
       if(reducedMotionQuery){var syncGraphMotion=function(){try{cy.style().selector("node.okf-hover").style("transition-duration",REDUCED_MOTION?"0ms":"120ms").update();}catch(e){}};if(reducedMotionQuery.addEventListener)reducedMotionQuery.addEventListener("change",syncGraphMotion);else if(reducedMotionQuery.addListener)reducedMotionQuery.addListener(syncGraphMotion);}
-      function resolvedSystemColor(value){var probe=document.createElement("span");probe.style.color=value;probe.style.position="fixed";probe.style.visibility="hidden";document.body.appendChild(probe);var color=getComputedStyle(probe).color;probe.remove();return color;}
+      // ---- Forced colours: the system-colour canvas layer -----------------
+      // Canvas pixels are never adjusted by the browser, so under forced
+      // colours the graph paints itself from the resolved system colours
+      // (systemColours). The layer is one block of rules scoped to the
+      // okf-forced class, appended after every palette rule so it wins
+      // Cytoscape's last-rule-wins cascade, and carried by elements only
+      // while forced colours are active. Leaving forced colours removes the
+      // class, so every ordinary rule (every Ledger palette value) applies
+      // again exactly as before; the block is re-appended on the next entry
+      // whenever palette passes have appended rules after it.
+      // Hue never carries meaning here: lens categories become node shapes,
+      // ordered lenses become stroke weights, and every reader state is
+      // Highlight plus its own stroke width, style or ring.
+      //   node          Canvas fill; CanvasText 2px solid stroke and label on
+      //                 a Canvas plate
+      //   lens category shape (FORCED_LENS_SHAPES; the legend draws the same)
+      //   lens order    stroke 1 / 2.5 / 4 / 5.5 / 7px; undated dotted 2px
+      //   orphan        dashed stroke        hub     thin CanvasText outer ring
+      //   bridge        6px double stroke    dimmed  GrayText dotted 2px
+      //   hover         Highlight 4px solid (plus the 15% growth)
+      //   search hit    Highlight 5px dashed
+      //   path node     Highlight 5px dotted
+      //   focus root    Highlight 7px double (over the selected stroke)
+      //   tour target   Highlight 4px solid ring, 6px outside the node
+      //   presence      LinkText 3px dashed ring, 4px outside the node
+      //   selected      Highlight 6px solid
+      //   edge          CanvasText, 3-5px by weight; typed edges keep dashes
+      //   dimmed edge   GrayText dotted 2px
+      //   path edge     Highlight 7px solid; selected edge Highlight 6px dashed
+      //   count chip    ButtonText on ButtonFace
+      var FORCED_CLASS = "okf-forced";
+      var FORCED_LENS_SHAPES = ["ellipse", "rectangle", "diamond", "triangle", "hexagon", "pentagon", "octagon", "rhomboid"];
+      var FORCED_LEVEL_WIDTHS = [1, 2.5, 4, 5.5, 7];
+      var forcedRulesEnd = -1, forcedRulesKey = "";
+      function forcedLensCue(n) { return String(n.data("lensCue") || ""); }
+      function forcedNodeShape(n) {
+        var cue = forcedLensCue(n);
+        if (cue.indexOf("shape-") === 0) return FORCED_LENS_SHAPES[(Number(cue.slice(6)) || 0) % FORCED_LENS_SHAPES.length];
+        return n.data("shape") || "ellipse";
+      }
+      function forcedNodeBorderWidth(n) {
+        var cue = forcedLensCue(n);
+        return cue.indexOf("level-") === 0 ? (FORCED_LEVEL_WIDTHS[Number(cue.slice(6))] || 2) : 2;
+      }
+      function forcedNodeBorderStyle(n) { return forcedLensCue(n) === "undated" ? "dotted" : "solid"; }
+      function appendForcedColourRules(sys, key) {
+        var dimNodes = "node.okf-forced.dim, node.okf-forced.okf-hover-dim, node.okf-forced.okf-path-dim, node.okf-forced.okf-search-nonmatch";
+        var dimEdges = "edge.okf-forced.dim, edge.okf-forced.okf-hover-dim, edge.okf-forced.okf-path-dim, edge.okf-forced.okf-unrelated";
+        cy.style()
+          .selector("node.okf-forced").style({
+            "background-color": sys.canvas, "background-opacity": 1, "shape": forcedNodeShape,
+            "border-color": sys.text, "border-opacity": 1, "border-width": forcedNodeBorderWidth, "border-style": forcedNodeBorderStyle,
+            "color": sys.text, "text-outline-color": sys.canvas, "text-outline-width": 2, "text-outline-opacity": 1,
+            "text-background-color": sys.canvas, "text-background-opacity": 1, "text-border-color": sys.text,
+            "underlay-color": sys.canvas, "underlay-opacity": 0, "outline-width": 0, "opacity": 1
+          })
+          .selector("node.okf-forced.okf-orphan").style({ "border-style": "dashed" })
+          .selector("node.okf-forced.okf-hub").style({ "outline-color": sys.text, "outline-style": "solid", "outline-width": 1.5, "outline-offset": 3, "outline-opacity": 1 })
+          .selector("node.okf-forced.okf-bridge").style({ "border-style": "double", "border-width": 6 })
+          .selector(dimNodes).style({ "border-color": sys.gray, "border-style": "dotted", "border-width": 2, "color": sys.gray, "outline-color": sys.gray })
+          .selector("node.okf-forced.okf-hover").style({ "border-color": sys.highlight, "border-style": "solid", "border-width": 4 })
+          .selector("node.okf-forced.okf-tour-target").style({ "outline-color": sys.highlight, "outline-style": "solid", "outline-width": 4, "outline-offset": 6, "outline-opacity": 1 })
+          .selector("node.okf-forced.okf-presence-halo").style({ "outline-color": sys.link, "outline-style": "dashed", "outline-width": 3, "outline-offset": 4, "outline-opacity": 1 })
+          .selector("node.okf-forced.okf-search-match").style({ "border-color": sys.highlight, "border-style": "dashed", "border-width": 5 })
+          .selector("node.okf-forced.okf-path").style({ "border-color": sys.highlight, "border-style": "dotted", "border-width": 5 })
+          .selector("node.okf-forced:selected").style({ "border-color": sys.highlight, "border-style": "solid", "border-width": 6 })
+          // The focus root is the selection Focus explores from; it keeps its
+          // own double stroke over the plain selected stroke.
+          .selector("node.okf-forced.okf-focus-root").style({ "border-color": sys.highlight, "border-style": "double", "border-width": 7 })
+          .selector("edge.okf-forced").style({
+            "line-color": sys.text, "target-arrow-color": sys.text, "width": "mapData(weight, 0, 1, 3, 5)", "opacity": 1,
+            "color": sys.text, "text-background-color": sys.canvas, "text-background-opacity": 1
+          })
+          .selector("edge.okf-forced.okf-multi-edge").style({
+            "color": sys.buttonText, "text-background-color": sys.buttonFace, "text-border-color": sys.buttonText, "text-border-width": 1, "text-border-opacity": 1
+          })
+          .selector(dimEdges).style({ "line-color": sys.gray, "target-arrow-color": sys.gray, "line-style": "dotted", "width": 2, "color": sys.gray })
+          .selector("edge.okf-forced.okf-path").style({ "line-color": sys.highlight, "target-arrow-color": sys.highlight, "line-style": "solid", "width": 7 })
+          .selector("edge.okf-forced:selected").style({
+            "line-color": sys.highlight, "target-arrow-color": sys.highlight, "line-style": "dashed", "line-dash-pattern": [12, 4], "width": 6
+          })
+          // A culled label stays hidden: the system plates above would
+          // otherwise paint an empty box where the text yielded.
+          .selector("node.okf-forced.okf-label-culled, edge.okf-forced.okf-label-culled").style(LABEL_CULLED_STYLE)
+          .update();
+        forcedRulesEnd = cy.style().length;
+        forcedRulesKey = key;
+      }
+      // The forced-colours hook: theme events and forced-colour media changes
+      // both route through syncGraphTheme to here. Under forced colours a
+      // palette event never reaches the ordinary synchroniser; leaving them
+      // hands the canvas back to it.
       function syncForcedColorGraph(){
         FORCED_COLORS=!!(forcedColorsQuery&&forcedColorsQuery.matches);
         try {
-          var canvasText=FORCED_COLORS?resolvedSystemColor("CanvasText"):graphPalette().nodeText;
-          var canvas=FORCED_COLORS?resolvedSystemColor("Canvas"):graphPalette().edgeLabelBg;
-          var highlight=FORCED_COLORS?resolvedSystemColor("Highlight"):graphPalette().select;
-          cy.style()
-            .selector("node")
-            .style({"color":canvasText,"text-background-color":canvas,"border-color":canvasText,"border-width":FORCED_COLORS?3:2})
-            .selector("edge")
-            // Edge label plates/text follow the system palette too: the
-            // theme's edgeLabelBg is no longer white (Soft Light), so it may
-            // not stand in for Canvas. syncLabelColour restores both.
-            .style({"line-color":canvasText,"target-arrow-color":canvasText,"color":canvasText,"text-background-color":canvas,"width":FORCED_COLORS?3:undefined,"opacity":FORCED_COLORS?1:undefined})
-            // Typed edge rules are later than the base edge rule; explicitly
-            // replace their hue so forced colours cannot leak ordinary HSL.
-            .selector("edge.okf-rel-edge")
-            .style({"line-color":canvasText,"target-arrow-color":canvasText})
-            .selector("node:selected, node.okf-search-match, node.okf-hover, node.okf-hub, node.okf-path, node.okf-focus-root, .okf-presence-halo")
-            .style({"underlay-color":highlight})
-            .selector("node:selected")
-            .style({"border-color":highlight,"border-width":FORCED_COLORS?6:4,"border-style":"solid"})
-            .selector("node.okf-search-match")
-            .style({"border-color":highlight,"border-width":FORCED_COLORS?5:3,"border-style":FORCED_COLORS?"dashed":"solid"})
-            .selector("node.okf-focus-root")
-            .style({"border-color":highlight,"border-width":FORCED_COLORS?7:4,"border-style":"double"})
-            .selector("node.okf-bridge")
-            .style({"border-color":canvasText})
-            .selector("node.okf-path, .okf-presence-halo")
-            .style({"border-color":highlight})
-            .selector("edge.okf-path, edge:selected")
-            .style({"line-color":highlight,"target-arrow-color":highlight})
-            .selector("edge.okf-path")
-            .style({"width":FORCED_COLORS?7:5,"line-style":"dashed"})
-            .selector("edge.okf-multi-edge")
-            .style("text-border-color", highlight)
-            .update();
-          if(!FORCED_COLORS)syncLabelColour();
+          if (FORCED_COLORS) {
+            var sys = systemColours(), key = Object.keys(sys).map(function (name) { return sys[name]; }).join("|");
+            // Re-append when the system colours changed or a palette pass
+            // appended rules after the layer: it must stay last to win.
+            if (key !== forcedRulesKey || cy.style().length !== forcedRulesEnd) appendForcedColourRules(sys, key);
+            cy.elements().addClass(FORCED_CLASS);
+          } else {
+            cy.elements().removeClass(FORCED_CLASS);
+            syncLabelColour();
+          }
         } catch(e) {}
         document.body.toggleAttribute("data-okf-forced-colors",FORCED_COLORS);
       }
+      // Elements added later (live refresh, LOD reveal, decluster) join the
+      // system layer immediately; their glyphs already use graphInk().
+      cy.on("add", function (evt) { if (FORCED_COLORS) evt.target.addClass(FORCED_CLASS); });
       // Theme events and forced-colour media changes share one route. A
       // resolved theme event must never call the ordinary synchronizer while
       // the system palette owns the graph.
-    function syncGraphTheme(){
+    // A palette change also recolours the lens encoding: node fills (neutral
+    // or the muted ramp), typed-edge hues, glyph strokes, legend and index
+    // swatches and the theme-digest bars, so a lens keeps its meaning in the
+    // new palette instead of keeping the previous palette's ramp.
+    var lensPaintReady = false;
+    // elemFor() already stamped every node with this palette's glyph and
+    // neutral fill, so first paint skips the per-node pass; it runs only once
+    // a palette change resolves a new token set.
+    var glyphsPaintedFor = graphPalette(), glyphInkPainted = graphInk().nodeIcon;
+    function refreshNodeGlyphs() {
+      // The glyph ink also changes when forced colours start or stop (or the
+      // system colours change) while the Ledger palette stays the same.
+      var pal = graphPalette(), ink = graphInk().nodeIcon;
+      if (pal === glyphsPaintedFor && ink === glyphInkPainted) return;
+      glyphsPaintedFor = pal;
+      glyphInkPainted = ink;
+      var neutral = pal.node;
+      cy.batch(function () {
+        cy.nodes().forEach(function (node) {
+          node.data("iconUrl", iconDataUri(node.data("icon") || "file"));
+          node.data("baseColor", neutral);
+        });
+      });
+    }
+    function repaintLensColours() {
+      refreshNodeGlyphs();
+      if (!lensPaintReady) return;
+      // Recolours nodes and typed edges, then legend, index swatches, the
+      // orphan shelf and the theme-digest bars from the new palette.
+      applyVisualEncoding();
+    }
+    function syncGraphTheme(event){
       if(forcedColorsQuery)FORCED_COLORS=!!forcedColorsQuery.matches;
-      syncBadgeDataUris();
-      if(FORCED_COLORS)syncForcedColorGraph();else syncLabelColour();
+      // A palette event invalidates the resolved token set; a forced-colours
+      // media change keeps it (custom properties are not forced).
+      if(event&&event.type==="okf-loom:themeChanged")invalidateGraphPalette();
+      // System colours are re-resolved on every pass: a forced-colour theme
+      // or colour-scheme switch changes them without a palette event.
+      invalidateSystemColours();
+      cy.batch(function () {
+        syncBadgeDataUris();
+        repaintLensColours();
+        // Both directions go through the forced-colours hook: entering
+        // applies the system layer, leaving removes it and re-runs the
+        // ordinary label/state synchroniser.
+        syncForcedColorGraph();
+      });
       syncMinimap();
       }
       window.addEventListener("okf-loom:themeChanged",syncGraphTheme);
       if(forcedColorsQuery){if(forcedColorsQuery.addEventListener)forcedColorsQuery.addEventListener("change",syncGraphTheme);else if(forcedColorsQuery.addListener)forcedColorsQuery.addListener(syncGraphTheme);}
+      // A high-contrast theme switch can change the system colours while
+      // forced colours stay active; outside forced colours theme.js owns
+      // the System appearance and announces it with a palette event.
+      var forcedSchemeQuery=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)");
+      if(forcedSchemeQuery){var syncForcedScheme=function(){if(FORCED_COLORS)syncGraphTheme();};if(forcedSchemeQuery.addEventListener)forcedSchemeQuery.addEventListener("change",syncForcedScheme);else if(forcedSchemeQuery.addListener)forcedSchemeQuery.addListener(syncForcedScheme);}
       syncGraphTheme();
 
     // Legend overlay. Rebuilt by updateLegend() so it reflects the
@@ -2210,7 +2582,9 @@
           btn.setAttribute("aria-label", label + " (not yet linked)");
           var sw = document.createElement("span");
           sw.className = "okf-node-index__swatch";
-          sw.style.background = n.data.color || "var(--okf-accent)";
+          var shelfNode = cy.getElementById(id);
+          sw.style.background = (shelfNode && shelfNode.length && shelfNode.data("color")) || graphPalette().node;
+          setForcedCue(sw, shelfNode && shelfNode.length ? shelfNode.data("lensCue") : "");
           btn.appendChild(sw);
           var lbl = document.createElement("span");
           lbl.className = "okf-node-index__label";
@@ -2234,55 +2608,29 @@
         var firstOrphan=list.querySelector('[role=option]');if(firstOrphan)list.setAttribute("aria-activedescendant",firstOrphan.id);
         orphanShelf.appendChild(list);
       }
-    function legendRow(swatchBg, text) {
+    // A legend row: a square swatch in the canvas colour it explains (the
+    // muted lens ramp), or a hollow canvas-coloured square for "no data".
+    // `cue` is the row's forced-colours key (shape or stroke weight).
+    function legendRow(swatchBg, text, cue) {
       var item = document.createElement("div");
       item.className = "okf-graph-legend__item";
       var sw = document.createElement("span");
       sw.className = "okf-graph-legend__swatch";
-      sw.style.background = swatchBg;
+      if (swatchBg === "transparent") sw.classList.add("okf-graph-legend__swatch--none");
+      else sw.style.background = swatchBg;
+      sw.dataset.swatch = swatchBg;
+      setForcedCue(sw, cue);
       var label = document.createElement("span");
       label.textContent = text;
       item.appendChild(sw); item.appendChild(label);
       return item;
     }
-    // Phase 4: type legend rows double as FILTER CHIPS — click toggles the
-    // type's visibility, alt-click solos it (alt-click again shows all).
-    // State lives in controlState.hiddenTypes; applyFilters consumes it.
-    function legendTypeChip(swatchBg, t) {
-      var typeCount=bundle.nodes.filter(function(n){return n.data.type===t;}).length;
-      var item=document.createElement("button");item.type="button";item.className="okf-graph-legend__item okf-graph-legend__item--chip okf-filter-chip";item.dataset.filterValue=t;
-      var sw=document.createElement("span");sw.className="okf-graph-legend__swatch";sw.style.background=swatchBg;item.appendChild(sw);var label=document.createElement("span");label.textContent=t+" ("+typeCount+")";item.appendChild(label);
-      var off = !!controlState.hiddenTypes[t];
-      item.classList.toggle("okf-graph-legend__item--off", off);
-      item.setAttribute("aria-pressed", String(!off));
-      item.title = "Click: show/hide " + t + " · Alt-click: only " + t;
-      function toggle(alt) {
-        var ht = controlState.hiddenTypes,candidate=Object.assign({},ht);
-        if (alt) {
-          var soloed = !ht[t] && Object.keys(palette).some(function (o) { return o !== t && ht[o]; })
-            && Object.keys(palette).every(function (o) { return o === t ? !ht[o] : ht[o]; });
-          candidate={};
-          if (!soloed) {
-            Object.keys(palette).forEach(function (o) { if (o !== t) candidate[o] = true; });
-          }
-        } else {
-          candidate[t] = !candidate[t];
-        }
-        if(!commitHiddenFilterState("Type",ht,candidate))return;
-        applyFilters();
-        updateLegend();
-        updateStatus();
-        writeInteractionUrl("replace");syncMinimap();
-      }
-        item.addEventListener("click", function (e) { toggle(e.altKey); });
-        return item;
-      }
       // P1 graph/type collision fix: a type FILTER chip that encodes type via
       // ICON + text ONLY (no colour swatch). Used in the "Filter types"
       // section so the legend never presents type colours alongside theme
       // colours — one colour variable, one meaning. The toggle/solo behaviour
-      // is identical to legendTypeChip so existing keyboard + click flows are
-      // preserved.
+      // is the type filter's single chip, so keyboard + click flows are
+      // identical in every lens.
       function legendTypeFilterChip(t) {
         var item = document.createElement("button");item.type="button";
         item.className = "okf-graph-legend__item okf-graph-legend__item--chip okf-graph-legend__item--type-filter okf-filter-chip";item.dataset.filterValue=t;
@@ -2349,7 +2697,7 @@
         if (controlState.colorMode === "community") {
           var com = computeCommunities();
           var pr = computePageRank();
-          body.appendChild(legendTitle("Colour: themes"));
+          body.appendChild(legendTitle(lensKeyTitle("shape", "themes")));
           com.list.slice(0, 8).forEach(function (c) {
             if (!c.ids.length) return;
             var ex = c.ids.slice().sort(function (a, b) { return (pr[b] || 0) - (pr[a] || 0); })[0];
@@ -2358,37 +2706,37 @@
             // theme identity so the legend is readable without relying on the
             // theme palette alone.
             body.appendChild(legendRow(communityColor(c.index),
-              themeLabel(c.index) + " \u00b7 " + (d.label || ex)));
+              themeLabel(c.index) + " \u00b7 " + (d.label || ex), lensShapeCue(c.index)));
           });
           if (com.list.length > 8) body.appendChild(legendRow("transparent", "+ " + (com.list.length - 8) + " more"));
       } else if (controlState.colorMode === "recency") {
-          body.appendChild(legendTitle("Colour: freshness"));
-          body.appendChild(legendRow(recencyColor(7), "This month"));
-          body.appendChild(legendRow(recencyColor(90), "This quarter"));
-          body.appendChild(legendRow(recencyColor(365), "6 months +"));
-          body.appendChild(legendRow(recencyColor(Infinity), "No timestamp"));
+          body.appendChild(legendTitle(lensKeyTitle("level", "freshness")));
+          body.appendChild(legendRow(recencyColor(7), "This month", recencyCue(7)));
+          body.appendChild(legendRow(recencyColor(90), "This quarter", recencyCue(90)));
+          body.appendChild(legendRow(recencyColor(365), "6 months +", recencyCue(365)));
+          var undatedRow = legendRow(recencyColor(Infinity), "No timestamp", recencyCue(Infinity));
+          undatedRow.firstChild.classList.add("okf-graph-legend__swatch--hollow");
+          body.appendChild(undatedRow);
       } else if (controlState.colorMode === "bridge") {
-          body.appendChild(legendTitle("Colour: bridging power"));
-          body.appendChild(legendRow(bridgeColor(0.1), "On few paths"));
-          body.appendChild(legendRow(bridgeColor(0.6), "Connective"));
-          body.appendChild(legendRow(bridgeColor(1), "Holds areas together"));
+          body.appendChild(legendTitle(lensKeyTitle("level", "bridging power")));
+          body.appendChild(legendRow(bridgeColor(0.1), "On few paths", lensLevelCue(0.1)));
+          body.appendChild(legendRow(bridgeColor(0.6), "Connective", lensLevelCue(0.6)));
+          body.appendChild(legendRow(bridgeColor(1), "Holds areas together", lensLevelCue(1)));
       } else if (controlState.colorBy === "group" && controlState.groupBy !== "type") {
-          body.appendChild(legendTitle("Colour: " + GROUP_LABELS[controlState.groupBy]));
-          groupList.slice(0, 12).forEach(function (g) { body.appendChild(legendRow(groupColor(g), g)); });
+          body.appendChild(legendTitle(lensKeyTitle("shape", GROUP_LABELS[controlState.groupBy])));
+          groupList.slice(0, 12).forEach(function (g) { body.appendChild(legendRow(groupColor(g), g, groupCue(g))); });
           if (groupList.length > 12) body.appendChild(legendRow("transparent", "+ " + (groupList.length - 12) + " more"));
       } else if (controlState.colorBy === "importance") {
-          body.appendChild(legendTitle("Node colour: importance (" + SIGNAL_LABELS[controlState.primarySignal] + ")"));
-          body.appendChild(legendRow(importanceColor(0.1), "Low"));
-          body.appendChild(legendRow(importanceColor(0.5), "Medium"));
-          body.appendChild(legendRow(importanceColor(0.95), "High"));
-      } else {
-          body.appendChild(legendTitle("Node colour: type"));
-          var typeFilters=document.createElement("div");typeFilters.className="okf-filter-chips";typeFilters.setAttribute("aria-label","Type filters");Object.keys(palette).sort().forEach(function (t) { typeFilters.appendChild(legendTypeChip(palette[t], t));var solo=document.createElement("button");solo.type="button";solo.className="okf-filter-solo";solo.dataset.filterSoloValue=t;solo.setAttribute("aria-label","Show only "+t);solo.textContent="Only";solo.addEventListener("click",function(){var candidate={};Object.keys(palette).forEach(function(v){candidate[v]=v!==t;});if(!commitHiddenFilterState("Type",controlState.hiddenTypes,candidate))return;applyFilters();updateLegend();updateStatus();writeInteractionUrl("replace");syncMinimap();});typeFilters.appendChild(solo);});var showTypes=document.createElement("button");showTypes.type="button";showTypes.className="okf-filter-showall";showTypes.textContent="Show all";showTypes.addEventListener("click",function(){replaceRecord(controlState.hiddenTypes,{});applyFilters();updateLegend();updateStatus();writeInteractionUrl("replace");syncMinimap();});typeFilters.appendChild(showTypes);body.appendChild(typeFilters);
+          body.appendChild(legendTitle("Node " + (FORCED_COLORS ? "outline" : "colour") + ": importance (" + SIGNAL_LABELS[controlState.primarySignal] + ")"));
+          body.appendChild(legendRow(importanceColor(0.1), "Low", lensLevelCue(0.1)));
+          body.appendChild(legendRow(importanceColor(0.5), "Medium", lensLevelCue(0.5)));
+          body.appendChild(legendRow(importanceColor(0.95), "High", lensLevelCue(0.95)));
       }
-        // Types are always filterable. P1 collision fix: the "Filter types"
-        // section shows type ICONS (non-colour encoding) instead of colour
-        // swatches so the legend never mixes type colours with theme colours.
-        if (controlState.colorMode !== "type") {
+        // Without a colour lens the nodes are neutral (content types are not
+        // colour-coded), so there is no colour key; types stay filterable
+        // through the icon chips below in every mode. The "Filter types"
+        // section shows type ICONS (non-colour encoding), never swatches.
+        {
           // Keep the title and filter rows under one semantic owner.  The
           // established legend contract also requires rows to be direct title
           // siblings (capture tooling deliberately does no wrapper traversal).
@@ -2410,13 +2758,23 @@
       // otherwise the legend contradicts the canvas. Previously this was
       // gated on the Relations preset, which now disagrees with the
       // always-on encoding.
-      if (relationLabelList.length) {
+      // One row per relation type the canvas actually draws (each edge's
+      // primary type), busiest first, in that type's real line style: plain
+      // links solid, typed relations dashed (hued only under Relations).
+      var drawnTypes = {};
+      cy.edges().forEach(function (e) { var t = e.data("relType"); if (t) drawnTypes[t] = (drawnTypes[t] || 0) + 1; });
+      var drawnTypeList = Object.keys(drawnTypes).sort(function (a, b) { return (drawnTypes[b] - drawnTypes[a]) || (a < b ? -1 : (a > b ? 1 : 0)); });
+      if (drawnTypeList.length) {
         body.appendChild(legendTitle("Edge: relation type"));
-        relationLabelList.slice(0, 10).forEach(function (lab) {
-          body.appendChild(legendLineRow(relColor(lab, !!controlState.relationEdges), relDashClass(lab), lab));
+        drawnTypeList.slice(0, 10).forEach(function (type) {
+          var typed = isTypedRelation(type);
+          var row = legendLineRow(typed ? relColor(type, !!controlState.relationEdges) : graphPalette().edge, typed ? relDashClass(type) : "solid", type);
+          row.dataset.relationType = type;
+          body.appendChild(row);
         });
-        buildFilterChips(body,allRelationValues(),controlState.hiddenRelations,"Relationship");
+        if (drawnTypeList.length > 10) body.appendChild(legendRow("transparent", "+ " + (drawnTypeList.length - 10) + " more relation types"));
       }
+      if (relationLabelList.length) buildFilterChips(body,allRelationValues(),controlState.hiddenRelations,"Relationship");
       var hasBody = body.childNodes.length > 0;
       legend.hidden = !hasBody;
       if (!hasBody) { legend.classList.remove("okf-graph-legend--collapsed"); return; }
@@ -2557,13 +2915,16 @@
           else if (controlState.sizeMode === "betweenness" && bt) vs = 22 + 50 * (bt[id] || 0);
           else if (controlState.scaleByImportance) vs = 26 + 44 * nodeWeight(id);
           n.data("vizSize", vs);
-          var col = n.data("baseColor");
-          if (controlState.colorMode === "community") col = communityColor(communityOf[id] || 0);
-          else if (controlState.colorMode === "recency") col = recencyColor(recencyDays(id));
-          else if (controlState.colorMode === "bridge" && bt) col = bridgeColor(bt[id] || 0);
-          else if (controlState.colorBy === "group") col = groupColor(groupOf[id]);
-          else if (controlState.colorBy === "importance") col = importanceColor(nodeWeight(id));
+          // lensCue is the same encoding without hue (shape or stroke
+          // weight); only the forced-colours layer and its keys read it.
+          var col = n.data("baseColor"), cue = "";
+          if (controlState.colorMode === "community") { col = communityColor(communityOf[id] || 0); cue = lensShapeCue(communityOf[id] || 0); }
+          else if (controlState.colorMode === "recency") { var days = recencyDays(id); col = recencyColor(days); cue = recencyCue(days); }
+          else if (controlState.colorMode === "bridge" && bt) { col = bridgeColor(bt[id] || 0); cue = lensLevelCue(bt[id] || 0); }
+          else if (controlState.colorBy === "group") { col = groupColor(groupOf[id]); cue = groupCue(groupOf[id]); }
+          else if (controlState.colorBy === "importance") { col = importanceColor(nodeWeight(id)); cue = lensLevelCue(nodeWeight(id)); }
           n.data("color", col);
+          n.data("lensCue", cue);
           // Bridges: the glow marks the TOP bridgers by real betweenness
           // (was: heuristic cross-group edge counting).
           n.toggleClass("okf-bridge", !!(controlState.showBridges && bt && (bt[id] || 0) >= BRIDGE_CUT));
@@ -2598,16 +2959,18 @@
           // default Map lens without having to flip presets (the prior
           // gate was a reviewer-6 contradiction with the plan's "typed
           // edge get their hue/dash always" requirement).
-          var lab = e.data("label");
+          var relType = edgePrimaryType(e.data());
+          e.data("relType", relType);
           e.removeClass("okf-rel-edge okf-reld-1 okf-reld-2 okf-reld-3");
-          if (lab) {
-            e.data("relColor", relColor(lab, !!controlState.relationEdges));
+          if (isTypedRelation(relType)) {
+            e.data("relColor", relColor(relType, !!controlState.relationEdges));
             e.addClass("okf-rel-edge");
-            e.addClass(relDashClass(lab));
+            e.addClass(relDashClass(relType));
           }
         });
       });
       applyEdgeLabels();
+      scheduleLabelCull();
       updateLegend();
       updateNodeIndexSwatches();
       // Phase 3: orphan shelf is a deterministic derivation from degreeOf,
@@ -2617,7 +2980,27 @@
       // is unaffected by edge elision / filters, so the shelf reflects
       // STRUCTURAL orphans, not "currently-filtered-out" nodes.
       refreshOrphanShelf();
+      syncLensSummaryColours();
     }
+
+    // Keep the theme digest's 2px bars in step with the canvas: the ramp
+    // colour while themes colour the nodes, the neutral rule otherwise.
+    function syncLensSummaryColours() {
+      var on = controlState.colorMode === "community";
+      Array.prototype.forEach.call(document.querySelectorAll("#detail-empty .okf-lens-summary__bar[data-community]"), function (bar) {
+        if (on) bar.style.background = communityColor(Number(bar.getAttribute("data-community")) || 0);
+        else bar.style.removeProperty("background");
+      });
+    }
+    // The starting point a reader picked stays marked (aria-current + the
+    // 2px accent edge) until the selection moves or clears.
+    function syncLensSummaryCurrent() {
+      Array.prototype.forEach.call(document.querySelectorAll("#detail-empty .okf-lens-summary__row[data-target]"), function (rowEl) {
+        if (selectedConceptId && rowEl.getAttribute("data-target") === selectedConceptId) rowEl.setAttribute("aria-current", "true");
+        else rowEl.removeAttribute("aria-current");
+      });
+    }
+    window.addEventListener("okf-loom:graph-selection", syncLensSummaryCurrent);
 
     // Toggle the per-edge `.okf-show-label` class. Labels show in Relations/
     // Focus presets (showEdgeLabels) and for edges touching the currently-
@@ -2631,10 +3014,19 @@
     // drops or the user zooms/selects in. The EXPLICIT Relations/Focus path
     // (showEdgeLabels) is untouched — that is deliberate "show the relationships"
     // intent and stays on the existing min-zoomed-font-size LOD.
+      // D2-010: relationship text is a neighbourhood reading aid, never a
+      // whole-map layer. With labels on (the setting, or a lens that asks
+      // for them) only the edges of the selected, hovered or focus-root
+      // concept carry text; every other edge stays a quiet line. Painting
+      // all of them at once was an unreadable pile of rotated anchor text.
       function applyEdgeLabels() {
         var selId = null;
         var sel = cy.nodes(":selected");
         if (sel && sel.length) selId = sel.id();
+        var labelOwners = {};
+        if (selId) labelOwners[selId] = true;
+        if (interactionState.hovered) labelOwners[interactionState.hovered] = true;
+        if (controlState.focusEnabled && focusRoot) labelOwners[focusRoot] = true;
         // Relationship text is an explicit Advanced choice. Selection still
         // emphasizes incident lines, but never silently turns labels on.
         // P1 edge highlight: toggle .okf-incident on edges touching the
@@ -2646,13 +3038,84 @@
             var incident = !!(selId && (e.source().id() === selId || e.target().id() === selId));
             e.toggleClass("okf-incident", incident);
             var show = false;
-            if (e.data("label")) {
-              if (controlState.showEdgeLabels && !FORCED_COLORS) show = true;
+            if (e.data("label") && controlState.showEdgeLabels && !FORCED_COLORS) {
+              show = !!(labelOwners[e.source().id()] || labelOwners[e.target().id()]);
             }
             e.toggleClass("okf-show-label", show);
           });
         });
       }
+
+    // Label culling (D2-006). Labels claim their painted box (plate and
+    // halo included) in priority order and a label or count chip that would
+    // overprint an already claimed box is hidden for now:
+    //   3  the selected, hovered or toured concept (the reader's focus)
+    //   2  focus root, search hits and path stops (explicit reader cues)
+    //   1  every other concept, busiest first (degree, then id)
+    //   -  bundled-relationship count chips (the bundle list keeps the count)
+    //   0  dimmed concepts (filtered, faded by hover/path/search)
+    // Label sizes are model units, so overlap does not change with zoom:
+    // the pass reruns when positions, classes or label styles change, never
+    // per zoom frame. Culling only toggles text opacity, never geometry.
+    var labelCullFrame = 0;
+    function scheduleLabelCull() {
+      if (labelCullFrame) return;
+      labelCullFrame = window.requestAnimationFrame(function () {
+        labelCullFrame = 0;
+        if (!cy.destroyed()) cullOverlappingLabels();
+      });
+    }
+    var LABEL_BOX = { includeNodes: false, includeEdges: false, includeLabels: true, includeOverlays: false };
+    function labelPriority(n) {
+      if (n.selected() || n.hasClass("okf-hover") || n.hasClass("okf-tour-target")) return 3;
+      if (n.hasClass("dim") || n.hasClass("okf-hover-dim") || n.hasClass("okf-path-dim") || n.hasClass("okf-search-nonmatch")) return 0;
+      if (n.hasClass("okf-focus-root") || n.hasClass("okf-search-match") || n.hasClass("okf-path")) return 2;
+      return 1;
+    }
+    function cullOverlappingLabels() {
+      var CELL = 96, grid = {}, culled = {};
+      function visit(b, fn) {
+        for (var gx = Math.floor(b.x1 / CELL); gx <= Math.floor(b.x2 / CELL); gx++)
+          for (var gy = Math.floor(b.y1 / CELL); gy <= Math.floor(b.y2 / CELL); gy++)
+            if (fn(gx + ":" + gy)) return true;
+        return false;
+      }
+      function claim(ele) {
+        var bb = ele.boundingBox(LABEL_BOX);
+        if (!(bb.w > 0 && bb.h > 0)) return;
+        // Cytoscape's node label box adds the halo, plate padding and margins
+        // (about 6 units around 13px text); touching halos are not an
+        // overprint, so only the inked text box claims space. A count chip's
+        // opaque plate is what overprints, so it claims its whole box.
+        var inset = ele.isNode() ? 6 : 1;
+        var b = { x1: bb.x1 + inset, y1: bb.y1 + inset, x2: bb.x2 - inset, y2: bb.y2 - inset };
+        if (b.x2 <= b.x1 || b.y2 <= b.y1) b = { x1: bb.x1, y1: bb.y1, x2: bb.x2, y2: bb.y2 };
+        var hit = visit(b, function (key) {
+          var list = grid[key];
+          if (!list) return false;
+          for (var i = 0; i < list.length; i++) {
+            var o = list[i];
+            if (b.x1 < o.x2 && o.x1 < b.x2 && b.y1 < o.y2 && o.y1 < b.y2) return true;
+          }
+          return false;
+        });
+        if (hit) { culled[ele.id()] = true; return; }
+        visit(b, function (key) { (grid[key] || (grid[key] = [])).push(b); return false; });
+      }
+      var labelled = cy.nodes(":visible").filter(function (n) { return !!n.style("label"); }).toArray();
+      labelled = labelled.map(function (n) { return { n: n, p: labelPriority(n), d: degreeOf[n.id()] || 0, id: n.id() }; });
+      labelled.sort(function (a, b) { return (b.p - a.p) || (b.d - a.d) || (a.id < b.id ? -1 : (a.id > b.id ? 1 : 0)); });
+      var chips = cy.edges(".okf-multi-edge:visible").toArray();
+      var i = 0;
+      for (; i < labelled.length && labelled[i].p > 0; i++) claim(labelled[i].n);
+      chips.forEach(claim);
+      for (; i < labelled.length; i++) claim(labelled[i].n);
+      cy.batch(function () {
+        cy.elements(".okf-label-culled").forEach(function (ele) { if (!culled[ele.id()]) ele.removeClass("okf-label-culled"); });
+        Object.keys(culled).forEach(function (id) { cy.getElementById(id).addClass("okf-label-culled"); });
+      });
+    }
+    cy.on("position add remove", scheduleLabelCull);
 
     // Ids within `depth` hops of `root`, over the CURRENTLY-rendered graph
     // (LOD-hidden neighbours are out of scope; documented in the status line).
@@ -2709,6 +3172,8 @@
           if (fr && fr.length) fr.addClass("okf-focus-root");
         }
       });
+      syncGraphToolsCue(q ? cy.nodes(".okf-search-match").length : 0, q);
+      scheduleLabelCull();
     }
 
     // ---- P1 Progressive disclosure: edge elision --------------------------
@@ -2750,6 +3215,7 @@
       });
       updateDensityIndicator();
       updateStatus();
+      scheduleLabelCull();
     }
 
     // Debounced, stale-safe layout rerun. The latest control values always
@@ -2815,7 +3281,7 @@
       var densityR = rel(densityIndicator);
       if (densityR) ins.top = Math.max(ins.top, densityR.b + 10);
       var focusR=rel(typeof focusBar!=="undefined"?focusBar:null);if(focusR)ins.top=Math.max(ins.top,focusR.b+12);
-      var viewportR=rel(container.querySelector(".okf-graph-zoom"));if(viewportR){if(isMobileGraphViewport()&&cw<=390)ins.bottom=Math.max(ins.bottom,ch-viewportR.t+10);else ins.right=Math.max(ins.right,cw-viewportR.l+10);}
+      var viewportR=rel(container.querySelector(".okf-graph-zoom"));/* The docked viewport actions are a full-width bottom row at every compact width (landscape phones included), not a right-hand column. */if(viewportR){if(isMobileGraphViewport()&&(cw<=390||viewportR.r-viewportR.l>cw*0.6))ins.bottom=Math.max(ins.bottom,ch-viewportR.t+10);else ins.right=Math.max(ins.right,cw-viewportR.l+10);}
       var minimapR=rel(container.querySelector(".okf-graph-minimap"));if(minimapR)ins.right=Math.max(ins.right,cw-minimapR.l+10);
       // Phase 3: reserve bottom space for the labelled orphan shelf so the
       // fcose-tiled orphans do not underlap the shelf's bottom-edge chrome.
@@ -3038,7 +3504,8 @@
       });
     }
 
-    function isMobileGraphViewport(){var viewport=window.visualViewport;return (viewport?viewport.width:window.innerWidth)<=900;}
+    function readMobileGraphViewport(){return readLiveViewportWidth()<=900;}
+    function isMobileGraphViewport(){return initialMobileViewport!==null?initialMobileViewport:readMobileGraphViewport();}
     var mobileLabelWidth=90;
     function compactMobileSmallGraph(){
       var nodes=cy.nodes().filter(function(n){return !n.hasClass("dim");});
@@ -3060,13 +3527,26 @@
       var spanX=Math.max(72,targetW-nodeFootprint),spanY=Math.max(90,targetH-labelFootprint);
       var spacingX=columns>1?spanX/(columns-1):0,spacingY=rows>1?spanY/(rows-1):0;
       mobileLabelWidth=Math.max(52,Math.min(150,spacingX-12));
-      cy.style().selector("node").style("text-max-width",mobileLabelWidth).update();
+      cy.style().selector("node").style("text-max-width",mobileLabelWidth).selector(LABEL_PRECEDENCE).style("text-max-width",Math.max(PRECEDENCE_LABEL_WIDTH,mobileLabelWidth)).update();
+      refreshLabelBounds();scheduleLabelCull();
       // Degree first puts hubs centrally; alternating row direction shortens
       // common neighbour routes and deterministically reduces grid crossings.
       var ordered=nodes.toArray().sort(function(a,b){var d=(degreeOf[b.id()]||0)-(degreeOf[a.id()]||0);return d||String(a.id()).localeCompare(String(b.id()));});
       cy.batch(function(){ordered.forEach(function(node,index){var row=Math.floor(index/columns),raw=index%columns,count=Math.min(columns,ordered.length-row*columns),slot=count===3?[0,2,1][raw]:raw,col=row%2?count-1-slot:slot;node.position({x:(col-(count-1)/2)*spacingX,y:(row-(rows-1)/2)*spacingY});});});
     }
-    function syncMobileReadableStyle(){var mobile=isMobileGraphViewport();cy.style().selector("node").style({"font-size":mobile?25:13,"font-weight":mobile?700:600,"line-height":mobile?1.2:1,"min-zoomed-font-size":mobile?10:6,"width":mobile?"mapData(vizSize, 24, 80, 36, 54)":"data(vizSize)","height":mobile?"mapData(vizSize, 24, 80, 36, 54)":"data(vizSize)","text-wrap":"ellipsis","text-max-width":mobile?mobileLabelWidth:90,"text-justification":"center"}).update();}
+    // Cytoscape rasterises a label texture under its new style key on the
+    // first frame after a label restyle, but sizes it from the label bounds
+    // cached under the OLD style until something asks for the bounding box.
+    // A window resize across the 900px readable-label switch therefore baked
+    // the 25px plate box into the 13px texture (and back), stretching every
+    // label until the next restyle. Recompute the bounds synchronously after
+    // each label-dimension restyle so the first texture uses the new box.
+    // useCache:false matters: the renderer only learns the labels are dirty
+    // when it flushes before the next frame, so a cached read here would
+    // re-cache the stale dimensions.
+    function refreshLabelBounds(){var nodes=cy.nodes();if(nodes.length)nodes.boundingBox({includeLabels:true,useCache:false});}
+    var readableStyleKey=null;
+    function syncMobileReadableStyle(){var mobile=isMobileGraphViewport(),key=(mobile?"m":"d")+mobileLabelWidth;if(key===readableStyleKey)return;readableStyleKey=key;cy.style().selector("node").style({"font-size":mobile?25:13,"font-weight":mobile?700:600,"line-height":mobile?1.2:1,"min-zoomed-font-size":mobile?10:6,"width":mobile?"mapData(vizSize, 24, 80, 36, 54)":"data(vizSize)","height":mobile?"mapData(vizSize, 24, 80, 36, 54)":"data(vizSize)","text-wrap":"ellipsis","text-max-width":mobile?mobileLabelWidth:90,"text-justification":"center"}).selector(LABEL_PRECEDENCE).style("text-max-width",Math.max(PRECEDENCE_LABEL_WIDTH,mobileLabelWidth)).update();refreshLabelBounds();scheduleLabelCull();}
     function applyInitialSparseSeed(){
       var nodes=cy.nodes().filter(function(n){return !n.hasClass("dim");});
       if(isMobileGraphViewport()||nodes.length<2||nodes.length>12||controlState.preset!=="map"||controlState.lens!=="map")return;
@@ -3349,7 +3829,7 @@
       [mobileOverviewStatus,densityIndicator].forEach(stampVisibilityProjection);
       mobileOverviewStatus.textContent=visibleEdges+" of "+cy.edges().length+" connection bundles · "+visibleRelationshipInstanceCount()+" of "+relationshipInstanceCount(cy.edges())+" relationship instances · select a concept to inspect its connections";mobileOverviewAll.hidden=false;mobileOverviewAll.textContent=controlState.relationshipDetailOptIn?"Show backbone":"Show all relationships";
       if (!densityIndicator) { updateStatus(); return; }
-      var detailInstruction = " · Graph settings → Show relationship labels reveals all relationships and their labels";
+      var detailInstruction = " · Graph settings → Show relationship labels reveals all relationships and names those of the selected or hovered concept";
       var tierCopy = densityTier === "full"
         ? "Local detail · " + visibleEdges + " of " + cy.edges().length + " relationships (connection bundles) · "+visibleRelationshipInstanceCount()+" relationship instances · node titles remain shortened; use Concepts for full titles" + detailInstruction
         : densityTier === "intermediate"
@@ -3408,10 +3888,11 @@
         var id = btn.getAttribute("data-target");
         var sw = btn.querySelector(".okf-node-index__swatch");
         if (!sw || !id) return;
-        var col = (nodeIndex[id] && nodeIndex[id].color) || "var(--okf-accent)";
-        if (controlState.colorBy === "group") col = groupColor(groupOf[id]);
-        else if (controlState.colorBy === "importance") col = importanceColor(nodeWeight(id));
-        sw.style.background = col;
+        // The swatch mirrors the node's CURRENT canvas fill: neutral by
+        // default, the muted lens colour while a colour lens is on.
+        var node = cy.getElementById(id);
+        sw.style.background = (node && node.length && node.data("color")) || graphPalette().node;
+        setForcedCue(sw, node && node.length ? node.data("lensCue") : "");
       });
     }
 
@@ -3506,29 +3987,15 @@
       communityOf = out;
       return _lensCache.communities;
     }
-      // P1 graph/type collision fix: the type palette (bundle.palette, from
-      // auto_palette) uses golden-angle full-spectrum hues at sat=62%/light=48%.
-      // The OLD communityColor used the SAME golden-angle technique at sat=52%/
-      // light=52%, producing near-identical red/green/purple/gold/teal families
-      // — users could not tell theme colours from type colours on the canvas or
-      // in the legend (one colour variable, two meanings).
-      //
-      // The fix: themes get a DISTINCT cool teal/steel/cyan family ramp so they
-      // read unmistakably as "structural grouping," never "category type."
-      // Lightness is kept in the 32–56% band so white-stroke node icons stay
-      // legible (≥3:1 contrast vs white). Eight stops cycle for >8 communities.
-      var THEME_PALETTE = [
-        "hsl(182, 55%, 32%)", // T1 deep teal
-        "hsl(199, 52%, 42%)", // T2 steel blue
-        "hsl(168, 50%, 36%)", // T3 sea green
-        "hsl(210, 46%, 50%)", // T4 slate blue
-        "hsl(176, 44%, 54%)", // T5 light teal
-        "hsl(195, 48%, 34%)", // T6 dark cyan
-        "hsl(165, 46%, 42%)", // T7 jade
-        "hsl(205, 42%, 56%)", // T8 periwinkle blue
-      ];
+      // Themes (communities) take the palette's muted categorical ramp:
+      // eight low-chroma hues at about the neutral node's lightness, so the
+      // glyph stays >= 4.5:1 and the lens reads as structural grouping, not
+      // a second accent. Content types are never colour-coded, so there is
+      // no type palette to collide with. Eight stops cycle for >8 themes;
+      // the T1, T2… markers carry identity without colour.
       function communityColor(i) {
-        return THEME_PALETTE[((i % THEME_PALETTE.length) + THEME_PALETTE.length) % THEME_PALETTE.length];
+        var cat = graphPalette().ramp.categorical;
+        return cat[((i % cat.length) + cat.length) % cat.length];
       }
       function themeLabel(i) {
         return "T" + (i + 1);
@@ -3576,19 +4043,18 @@
       return Math.max(0, (Date.now() - t) / 86400000);
     }
     function recencyColor(days) {
-      if (!isFinite(days)) return "#94a3b8";               // undated: neutral slate
-      // Fresh teal → aged amber → stale grey-brown over ~180 days.
-      var t = Math.min(1, days / 180);
-      var hue = 175 - 135 * t;                              // 175 (teal) → 40 (amber)
-      var sat = 62 - 30 * t;
-      var light = 46 + 10 * t;
-      return "hsl(" + Math.round(hue) + ", " + Math.round(sat) + "%, " + Math.round(light) + "%)";
+      // Undated concepts are hollow: the canvas colour inside the 1.5px
+      // node stroke ("no data", distinct from every dated step).
+      var ramp = graphPalette().ramp;
+      if (!isFinite(days)) return ramp.empty;
+      // Fresh = the muted accent end of the ordered ramp, fading to the
+      // neutral node fill as a concept ages past ~180 days.
+      return ramp.sequence(1 - Math.min(1, days / 180));
     }
     function bridgeColor(score) {
-      // Muted slate for low scores → strong violet for the top bridgers
-      // (distinct from the teal selection accent).
-      var t = Math.max(0, Math.min(1, score));
-      return "hsl(268, " + Math.round(12 + 60 * t) + "%, " + Math.round(62 - 20 * t) + "%)";
+      // Neutral for concepts on few paths → the muted accent end of the
+      // ordered ramp for the top bridgers.
+      return graphPalette().ramp.sequence(Math.max(0, Math.min(1, score)));
     }
 
     // ====================================================================
@@ -3598,10 +4064,13 @@
     // yFiles): the structure revealed, never the algorithm.
     // ====================================================================
     var LENSES = {
+      // colorMode "type" is the neutral encoding (content types are not
+      // colour-coded): Map, Flow and Explore keep neutral round nodes; the
+      // Themes, Bridges and Recent lenses colour from the muted ramp.
       map: {
         label: "Map", question: "How does this knowledge fit together?",
         state: { spacing: 1, separation: 1, groupStrength: 1, groupBy: "community",
-                 colorMode: "community", sizeMode: "pagerank",
+                 colorMode: "type", sizeMode: "pagerank",
                  focusEnabled: false, relationEdges: false, showEdgeLabels: false,
                  showBridges: false, layout: "cose" },
       },
@@ -3615,7 +4084,7 @@
       flow: {
         label: "Flow", question: "What feeds into what? (reading left → right)",
         state: { spacing: 1, separation: 1, groupStrength: 0, groupBy: "none",
-                 colorMode: "community", sizeMode: "body",
+                 colorMode: "type", sizeMode: "body",
                  focusEnabled: false, relationEdges: true, showEdgeLabels: true,
                  showBridges: false, layout: "dagre" },
       },
@@ -3636,7 +4105,7 @@
       focus: {
         label: "Explore neighborhood", question: "What surrounds the selected concept?",
         state: { focusEnabled: true, focusDepth: 1, groupBy: "none",
-                 colorMode: "community", sizeMode: "body",
+                 colorMode: "type", sizeMode: "body",
                  relationEdges: false, showEdgeLabels: true, showBridges: false },
       },
     };
@@ -3695,12 +4164,15 @@
       var frag = document.createDocumentFragment();
       function heading(text) { frag.appendChild(el("h2", { class: "okf-lens-summary__title" }, [text])); }
       function verdict(text) { frag.appendChild(el("p", { class: "okf-lens-summary__verdict" }, [text])); }
-      function row(id, note, score, barColor) {
+      // A ranked row: hairline record, label, mono figure, and a 2px score
+      // bar along the foot (never a filled bar). The row a reader selected
+      // is current (aria-current + the 2px accent edge in graph.css).
+      function row(id, note, score) {
         var d = nodeIndex[id] || {};
-        var btn = el("button", { type: "button", class: "okf-lens-summary__row" });
-        var bar = el("span", { class: "okf-lens-summary__bar" });
+        var btn = el("button", { type: "button", class: "okf-lens-summary__row", "data-target": id,
+          "aria-current": selectedConceptId && selectedConceptId === id ? "true" : null });
+        var bar = el("span", { class: "okf-lens-summary__bar", "aria-hidden": "true" });
         bar.style.width = Math.round(Math.max(0.04, Math.min(1, score)) * 100) + "%";
-        if (barColor) bar.style.background = barColor;
         btn.appendChild(bar);
         btn.appendChild(el("span", { class: "okf-lens-summary__label" }, [d.label || id]));
         btn.appendChild(el("span", { class: "okf-lens-summary__note" }, [note]));
@@ -3763,7 +4235,8 @@
           frag = el("details", { class: "okf-graph-theme-digest" });
           frag.appendChild(el("summary", {}, ["Themes in this graph"]));
         }
-        heading(lensKey === "themes" ? "Themes" : "Themes in this graph");
+        // Inside the disclosure its summary already names the section.
+        if (lensKey === "themes") heading("Themes");
         var top = com.list.slice(0, 6).filter(function (c) { return c.ids.length > 1; });
         var linked = {};
         cy.edges().forEach(function (e) {
@@ -3781,20 +4254,23 @@
         }
         var themes = com.list.filter(function (c) { return c.ids.length > 1; }).length;
         var bits = themes + " theme" + (themes === 1 ? "" : "s");
-        if (orphans.length) bits += " - " + orphans.length + " not yet linked";
+        if (orphans.length) bits += " \u2014 " + orphans.length + " not yet linked";
         if (gap) {
           var ga = nodeIndex[exemplar(gap[0])] || {}, gb = nodeIndex[exemplar(gap[1])] || {};
-          bits += " - the areas around \u201c" + (ga.label || "?") + "\u201d and \u201c" + (gb.label || "?") + "\u201d share no links";
+          bits += " \u2014 the areas around \u201c" + (ga.label || "?") + "\u201d and \u201c" + (gb.label || "?") + "\u201d share no links";
         }
         verdict(bits + ".");
         com.list.slice(0, 8).forEach(function (c) {
           if (c.ids.length < 2 && com.list.length > 3) return;
           var ex = exemplar(c);
           var d = nodeIndex[ex] || {};
-          var btn = el("button", { type: "button", class: "okf-lens-summary__row" });
-          var bar = el("span", { class: "okf-lens-summary__bar" });
+          var btn = el("button", { type: "button", class: "okf-lens-summary__row okf-lens-summary__row--theme", "data-target": ex,
+            "aria-current": selectedConceptId && selectedConceptId === ex ? "true" : null });
+          // The theme's 2px bar takes its canvas colour while themes colour
+          // the canvas (syncLensSummaryColours keeps legend and canvas in
+          // step); otherwise it is the neutral rule.
+          var bar = el("span", { class: "okf-lens-summary__bar", "aria-hidden": "true", "data-community": String(c.index) });
           bar.style.width = Math.round(100 * c.ids.length / Math.max(1, com.list[0].ids.length)) + "%";
-          bar.style.background = communityColor(c.index);
           btn.appendChild(bar);
             btn.appendChild(el("span", { class: "okf-lens-summary__label" },
               [themeLabel(c.index) + " \u00b7 around \u201c" + (d.label || ex) + "\u201d"]));
@@ -3807,6 +4283,7 @@
       frag.appendChild(el("p", { class: "okf-lens-summary__hint okf-muted" },
         ["Choose a row to select it on the canvas. Tap or hover concepts to preview connections; keyboard users can press Shift+Space at two concepts to trace a path."]));
       empty.appendChild(frag);
+      syncLensSummaryColours();
     }
 
     function markCustom() {
@@ -3891,7 +4368,7 @@
       edges.forEach(function(pair){var line=document.createElementNS(svg.namespaceURI,"line");line.setAttribute("x1",pts[pair[0]][0]);line.setAttribute("y1",pts[pair[0]][1]);line.setAttribute("x2",pts[pair[1]][0]);line.setAttribute("y2",pts[pair[1]][1]);svg.appendChild(line);});
       pts.forEach(function(p,i){var c=document.createElementNS(svg.namespaceURI,"circle");c.setAttribute("cx",p[0]);c.setAttribute("cy",p[1]);c.setAttribute("r",key==="focus"&&i===2?"5":key==="bridges"&&i===2?"4.5":"3");c.setAttribute("data-rank",String(i));if(key==="recent")c.setAttribute("opacity",String(.3+i*.2));svg.appendChild(c);});
       if(key==="flow")[[25,8],[25,28],[52,18]].forEach(function(p){var a=document.createElementNS(svg.namespaceURI,"path");a.setAttribute("d","M"+(p[0]-3)+" "+(p[1]-2)+" L"+p[0]+" "+p[1]+" L"+(p[0]-3)+" "+(p[1]+2));a.setAttribute("class","okf-preview-arrow");svg.appendChild(a);});
-      if(key==="themes")[[5,5,20,20],[36,4,20,21]].forEach(function(r){var hull=document.createElementNS(svg.namespaceURI,"rect");hull.setAttribute("x",r[0]);hull.setAttribute("y",r[1]);hull.setAttribute("width",r[2]);hull.setAttribute("height",r[3]);hull.setAttribute("rx","7");hull.setAttribute("class","okf-preview-hull");svg.insertBefore(hull,svg.firstChild);});
+      if(key==="themes")[[5,5,20,20],[36,4,20,21]].forEach(function(r){var hull=document.createElementNS(svg.namespaceURI,"rect");hull.setAttribute("x",r[0]);hull.setAttribute("y",r[1]);hull.setAttribute("width",r[2]);hull.setAttribute("height",r[3]);hull.setAttribute("rx","0");hull.setAttribute("class","okf-preview-hull");svg.insertBefore(hull,svg.firstChild);});
       if(key==="focus"){var ring=document.createElementNS(svg.namespaceURI,"circle");ring.setAttribute("cx","30");ring.setAttribute("cy","20");ring.setAttribute("r","13");ring.setAttribute("class","okf-preview-ring");svg.insertBefore(ring,svg.firstChild);}
       return svg;
     }
@@ -3974,7 +4451,9 @@
         markCustom(); applyGrouping(); applyVisualEncoding(); applyFilters(); updateLegend(); updateStatus(); scheduleLayout(false);
       });
         ui.relLabels = checkRow(vfs, "Show relationship labels", controlState.showEdgeLabels, function (c) {
-          controlState.showEdgeLabels = c; controlState.relationEdges = c;
+          // Labels and the complete relationship set only: hue stays the
+          // Relations lens's encoding, so the map keeps its muted palette.
+          controlState.showEdgeLabels = c;
           controlState.relationshipDetailOptIn = c;
            markCustom(); applyVisualEncoding(); applyEdgeLabels(); applyEdgeElision(); reconcileVisibleRelationshipProjection();
           // Cytoscape may defer style/class projection until the current event
@@ -3984,7 +4463,8 @@
         });
       // Saket et al. 2014: group colouring aids cluster tasks but costs
       // ~25% accuracy on plain topology tasks — so the evidence says make
-      // it a toggle. Off = colour by type (the auto palette).
+      // it a toggle. Off = the neutral node fill (types are never coloured);
+      // on = the palette's muted categorical ramp.
       ui.themeColors = checkRow(vfs, "Colour by theme", controlState.colorMode === "community", function (c) {
         controlState.colorMode = c ? "community" : "type";
         if (c) controlState.colorBy = "type";
@@ -4111,8 +4591,26 @@
     // canvas's right edge it used to be clamped back over the node, so the
     // second click pressed "Explore neighborhood" instead. Prefer the right
     // (the long-standing spot), then the left, then below, then above.
-    function positionActionBar(){var n=interactionState.selected&&cy.getElementById(interactionState.selected);if(!n||!n.length||actionBar.hidden)return;var p=n.renderedPosition(),w=actionBar.offsetWidth,h=actionBar.offsetHeight,W=container.clientWidth,H=container.clientHeight;var off=Math.max(22,Math.max(n.renderedOuterWidth(),n.renderedOuterHeight())/2+8);var left=p.x+off,top=p.y-h/2;if(p.x+off+w>W-8){if(p.x-off-w>=8)left=p.x-off-w;else if(p.y+off+h<=H-8){left=p.x-w/2;top=p.y+off;}else if(p.y-off-h>=8){left=p.x-w/2;top=p.y-off-h;}}actionBar.style.left=Math.max(8,Math.min(W-w-8,left))+"px";actionBar.style.top=Math.max(8,Math.min(H-h-8,top))+"px";}
-    cy.on("pan zoom position",positionActionBar);window.addEventListener("resize",function(){syncActionBarOwner();positionActionBar();});
+    // The floating action bar sits where it hides the least (D2-015): never
+    // over the selected concept or its name, never over the other canvas
+    // chrome (concept list, focus bar, zoom column, minimap), and over as
+    // few nearby concepts as possible. Candidates are tried above, right,
+    // left and below the name; a placement that is still clear is kept while
+    // the reader pans so the bar does not hop between sides.
+    var actionBarSide=null;
+    function positionActionBar(){var n=interactionState.selected&&cy.getElementById(interactionState.selected);if(!n||!n.length||actionBar.hidden||actionBar.parentNode!==container)return;var p=n.renderedPosition(),w=actionBar.offsetWidth,h=actionBar.offsetHeight,W=container.clientWidth,H=container.clientHeight;var off=Math.max(22,Math.max(n.renderedOuterWidth(),n.renderedOuterHeight())/2+8);
+      var name=n.renderedBoundingBox({includeNodes:false,includeEdges:false,includeLabels:true}),below=Math.max(p.y+off,name.y2+8);
+      var c=container.getBoundingClientRect(),chrome=[];Array.prototype.forEach.call(container.querySelectorAll(".okf-node-index > summary, .okf-graph-focusbar:not([hidden]), .okf-graph-zoom, .okf-graph-minimap:not([hidden]), .okf-graph-legend:not([hidden])"),function(el){var r=el.getBoundingClientRect();if(r.width&&r.height)chrome.push({x1:r.left-c.left-4,y1:r.top-c.top-4,x2:r.right-c.left+4,y2:r.bottom-c.top+4});});
+      var near=[],reach=Math.max(w,h)+off+40;cy.nodes(":visible").forEach(function(m){if(m.same(n))return;var q=m.renderedPosition();if(Math.abs(q.x-p.x)>reach+w||Math.abs(q.y-p.y)>reach+h)return;near.push(m.renderedBoundingBox({includeLabels:!m.hasClass("okf-label-culled"),includeEdges:false,includeOverlays:false}));});
+      function hits(a,b){return a.x1<b.x2&&b.x1<a.x2&&a.y1<b.y2&&b.y1<a.y2;}
+      var own={x1:Math.min(p.x-off,name.x1),y1:p.y-off,x2:Math.max(p.x+off,name.x2),y2:name.y2};
+      var candidates=[["above",p.x-w/2,p.y-off-h],["right",p.x+off,p.y-h/2],["left",p.x-off-w,p.y-h/2],["below",p.x-w/2,below],["above-right",p.x-off,p.y-off-h],["above-left",p.x+off-w,p.y-off-h],["below-right",p.x-off,below],["below-left",p.x+off-w,below]],best=null;
+      candidates.forEach(function(cand,order){var left=Math.max(8,Math.min(W-w-8,cand[1])),top=Math.max(8,Math.min(H-h-8,cand[2])),box={x1:left,y1:top,x2:left+w,y2:top+h};var score=(hits(box,own)?1000:0)+chrome.filter(function(r){return hits(box,r);}).length*100+near.filter(function(r){return hits(box,r);}).length*10+order+(left!==cand[1]||top!==cand[2]?5:0);if(cand[0]===actionBarSide&&score<100)score-=20;if(!best||score<best.score)best={side:cand[0],left:left,top:top,score:score};});
+      actionBarSide=best.side;actionBar.dataset.side=best.side;actionBar.style.left=best.left+"px";actionBar.style.top=best.top+"px";}
+    // The bar follows pan, zoom and its own concept at once; other concepts
+    // moving (a running layout fires one event per node) only change which
+    // side is clearest, so those re-placements coalesce to one per frame.
+    var actionBarFrame=0;cy.on("pan zoom",positionActionBar);cy.on("position",function(evt){if(actionBar.hidden)return;if(evt.target&&evt.target.id&&evt.target.id()===interactionState.selected){positionActionBar();return;}if(actionBarFrame)return;actionBarFrame=requestAnimationFrame(function(){actionBarFrame=0;if(!cy.destroyed())positionActionBar();});});window.addEventListener("resize",function(){syncActionBarOwner();positionActionBar();});
     var graphResizeTimer=null,userViewportInteracted=false;
     ["wheel","pointerdown","touchstart"].forEach(function(name){container.addEventListener(name,function(event){if(event.isTrusted&&(event.target.tagName==="CANVAS"||event.target===canvasProxy))userViewportInteracted=true;},{passive:true});});
     function refitGraphViewport(){if(graphResizeTimer)cancelAnimationFrame(graphResizeTimer);graphResizeTimer=requestAnimationFrame(function(){graphResizeTimer=null;if(graphPageActive&&layoutSettled&&container.offsetWidth&&container.offsetHeight){cy.resize();if(!userViewportInteracted){cancelPendingViewportRestore();syncMobileReadableStyle();compactMobileSmallGraph();overlayAwareFit();}positionActionBar();syncMinimap();}});}
@@ -4122,7 +4620,7 @@
     window.addEventListener("pagehide", function () { if (canvasSizeObserver) canvasSizeObserver.disconnect(); if (graphResizeTimer) cancelAnimationFrame(graphResizeTimer); });
     window.addEventListener("pageshow", function (event) { if (event.persisted && canvasSizeObserver) canvasSizeObserver.observe(container); });
     function syncInteractionIndex(){var list=document.getElementById("okf-node-index-list"),activeOption=null;Array.prototype.forEach.call(document.querySelectorAll("#okf-node-index-list .okf-node-index__item"),function(b){var active=b.dataset.target===interactionState.active,selected=b.dataset.target===interactionState.selected;b.classList.toggle("is-active",active);b.setAttribute("aria-selected",selected?"true":"false");if(active)activeOption=b;});if(list&&activeOption)list.setAttribute("aria-activedescendant",activeOption.id);}
-    function renderInteraction(pos){syncActionBarOwner();applyFilters();applyEdgeLabels();applyEdgeElision();renderRelationshipProjection();if(activeBundleEdgeId&&!bundlePanel.hidden){var activeEdge=cy.getElementById(activeBundleEdgeId);if(activeEdge&&activeEdge.length)renderBundleDetail(activeEdge,{focusPanel:false});}syncInteractionIndex();cy.edges().removeClass("okf-unrelated");if(interactionState.selected){var selectedNode=cy.getElementById(interactionState.selected);if(selectedNode.length)cy.edges().not(selectedNode.connectedEdges()).addClass("okf-unrelated");}cy.elements().removeClass("okf-hover-dim");cy.nodes().removeClass("okf-hover");if(interactionState.hovered){var n=cy.getElementById(interactionState.hovered);if(n.length){cy.elements().not(n.closedNeighborhood()).addClass("okf-hover-dim");n.addClass("okf-hover");showHoverTip(n,pos||n.renderedPosition());}}actionBar.hidden=!interactionState.selected;isolateAction.textContent=interactionState.isolated?"Show all":"Hide others";positionActionBar();focusBar.hidden=!(controlState.focusEnabled&&focusRoot);container.classList.toggle("okf-graph-focus-active",!focusBar.hidden);if(!focusBar.hidden){focusCrumb.textContent="Exploring neighborhood around "+((nodeIndex[focusRoot]&&nodeIndex[focusRoot].label)||focusRoot);focusDepth.value=String(controlState.focusDepth);}publishInteractionSnapshot("render");}
+    function renderInteraction(pos){syncActionBarOwner();applyFilters();applyEdgeLabels();applyEdgeElision();renderRelationshipProjection();if(activeBundleEdgeId&&!bundlePanel.hidden){var activeEdge=cy.getElementById(activeBundleEdgeId);if(activeEdge&&activeEdge.length)renderBundleDetail(activeEdge,{focusPanel:false});}syncInteractionIndex();cy.edges().removeClass("okf-unrelated");if(interactionState.selected){var selectedNode=cy.getElementById(interactionState.selected);if(selectedNode.length)cy.edges().not(selectedNode.connectedEdges()).addClass("okf-unrelated");}cy.elements().removeClass("okf-hover-dim");cy.nodes().removeClass("okf-hover");if(interactionState.hovered){var n=cy.getElementById(interactionState.hovered);if(n.length){cy.elements().not(n.closedNeighborhood()).addClass("okf-hover-dim");n.addClass("okf-hover");showHoverTip(n,pos||n.renderedPosition());}}actionBar.hidden=!interactionState.selected;isolateAction.textContent=interactionState.isolated?"Show all":"Hide others";positionActionBar();focusBar.hidden=!(controlState.focusEnabled&&focusRoot);container.classList.toggle("okf-graph-focus-active",!focusBar.hidden);if(!focusBar.hidden){focusCrumb.textContent="Exploring neighborhood around "+((nodeIndex[focusRoot]&&nodeIndex[focusRoot].label)||focusRoot);focusDepth.value=String(controlState.focusDepth);}scheduleLabelCull();publishInteractionSnapshot("render");}
     function restoreInvokerFocus(){var id=interactionState.focusInvoker,target=null,list=document.getElementById("okf-node-index-list");Array.prototype.some.call(document.querySelectorAll("#okf-node-index-list .okf-node-index__item"),function(option){if(option.dataset.target===id){target=option;return true;}return false;});if(id)dispatchInteraction({type:"ACTIVE",id:id,quietUrl:true,source:"neighborhood-restore"});if(target&&target.offsetParent!==null&&list){list.setAttribute("aria-activedescendant",target.id);list.focus();}else canvasProxy.focus();}
     function captureFocusOrigin(id){if(!interactionState.priorLens){var pan=cy.pan();interactionState.priorLens=controlState.lens!=="focus"?controlState.lens:"map";interactionState.priorViewport={zoom:cy.zoom(),pan:{x:pan.x,y:pan.y}};}interactionState.focusInvoker=id||interactionState.focusInvoker;}
     function activateFocusLens(source){captureFocusOrigin(interactionState.selected);if(interactionState.selected)enterFocus(interactionState.selected,source);else{applyLens("focus");renderInteraction();writeInteractionUrl("push");}}
@@ -4238,9 +4736,9 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
       var typeRow = document.createElement("div");
       typeRow.className = "okf-graph-tip__type";
       typeRow.textContent = d.type || "concept";
-      // The node colour is a stripe beside the name (graph.css), not the
-      // name's ink: mid-tone node fills measured 2.4:1 as tip text.
-      typeRow.style.setProperty("--okf-type-accent", d.baseColor || d.color || "");
+      // The node's canvas fill is a stripe beside the name (graph.css), not
+      // the name's ink: neutral by default, the muted lens colour otherwise.
+      typeRow.style.setProperty("--okf-graph-tip-fill", d.color || d.baseColor || "");
       tip.appendChild(typeRow);
       var title = document.createElement("div");
       title.className = "okf-graph-tip__title";
@@ -4249,7 +4747,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
       if (d.description) {
         var desc = document.createElement("div");
         desc.className = "okf-graph-tip__desc";
-        var text = String(d.description);
+        var text = window.okfReadableText(d.description);
         desc.textContent = text.length > 140 ? text.slice(0, 140) + "…" : text;
         tip.appendChild(desc);
       }
@@ -4317,7 +4815,11 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
     function edgeFlowSet(){var active=cy.edges(":selected");if(edgeFlowHovered&&directionalEdge(edgeFlowHovered))active=active.union(edgeFlowHovered);return active.filter(function(e){return directionalEdge(e);});}
     function stopDirectionalEdgeFlow(){if(edgeFlowFrame){cancelAnimationFrame(edgeFlowFrame);edgeFlowFrame=0;}edgeFlowEpoch++;try{cy.edges().style("line-dash-offset",0);}catch(e){}document.body.removeAttribute("data-okf-edge-flow");}
     function tickDirectionalEdgeFlow(now,epoch){if(epoch!==edgeFlowEpoch||REDUCED_MOTION||edgeFlowLeaseToken||document.hidden)return stopDirectionalEdgeFlow();var edges=edgeFlowSet();if(!edges.length)return stopDirectionalEdgeFlow();edges.style("line-dash-offset",-Math.floor(now/32)%18);document.body.setAttribute("data-okf-edge-flow","active");edgeFlowFrame=requestAnimationFrame(function(next){tickDirectionalEdgeFlow(next,epoch);});}
-    function syncDirectionalEdgeFlow(){stopDirectionalEdgeFlow();if(!REDUCED_MOTION&&!edgeFlowLeaseToken&&edgeFlowSet().length){var epoch=edgeFlowEpoch;edgeFlowFrame=requestAnimationFrame(function(now){tickDirectionalEdgeFlow(now,epoch);});}}
+    // The hovered or selected directional edge is dashed while it is the
+    // flow target, so the moving dash shows direction (and, with reduced
+    // motion, the dash itself is the static cue). Plain links draw solid
+    // otherwise; typed relations keep their own dash pattern.
+    function syncDirectionalEdgeFlow(){stopDirectionalEdgeFlow();var flowing=edgeFlowSet();cy.edges(".okf-edge-flow").difference(flowing).removeClass("okf-edge-flow");flowing.addClass("okf-edge-flow");if(!REDUCED_MOTION&&!edgeFlowLeaseToken&&edgeFlowSet().length){var epoch=edgeFlowEpoch;edgeFlowFrame=requestAnimationFrame(function(now){tickDirectionalEdgeFlow(now,epoch);});}}
     function acquireDirectionalEdgeFlowLease(){var token="edge-flow-capture-"+(++edgeFlowLeaseGeneration);edgeFlowLeaseToken=token;stopDirectionalEdgeFlow();return token;}
     function releaseDirectionalEdgeFlowLease(token){if(token!==edgeFlowLeaseToken)return false;edgeFlowLeaseToken=null;if(!document.hidden)syncDirectionalEdgeFlow();return true;}
     function invalidateDirectionalEdgeFlowLease(){edgeFlowLeaseGeneration++;edgeFlowLeaseToken=null;stopDirectionalEdgeFlow();}
@@ -4437,7 +4939,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
         e.preventDefault(); cancelPendingViewportRestore();overlayAwareFit();
       } else if (e.key === "/") {
         var si = document.getElementById("okf-search");
-        if (si) { e.preventDefault(); si.focus(); }
+        if (si) { e.preventDefault(); if (graphToolsFolded()) setGraphToolsOpen(true, false); si.focus(); }
       } else if (e.key === "Escape") {
         e.preventDefault();
         clearLocalInteraction();
@@ -4458,7 +4960,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
     var minimapWrap=null,minimapCanvas=null,viewportRerunButton=null,fullscreenButton=null,fullscreenGeneration=0,fullscreenPending=false;
     function viewportIcon(name){var svg=document.createElementNS("http://www.w3.org/2000/svg","svg");svg.setAttribute("viewBox","0 0 24 24");svg.setAttribute("aria-hidden","true");svg.classList.add("okf-viewport-icon");var paths={plus:"M12 5v14M5 12h14",minus:"M5 12h14",/* fit: four arrows pointing in at a centre content box (never bare corner brackets: those read as fullscreen) */fit:"M9 9h6v6H9zM3 3l3.5 3.5M6.5 3.5v3h-3M21 3l-3.5 3.5M17.5 3.5v3h3M3 21l3.5-3.5M6.5 20.5v-3h-3M21 21l-3.5-3.5M17.5 20.5v-3h3",/* reset: counter-clockwise circular arrow (rotate-ccw) */reset:"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5",fullscreen:"M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5",exit:"M9 9H4V4M15 9h5V4M9 15H4v5M15 15h5v5",minimap:"M4 5h16v14H4zM8 15l3-4 3 2 3-5",layout:"M12 3a9 9 0 0 1 8 5M20 3v5h-5M12 21a9 9 0 0 1-8-5M4 21v-5h5"};var p=document.createElementNS(svg.namespaceURI,"path");p.setAttribute("d",paths[name]||paths.layout);p.setAttribute("fill","none");p.setAttribute("stroke","currentColor");p.setAttribute("stroke-width","2");p.setAttribute("stroke-linecap","round");p.setAttribute("stroke-linejoin","round");svg.appendChild(p);return svg;}
     function setViewportIcon(button,name){var old=button.querySelector(".okf-viewport-icon"),next=viewportIcon(name);if(old)button.replaceChild(next,old);else button.insertBefore(next,button.firstChild);}
-      function syncMinimap(){if(!minimapCanvas||!minimapWrap||minimapWrap.hidden)return;var ctx=minimapCanvas.getContext("2d");if(!ctx)return;var w=minimapCanvas.width,h=minimapCanvas.height,nodes=cy.nodes().not(".dim");ctx.clearRect(0,0,w,h);if(!nodes.length)return;var pal=graphPalette(),nodeColour=FORCED_COLORS?resolvedSystemColor("CanvasText"):pal.nodeText,selectColour=FORCED_COLORS?resolvedSystemColor("Highlight"):pal.select,bb=nodes.boundingBox(),sx=(w-12)/Math.max(1,bb.w),sy=(h-18)/Math.max(1,bb.h),s=Math.min(sx,sy);ctx.fillStyle=nodeColour;nodes.forEach(function(n){var p=n.position();ctx.beginPath();ctx.arc(6+(p.x-bb.x1)*s,12+(p.y-bb.y1)*s,FORCED_COLORS?3.5:3,0,Math.PI*2);ctx.fill();});var ext=cy.extent(),x=6+(ext.x1-bb.x1)*s,y=12+(ext.y1-bb.y1)*s,rw=Math.max(3,ext.w*s),rh=Math.max(3,ext.h*s);ctx.fillStyle=FORCED_COLORS?"transparent":selectColour+"33";ctx.fillRect(x,y,rw,rh);ctx.strokeStyle=selectColour;ctx.lineWidth=FORCED_COLORS?3:2;ctx.strokeRect(x,y,rw,rh);minimapCanvas.dataset.zoom=String(cy.zoom());minimapCanvas.dataset.nodeCount=String(nodes.length);minimapCanvas.title="Overview map: "+nodes.length+" visible concepts; outlined rectangle is the current viewport.";var label=minimapWrap.querySelector("span");if(label)label.textContent="Overview · "+nodes.length;}
+      function syncMinimap(){if(!minimapCanvas||!minimapWrap||minimapWrap.hidden)return;var ctx=minimapCanvas.getContext("2d");if(!ctx)return;var w=minimapCanvas.width,h=minimapCanvas.height,nodes=cy.nodes().not(".dim");ctx.clearRect(0,0,w,h);if(!nodes.length)return;/* Ledger overview: --text-3 dots on the panel, the viewport as a 1.5px ink frame (no tinted wash); forced colours use system ink and Highlight. */var pal=graphPalette(),sys=FORCED_COLORS?systemColours():null,nodeColour=sys?sys.text:pal.muted,frameColour=sys?sys.highlight:pal.cue,bb=nodes.boundingBox(),sx=(w-12)/Math.max(1,bb.w),sy=(h-18)/Math.max(1,bb.h),s=Math.min(sx,sy);ctx.fillStyle=nodeColour;nodes.forEach(function(n){var p=n.position();ctx.beginPath();ctx.arc(6+(p.x-bb.x1)*s,12+(p.y-bb.y1)*s,FORCED_COLORS?3.5:2.5,0,Math.PI*2);ctx.fill();});var ext=cy.extent(),x=6+(ext.x1-bb.x1)*s,y=12+(ext.y1-bb.y1)*s,rw=Math.max(3,ext.w*s),rh=Math.max(3,ext.h*s);ctx.strokeStyle=frameColour;ctx.lineWidth=FORCED_COLORS?3:1.5;ctx.strokeRect(x,y,rw,rh);minimapCanvas.dataset.zoom=String(cy.zoom());minimapCanvas.dataset.nodeCount=String(nodes.length);minimapCanvas.title="Overview map: "+nodes.length+" visible concepts; outlined rectangle is the current viewport.";var label=minimapWrap.querySelector("span");if(label)label.textContent="Overview · "+nodes.length;}
     // ---- Phase 4: zoom cluster (bottom-right) ---------------------------
     (function buildZoomCluster() {
       var wrap = document.createElement("div");
@@ -4491,6 +4993,15 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
       var minimapButton=zbtn("minimap","Show minimap","Overview",function(){minimapWrap.hidden=!minimapWrap.hidden;var minimapAction=minimapWrap.hidden?"Show minimap":"Hide minimap";minimapButton.setAttribute("aria-pressed",String(!minimapWrap.hidden));minimapButton.setAttribute("aria-label",minimapAction);minimapButton.title=minimapAction;minimapButton.dataset.tooltip=minimapAction;syncMinimap();});minimapButton.setAttribute("aria-pressed","false");
       viewportRerunButton=zbtn("layout", "Re-run layout", "Layout", function () { viewportRerunButton.disabled=true;viewportRerunButton.dataset.layoutState="running";viewportRerunButton.classList.add("is-running");viewportRerunButton.title="Layout running";viewportRerunButton.dataset.tooltip="Layout running";runLayoutNow(true,false,true); });viewportRerunButton.dataset.layoutState="ready";
       container.appendChild(wrap);
+      // The zoom column (bottom-right) and the All concepts summary
+      // (top-right) share the right edge. When the canvas is too short for
+      // both (the single-file Search & context drawer open, a short window)
+      // mark it so CSS lays the cluster out as a bottom-left row instead of
+      // stacking it over the summary. Docked mobile toolbars are not direct
+      // children and never take the mark.
+      function syncCanvasClearance(){var zoom=wrap.parentNode===container?wrap:null,index=container.querySelector(":scope > .okf-node-index"),summary=index&&index.querySelector("summary");var short=false;if(zoom&&summary&&summary.offsetParent!==null){var buttons=Array.prototype.filter.call(zoom.children,function(child){return child.offsetParent!==null;}),column=0;buttons.forEach(function(child){column+=child.offsetHeight;});column+=Math.max(0,buttons.length-1)*4;short=container.clientHeight<index.offsetTop+summary.offsetHeight+8+column+14;}if(short!==container.hasAttribute("data-okf-graph-short"))container.toggleAttribute("data-okf-graph-short",short);}
+      if(typeof ResizeObserver!=="undefined"){var canvasClearanceObserver=new ResizeObserver(syncCanvasClearance);canvasClearanceObserver.observe(container);window.addEventListener("pagehide",function(){canvasClearanceObserver.disconnect();});window.addEventListener("pageshow",function(event){if(event.persisted)canvasClearanceObserver.observe(container);});}
+      syncCanvasClearance();
       if(isMobileGraphViewport()){var viewportToolbar=document.createElement("div");viewportToolbar.className="okf-graph-viewport-toolbar";container.appendChild(viewportToolbar);viewportToolbar.appendChild(wrap);}
       ["pointerdown","mousedown","touchstart","click","dblclick","wheel"].forEach(function(name){wrap.addEventListener(name,function(e){e.stopPropagation();});});
       minimapWrap=document.createElement("div");minimapWrap.className="okf-graph-minimap";minimapWrap.hidden=true;minimapWrap.setAttribute("aria-hidden","true");var minimapLabel=document.createElement("span");minimapLabel.textContent="Overview";minimapWrap.appendChild(minimapLabel);minimapCanvas=document.createElement("canvas");minimapCanvas.width=160;minimapCanvas.height=100;minimapWrap.appendChild(minimapCanvas);container.appendChild(minimapWrap);
@@ -4515,13 +5026,17 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
 
     var searchInput = document.getElementById("okf-search");
     if (searchInput) {
-      var searchStatus=document.createElement("span");searchStatus.className="okf-graph-search-status";searchInput.insertAdjacentElement("afterend",searchStatus);
+      // Find in graph keeps one row: Clear sits inside the field's end edge
+      // and the match status follows the field (outside its label, so it
+      // reads the query as typed rather than in the label's eyebrow caps).
+      var searchField=searchInput.closest("label")||searchInput.parentNode;searchField.classList.add("okf-graph-search-field");
+      var searchStatus=document.createElement("span");searchStatus.className="okf-graph-search-status";searchField.insertAdjacentElement("afterend",searchStatus);
       var clearSearch=document.createElement("button");clearSearch.type="button";clearSearch.className="okf-graph-search-clear";clearSearch.textContent="Clear";clearSearch.hidden=true;searchInput.insertAdjacentElement("afterend",clearSearch);
       var searchTimer=null;
       function commitSearch() {
         searchTimer=null;
         dispatchInteraction({type:"FILTER_SEARCH",value:searchInput.value,quietUrl:true});
-        var matches=controlState.search?cy.nodes(".okf-search-match").length:cy.nodes().length,total=cy.nodes().length;searchStatus.textContent=controlState.search?(matches?matches+" of "+total+" concepts match":"No concepts match “"+searchInput.value.trim()+"”"):"";clearSearch.hidden=!controlState.search;
+        var matches=controlState.search?cy.nodes(".okf-search-match").length:cy.nodes().length,total=cy.nodes().length;searchStatus.textContent=controlState.search?(matches?matches+" of "+total+" concepts match":"No concepts match “"+searchInput.value.trim()+"”"):"";searchStatus.title=searchStatus.textContent;clearSearch.hidden=!controlState.search;
         updateStatus();
         syncMinimap();
       }
@@ -4540,7 +5055,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
     // lays out the same way on every load (the top Obsidian complaint was
     // position churn destroying spatial memory).
     buildSignalPanel();
-    if(ui.settingsBody){var layoutGroup=el("fieldset",{class:"okf-signal__group okf-graph-layout-settings"});layoutGroup.appendChild(el("legend",{},["Layout and relationship bundles"]));if(viewportRerunButton)layoutGroup.appendChild(viewportRerunButton);if(bundleIndex)layoutGroup.appendChild(bundleIndex);ui.settingsBody.appendChild(layoutGroup);}
+    if(ui.settingsBody){var layoutGroup=el("fieldset",{class:"okf-signal__group okf-graph-layout-settings"});layoutGroup.appendChild(el("legend",{},["Layout and relationship bundles"]));if(viewportRerunButton){/* In settings it is an ordinary labelled Ledger button, not a zoom-cluster icon. */viewportRerunButton.classList.add("okf-btn");var rerunLabel=viewportRerunButton.querySelector(".okf-viewport-label");if(rerunLabel)rerunLabel.textContent="Re-run layout";layoutGroup.appendChild(viewportRerunButton);}if(bundleIndex)layoutGroup.appendChild(bundleIndex);ui.settingsBody.appendChild(layoutGroup);}
     if (GRAPH_EMPTY) {
       applyVisualEncoding();
       applyFilters();
@@ -4562,7 +5077,9 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
         // real layout so the layout only considers backbone edges (cleaner
         // initial positions — the hairball-free default).
         applyEdgeElision();
-        applyLens(controlState.lens);
+        // Lens data, filter/interaction classes and labels form one initial
+        // projection. Flush styles before any layout/bounding-box reads.
+        cy.batch(function () { applyLens(controlState.lens); });
       }
     var fitDebounced = debounce(function () { overlayAwareFit(); }, 160);
     if (window.addEventListener) window.addEventListener("resize", fitDebounced);
@@ -4685,6 +5202,86 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
         activateRelationship(0, false);
       }
 
+      function paintDetailMetadata(metadataSlot, html) {
+        // Escaped server HTML, never constructed from raw metadata.
+        metadataSlot.innerHTML = html || "";
+        metadataSlot.querySelectorAll("[data-okf-source-concept]").forEach(function (link) {
+          var target = link.dataset.okfSourceConcept;
+          var fragment = link.dataset.okfSourceFragment;
+          if (!nodeIndex[target]) { link.removeAttribute("href"); return; }
+          if (!IS_SINGLE) link.href = conceptPagePrefix.replace(/\/$/, "") + "/" + target + (MODE === "static" ? ".html" : "") + (fragment ? "#" + encodeURIComponent(fragment) : "");
+          else link.addEventListener("click", function (event) {
+            event.preventDefault(); dispatchInteraction({type:"SELECT",id:target,source:"detail-link"});
+            var heading = document.getElementById("detail-title");
+            if (fragment) heading = Array.from(document.querySelectorAll("#detail-body [id]")).find(function(el) { return el.id === fragment; }) || heading;
+            if (heading) { heading.tabIndex = -1; heading.focus(); }
+          });
+        });
+      }
+      function paintDetailBody(bodyEl, html) {
+        bodyEl.innerHTML = html;
+        bodyEl.removeAttribute("aria-busy");
+        rewriteInternalLinks(bodyEl);
+        var fragment = bodyEl.dataset.okfPendingFragment;
+        delete bodyEl.dataset.okfPendingFragment;
+        if (fragment) focusDetailFragment(bodyEl, fragment, document.getElementById("detail-title"));
+        // Existing progressive renderers also see lazily loaded bodies.
+        try { window.dispatchEvent(new Event("okf-loom:bodyPatched")); } catch (e) {}
+      }
+      function graphBodyErrorMessage(error) {
+        if (error.status === 409) return "This bundle changed while the concept was loading. Try again to load the latest version.";
+        if (error.status === 413) return "This concept is too large to display here. Open its page to read it.";
+        if (error.status === 503) return "The server is busy or took too long to load this concept. Try again.";
+        if (error.name === "AbortError" || error.name === "TimeoutError") return "Loading this concept took too long or was interrupted. Try again.";
+        if (error instanceof TypeError) return "Could not reach the server to load this concept. Check your connection and try again.";
+        return "This concept could not be loaded. Try again.";
+      }
+      function showSelectedBody(conceptId, bodyEl, metadataSlot, retriedRevision) {
+        if (!bodyEl || !metadataSlot) return;
+        if (LIVE_GRAPH && !bundle.bodies) {
+          var owner = selectionGeneration, epoch = bodyEpoch;
+          var bodyStatus = document.getElementById("detail-body-status");
+          if (!bodyStatus) {
+            bodyStatus = document.createElement("div"); bodyStatus.id = "detail-body-status";
+            bodyStatus.setAttribute("role", "status"); bodyEl.before(bodyStatus);
+          }
+          bodyStatus.textContent = "";
+          function stillSelected() { return graphPageActive && epoch === bodyEpoch && owner === selectionGeneration && selectedConceptId === conceptId; }
+          function showBodyError(error) {
+            if (!stillSelected()) return;
+            detailBodyPending = false; detailBodyError = graphBodyErrorMessage(error);
+            bodyEl.removeAttribute("aria-busy"); bodyEl.textContent = "";
+            var message = document.createElement("p"); message.textContent = detailBodyError;
+            var retry = document.createElement("button"); retry.type = "button";
+            retry.className = "okf-btn okf-detail-body-retry"; retry.textContent = "Retry";
+            retry.addEventListener("click", function () {
+              if (!stillSelected()) return;
+              showSelectedBody(conceptId, bodyEl, metadataSlot);
+              bodyEl.tabIndex = -1; bodyEl.focus({ preventScroll: true });
+            });
+            bodyStatus.replaceChildren(message, retry);
+          }
+          detailBodyPending = true; detailBodyError = null;
+          bodyEl.textContent = "Loading concept…"; bodyEl.setAttribute("aria-busy", "true");
+          readGraphBody(conceptId).then(function (doc) {
+            if (!graphPageActive || epoch !== bodyEpoch || owner !== selectionGeneration || selectedConceptId !== conceptId) return;
+            paintDetailMetadata(metadataSlot, doc.metadata_html);
+            paintDetailBody(bodyEl, doc.html); detailBodyPending = false;
+          }).catch(function (error) {
+            if (!stillSelected()) return;
+            if (error.status === 409 && !retriedRevision) {
+              // Reuse the same latest-wins structure owner even without SSE.
+              // Acceptance cancels this epoch and retries the current selection
+              // once; a failed refresh leaves this owner to report the error.
+              refreshGraphFromServer({ retryBodyRevision: true }).then(function (accepted) {
+                if (!accepted) showBodyError(error);
+              });
+              return;
+            }
+            showBodyError(error);
+          });
+        } else paintDetailBody(bodyEl, bodies[conceptId] || "");
+      }
       function showDetail(conceptId, provenance) {
       var data = nodeIndex[conceptId];
       if (!data) return;
@@ -4727,17 +5324,16 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
 
       var chip = document.getElementById("detail-type");
       if (chip) {
+        // An outlined mono type badge (graph.css); the type name carries the
+        // distinction, never a fill colour.
         chip.textContent = data.type || "concept";
-        var bg = data.color || palette[data.type] || typeColorFor(data.type);
-        chip.style.background = bg;
-        // P0-4: per-chip foreground via luminance (was hardwired #fff via
-        // --okf-chip-fg, which failed on yellow/green/cyan palette colours).
-        chip.style.color = _chipFg(bg);
+        chip.style.removeProperty("background");
+        chip.style.removeProperty("color");
       }
       setText("detail-title", data.label || conceptId);
       var selectedStatus=document.querySelector(".okf-detail-selected-status");if(selectedStatus)selectedStatus.textContent="Selected: "+(data.label||conceptId);
       setText("detail-id", conceptId);
-      setText("detail-description", data.description || "Not set");
+      setText("detail-description", window.okfReadableText(data.description) || "Not set");
 
       // Resource.
       var resourceEl = document.getElementById("detail-resource");
@@ -4780,21 +5376,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
         var detailDescription = document.getElementById("detail-description");
         if (detailDescription) detailDescription.after(metadataSlot);
       }
-      // Like bodies, this fragment is escaped by the server renderer. Never
-      // construct markup from raw okf_metadata in the browser.
-      metadataSlot.innerHTML = data.metadata_html || "";
-      metadataSlot.querySelectorAll("[data-okf-source-concept]").forEach(function (link) {
-        var target = link.dataset.okfSourceConcept;
-        var fragment = link.dataset.okfSourceFragment;
-        if (!nodeIndex[target]) { link.removeAttribute("href"); return; }
-        if (!IS_SINGLE) link.href = conceptPagePrefix.replace(/\/$/, "") + "/" + target + (MODE === "static" ? ".html" : "") + (fragment ? "#" + encodeURIComponent(fragment) : "");
-        else link.addEventListener("click", function (event) {
-          event.preventDefault(); dispatchInteraction({type:"SELECT",id:target,source:"detail-link"});
-          var heading = document.getElementById("detail-title");
-          if (fragment) heading = Array.from(document.querySelectorAll("#detail-body [id]")).find(function(el) { return el.id === fragment; }) || heading;
-          if (heading) { heading.tabIndex = -1; heading.focus(); }
-        });
-      });
+      paintDetailMetadata(metadataSlot, data.metadata_html || "");
 
       // Computed relationship explanation — why this node connects and
       // stands out. Every figure comes from the SAME client-side metrics that
@@ -4807,19 +5389,16 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
       // client-side XSS surface (no marked.parse, no DOMPurify needed).
       var bodyEl = document.getElementById("detail-body");
       if (bodyEl) {
-        bodyEl.innerHTML = bodies[conceptId] || "";
+        bodyEl.innerHTML = "";
+        delete bodyEl.dataset.okfPendingFragment;
         // Stamp the concept id so studio.js's comment affordance can
         // anchor comments to the right concept when the user selects
         // text in the graph detail panel.
         bodyEl.setAttribute("data-concept-id", conceptId);
-        bodyEl.className = "okf-page__body okf-graph-detail__body";
-        rewriteInternalLinks(bodyEl);
-        // User feedback: the detail panel shows the SAME
-        // server-rendered concept HTML as the wiki pages, so the same
-        // progressive renderers must run over it. renderers.js listens
-        // for okf-loom:bodyPatched (the event the studio dispatches after live
-        // patches) and re-scans for mermaid/code/math blocks.
-        try { window.dispatchEvent(new Event("okf-loom:bodyPatched")); } catch (e) {}
+        // okf-prose owns the document's Ledger reading styles (code wells,
+        // inline code, prose links, task lists), as on the cited-document path.
+        bodyEl.className = "okf-prose okf-page__body okf-graph-detail__body";
+        showSelectedBody(conceptId, bodyEl, metadataSlot);
       }
 
       // Open-page link (graph view only).
@@ -5009,7 +5588,9 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
         btn.setAttribute("aria-label", aria);
         var sw = document.createElement("span");
         sw.className = "okf-node-index__swatch";
-        sw.style.background = n.data.color || "var(--okf-accent)";
+        // Neutral until a colour lens repaints it (updateNodeIndexSwatches);
+        // the bundle's type colour is never shown.
+        sw.style.background = graphPalette().node;
         btn.appendChild(sw);
         var lbl = document.createElement("span");
         lbl.className = "okf-node-index__label";
@@ -5022,7 +5603,10 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
           var warn = document.createElement("span");
           warn.className = "okf-node-index__warn";
           warn.setAttribute("aria-hidden", "true");
-          warn.textContent = "!";
+          // Visible meaning, not glyph + colour alone; the row's aria-label
+          // already carries the same phrase for assistive technology.
+          warn.textContent = unres + " broken";
+          warn.title = unres + " broken link" + (unres === 1 ? "" : "s");
           btn.appendChild(warn);
         }
         if (showComments) {
@@ -5131,6 +5715,10 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
       });
     }
     function focusDetailFragment(scope, fragment, fallback) {
+      if (fragment && scope && scope.getAttribute("aria-busy") === "true") {
+        scope.dataset.okfPendingFragment = fragment;
+        return;
+      }
       var target = fallback;
       if (fragment && scope) {
         target = Array.prototype.slice.call(scope.querySelectorAll("[id]")).filter(function (node) {
@@ -5326,12 +5914,16 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
     if (detailPane && livePresenceHub) detailPane.appendChild(collaboratorRegion);
     var mobilePresenceBar = document.createElement("aside");
     mobilePresenceBar.className = "okf-mobile-presence";
+    mobilePresenceBar.id = "okf-mobile-presence";
     mobilePresenceBar.setAttribute("aria-label", "Current collaborators");
     var mobilePresenceText = document.createElement("span"); mobilePresenceText.className = "okf-mobile-presence__text";
-    var mobilePresenceOpen = document.createElement("button"); mobilePresenceOpen.type = "button"; mobilePresenceOpen.textContent = "Details"; mobilePresenceOpen.setAttribute("aria-label", "Show collaborator details"); mobilePresenceOpen.setAttribute("aria-controls", collaboratorSection.id);
+    var mobilePresenceOpen = document.createElement("button"); mobilePresenceOpen.type = "button"; mobilePresenceOpen.textContent = "Collaborators"; mobilePresenceOpen.setAttribute("aria-label", "Show collaborators"); mobilePresenceOpen.setAttribute("aria-controls", collaboratorSection.id);
     mobilePresenceOpen.addEventListener("click", function () { collaboratorSection.open = true; var detailsTab=document.querySelector('[data-graph-pane="details"]'); if(detailsTab)detailsTab.click(); });
     mobilePresenceBar.appendChild(mobilePresenceText); mobilePresenceBar.appendChild(mobilePresenceOpen);
-    if (paneNav && paneNav.parentNode && livePresenceHub) paneNav.parentNode.insertBefore(mobilePresenceBar, paneNav.nextSibling);
+    if (paneNav && paneNav.parentNode && livePresenceHub) {
+      paneNav.parentNode.insertBefore(mobilePresenceBar, paneNav.nextSibling);
+      if (graphToolsToggle) graphToolsToggle.setAttribute("aria-controls", graphToolsToggle.getAttribute("aria-controls") + " okf-mobile-presence");
+    }
     var ghostNodes = Object.create(null);
     var overflowGhost = null;
     var lastPresenceSnapshot = null, presenceRenderFrame = null;
@@ -5445,6 +6037,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
         if (focus === presenceFocus) return;
         applyPresenceFocus(focus);
       });
+    }
 
       // ---- Phase 5: the canvas consumes live graph events ---
       // Phase 4 compatibility boundary: existing Phase 5 graph/comment SSE
@@ -5528,8 +6121,9 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
       }
       function hideGraphChip() { if (_graphChipEl) _graphChipEl.hidden = true; }
 
-          function refreshGraphFromServer() {
-          if (!DATA_URL) return;
+          function refreshGraphFromServer(options) {
+          options = options || {};
+          if (!DATA_URL || !graphPageActive) return Promise.resolve(false);
           var refreshFocus=document.activeElement,refreshFocusSolo=!!(refreshFocus&&refreshFocus.classList&&refreshFocus.classList.contains("okf-filter-solo")),refreshFocusOwner=refreshFocus&&refreshFocus.closest&&refreshFocus.closest('[aria-label="Relationship filters"]'),refreshFocusValue=refreshFocusOwner?(refreshFocusSolo?refreshFocus.dataset.filterSoloValue:refreshFocus.dataset.filterValue):document.body.dataset.okfRelationshipFilterFocus;if(!refreshFocusOwner)refreshFocusSolo=document.body.dataset.okfRelationshipFilterFocusSolo==="1";
           if (graphRefreshController) graphRefreshController.abort();
           var controller = new AbortController();
@@ -5548,13 +6142,17 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
           var deadlineTimer = setTimeout(function () { controller.abort("deadline"); classifyDeadline(); }, GRAPH_REFRESH_DEADLINE);
           refreshStats.started++;
           publishGraphCaptureReady("loading");
-          return fetch(DATA_URL, { signal: controller.signal, cache: "no-store", headers: { Accept: "application/json" } })
+          return fetch(GRAPH_REQUEST_URL, { signal: controller.signal, cache: "no-cache", headers: { Accept: "application/json" } })
             .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
               .then(function (fresh) {
             // A newer refresh started while this one was in flight → this
             // response is stale; never let it mutate graph/detail/status.
                 if (!graphPageActive || controller.signal.aborted || requestOwner !== graphRequestGeneration || seq !== _graphRefreshSeq) { refreshStats.skippedStale++; return; }
                   fresh = graphCandidate(fresh);
+                  if (DATA_URL === "/__data/graph.json") {
+                    window.okfGraphData = Promise.resolve(fresh);
+                    window.dispatchEvent(new CustomEvent("okf-loom:graph-data", { detail: fresh }));
+                  }
                   delete document.body.dataset.okfGraphRefreshError;
                   var previousNodeIds = bundle.nodes.map(function (n) { return n.data.id; }).sort().join("\n");
                   var freshNodeIds = fresh.nodes.map(function (n) { return n.data.id; }).sort().join("\n");
@@ -5574,8 +6172,9 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
                 bundle = fresh;
                 document.body.dataset.okfRevision = freshRevision;
                 document.body.dataset.okfCaptureRevision = freshRevision;
+                if (cancelGraphBodies) cancelGraphBodies();
                 bodies = fresh.bodies || {};
-                reservedDocuments = fresh.documents || {};
+                reservedDocuments = graphDocuments(fresh);
               backlinks = fresh.backlinks;
               outgoing = fresh.outgoing;
               recomputeLodState(fresh);
@@ -5636,7 +6235,10 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
                 animateGraphDelta(n, n.id(), deltaOwner, true);
               });
               buildNodeIndex(fresh);
-              if (selectedConceptId && freshIds[selectedConceptId]) renderSignalExplain(selectedConceptId);
+              if (selectedConceptId && freshIds[selectedConceptId]) {
+                renderSignalExplain(selectedConceptId);
+                if (LIVE_GRAPH) showSelectedBody(selectedConceptId, document.getElementById("detail-body"), document.getElementById("detail-okf-metadata"), options.retryBodyRevision);
+              }
               if (selectedConceptId && !freshIds[selectedConceptId]) {
                 // Phase 4 compatibility boundary for the existing Phase 5
                 // refresh: reconcile interaction state after acceptance only.
@@ -5644,7 +6246,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
                 var deletedWasFocusRoot=controlState.focusEnabled&&focusRoot===selectedConceptId;
                 dispatchInteraction({type:"CLEAR",quietUrl:true});
                 if(deletedWasFocusRoot)reconcileDeletedFocus();
-                var survivor = document.getElementById("okf-search") || document.querySelector("[data-graph-pane]");
+                var survivor = (!graphToolsFolded() && document.getElementById("okf-search")) || document.querySelector("[data-graph-pane]");
                 if (survivor) survivor.focus();
               }
               if(interactionState.active&&!freshIds[interactionState.active]){interactionState.active=null;syncInteractionIndex();}
@@ -5718,6 +6320,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
                   publishGraphCaptureReady(acceptedState, acceptedState === "ready");
                 }
               });
+              return true;
             })
               .catch(function (error) {
                 // Only the still-current owner may restore the coherent
@@ -5743,6 +6346,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
           if (graphRefreshDebounceTimer) clearTimeout(graphRefreshDebounceTimer);
           graphRefreshDebounceTimer = setTimeout(function () { graphRefreshDebounceTimer = null; if (graphPageActive) refreshGraphFromServer(); }, 700);
         }
+    if (window.okfLoomLive && typeof window.okfLoomLive.on === "function") {
         window.okfLoomLive.on("graph", scheduleGraphRefresh);
         // Comment lifecycle events change only graph-derived count metadata,
         // but share the exact same debounced request owner and stale fence.
@@ -5996,7 +6600,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
         if (modal || replayStart) try { next.focus({ preventScroll: true }); } catch (e) { try { next.focus(); } catch (e2) {} }
        }
       var replay = document.createElement("button");
-      replay.type = "button"; replay.className = "okf-graph-tour-replay";
+      replay.type = "button"; replay.className = "okf-btn okf-graph-tour-replay";
       replay.textContent = "Take a 45-second graph tour";
       replay.setAttribute("aria-label", "Take a 45-second graph tour");
       var helpGroup=document.createElement("div");helpGroup.className="okf-graph-help";helpGroup.setAttribute("role","group");helpGroup.setAttribute("aria-label","Graph help");var helpLabel=document.createElement("span");helpLabel.className="okf-graph-help__label";helpLabel.textContent="Help";helpGroup.appendChild(helpLabel);helpGroup.appendChild(replay);
@@ -6028,6 +6632,9 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
     // (`layoutStats.skippedStale`). The tests only READ through it; callers must
     // not treat `cy` as immutable. It adds no inline script (CSP-safe) and does
     // not affect rendering. Field shape may change with the implementation.
+      // Every encoding owner (legend, summary, shelf) now exists, so a later
+      // palette event may repaint the whole lens encoding.
+      lensPaintReady = true;
       try {
         window.__okfLoomGraph = {
           cy: cy,   // live, mutable Cytoscape core — for tests/diagnostics only
@@ -6050,7 +6657,14 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
         refreshGraph: typeof window.__okfRefreshGraph === "function" ? window.__okfRefreshGraph : null
       };
       window.okfGraphInteraction = graphInteractionController;
-      graphInteractionController.restore();
+      // The default Map projection above already represents an empty URL.
+      // Restore only admitted URL state, not a second Map restyle/clear pass.
+      // Popstate always uses the full restore owner, including an empty URL.
+      // Skipping the restyle must not skip its final status commit: the
+      // visible counts/text are published now, not by the 200ms debounce.
+      var initialInteraction = decodeInteractionUrl();
+      if (initialInteraction.lens !== "map" || initialInteraction.selected || initialInteraction.focus || initialInteraction.path || Object.keys(initialInteraction.hidden).length || Object.keys(initialInteraction.hiddenRelations).length) graphInteractionController.restore();
+      else reconcileVisibleRelationshipProjection();
       // Stable, read-only capture adapter. The mutable Cytoscape core remains
       // diagnostic-only and is intentionally absent from this public shape.
       window.okfGraphCaptureState = function () {
@@ -6061,7 +6675,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
           payloadNodeCount: authoritativePayloadNodeCount,
           layoutRequired: layoutRequired,
           layoutSettled: layoutSettled && !interactionPending,
-          transitionPending: graphDeltaPending > 0,
+          transitionPending: graphDeltaPending > 0 || detailBodyPending,
           layoutGeneration: layoutSeq,
           appliedLayoutGeneration: lastAppliedSeq,
           initialSeedApplied: initialSeedApplied,
@@ -6073,6 +6687,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
             sessionIds: Object.keys(ghostNodes).sort()
           }
         };
+        if (detailBodyError) { state.terminalCode = "network-failure"; state.terminalPhase = "graph-body"; }
         if (layoutTerminalCode) { state.terminalCode = layoutTerminalCode; state.terminalPhase = layoutTerminalPhase; }
         return state;
       };
@@ -6085,6 +6700,7 @@ if(s.path)dispatchInteraction({type:"PATH",from:s.path[0],id:s.path[1],quietUrl:
       }
         publishGraphCaptureReady(layoutSettled ? "ready" : "loading", true);
     } catch (e) {}
+    initialMobileViewport = null;
   }
 
   // ---- helpers ----------------------------------------------------------

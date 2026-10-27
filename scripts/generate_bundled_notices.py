@@ -37,11 +37,15 @@ metadata):
 3. Code snippets that upstream adapted into its own files (identified by the
    banners/comments they retained) and the KaTeX fonts (OFL-1.1, from the
    fonts' own ``name`` tables) are listed separately.
+4. Ledger's Public Sans and Azeret Mono are local, content-locked snapshots,
+   not npm packages. Their full OFL appendices come from the verified LICENSE
+   inputs in the vendor tree; the inventory preserves their recorded provenance
+   without inventing an upstream release version.
 
 Every licence text is copied verbatim from the exact version's npm tarball
-(integrity-verified) or from a pinned upstream commit; every GitHub file below
-is pinned by commit AND SHA-256. Network: registry.npmjs.org and
-raw.githubusercontent.com only; redirects are refused.
+(integrity-verified), a pinned upstream commit, or a content-locked local Ledger
+snapshot; every GitHub file below is pinned by commit AND SHA-256. Network:
+registry.npmjs.org and raw.githubusercontent.com only; redirects are refused.
 
 Modes: ``--check`` (default) regenerates in memory and compares with the
 checked-in files byte for byte; ``--write`` rewrites them. After ``--write``,
@@ -668,12 +672,32 @@ def _quote_between(text: str, start: str, end: str) -> str:
     return text[line_start:stop]
 
 
+def ledger_fonts_entries(lock: dict) -> list[dict]:
+    packages, verified, _pin = fva._ledger_snapshots(vendor.VENDOR_ROOT, lock)
+    entries = []
+    for package in packages:
+        licence = next(entry for entry in package["files"] if entry["dest"].endswith("/LICENSE"))
+        text = verified[licence["dest"]].decode("utf-8")
+        entries.append({
+            "id": f"{package['name']}@{package['version']}",
+            "name": package["name"], "version": package["version"], "license": package["license"],
+            "provenance": package["provenance"], "upstream": package["upstream"],
+            "included_in": [entry["dest"] for entry in package["files"]
+                            if not entry["dest"].endswith("/LICENSE")] + [vendor.LEDGER_DERIVED],
+            "licence_files": [{"path": licence["dest"], "sha256": licence["sha256"],
+                               "quoted_sha256": vendor.sha256_hex(as_quoted(text).encode("utf-8"))}],
+            "text": text,
+        })
+    return entries
+
+
 # ---------------------------------------------------------------------------
 # Assemble
 # ---------------------------------------------------------------------------
 
 def build() -> tuple[str, str]:
     lock = vendor.load_lock()
+    ledger_fonts = ledger_fonts_entries(lock)  # verify local inputs before any network use
     shipped_bytes = {rel: vendor.read_vendor_bytes(rel) for rel in
                      [MERMAID["shipped"]] + [b["shipped"] for b in VENDORED_BUNDLES]}
     mermaid, evidence = mermaid_inventory()
@@ -825,15 +849,18 @@ def build() -> tuple[str, str]:
                      for entry in ordered],
         "snippets": [{k: v for k, v in item.items() if k != "terms_text"} for item in snippets],
         "fonts": {k: v for k, v in fonts.items() if k != "terms_text"},
+        "ledger_fonts": [{k: v for k, v in entry.items() if k != "text"} for entry in ledger_fonts],
         "gaps": [{"id": item["id"], "reason": item["gap"]} for item in snippets if item.get("gap")],
     }
-    return render_notices(ordered, snippets, fonts, evidence), json.dumps(inventory, indent=1, sort_keys=True) + "\n"
+    return (render_notices(ordered, snippets, fonts, evidence, ledger_fonts),
+            json.dumps(inventory, indent=1, sort_keys=True) + "\n")
 
 
 RULE = "=" * 78
 
 
-def render_notices(entries: list[dict], snippets: list[dict], fonts: dict, evidence: dict) -> str:
+def render_notices(entries: list[dict], snippets: list[dict], fonts: dict, evidence: dict,
+                   ledger_fonts: list[dict]) -> str:
     out = [
         "okf-loom offline assets: bundled-dependency licence notices",
         "=" * 59,
@@ -910,6 +937,11 @@ def render_notices(entries: list[dict], snippets: list[dict], fonts: dict, evide
         out += ["", f"--- notice of {', '.join(notice['faces'])} (font name table) ---", "", notice["text"]]
     out += ["", f"--- licence terms: SIL Open Font License 1.1 ({fonts['terms_source']}) ---", "",
             fonts["terms_text"].rstrip("\n"), f"END FONTS {fonts['id']}", ""]
+    # Keep the existing appendix format byte-for-byte; these are local snapshots
+    # inventoried separately from the npm-derived renderer/KaTeX components.
+    for entry in ledger_fonts:
+        out += [f"===== Ledger font: {entry['name']} ({entry['license']}) =====",
+                f"Upstream: {entry['upstream']}", "", as_quoted(entry["text"]), ""]
     text = "\n".join(line.rstrip(" \t") for line in "\n".join(out).replace("\r\n", "\n").split("\n"))
     if "\r" in text:
         raise SystemExit("notices text contains a bare carriage return")

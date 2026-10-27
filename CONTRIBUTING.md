@@ -64,8 +64,14 @@ This is the core run. It collects without importing Playwright and covers local
 HTTP, persistence, capture validators, retrieval and proposal runtime
 identity. Only real browser tests and the optional external upstream-bundle
 integration tests are deselected. Fixtures that serve shipped bundles use
-disposable copies, and no stored evidence is regenerated. Set `TMPDIR=/tmp` to
-relocate pytest's temporary directories. `requirements-dev.txt` pins the
+disposable copies, and no stored evidence is regenerated. On restricted hosts,
+set `TMPDIR` to a writable private directory (`mkdir -m 700`, then `chmod 700`
+if inherited ACLs require it); tests and capture helpers honour it rather than
+requiring `/tmp`. Proposal fixtures create their own 0700 session authorities,
+so a shared/setgid checkout does not require stripping its ACLs. Tests needing
+POSIX multiprocessing semaphores probe `multiprocessing.Lock()` and skip only
+on `PermissionError`; the capture publisher race uses semaphore-free pipes.
+`requirements-dev.txt` pins the
 complete Linux dependency set; there is no `uv sync` or editable-install step.
 
 ### Built-in YAML fallback
@@ -101,6 +107,16 @@ some need CDN access, or headed Chrome for real browser zoom.
   Playwright-managed Chromium, then an installed Chrome or Chromium.
 - The legacy `OKF_BROWSER_TEST_OPT_OUT=1` opt-out still works, but conflicts
   with `OKF_REQUIRE_BROWSER=1`.
+- Chrome's Unix socket path is limited to 107 bytes. Before collection, conftest
+  relocates an overlong, shared or setgid effective `TMPDIR` to a short private
+  directory under writable `/tmp` first, then the resolved `.shared-cache` or
+  the virtualenv's parent. Effective temp directories and fallback candidates
+  inside this checkout's work tree are rejected (including an in-repo `.venv`
+  parent); an external cache symlink remains a valid fallback. A short private
+  external `TMPDIR` is kept as-is, including on hosts that deny `/tmp`.
+  If none fits, it fails early with a request for a short writable external `TMPDIR`.
+  The directory is removed after the test session; do not use a symlink to a
+  long path as a workaround (Chrome resolves it).
 - The shared server fixture prints startup logs on failure and cleans up with
   a bounded terminate-then-kill.
 - Use marker selection for core runs. A test that starts Playwright or
@@ -120,8 +136,12 @@ Automated browser checks run on Chromium only, driven by Playwright 1.58.0.
   `OKF_TEST_HEADED_ZOOM=1` runs the `HEADED_ZOOM_TESTS` in
   `tests/test_ui_reflow_nojs_remediation.py` with
   `OKF_CAPTURE_REAL_BROWSER_ZOOM=1`, pressing Ctrl+plus through `xdotool`, so
-  they need `DISPLAY` and `xdotool` (see `tests/browser_zoom.py`). They are not
-  part of CI.
+  they need X11 `DISPLAY` and `xdotool` (see `tests/browser_zoom.py`). With no
+  display and no `xvfb-run`, only these seven proofs skip, with an explicit
+  environment reason (even in the required-browser lane). If Xvfb is installed,
+  prefer `OKF_TEST_HEADED_ZOOM=1 xvfb-run -a python -m pytest -q
+  tests/test_ui_reflow_nojs_remediation.py`. Wayland alone cannot drive the
+  X11 keyboard driver. They are not part of CI.
 - Text-only zoom and custom browser font sizes are not tested.
 - Accessibility semantics are checked against Playwright's ARIA snapshot and
   Chromium's accessibility tree. No screen reader has been run, so spoken
@@ -168,8 +188,18 @@ full browser suite stays manual.
 
 ## Regenerating the README media
 
-The README's screenshots and clips live in [`docs/media/`](docs/media/) and
-are reproducible from a live Studio. Use the browser setup above.
+The README's screenshots, clips and tour live in [`docs/media/`](docs/media/)
+and are reproducible from a live Studio. Use the browser setup above.
+
+On a host that cannot reach `cdn.jsdelivr.net` (a sandbox or an offline CI
+runner), add `--cdn-mirror vendor` to either script. The browser then gets
+the Studio's pinned Mermaid, KaTeX, highlight.js and Cytoscape files from the
+lock-verified copies in `scripts/okf_loom/viewer/vendor/`, with the page's SRI
+checks still enforced (see `scripts/cdn_mirror.py`). Every SRI-pinned file is
+the identical vendored copy. The two ES-module entry points the Studio
+imports without SRI (Mermaid's and highlight.js's) are rebuilt locally from
+the same pinned versions, so they are equivalent to the CDN files, not
+byte-identical.
 
 **Screenshots and the social card:**
 
@@ -181,23 +211,41 @@ It serves a snapshot of the docs bundle's git-tracked files, so local comment
 history and activity never appear in the media (`--in-place` serves the bundle
 as-is instead). It seeds no appearance settings, so the stills show the
 shipped defaults, and it fails on any browser console, page or network error.
-It also composes `docs/media/social-preview.png`, the 1280×640 repository
-card. Options: `--bundle`, `--out-dir`, `--chrome`.
+The README hero (`hero-light.png` in Bone, `hero-dark.png` in Slate, shown
+by GitHub to readers in its light and dark themes) comes from a real comment
+loop, posted in the page and then claimed, edited and resolved with
+`scripts/okf-loom` on a separate throwaway copy, so its edit never reaches the
+other stills. The script also captures the two phone stills
+(`phone-top.png`, `phone-scrolled.png`) on a 390×844 touch viewport, swiping
+the page so the chrome scrolls away; `palettes.png`, the home in all four
+palettes; and composes `docs/media/social-preview.png`, the 1280×640
+repository card. The card is not used by the README: upload it under the
+repository's **Settings → General → Social preview**. Options: `--bundle`,
+`--out-dir`, `--chrome`, `--in-place`, `--cdn-mirror`.
 
-**Clips (MP4 and GIF):**
+**Clips (MP4 and GIF) and the tour (MP4):**
 
 ```bash
 python scripts/record_showcase_media.py
 python scripts/record_showcase_media.py --only search --only graph
+python scripts/record_showcase_media.py --only walkthrough
 ```
 
-It records `comment-loop`, `appearance`, `graph` and `search`, each as an
-H.264 1280×720 MP4 and a looping 960 px GIF. Every clip runs against its own
-scratch copy of the docs bundle's git-tracked files, so recording never
-changes the checkout. The pointer, captions, key hints and terminal panel are
-a recording-only overlay, never part of the product. It needs `ffmpeg` and
-`ffprobe` (with libx264 and the GIF encoder) on `PATH`; Pillow is not needed.
-Options: `--out`, `--chrome`, `--keep-frames DIR`.
+By default it records `comment-loop`, `appearance`, `graph` and `search`, each
+as an H.264 1280×720 MP4 and a looping 960 px GIF. `--only walkthrough`
+records the two-minute captioned tour, `walkthrough.mp4`, kept under GitHub's
+10 MB limit for a video uploaded into the README. To show it in an inline
+player, edit the README on github.com and drag the file onto the marked line
+in **The two-minute tour**; GitHub hosts the upload and inserts its URL.
+
+Every clip runs against its own scratch copy of the docs bundle's git-tracked
+files, so recording never changes the checkout. The pointer, captions, key
+hints, title cards and terminal panel are a recording-only overlay, never
+part of the product. While each newly loaded page is booting, its frames are
+left out, so a navigation cuts straight to the ready page instead of showing
+the brief pre-boot notice. It needs `ffmpeg` and `ffprobe` (with libx264 and
+the GIF encoder) on `PATH`; Pillow is not needed. Options: `--out`,
+`--chrome`, `--keep-frames DIR`, `--cdn-mirror`.
 
 Both scripts find a browser the same way: `--chrome`, then `OKF_CHROME`, then
 `AIC_PLAYWRIGHT_CHROME_PATH`, known system Chrome paths, the Chrome channel,

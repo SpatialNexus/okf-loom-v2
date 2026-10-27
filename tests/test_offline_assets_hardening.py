@@ -107,9 +107,9 @@ def test_substituted_tree_is_self_consistent_as_a_real_directory(substituted_tre
 def test_symlinked_vendor_root_is_refused(tmp_path, monkeypatch, capsys, substituted_tree, verb):
     link = tmp_path / "vendor-link"
     link.symlink_to(substituted_tree, target_is_directory=True)
-    monkeypatch.setattr(vendor, "VENDOR_ROOT", link)
     bundle = write_offline_fixture(tmp_path / "bundle")
     out = _previous_output(tmp_path, verb, bundle)
+    monkeypatch.setattr(vendor, "VENDOR_ROOT", link)
     capsys.readouterr()
     before = _snapshot(out)
     code, err = _cli(capsys, verb, bundle, out)
@@ -326,6 +326,101 @@ def test_fetch_positive_control_writes_only_selected_files(fetch_env):
     fva.fetch(dest)
     assert sorted(p.relative_to(dest).as_posix() for p in dest.rglob("*") if p.is_file()) == ["good-1.0.0/a.js"]
     assert (dest / "good-1.0.0" / "a.js").read_bytes() == GOOD
+
+
+@pytest.fixture
+def locked_registry(monkeypatch, offline_root):
+    """Serve the real locked npm inputs in memory; local snapshots must never download."""
+    lock = vendor.load_lock(offline_root)
+    packages = {package["name"]: package for package in lock["packages"] if "tarball" in package}
+    members = {package["tarball"]: {entry["src"]: vendor.read_vendor_bytes(entry["dest"], offline_root)
+                                    for entry in package["files"]}
+               for package in packages.values()}
+    downloads = []
+
+    def download(tarball, integrity, wanted):
+        package = next(package for package in packages.values() if package["tarball"] == tarball)
+        assert integrity == package["integrity"]
+        downloads.append(tarball)
+        return {src: data for src, data in members[tarball].items() if wanted(src)}
+
+    monkeypatch.setattr(fva, "_download", download)
+    monkeypatch.setattr(fva, "_registry_dist", lambda name, version: {
+        key: packages[name][key] for key in ("tarball", "integrity", "license")})
+    monkeypatch.setattr(fva, "_hljs_language_sets", lambda: (
+        lock["reference_packages"][0], lock["parity"]["highlightjs_languages"],
+        lock["parity"]["highlightjs_common"]))
+    return lock, downloads
+
+
+def test_fetch_copies_verified_local_snapshots_without_changing_the_lock(tmp_path, offline_root,
+                                                                       locked_registry, capsys):
+    lock, downloads = locked_registry
+    dest = tmp_path / "fresh-vendor"
+    dest.mkdir()
+    # Auxiliary files and the lock remain repository-authored, not fetched.
+    for rel in [vendor.LOCK_NAME, *(entry["dest"] for entry in lock["auxiliary"])]:
+        (dest / rel).write_bytes(vendor.read_vendor_bytes(rel, offline_root))
+    before = (dest / vendor.LOCK_NAME).read_bytes()
+    assert fva.main(["--fetch", "--dest", str(dest)]) == 0
+    assert "vendor check OK" in capsys.readouterr().out
+    assert len(downloads) == len(fva.PINS)
+    assert (dest / vendor.LOCK_NAME).read_bytes() == before
+    assert vendor.load_ledger_css(dest) == vendor.load_ledger_css(offline_root)
+    for package in lock["packages"]:
+        if package["version"] == "ledger-snapshot":
+            for entry in package["files"]:
+                assert vendor.read_vendor_bytes(entry["dest"], dest) == \
+                    vendor.read_vendor_bytes(entry["dest"], offline_root)
+
+
+@pytest.mark.parametrize("existing_lock", [True, False])
+def test_init_lock_preserves_local_snapshot_provenance_and_derived_pin(tmp_path, offline_root,
+                                                                     locked_registry, existing_lock,
+                                                                     capsys):
+    lock, downloads = locked_registry
+    dest = tmp_path / "vendor-to-relock"
+    shutil.copytree(offline_root, dest)
+    if not existing_lock:
+        (dest / vendor.LOCK_NAME).unlink()
+    assert fva.main(["--init-lock", "--dest", str(dest)]) == 0
+    assert "vendor check OK" in capsys.readouterr().out
+    assert len(downloads) == len(fva.PINS)
+    assert vendor.load_lock(dest) == lock
+
+
+@pytest.mark.parametrize("mode", ["fetch", "init_lock"])
+@pytest.mark.parametrize("damage", ["font", "licence", "missing", "symlink", "derived"])
+def test_local_snapshot_damage_fails_before_network_or_writes(tmp_path, offline_root, monkeypatch,
+                                                            mode, damage):
+    font = vendor.LEDGER_FACES[0][2]
+    if damage in ("font", "licence"):
+        victim = offline_root / (font if damage == "font" else vendor.LEDGER_LICENSES[0])
+        victim.write_bytes(victim.read_bytes() + b"damaged")
+    elif damage == "missing":
+        (offline_root / font).unlink()
+    elif damage == "symlink":
+        target = tmp_path / "font.woff2"
+        (offline_root / font).rename(target)
+        (offline_root / font).symlink_to(target)
+    else:
+        lock_path = offline_root / vendor.LOCK_NAME
+        lock = vendor.load_lock(offline_root)
+        lock["derived"][vendor.LEDGER_DERIVED]["sha256"] = "0" * 64
+        lock_path.write_text(json.dumps(lock), encoding="utf-8")
+    before = _tree(offline_root)
+    dest = tmp_path / "fetch-output"
+    dest.mkdir()
+
+    def no_network(*args, **kwargs):
+        pytest.fail("damaged local snapshots must fail before network use")
+
+    monkeypatch.setattr(fva, "_download", no_network)
+    monkeypatch.setattr(fva, "_hljs_language_sets", no_network)
+    with pytest.raises(SystemExit, match="Ledger"):
+        getattr(fva, mode)(dest if mode == "fetch" else offline_root)
+    assert list(dest.iterdir()) == []
+    assert _tree(offline_root) == before
 
 
 @pytest.mark.parametrize("case, message", [

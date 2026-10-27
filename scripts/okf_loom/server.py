@@ -59,7 +59,6 @@ from .studio import Studio, rev_of, CommentMutationError, CommentSummaryUnavaila
 from .presence import PresenceUnavailable, PresenceCapacity, valid_focus, valid_label
 from .annotations import AnchorError, capture_anchor, concept_content_rev, parse_v2_anchor, resolve_anchor
 from .render import (
-    build_graph_data,
     _render_concept_page,
     _render_index_page,
     _render_search_page,
@@ -90,6 +89,9 @@ _STDLIB_THREADING_HTTP_SERVER = ThreadingHTTPServer
 # (16 MiB) — it is a backstop, not the primary control.
 # ---------------------------------------------------------------------------
 MAX_RAW_RESPONSE_BYTES: int = 16 * 1024 * 1024  # 16 MiB cap on /__raw bodies.
+# The root inventory lists every concept. Keep its HTML allowance independent
+# of retrieval JSON; no other HTML route inherits this larger bound.
+MAX_INDEX_RESPONSE_BYTES: int = 8 * 1024 * 1024
 
 
 def _prefers_html_error(accept: str) -> bool:
@@ -125,6 +127,14 @@ def _prefers_html_error(accept: str) -> bool:
         return 0, 0
 
     return preference("text/html") > max(preference("text/plain"), preference("application/json"))
+
+
+def _if_none_match_matches(fields: list[str], etag: str) -> bool:
+    """GET/HEAD weak comparison across all If-None-Match header fields."""
+    # Commas inside an opaque quoted tag are not list separators.
+    validators = (value.strip() for field in fields
+                  for value in re.findall(r'(?:[^",]|"[^"]*")+', field))
+    return any(value == "*" or value.removeprefix("W/") == etag for value in validators)
 
 
 def _canonical_annotation_source(bundle: Bundle, cid: ConceptId) -> str:
@@ -285,6 +295,7 @@ _PUBLIC_GET_INTERNAL_ROUTES = frozenset({
     "/__context",
     "/__events",
     "/__data/doc",
+    "/__data/graph-body",
     "/__data/events",
     "/__comments",
     "/__data/page",
@@ -1576,6 +1587,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         self._send_text(200, render_feedback_import_page(
             name=self.display_name, config=self._config(),
             availability=self._feedback_import_availability(),
+            studio_available=self.studio is not None,
             max_note_bytes=MAX_NOTE_BYTES,
             preview_ttl_seconds=PREVIEW_TOKEN_TTL_SECONDS,
         ))
@@ -2737,6 +2749,8 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
             return self._handle_events(query)
         if path == "/__presence":
             return self._handle_presence_get()
+        if path == "/__data/graph-body":
+            return self._handle_graph_body(query)
         if path == "/__data/doc":
             return self._handle_data_doc(query)
         if path == "/__data/page":
@@ -2752,7 +2766,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         if path in ("/__graph", "/__graph.html"):
             return self._handle_graph()
         if path == "/__data/graph.json":
-            return self._handle_graph_json()
+            return self._handle_graph_json(query)
         if path == "/__data/content.json":
             return self._handle_content_json()
         if path == "/__data/summary":
@@ -2810,7 +2824,8 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         from .render import render_reserved_document
         self._send_text(200, render_reserved_document(
             document, payload['raw'], mode='serve', config=self._config(),
-            bundle=self.bundle, name=self.display_name))
+            bundle=self.bundle, name=self.display_name,
+            studio_available=self.studio is not None))
 
     def _handle_root(self) -> None:
         self._page_document = 'index.md' if self.bundle.root_index() else None
@@ -2825,13 +2840,14 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
                 pass
         html = _render_index_page(
             self.bundle, mode="serve", name=self.display_name,
+            studio_available=self.studio is not None,
             palette=self.palette, config=self._config(), sub="",
             index_file=self.bundle.root_index(),
             comment_summary=comment_summary,
             engagement_events=engagement_events,
         )
         html = self._plugin().on_index_render(html)
-        self._send_text(200, html)
+        self._send_text(200, html, html_limit=MAX_INDEX_RESPONSE_BYTES)
 
     def _handle_dir_index(self, sub: str) -> None:
         sub = sub.lstrip("/")
@@ -2864,6 +2880,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
                 )
         html = _render_index_page(
             self.bundle, mode="serve", name=self.display_name,
+            studio_available=self.studio is not None,
             palette=self.palette, config=self._config(), sub=sub,
             index_file=index_file,
             comment_summary=None,
@@ -2879,6 +2896,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         if _prefers_html_error(",".join(self.headers.get_all("Accept", []))):
             return self._send_text(404, _render_not_found_page(
                 name=self.display_name, path=cid_str, config=self._config(),
+                studio_available=self.studio is not None,
             ), extra_headers=headers)
         self._send_text(404, plain_message, content_type="text/plain", extra_headers=headers)
 
@@ -2928,6 +2946,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
                 pass
         html = _render_concept_page(
             concept, bundle, graph, mode="serve",
+            studio_available=self.studio is not None,
             name=self.display_name, palette=self.palette,
             config=self._config(),
             body_plugin=plugin.on_concept_render,
@@ -2938,6 +2957,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
     def _handle_graph(self) -> None:
         html = _render_graph_page(
             self.bundle, mode="serve", name=self.display_name,
+            studio_available=self.studio is not None,
             config=self._config(),
         )
         self._send_text(200, html)
@@ -2985,6 +3005,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
                         )
                         html = _render_search_page(
                             bundle, mode="serve", name=display_name, config=config,
+                            studio_available=self.studio is not None,
                             query=request.query, results=rows, request=request,
                             sections=sections,
                         )
@@ -3202,6 +3223,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
             **{key: params.get(key) for key in ("tag", "entity", "relation", "source", "target")})
         body = _render_search_page(
             bundle, mode="serve", name=display_name or self.display_name, config=config,
+            studio_available=self.studio is not None,
             query=params.get("q", ""), results=[], error=exc, request=request,
         )
         self._send_text(exc.status, body, content_type="text/html; charset=utf-8")
@@ -3271,7 +3293,11 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
             ) if isinstance(relations, list) else 0,
         })
 
-    def _handle_graph_json(self) -> None:
+    def _handle_graph_json(self, query: dict[str, list[str]] | None = None) -> None:
+        query = query or {}
+        structure = query.get("view") == ["structure"]
+        if "view" in query and not structure:
+            return self._send_json(400, {"ok": False, "error": "invalid_request"})
         bundle, _palette, _plugin, config = self._state_snapshot()
         display_name = getattr(self.server, "name", None) or config.get("name") or bundle.name
         comment_summary = None
@@ -3288,12 +3314,71 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
                     {"ok": False, "error": "comment_summary_unavailable"},
                     extra_headers={"Cache-Control": "no-store"},
                 )
-        data = build_graph_data(
-            bundle,
-            name=display_name,
-            comment_summary=comment_summary,
-        )
-        self._send_json(200, data, extra_headers={"Cache-Control": "no-store"})
+        from .graph_response import MAX_STRUCTURE_BYTES, graph_response
+        from .retrieval import MAX_RESPONSE_BYTES, RetrievalContractError
+        limit = MAX_STRUCTURE_BYTES if structure else MAX_RESPONSE_BYTES
+        try:
+            response = graph_response(
+                bundle, name=display_name, comment_summary=comment_summary,
+                structure=structure, limit=limit,
+            )
+        except RetrievalContractError:
+            return self._send_json(500, {"ok": False, "error": {
+                "code": "invalid_json_value", "message": "Response contains a non-canonical JSON value",
+                "fields": {},
+            }}, extra_headers={"Cache-Control": "no-store"})
+        if response is None:
+            return self._send_json(413, {"ok": False, "error": {
+                "code": "response_too_large",
+                "message": f"This bundle's graph is too large to display (limit {limit / (1024 * 1024):g} MiB). Open a smaller bundle or use a portable build.",
+                "fields": {},
+            }}, extra_headers={"Cache-Control": "no-store"})
+        # No authority/viewer-specific fields: local and public ingress share
+        # this read-only projection. Hash final bytes, not just the revision:
+        # comment counts and stale_after metadata can change independently.
+        body, etag = response
+        headers = {"Cache-Control": "private, no-cache", "ETag": etag}
+        not_modified = _if_none_match_matches(self.headers.get_all("If-None-Match", []), etag)
+        self._send_bytes(304 if not_modified else 200, b"" if not_modified else body,
+                         content_type="application/json; charset=utf-8", extra_headers=headers)
+
+    def _handle_graph_body(self, query: dict[str, list[str]]) -> None:
+        """One graph body, not the annotation/plugin concept-page projection.
+
+        /__data/doc does canonical disk I/O, parses again, copies the bundle and
+        builds its graph/projection. This read instead uses one already loaded
+        generation and exactly the full graph's HTML. Never serve a newer body
+        under an older graph revision; public and local readers see the same data.
+        """
+        from .render import render_graph_body
+        from .retrieval import bundle_revision, RetrievalContractError
+        from .viewer.metadata import render_metadata
+
+        headers = {"Cache-Control": "private, no-cache"}
+        if set(query) != {"id", "revision"} or any(len(values) != 1 for values in query.values()):
+            return self._send_json(400, {"error": "invalid_request"}, extra_headers=headers)
+        try:
+            cid = concept_id_from_str(query["id"][0])
+        except ConceptIdError:
+            return self._send_json(404, {"error": "target_not_found"}, extra_headers=headers)
+        bundle, _, _, _ = self._state_snapshot()
+        concept = bundle.concepts.get(cid)
+        if concept is None:
+            return self._send_json(404, {"error": "target_not_found"}, extra_headers=headers)
+        revision = bundle_revision(bundle)
+        if query["revision"][0] != revision:
+            return self._send_json(409, {"error": "revision_mismatch"}, extra_headers=headers)
+        def prepare_body():
+            return self._prepare_retrieval_json({
+                "id": concept_id_to_str(cid), "bundle_revision": revision,
+                "html": render_graph_body(concept),
+                "metadata_html": render_metadata(concept, bundle, mode="graph"),
+            })
+        try:
+            code, body = self._run_retrieval_bounded(prepare_body)
+        except RetrievalContractError as exc:
+            return self._send_json(exc.status, exc.as_error(), extra_headers={"Cache-Control": "no-store"})
+        return self._send_bytes(code, body, content_type="application/json; charset=utf-8", extra_headers=headers)
 
     def _handle_content_json(self) -> None:
         data = _content_index_json(self.bundle)
@@ -3695,6 +3780,11 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         self._send_json(200, {"comments": comments})
 
     def _handle_static(self, name: str) -> None:
+        # Exact built-in font allowlist before normalization or overrides:
+        # neither bundle content nor a user path can select vendor files.
+        from .viewer.vendor import LEDGER_FACES, load_ledger_files
+        if name in {face[2] for face in LEDGER_FACES}:
+            return self._send_static_bytes(load_ledger_files()[name], content_type="font/woff2")
         # Prevent path traversal. Normalize, then reject anything still
         # containing a separator or a traversal token after normalization.
         # ``unquote`` already ran in ``_route`` (we parse the decoded path),
@@ -3726,12 +3816,23 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
                     )
                 body = override.read_bytes()
                 ctype = _content_type_for(name)
-                return self._send_bytes(200, body, content_type=ctype)
+                return self._send_static_bytes(body, content_type=ctype)
         if name in list_served_static():
             body = load_static(name, self.bundle).encode("utf-8")
             ctype = _content_type_for(name)
-            return self._send_bytes(200, body, content_type=ctype)
+            return self._send_static_bytes(body, content_type=ctype)
         return self._send_text(404, f"Unknown static asset: {name}", content_type="text/plain")
+
+    def _send_static_bytes(self, body: bytes, *, content_type: str) -> None:
+        # Hash the final representation, not file metadata: generated font CSS
+        # and active-code overrides share this path. Keep loading/verifying on
+        # every request so even edits preserving mtime/size cannot hide changes
+        # or bypass vendor integrity checks. No viewer-specific data is added.
+        etag = '"' + hashlib.sha256(body).hexdigest() + '"'
+        not_modified = _if_none_match_matches(self.headers.get_all("If-None-Match", []), etag)
+        self._send_bytes(304 if not_modified else 200, b"" if not_modified else body,
+                         content_type=content_type,
+                         extra_headers={"Cache-Control": "private, no-cache", "ETag": etag})
 
     def _handle_bundle_asset(self, rel: str) -> None:
         """Serve a bundle-local media file (screenshots, diagrams, video, PDF).
@@ -3876,7 +3977,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
                     "okf_loom.proposal_review.activation", fromlist=["capability"]
                 ).capability(getattr(self.server, "proposal_service", None) is not None),
                 "rev": studio.current_rev(),
-                "theme": getattr(self.server, "studio_theme", "auto"),
+                "theme": getattr(self.server, "studio_theme", "bone"),
             }
             payload = json.dumps(cfg, default=str)
             # CSP-safe bootstrap: a non-executable JSON data block. The
@@ -3902,7 +4003,8 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         return "\n".join(bits)
 
     def _send_text(self, code: int, body: str, *, content_type: str = "text/html; charset=utf-8",
-                   close: bool = False, extra_headers: dict[str, str] | None = None) -> None:
+                   close: bool = False, extra_headers: dict[str, str] | None = None,
+                   html_limit: int | None = None) -> None:
         # Inject theme.js (+ studio bootstrap when attached) into <head> of
         # every served HTML page so data-theme resolves before first paint.
         if content_type.startswith("text/html") and "</head>" in body:
@@ -3910,7 +4012,7 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         body_bytes = body.encode("utf-8")
         if content_type.startswith("text/html"):
             from .retrieval import MAX_RESPONSE_BYTES
-            if len(body_bytes) > MAX_RESPONSE_BYTES:
+            if len(body_bytes) > (MAX_RESPONSE_BYTES if html_limit is None else html_limit):
                 code = 413
                 body_bytes = (
                     b"<!doctype html><html><head><title>Response too large</title></head>"
@@ -3941,7 +4043,10 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
             self.close_connection = True
         self.send_response(code)
         self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(body)))
+        # A 304 has no body; its Content-Length, if sent, must describe the
+        # selected 200 representation, not the empty wire body (RFC 9110).
+        if code != 304:
+            self.send_header("Content-Length", str(len(body)))
         if close:
             self.send_header("Connection", "close")
         if not extra_headers or "Cache-Control" not in extra_headers:
@@ -3959,8 +4064,9 @@ class OKFWikiHandler(BaseHTTPRequestHandler):
         # ``data:`` (inline SVG icons) plus the CDN for any image asset
         # a bundle might embed from jsdelivr. ``font-src`` allows the CDN
         # because KaTeX's stylesheet references its webfonts relative to
-        # the CDN. Keep this list in sync with the per-page
-        # <meta> CSPs in viewer/templates/ — browsers enforce the
+        # the CDN. Ledger fonts are same-origin WOFF2 files, so no ``data:``
+        # font source is needed on served pages. Keep this list in sync with
+        # the per-page <meta> CSPs in viewer/templates/ — browsers enforce the
         # INTERSECTION of header + meta, so a directive missing here or
         # there silently wins.
         self.send_header(

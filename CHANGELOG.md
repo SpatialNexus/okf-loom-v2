@@ -10,6 +10,204 @@ follow [Semantic Versioning](https://semver.org/). The product version
 
 ### Fixed
 
+- Search fields (top bar, the search page, Find in graph) and their joined Search
+  buttons draw a complete inset focus ring that hugs the focused part, instead of an
+  outset box half hidden under the button and the suggestions list (also in forced colours).
+- The search fields' clear "x" is a palette-ink glyph instead of Chrome's stock blue one;
+  Find in graph, which has its own Clear button, no longer shows a second one.
+- Portable context disclosures share the adjacent button's scale and coarse
+  target sizing; graph view-only notes use the panel's secondary text role.
+- Static Graph and Search pages opened from disk show one server-required
+  explanation instead of contradictory fetch errors and impossible retry controls.
+- Opening a single-file Index concept resets only its detail pane and focuses
+  without scrolling the graph workspace or hiding its top bar.
+- Portable builds use the configured viewer title consistently across Index,
+  documents, Graph, Search and the single-file viewer, without client-side renaming.
+- Portable results retain the query in both search fields even while loading
+  or unavailable, and use the same type chips, concept ids, source paths and
+  context-action wording as live results (D3-008, D3-013).
+- Search modes read as single-choice Ledger segments with whole-label focus
+  and a 2px selected state bar, retaining native radio keyboard behavior (D2-024).
+- Search discloses reached result limits and offers relevant, evenly spaced
+  empty-state actions instead of clearing nonexistent filters (D2-019, D2-020).
+- Search and suggestion highlighting marks whole query terms, not fragments
+  inside identifiers or English stop words (D2-018).
+- Suggestions show an explicit no-match message, omit the current page from
+  Recent pages, stay closed for empty history, and have one bottom edge (D1-004).
+- Search previews, evidence previews, graph descriptions and concept summaries
+  share a safe plain-text Markdown projection; exact source remains available
+  separately and copied passages/Context Packs are unchanged (D2-016, M1-015,
+  T1-011, D1-011).
+- Search result titles meet the 44px coarse-pointer target on tablets as well
+  as phones (search portion of T1-006).
+- Portable search verifies the same SHA-256 evidence hashes on plain-HTTP LAN
+  mirrors using a bundled fallback only when WebCrypto is absent (D3-005).
+- Search suggestion selection keeps row heights stable while `aria-selected`
+  and forced-colour outlines continue to announce the active option (D1-002, D3-006).
+- Landscape phones (short, coarse viewports such as 844x390) now scroll the top bar
+  and view tabs away while reading, like portrait phones; only the Sections row stays.
+- The two-row top bar no longer drops Appearance onto a third row at 641–665px or
+  beside an open Studio rail: below a 780px page the launcher shows only "Studio".
+- The single-row top bar keeps an even rhythm: the Studio launcher is exactly as wide
+  as its idle label (no blank slot); longer statuses end in an ellipsis, so nothing moves.
+- Document details shows the document's own short content revision instead of
+  "rev section-" on every page, and no revision when there is none.
+- The top-bar Index link is marked as the current page only on the bundle index,
+  not on documents, the log or section indexes.
+- Studio change toasts use the singular for one ("1 change", not "1 changes"), and
+  "Undo all (N)" counts the same changes as the summary ("Undo 4 of 5" when some can't be undone).
+- Home: "Recently changed" now comes before the spotlight in Tab order (left column first).
+- Home spotlight: the "New" badge and check marks are neutral; the accent stays on the one CTA.
+- Section indexes (e.g. /how-to/) use their authored heading as the single page title, and
+  their body sits on the title's edge in the document lane instead of a 60ch column.
+- Related rail titles wrap instead of being cut off, and the rail's collapse control is a
+  disclosure button named "Related" with a chevron and aria-expanded (was a bare "-").
+- Graph route at 641–899px: the Graph pane paints and stays one viewport tall
+  (the page no longer grows without bound), with its zoom bar docked on screen.
+- Phone graph chrome is compact: one-line presence row (its button now reads
+  "Collaborators", not a second "Details"), a one-row Find in graph band and a
+  one-row labelled zoom dock from 375px; at 320px Appearance stays beside Studio
+  and touch-only devices drop the arrow-key hint.
+- Short touch screens (320x568, landscape phones) give the graph canvas most of the
+  viewport: Find in graph and the presence row fold behind a Tools toggle in the pane
+  tabs, and the fitted graph no longer runs under the docked zoom bar. While a Find
+  filter is active the toggle reads "Tools · 2" (match count, also in its name), and
+  rotating into this layout keeps a focused or filled Find band open with its focus.
+- Graph settings flow in the details pane instead of a nested 440px scroller, and
+  a focused filter chip shows its whole focus ring beside its joined Only button.
+- A concept selected in the graph details pane (and every single-file document)
+  keeps the Ledger prose styles: padded, scrollable code wells, inline-code chips,
+  underlined prose links, task lists and blockquotes.
+- The graph's All concepts list keeps the active row on one line (its 2px bar
+  marks it; the wrapping "Active ·" prefix is gone) and, open, sits above the zoom
+  controls instead of under them.
+- Graph settings controls follow Ledger: type filter chips stay joined to their
+  Only buttons, Re-run layout is a labelled button, sliders and checkboxes are
+  square ink controls (accent only on focus), and legend and filter buttons are
+  44px targets on touch tablets.
+- The graph details pane reads as one column: no duplicate Themes heading, the
+  Collaborators disclosure and lens hint match their siblings, starting-point
+  counts stay on one line, tablet content shares one left edge, and a concept's
+  broken-link marker reads "! 4 broken" instead of a bare "!".
+- Focusing the graph region (single-file Graph, `#okf-graph`) draws an inset ring
+  that hugs it instead of a clipped L, and the Static/Local mode word is no
+  longer an empty Tab stop.
+- Document view tabs no longer slide sideways while you scroll or switch views;
+  Sections keeps a stable slot on the same row, and a focused tab's ring clears the
+  top bar on phones.
+- Sections (view-bar menu and the pinned phone row) follows the reading position
+  after any jump, opens on the current section with a scroll cue, and no longer
+  clips the last entry's focus ring.
+- A link preview opened by keyboard focus is placed beside its link and never
+  covers it or its focus ring.
+- Document controls on touch screens are 44px targets (sortable table heads,
+  metadata summary, entity and source chips, relation rows, document-end links);
+  heading ¶ anchors stay quiet and on the heading's line, and short breadcrumb
+  segments no longer leave gaps.
+- Mermaid diagrams keep labels at about 12px or larger and scroll in their frame
+  instead of shrinking to fit; the palette swap stays atomic.
+- Mono text (ids, paths, code) no longer shows Azeret Mono's fi ligature
+  ("conf1g"); mono labels also keep tabular figures.
+- Table toolbars match their table's width; dates and other one-token cells stay
+  unbroken, and wide tables scroll in their wrapper on phones and in the graph
+  details pane.
+- Skip links and sortable table heads show one focus ring that hugs the control.
+- Document pages draw one hairline between the metadata strip and the tools and
+  no blank bands or doubled rules at the page foot.
+- Graph node labels are no longer stretched or squashed after resizing the window
+  across 900px; labels re-rasterise at the new size like a fresh load (D2-017).
+- Graph labels no longer overprint: the selected, hovered or toured concept's
+  full title draws above its edges on a `--surface` plate, incident edges pass
+  behind names, and lower-priority labels and count chips that would collide
+  are hidden (D2-006).
+- Find in graph is one stable row on the route's 20px gutter: typing no longer
+  grows the band or moves the canvas, Clear sits inside the field (the native
+  cancel glyph is gone), the status quotes the query as typed, and the field is
+  labelled once (D2-007, T1-007).
+- The graph's edge key lists real relation types (link, references, …) in their
+  canvas line style, and edges are dashed by relation type rather than by link
+  anchor text. Show relationship labels names only the selected or hovered
+  concept's relationships, in muted ink, without recolouring the edges
+  (D2-008, D2-010).
+- Graph hub halos end above the hub's label and fade with their node in
+  search, filter and hover states (D2-014).
+- The graph's floating action bar is placed clear of the selected concept, its
+  name and the canvas controls; the docked bar at 641–900px no longer covers the
+  zoom column, and the focus bar keeps "Show all" on one line (D2-015).
+- Opening Graph at 641–1100px no longer moves the top bar: the graph route keeps
+  the shared shell's 20px gutter, row tops and destination spacing (T1-007).
+- Compact live graph relations retain OKF 0.2 `origin` and `source_id` provenance,
+  including source derivations; the full/tool graph projection is unchanged.
+- Missing or malformed embedded search evidence in single-file exports settles as
+  unavailable without an uncaught bootstrap error; graph and shell setup still run.
+- Switching palettes no longer flashes a Mermaid diagram's source text. The old
+  diagram stays in place (marked busy) until the new palette's diagram is ready,
+  then swaps in without moving the layout; the latest switch wins and a failed
+  redraw keeps the old diagram. Renderer and capture readiness wait for the swap.
+- Live graph JSON reuses final serialized bytes and strong ETags, with independent
+  per-view coalescing and exact metadata-expiry invalidation. Certainly oversized
+  projections are refused before rendering/encoding, and repeated size refusals
+  no longer rebuild the graph. The full/tool view retains its 4 MiB cap and bytes.
+- Live graph pages share one compact structure request, with deduplicated relation
+  records and a graph-only 16 MiB cap, supporting 1,500–5,000 ordinary concepts.
+  Selected bodies/advisory HTML load on demand with bounded reads, revision and
+  lifecycle fences, and explicit capture readiness; graph refusals show the
+  server's readable message. Portable data, markup, CSP and offline behaviour
+  retain their full/inline path; only shared graph/Studio runtime bytes change.
+- Live index thumbnails derive only identities, topology and relationship counts
+  instead of building unused graph metadata HTML. The root inventory has a separate
+  8 MiB HTML cap so 5,000 ordinary cards fit; other response caps and portable
+  build bytes are unchanged.
+- Single-file exports store portable search passages once instead of embedding
+  both canonical JSON and its parsed copy. Existing `window.BUNDLE` consumers
+  retain lazy, mutable `payload` access; static/SPA and live output are unchanged.
+- Live index cards, type/count statistics and document Connections now refresh
+  in other open tabs after watcher or CLI edits, without reloading the page or
+  replacing reader controls and comment drafts; read-only viewers stay live too.
+- Atomic content writes preserve existing file permissions (except setuid) and
+  ownership when permitted. Shared-file rewrites that cannot retain ownership
+  try keeping the group alone, otherwise proceeding as the writing user, without
+  carrying setuid/setgid across owners. New bundle files and build outputs use
+  normal umask-derived permissions instead of becoming owner-only. Published build directories are traversable by other
+  users when the umask permits; rebuilds preserve an operator-set output root
+  mode. Staging and recovery stay private, as does Studio state, including
+  rewrites of files whose permissions were previously wider.
+- Under forced colours (Windows High Contrast) the graph canvas paints only
+  system colours: Canvas nodes with CanvasText strokes, glyphs, labels and
+  edges; Highlight selection, path, search and focus cues that each carry
+  their own stroke width or style; dotted GrayText for dimmed context. Lenses
+  trade hue for node shape or stroke weight (with a matching key), badges,
+  count chips and the overview map stay readable, and leaving forced colours
+  restores the Ledger palette exactly.
+- On phones (640px and narrower) the page chrome no longer takes a third to
+  half of the screen while reading. Scrolling down slides the top bar and view
+  tabs away and keeps only the Sections row pinned (about 45-49px); scrolling
+  up, returning to the top, moving keyboard focus into the chrome, or opening a
+  menu, the command palette or a Studio dialog brings all of it back. Static
+  and SPA pages get the same scroll-away top bar. The top bar fits on two rows
+  at 390px and the view tabs on one row down to 320px. Reduced motion skips
+  the slide; captures always show the full chrome; wider screens and the graph
+  are unchanged.
+- On touch screens the code-block Copy button no longer covers the first
+  line of code, and stays in view while a long line is scrolled sideways.
+- Graph JSON tolerates unknown query parameters (including cache-busters);
+  only `view` is interpreted: absent means full, one `structure` means body-free,
+  and other or repeated values return `400 invalid_request`. The route reference
+  now records both views and graph/static final-byte ETag revalidation.
+- Graph first frames avoid redundant default-URL restyling and a discarded grid
+  layout; initial lens/theme updates are batched without changing settled positions.
+- Graph canvas labels remeasure and redraw once when Ledger fonts load late,
+  without delaying the first frame or rerunning the layout.
+- Live pages reserve inert Studio launcher and document viewbar geometry only
+  when Studio is attached, and index feedback only for an actual index document.
+  Studio fills those slots in place (removing feedback it cannot fill); its
+  truthful loading/failure notice stays anchored below the bar while booting.
+  Inactive sessions, documentless indexes, portable and no-JS pages reserve no
+  inactive Studio chrome.
+- Split view now clears the "Loading source…" notice whenever the source pane
+  is populated, including by a concurrent document or live-update load. A
+  redundant request no longer leaves a loading or failure notice above source
+  that has already loaded.
 - A v1 `presence.json` in the Studio session no longer stops `serve`. It is
   normalised to the v2 format (unknown actors become `agent`, unknown states
   `idle`) instead of being rejected with a bare `error:`.
@@ -20,13 +218,105 @@ follow [Semantic Versioning](https://semver.org/). The product version
   Presence records a role, so it silently failed for any name other than
   `agent`/`user`; the name stays on the comment as `claimed_by`. `presence
   --actor <name>` likewise shows a v1-style custom name as the agent.
+- On phones, the graph route now follows an in-place resize or rotation
+  (390 → 320 wide, for example). Before, the top bar kept the old width and the
+  page stayed zoomed out until reload.
+- The Split view tab now lines up with Rendered and Source on touch screens.
+  It sat about 4px higher.
+- The graph's selects (Graph settings Depth and Group by, and the focus bar's
+  neighbourhood depth) now use the Ledger field style: square 1px outline,
+  palette colours, Public Sans, focus ring, 44px touch target and a
+  forced-colours outline. Before, they used the browser default.
+- The "Live Studio is unavailable" boot notice now sits just below the top
+  bar while Studio loads. Before, it covered the brand, search and
+  destinations (or, on narrow graph pages, was hidden under the bar).
+- If Studio cannot load at all (for example, a blocked script), the page now
+  reports the failure. The notice then sits in the page below the bar, and the
+  empty Studio launcher, view bar and feedback slots are removed.
+- Read-only and public read-only sessions reserve the read-only page-feedback
+  layout (View comments plus its note), so the index no longer shifts when
+  Studio loads.
+- On tablets and in phone landscape (641–900px wide), the graph pane tabs
+  are now Ledger tabs with a visible current pane. Before, they were
+  unstyled browser buttons.
+- On narrow screens, the single-file Index no longer shows the
+  Graph/Concepts/Details pane tabs, which controlled the hidden graph. They
+  appear with the graph, and the pressed tab matches the visible pane.
+- The favicon is now a square Ledger mark (ink tile, bone bars, warm 1px frame)
+  instead of the old rounded teal tile. It is the same inline icon in every
+  output, and the live 404 page now has it too.
 
 ### Changed
 
-- The v1 theme names are accepted as aliases in `studio.theme` and the
-  viewer `config.json` `theme`: `light` → `technical-light`, `dark` and
-  `midnight` → `technical-dark`, `pastel` and `sepia` → `swiss-light`.
-  Unknown values are still a configuration error.
+- Live static assets now use final-byte strong ETags and body-free conditional
+  GET/HEAD responses. `Cache-Control: private, no-cache` requires revalidation on
+  every reuse, so toolkit edits, overrides and generated font CSS stay fresh.
+- Graph pages defer the ordered, integrity-pinned vendor chain in CDN and
+  offline modes, letting the appearance runtime and page styles load without
+  waiting for graph dependencies. Single-file vendor ordering is unchanged.
+- Live document pages, document data and search reuse bounded, content-keyed
+  heading render work without changing canonical-source or section-link checks.
+- Live graph reads reuse single-flight, generation-owned rendered bodies while
+  recomputing clock-sensitive metadata; index/graph HTML skip unused bodies.
+  Graph JSON now has final-byte strong
+  ETags and revalidates with `private, no-cache` (no shared-cache storage);
+  Studio shares the graph page's initial
+  request and uses body-free structure only for visible badges/recency or an
+  opened command palette on other pages.
+- **Ledger appearance:** Bone (default, light), Slate, Clay, Plum (dark), plus
+  System (Bone/Slate following the OS). Square geometry, ruled inventory,
+  neutral content types and palette-derived graph lenses replace the family
+  system. The page maximum is 1280px, reading column 760px, prose 55ch even in
+  full-width Focus. Contrast, border and density modifiers are removed.
+- Public Sans and Azeret Mono normal/italic faces are self-hosted on every
+  output, with verified hashes and full SIL OFL notices. Live/static/SPA pages
+  use relative WOFF2 files; static/SPA builds (including CDN mode) emit
+  `__static/ledger-public-sans/` and `__static/ledger-azeret-mono/` with the faces
+  and OFL `LICENSE` files. Publish both directories with the site. Single-file
+  output alone embeds the faces as base64 data URLs. All use `font-display: swap`
+  (text may paint in a fallback face first); only serve/SPA preload the upright
+  faces. No external font network access is needed on any target.
+- **README media re-recorded in Ledger** from the final redesign: a
+  theme-aware hero (Bone for GitHub's light theme, Slate for dark) showing a
+  real resolved comment loop, a four-palette still, a cited-search still, a
+  two-minute captioned tour (`walkthrough.mp4`, with a poster still), and a
+  new 1280×640 social card. The rendering still uses Focus view so the whole
+  flowchart fits.
+  The clips now show Find in graph and cited search results, and the comment
+  loop's terminal text is set larger so it stays legible at README width.
+  `graph-map.png` is no longer produced.
+- The README media scripts accept `--cdn-mirror vendor` to serve the Studio's
+  pinned CDN libraries from the lock-verified vendored copies (SRI-pinned
+  files byte-identical; the two un-pinned ES-module entry points rebuilt from
+  the same versions) on hosts that cannot reach jsDelivr. Their bundle snapshot also carries the repository
+  files the docs link to (`../../SKILL.md` and others), so those links no
+  longer render as broken-link markers in the captured graph.
+
+### Appearance migration
+
+| Old name | Ledger choice |
+|---|---|
+| `technical-light`, `swiss-light`, `purple-light`, `coffee-light` | `bone` |
+| `technical-dark`, `swiss-dark` | `slate` |
+| `coffee-dark` | `clay` |
+| `purple-dark` | `plum` |
+| `auto` | `system` |
+| v1 `light`, `pastel`, `sepia` (via their previous light aliases) | `bone` |
+| v1 `dark`, `midnight` (via Technical dark) | `slate` |
+
+Old config values still load; unknown Studio values fail closed. Browser legacy
+keys are read only when `okf-loom.appearance` is absent. A saved choice wins over
+configuration, then Bone; configuration is not persisted. Reset clears legacy
+appearance choices too, so they cannot reappear on reload. Retired modifier keys
+are ignored. Type-colour overrides in `.okf-loom/viewer/palette.json` are
+retired and ignored by Ledger: types remain neutral and graph lenses use the
+active palette's muted ramp. Existing files need not be deleted; compatibility
+payloads may still contain their values, but the built-in viewer does not paint
+them. The public JS API is `setTheme`, `getChoice`, `getResolvedTheme`,
+`getScheme`, `reset` and `on`; old family/mode/modifier setters are removed.
+`okf-loom:themeChanged` stays on window and now represents palette changes,
+including dark-to-dark changes, with current/previous palette and scheme.
+README media refresh is a separate follow-up; no product version bump here.
 
 ## [2.0.0] - 2026-09-24
 

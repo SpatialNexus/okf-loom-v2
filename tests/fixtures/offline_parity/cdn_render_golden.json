@@ -1,8 +1,8 @@
 {
  "provenance": {
   "generator": "tests/regenerate_offline_cdn_golden.py",
-  "generated": "2026-09-22",
-  "source": "default CDN build (`build --target static --assets cdn`) of the write_offline_fixture bundle in tests/test_offline_assets.py; page rich.html, scope .okf-page__body, theme technical-light, viewport 1280x900",
+  "generated": "2026-10-13",
+  "source": "default CDN build (`build --target static --assets cdn`) of the write_offline_fixture bundle in tests/test_offline_assets.py; page rich.html, scope .okf-page__body, theme bone, viewport 1280x900",
   "browser": "Chromium 153.0.8010.36 (Playwright)",
   "versions": {
    "highlight.js": "11.12.0",
@@ -11,7 +11,6 @@
   },
   "cdn_requests": [
    "https://cdn.jsdelivr.net/npm/highlight.js@11.12.0/+esm",
-   "https://cdn.jsdelivr.net/npm/highlight.js@11.12.0/styles/github.min.css",
    "https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/fonts/KaTeX_AMS-Regular.woff2",
    "https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/fonts/KaTeX_Fraktur-Regular.woff2",
    "https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/fonts/KaTeX_Main-Regular.woff2",
@@ -130,7 +129,10 @@
    "fedropshadow||||",
    "defs||||",
    "filter|okf-mermaid-svg-N-drop-shadow-small|||",
-   "fedropshadow||||"
+   "fedropshadow||||",
+   "lineargradient|okf-mermaid-svg-N-gradient|||",
+   "stop||||",
+   "stop||||"
   ],
   [
    "svg|okf-mermaid-svg-N||graphics-document document|gantt",
@@ -188,9 +190,9 @@
    "g||||",
    "rect|okf-mermaid-svg-N-a1|task task0||",
    "rect|okf-mermaid-svg-N-task1|task task0||",
-   "text|okf-mermaid-svg-N-a1-text|taskText taskText0  width-35.20068359375||",
+   "text|okf-mermaid-svg-N-a1-text|taskText taskText0  width-36.5625||",
    "#Vendor",
-   "text|okf-mermaid-svg-N-task1-text|taskText taskText0  width-28.75||",
+   "text|okf-mermaid-svg-N-task1-text|taskText taskText0  width-29||",
    "#Prove",
    "g||||",
    "text||sectionTitle sectionTitle0||",

@@ -8,12 +8,18 @@ yuv420p, faststart) and a looping README GIF (960 px wide):
                       ``wait`` returns the comment, then it claims it, edits the
                       Markdown (the page patches live), and resolves the thread,
                       ending on the whole resolved card in the Comments rail
-* ``appearance``   -- the Appearance menu restyling a page live: colour mode,
-                      the four families, contrast, borders, then reset
-* ``graph``        -- the bundle graph: lenses, a hover preview, and opening a
-                      node's page
-* ``search``       -- live header search, a link's hover preview, then the
-                      Ctrl+K command palette
+* ``appearance``   -- the Appearance menu restyling the studio home's ruled
+                      inventory live through the Ledger palettes: Slate, Clay,
+                      Plum, System, back to Bone
+* ``graph``        -- the bundle graph: lenses, Find in graph, a hover
+                      preview, and opening a node's page
+* ``search``       -- live header search, the full results page with a
+                      result's cited evidence, then the Ctrl+K command palette
+* ``walkthrough``  -- a captioned tour of the whole studio (MP4 only, for the
+                      README's inline player): the home inventory, reading
+                      views, the comment loop, search, the palette, the graph
+                      and the palettes. Not part of the default run; ask for
+                      it with ``--only walkthrough``.
 
 Every clip runs against its own scratch copy of the docs bundle's git-tracked
 files, served by ``scripts/okf-loom serve`` on a free local port, so comment
@@ -35,6 +41,10 @@ libx264 and the GIF encoder on PATH::
 
     python scripts/record_showcase_media.py
     python scripts/record_showcase_media.py --only search --only graph
+    python scripts/record_showcase_media.py --only walkthrough
+
+A host that cannot reach the studio's pinned CDN libraries adds
+``--cdn-mirror vendor`` (see ``cdn_mirror.py``).
 
 Browser resolution follows ``capture_viewer_proof.launch_chromium``:
 ``--chrome PATH``, ``OKF_CHROME``, ``AIC_PLAYWRIGHT_CHROME_PATH``, system
@@ -57,6 +67,7 @@ import re
 import shlex
 import shutil
 import socket
+import string
 import subprocess
 import sys
 import tempfile
@@ -67,10 +78,13 @@ from pathlib import Path
 from typing import Callable
 
 from capture_readme_media import (
-    DEFAULT_BUNDLE, REPO_ROOT, _BrowserDiagnostics, _SCROLL_UNDER_CHROME_JS,
-    _STUDIO_SETTLED_JS, _free_port, _script_env, _tracked_bundle_snapshot,
-    _wait_for_http_ok,
+    DEFAULT_BUNDLE, LOOP_ACTOR, LOOP_BODY, LOOP_EDIT_NEW, LOOP_EDIT_OLD, LOOP_PAGE,
+    LOOP_REPLY, LOOP_SENTENCE, LOOP_SUMMARY, LOOP_TITLE, REPO_ROOT,
+    _BrowserDiagnostics, _SCROLL_UNDER_CHROME_JS, _STUDIO_SETTLED_JS, _free_port,
+    _script_env, _stylesheet_href, _tracked_bundle_snapshot, _wait_for_http_ok,
 )
+from okf_loom import LOOM_VERSION, SPEC_VERSION
+import cdn_mirror
 from capture_viewer_proof import _claim_destination, _publish_if_current, launch_chromium
 
 __all__ = ["main"]
@@ -97,36 +111,40 @@ GIF_LADDER = ((256, "bayer:bayer_scale=5"), (192, "bayer:bayer_scale=5"),
 _SERVER_STARTUP_TIMEOUT = 20.0
 _CLI_TIMEOUT = 30.0
 _WAIT_FOR_COMMENT_TIMEOUT = 20.0
-# Characters per displayed terminal line: the compact panel is 620 px wide
-# with 13 px monospace (about 7.8 px per character, 12 px padding a side).
+# Characters per displayed terminal line: the panel is 700 px wide with
+# 15 px monospace (about 9 px per character, 12 px padding a side), so its
+# text stays legible once GitHub scales the 960 px GIF to its README column.
 _TERMINAL_WIDTH = 74
 
 # The comment loop reads a plain-language tutorial opening: the body's own
 # first heading is scrolled up under the sticky chrome so the frame's top edge
 # is the title and first paragraphs, not the header band's ids, paths and
 # metadata.
-COMMENT_PAGE = "tutorials/live_studio_basics"
-COMMENT_TITLE = "Use the live studio"
-COMMENT_SENTENCE = "This tutorial assumes you have a small bundle to point at."
-COMMENT_BODY = "What is a bundle? Say it in plain words."
+# The same loop as the README hero (capture_readme_media.py owns the strings).
 # The edit adds the explanation right after the anchored sentence without
 # touching the sentence itself, so the annotation stays attached to it.
-EDIT_OLD = "If you do not, finish"
-EDIT_NEW = ("A bundle is just a folder of Markdown pages.\n"
-            "If you do not have one, finish")
-RESOLVE_SUMMARY = "Explained what a bundle is"
-RESOLVE_REPLY = "Added one plain sentence that says what a bundle is."
-ACTOR = "docs-agent"
-APPEARANCE_PAGE = "demo/showcase"
+COMMENT_PAGE = LOOP_PAGE
+COMMENT_TITLE = LOOP_TITLE
+COMMENT_SENTENCE = LOOP_SENTENCE
+COMMENT_BODY = LOOP_BODY
+EDIT_OLD = LOOP_EDIT_OLD
+EDIT_NEW = LOOP_EDIT_NEW
+RESOLVE_SUMMARY = LOOP_SUMMARY
+RESOLVE_REPLY = LOOP_REPLY
+ACTOR = LOOP_ACTOR
+# The studio home, framed on its ruled inventory: type chips, numbered rows,
+# mono ids and tabular link counts are the Ledger structure every palette keeps.
+APPEARANCE_PAGE = ""
+APPEARANCE_HEADING = "What do you want to explore?"
 SEARCH_QUERY = "live studio"
-# A link in the first search result's opening paragraph, hovered for its preview.
-SEARCH_PREVIEW_LINK = "Use the live studio"
 PALETTE_QUERY = "search"
 PALETTE_TARGET = "Search modes"
 GRAPH_NODE = "explanation/live_studio_design"
-# Flow is left out: at 1280x720 it draws this bundle as small unlabelled dots
-# joined by long crossing edges, which does not read as left-to-right layers.
-GRAPH_LENSES = ("Themes", "Bridges", "Map")
+# The graph opens on Map; two more lenses reframe it. Flow is left out: at
+# 1280x720 it draws this bundle as small unlabelled dots joined by long
+# crossing edges, which does not read as left-to-right layers.
+GRAPH_LENSES = ("Themes", "Bridges")
+GRAPH_FIND = "comment"
 
 
 def _log(msg: str) -> None:
@@ -139,10 +157,39 @@ def _log(msg: str) -> None:
 
 _OVERLAY_JS = r"""(() => {
   if (window.__okfRec) return;
+  // Paint gate: a new document closes it at once; it reopens when the page is
+  // ready to be seen (a Studio page once its live runtime has booted, which
+  // hides the pre-boot "Live Studio is unavailable" notice; any other page
+  // once it has parsed). The recorder keeps no frame while it is closed.
+  // Both edges carry wall-clock milliseconds, the clock the screencast stamps
+  // its frames with, so frames painted before the binding call lands are
+  // still sorted to the right side of the edge.
+  const gate = (open, at) => { try { window.__okfRecGate && window.__okfRecGate(open, at); } catch (e) { /* no binding */ } };
+  const now = () => performance.timeOrigin + performance.now();
+  if (window.top === window) {
+    gate(false, performance.timeOrigin);
+    // A still page paints no new frame once the gate is open, so force one
+    // just after the recorder's settle margin; otherwise the last frame kept
+    // would be the previous page.
+    const afterPaint = () => requestAnimationFrame(() => requestAnimationFrame(() => {
+      gate(true, now());
+      setTimeout(() => { if (window.__okfRec) window.__okfRec.nudge(); }, 200);
+    }));
+    const watchBoot = () => {
+      const root = document.documentElement;
+      const settled = () => root.classList.contains('okf-studio-booted')
+        || ['ready', 'failed'].includes(root.dataset.okfStudioStatus || '');
+      if (!document.querySelector('.okf-live-studio-fallback') || settled()) { afterPaint(); return; }
+      const watcher = new MutationObserver(() => { if (settled()) { watcher.disconnect(); afterPaint(); } });
+      watcher.observe(root, {attributes: true, attributeFilter: ['class', 'data-okf-studio-status']});
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watchBoot, {once: true});
+    else watchBoot();
+  }
   const KEY = '__okf_showcase_overlay__';
   let saved = {};
   try { saved = JSON.parse(sessionStorage.getItem(KEY) || '{}') || {}; } catch (e) { saved = {}; }
-  const st = Object.assign({x: null, y: null, cap: '', step: '', term: false, lines: []}, saved);
+  const st = Object.assign({x: null, y: null, cap: '', step: '', term: false, lines: [], hideCur: false}, saved);
   addEventListener('pagehide', () => {
     try { sessionStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* storage full */ }
   });
@@ -151,6 +198,9 @@ _OVERLAY_JS = r"""(() => {
 .cur { position: fixed; left: 0; top: 0; width: 22px; height: 26px;
   transform: translate(-60px, -60px); will-change: transform;
   filter: drop-shadow(0 1px 1.5px rgba(0,0,0,.5)); }
+.cur.hid { display: none; }
+.tick { position: fixed; right: 0; bottom: 0; width: 1px; height: 1px; background: #000;
+  opacity: .01; }
 .cur svg { display: block; transform-origin: 2px 2px; transition: transform 90ms ease-out; }
 .cur.down svg { transform: scale(.84); }
 .rip { position: fixed; left: 0; top: 0; width: 46px; height: 46px; margin: -23px 0 0 -23px;
@@ -160,37 +210,37 @@ _OVERLAY_JS = r"""(() => {
 .cap { position: fixed; left: 16px; bottom: 16px; display: flex; align-items: center; gap: 10px;
   max-width: calc(100vw - 32px); padding: 8px 16px 8px 8px; border-radius: 999px;
   background: rgba(15,23,42,.93); color: #f8fafc; box-shadow: 0 8px 24px rgba(0,0,0,.28);
-  font: 600 16px/1.3 system-ui, "DejaVu Sans", "Segoe UI", Arial, sans-serif;
+  font: 600 17px/1.3 system-ui, "DejaVu Sans", "Segoe UI", Arial, sans-serif;
   transition: opacity 220ms ease, transform 220ms ease; }
 .cap.off { opacity: 0; transform: translateY(8px); }
 .chip { flex: none; padding: 3px 10px; border-radius: 999px; background: #2dd4bf; color: #042f2e;
-  font: 700 13px/1.3 system-ui, "DejaVu Sans", "Segoe UI", Arial, sans-serif; }
+  font: 700 14px/1.3 system-ui, "DejaVu Sans", "Segoe UI", Arial, sans-serif; }
 .chip:empty { display: none; }
 .keys { display: flex; gap: 5px; margin-left: 4px; transition: opacity 200ms ease; }
 .keys.off { opacity: 0; }
 kbd { display: inline-block; min-width: 14px; padding: 2px 8px; border-radius: 6px;
   border: 1px solid #94a3b8; border-bottom-width: 3px; background: #1e293b; color: #f8fafc;
   text-align: center; font: 700 13px/1.3 "DejaVu Sans Mono", ui-monospace, Menlo, Consolas, monospace; }
-.term { position: fixed; left: 16px; bottom: 92px; width: 620px; border-radius: 10px;
+.term { position: fixed; left: 16px; bottom: 92px; width: 700px; border-radius: 10px;
   background: #0b1220; color: #cbd5e1; overflow: hidden;
   border: 1px solid rgba(148,163,184,.28); box-shadow: 0 14px 34px rgba(0,0,0,.34);
   transition: opacity 260ms ease, transform 260ms ease; }
 .term.off { opacity: 0; transform: translateY(14px); }
-.bar { display: flex; align-items: center; gap: 7px; height: 24px; padding: 0 11px;
+.bar { display: flex; align-items: center; gap: 7px; height: 26px; padding: 0 11px;
   background: #121b2f; border-bottom: 1px solid rgba(148,163,184,.18); color: #94a3b8;
-  font: 600 12px/1 system-ui, "DejaVu Sans", "Segoe UI", Arial, sans-serif; }
+  font: 600 13px/1 system-ui, "DejaVu Sans", "Segoe UI", Arial, sans-serif; }
 .bar i { width: 10px; height: 10px; border-radius: 50%; background: #334155; }
 .bar span { margin-left: 6px; }
 .pad { padding: 6px 12px; }
-.body { height: 102px; overflow: hidden; display: flex;
+.body { height: 114px; overflow: hidden; display: flex;
   flex-direction: column; justify-content: flex-end; white-space: pre;
-  font: 13px/17px "DejaVu Sans Mono", ui-monospace, Menlo, Consolas, monospace; }
-.ln { min-height: 17px; }
+  font: 15px/19px "DejaVu Sans Mono", ui-monospace, Menlo, Consolas, monospace; }
+.ln { min-height: 19px; }
 .ln.cmd { color: #e2e8f0; }
 .ln.out { color: #94a3b8; }
 .ln.ok { color: #6ee7b7; }
 .ps { color: #34d399; }
-.caret { display: inline-block; width: 7px; height: 13px; vertical-align: -2px; background: #e2e8f0;
+.caret { display: inline-block; width: 8px; height: 15px; vertical-align: -2px; background: #e2e8f0;
   animation: blink 1s steps(1) infinite; }
 @keyframes blink { 50% { opacity: 0; } }`;
   const CURSOR = '<svg width="22" height="26" viewBox="0 0 22 26" aria-hidden="true">'
@@ -198,7 +248,9 @@ kbd { display: inline-block; min-width: 14px; padding: 2px 8px; border-radius: 6
     + 'stroke="#0f172a" stroke-width="1.6" stroke-linejoin="round"/></svg>';
   let host = null, els = null;
   function place() {
-    if (!els || st.x === null) return;
+    if (!els) return;
+    els.cur.classList.toggle('hid', !!st.hideCur);
+    if (st.x === null) return;
     els.cur.style.transform = `translate(${st.x - 2}px, ${st.y - 2}px)`;
   }
   function renderLine(kind, text) {
@@ -238,12 +290,12 @@ kbd { display: inline-block; min-width: 14px; padding: 2px 8px; border-radius: 6
       <div class="term off"><div class="bar"><i></i><i></i><i></i><span>docs-agent \u2014 terminal</span></div>
       <div class="pad"><div class="body"></div></div></div>
       <div class="cap off"><span class="chip"></span><span class="txt"></span><span class="keys off"></span></div>
-      <div class="cur">${CURSOR}</div>`;
+      <div class="cur">${CURSOR}</div><i class="tick"></i>`;
     els = {
       root, term: root.querySelector('.term'), body: root.querySelector('.body'),
       cap: root.querySelector('.cap'), chip: root.querySelector('.chip'),
       txt: root.querySelector('.txt'), keys: root.querySelector('.keys'),
-      cur: root.querySelector('.cur'),
+      cur: root.querySelector('.cur'), tick: root.querySelector('.tick'),
     };
     document.documentElement.appendChild(host);
     place(); renderCap(); renderTerm();
@@ -276,6 +328,7 @@ kbd { display: inline-block; min-width: 14px; padding: 2px 8px; border-radius: 6
       keysTimer = setTimeout(() => els.keys.classList.add('off'), ms || 1400);
     },
     term(on) { st.term = !!on; renderTerm(); },
+    cursor(on) { st.hideCur = !on; place(); },
     termOut(lines) { st.lines.push(...lines); renderTerm(); },
     async termType(lines, cps) {
       // Types command lines at a steady rate; resolves when the last is shown.
@@ -305,10 +358,12 @@ kbd { display: inline-block; min-width: 14px; padding: 2px 8px; border-radius: 6
         last.remove();
       }
     },
-    // Screencast only emits a frame when something paints; this forces one.
+    // Screencast only emits a frame when something paints; this forces one
+    // by flipping one corner pixel between 1% and 2% black (which paints even
+    // when the overlay shows nothing else, as on a title card).
     nudge() {
-      if (!host) return;
-      host.style.opacity = host.style.opacity === '1' ? '0.999' : '1';
+      if (!els) return;
+      els.tick.style.opacity = els.tick.style.opacity === '0.02' ? '0.01' : '0.02';
     },
     text() { return els ? [st.cap, st.step, ...st.lines.map((l) => l[1])].join('\n') : ''; },
     // Layout boxes (ignoring the show/hide transform) of the caption and the
@@ -450,7 +505,8 @@ class _Scratch:
     def __enter__(self) -> "_Scratch":
         self._tmp = tempfile.TemporaryDirectory(prefix="okf-showcase-")
         self.root = Path(self._tmp.name)
-        snapshot = _tracked_bundle_snapshot(self.bundle, self.root)
+        # The scripts/ link below already makes links into scripts/ resolve.
+        snapshot = _tracked_bundle_snapshot(self.bundle, self.root, skip_context=("scripts",))
         if snapshot is None or snapshot.name != "docs-bundle":
             self.__exit__()
             raise RuntimeError("the showcase needs the git-tracked docs-bundle/ of this checkout")
@@ -509,12 +565,56 @@ class _Studio:
 # ---------------------------------------------------------------------------
 
 
+class _PaintGate:
+    """The spans of time a newly loaded document was not yet ready to be seen.
+
+    The overlay reports, in wall-clock milliseconds, when each new document
+    started and when it was ready (a Studio page once its live runtime has
+    booted and hidden the pre-boot notice; see ``_OVERLAY_JS``). Frames the
+    screencast stamped inside a span are dropped, so a navigation cuts
+    straight from the old page to the ready new one. A span that never
+    closes ends ``limit`` seconds after it opened.
+    """
+
+    # The page and the compositor stamp time separately; a span ends a few
+    # frames late so the frame that still showed the notice is never kept.
+    # (The overlay forces a fresh frame 0.2 s after a gate opens, past this.)
+    SETTLE = 0.12
+
+    def __init__(self, limit: float = 4.0) -> None:
+        self.limit = limit
+        self.spans: list[list[float]] = []  # [start, end], in seconds
+        self._open_span: list[float] | None = None
+
+    def set(self, _source, is_open, at_ms) -> None:
+        at = float(at_ms) / 1000.0
+        if not is_open:
+            # A document that starts while an earlier one never reported ready
+            # ends that earlier span: the earlier page is gone.
+            if self._open_span is not None and self._open_span[0] <= at:
+                self._open_span[1] = min(self._open_span[1], at)
+            self._open_span = [at, at + self.limit]
+            self.spans.append(self._open_span)
+        elif self._open_span is not None and self._open_span[0] <= at:
+            self._open_span[1] = at + self.SETTLE
+            self._open_span = None
+
+    def hides(self, stamp: float) -> bool:
+        return any(start <= stamp < end for start, end in self.spans)
+
+    def unready(self) -> list[list[float]]:
+        """Spans that ran to ``limit`` without the page reporting ready."""
+        return [span for span in self.spans
+                if span is self._open_span or span[1] - span[0] >= self.limit]
+
+
 class _Screencast:
     """Chromium ``Page.startScreencast`` frames, written to disk with timestamps."""
 
-    def __init__(self, page, frames_dir: Path) -> None:
+    def __init__(self, page, frames_dir: Path, gate: _PaintGate | None = None) -> None:
         self.page = page
         self.dir = frames_dir
+        self.gate = gate or _PaintGate()
         self.frames: list[tuple[float, str]] = []
         self._recording = False
         self._cdp = page.context.new_cdp_session(page)
@@ -526,9 +626,14 @@ class _Screencast:
             name = f"{len(self.frames):06d}.jpg"
             (self.dir / name).write_bytes(base64.b64decode(params["data"]))
             self.frames.append((stamp, name))
-            self._cdp.send("Page.screencastFrameAck", {"sessionId": params["sessionId"]})
+        # Every frame is acknowledged, or the screencast stalls.
+        self._cdp.send("Page.screencastFrameAck", {"sessionId": params["sessionId"]})
 
     def start(self) -> None:
+        # Begin past any page-load span, so the first frame is one that is kept.
+        deadline = time.time() + self.gate.limit + 1
+        while time.time() < deadline and any(end > time.time() for _, end in self.gate.spans):
+            self.page.wait_for_timeout(30)
         self._recording = True
         self._cdp.send("Page.startScreencast", {
             "format": "jpeg", "quality": 92, "everyNthFrame": 1,
@@ -536,7 +641,7 @@ class _Screencast:
         })
         self.page.evaluate("() => window.__okfRec.nudge()")
         self.page.wait_for_timeout(120)
-        if not self.frames:
+        if not [frame for frame in self.frames if not self.gate.hides(frame[0])]:
             raise RuntimeError("the screencast produced no first frame")
 
     def stop(self) -> list[tuple[float, str]]:
@@ -545,7 +650,13 @@ class _Screencast:
         self._recording = False
         self._cdp.send("Page.stopScreencast")
         self._cdp.detach()
-        return list(self.frames)
+        kept = [frame for frame in self.frames if not self.gate.hides(frame[0])]
+        if not kept:
+            raise RuntimeError("every screencast frame fell inside a page load")
+        if self.gate.unready():
+            raise RuntimeError(f"a page never reported ready within {self.gate.limit:g}s "
+                               "of loading, so its frames were all dropped")
+        return kept
 
 
 # ---------------------------------------------------------------------------
@@ -591,6 +702,9 @@ class _Take:
 
     def keys(self, *names: str) -> None:
         self.page.evaluate("(k) => window.__okfRec.keys(k, 1500)", list(names))
+
+    def cursor(self, visible: bool) -> None:
+        self.page.evaluate("(v) => window.__okfRec.cursor(v)", visible)
 
     # -- pointer --------------------------------------------------------------
     def park(self, x: float, y: float) -> None:
@@ -725,14 +839,20 @@ _COMMENT_CARD_JS = """(id) => {
           state: state ? state.textContent.trim() : ''};
 }"""
 
-# The empty strip between the reading column's text and the Comments rail:
-# the pointer rests there between steps, clear of the text and every control.
+# The empty strip right of the reading column, before the page's Related
+# sidebar (or, without one, the Comments rail): the pointer rests there
+# between steps, clear of the text, its links and every control.
 _READING_MARGIN_JS = """() => {
   const body = document.querySelector('.okf-page__body');
   const rail = document.querySelector('#okf-panel');
   if (!body || !rail) return null;
-  const b = body.getBoundingClientRect(), r = rail.getBoundingClientRect();
-  return {x: (b.right + r.left) / 2, gap: r.left - b.right};
+  const b = body.getBoundingClientRect();
+  const edges = [rail.getBoundingClientRect().left];
+  const side = document.querySelector('.okf-page__sidebar');
+  const s = side && side.getBoundingClientRect();
+  if (s && s.width > 0 && s.left > b.right) edges.push(s.left);
+  const right = Math.min(...edges);
+  return {x: (b.right + right) / 2, gap: right - b.right};
 }"""
 
 _TOASTS_JS = """() => [...document.querySelectorAll('.okf-toast')]
@@ -788,7 +908,7 @@ def _scroll_rail_to_end(take: _Take, comment_id: str, rest: tuple[float, float])
     take.glide(*rest, 500)
 
 
-def direct_comment_loop(take: _Take, rec: _Screencast) -> None:
+def _setup_comment_loop(take: _Take) -> tuple[float, float]:
     page = take.page
     take.goto(COMMENT_PAGE)
     # Open the Comments drawer first: at 1280 px it becomes a rail that
@@ -819,8 +939,11 @@ def direct_comment_loop(take: _Take, rec: _Screencast) -> None:
     take.park(*rest)
     take.hold(400)
     take.check_public("comment-loop start")
+    return rest
 
-    rec.start()
+
+def _act_comment_loop(take: _Take, rest: tuple[float, float]) -> None:
+    page = take.page
     take.caption("Comment on any sentence", "1/4")
     page.evaluate("() => window.__okfRec.term(true)")
     take.hold(700)
@@ -897,67 +1020,58 @@ def direct_comment_loop(take: _Take, rec: _Screencast) -> None:
     take.check_public("comment-loop end")
 
 
+def direct_comment_loop(take: _Take, rec: _Screencast) -> None:
+    rest = _setup_comment_loop(take)
+    rec.start()
+    _act_comment_loop(take, rest)
+
+
 def _appearance_option(page, group: str, value: str):
     return page.locator(f"label[for='okf-appearance-{group}-{value}']")
 
 
-def direct_appearance(take: _Take, rec: _Screencast) -> None:
+def _frame_home_inventory(take: _Take) -> None:
+    """Scroll the studio home so its inventory heading sits under the top bar."""
+    if not take.page.evaluate(_SCROLL_UNDER_CHROME_JS,
+                              ["h2", rf"^\s*{re.escape(APPEARANCE_HEADING)}", 18]):
+        raise RuntimeError(f"the studio home has no {APPEARANCE_HEADING!r} heading")
+
+
+def _setup_appearance(take: _Take) -> None:
     page = take.page
     take.goto(APPEARANCE_PAGE)
-    if not page.evaluate(_SCROLL_UNDER_CHROME_JS, ["h2, h3", r"^\s*Diagrams", 16]):
-        raise RuntimeError(f"/{APPEARANCE_PAGE} has no Diagrams heading")
-    page.wait_for_function("() => document.querySelectorAll('.okf-page__body svg').length >= 2",
-                           timeout=15_000)
+    _frame_home_inventory(take)
     take.hold(600)
-    take.park(640, 420)
+    take.park(330, 300)  # the gutter beside the inventory heading, over no control
     take.check_public("appearance start")
 
-    rec.start()
+
+def _act_appearance(take: _Take) -> None:
+    page = take.page
     take.caption("Appearance: one menu, applied live")
     take.hold(900)
     take.click(page.locator(".okf-appearance-trigger"), ms=700)
     page.locator("#okf-appearance-menu").wait_for(state="visible", timeout=5_000)
     take.hold(700)
 
-    take.caption("Colour mode", "Dark")
-    take.click(_appearance_option(page, "mode", "dark"))
-    take.hold(1300)
+    for palette in ("slate", "clay", "plum", "system", "bone"):
+        take.caption("Palette", palette.title())
+        take.click(_appearance_option(page, "theme", palette), ms=450)
+        take.hold(1500)
 
-    take.click(page.locator("details.okf-appearance__advanced summary"), ms=500)
-    take.hold(600)
-    for family in ("swiss", "purple", "coffee"):
-        take.caption("Family", family.title())
-        take.click(_appearance_option(page, "family", family), ms=450)
-        take.hold(1150)
-
-    take.caption("Colour mode", "Light")
-    take.click(_appearance_option(page, "mode", "light"), ms=650)
-    take.hold(1200)
-    take.caption("Contrast", "Soft")
-    take.click(_appearance_option(page, "contrast", "soft"), ms=650)
-    take.hold(1000)
-    take.caption("Borders", "On")
-    take.click(_appearance_option(page, "border", "on"), ms=500)
-    take.hold(1100)
-
-    take.caption("Back to the defaults", "Reset")
-    reset = page.locator("#okf-appearance-menu .okf-appearance__reset")
-    take.glide(*take.center(page.locator("#okf-appearance-menu"), 0.5, 0.8), 450)
-    for _ in range(6):
-        box = reset.bounding_box()
-        if box and box["y"] + box["height"] <= VIEWPORT["height"] - 12:
-            break
-        take.wheel(120, steps=4, pause=35)
-    take.hold(250)
-    take.click(reset, ms=450)
-    take.hold(900)
     take.keys("Esc")
     page.keyboard.press("Escape")
     take.hold(1600)
     theme = page.evaluate("() => document.documentElement.dataset.theme")
-    if theme != "technical-light":
-        raise RuntimeError(f"reset did not return to technical-light (got {theme!r})")
+    if theme != "bone":
+        raise RuntimeError(f"palette selection did not return to bone (got {theme!r})")
     take.check_public("appearance end")
+
+
+def direct_appearance(take: _Take, rec: _Screencast) -> None:
+    _setup_appearance(take)
+    rec.start()
+    _act_appearance(take)
 
 
 _GRAPH_NODE_JS = """(id) => {
@@ -1007,22 +1121,50 @@ def _reveal_in_detail_panel(take: _Take, locator) -> None:
     raise RuntimeError(f"could not scroll {locator} into view in #okf-detail")
 
 
-def direct_graph(take: _Take, rec: _Screencast) -> None:
+def _setup_graph(take: _Take) -> object:
     page = take.page
     take.goto("__graph")
     page.wait_for_function("() => window.__okfLoomGraph && window.__okfLoomGraph.cy"
                            " && window.__okfLoomGraph.cy.nodes().length > 5", timeout=15_000)
     page.wait_for_function(_GRAPH_SETTLED_JS, timeout=15_000)
     take.hold(900)
+    # At 1280x720 the lens disclosure sits below the detail panel's fold.
+    summary = page.locator("details.okf-signal__lenses summary")
+    # The detail panel opens at its top, so its overview note is whole; the
+    # pointer scrolls it to the lenses on camera, as a reader would.
+    page.evaluate("() => { const d = document.getElementById('okf-detail'); if (d) d.scrollTop = 0; }")
     take.park(650, 330)  # empty canvas, clear of nodes and the detail panel
     take.check_public("graph start")
+    return summary
 
-    rec.start()
+
+def _act_graph(take: _Take, summary) -> None:
+    page = take.page
     take.caption("The graph: every concept and how it links")
-    take.hold(1800)
+    take.hold(950)
+    # Find in graph narrows the canvas to the concepts that match a word. It
+    # runs on the Map layout, where the matches read as labelled nodes.
+    take.caption("Find in graph by title, id or tag")
+    find = page.locator("#okf-search")
+    take.click(find, ms=650, dx=0.25)
+    take.hold(200)
+    page.keyboard.type(GRAPH_FIND, delay=85)
+    page.wait_for_function(
+        "() => /\\d+ of \\d+ concepts? match/.test(document.querySelector('.okf-graph-tools').innerText)",
+        timeout=5_000)
+    take.hold(1300)
+    clear = page.locator(".okf-graph-tools button", has_text=re.compile(r"^\s*Clear\s*$")).first
+    take.click(clear, ms=450)
+    page.wait_for_function("() => !document.querySelector('#okf-search').value", timeout=5_000)
+    take.hold(300)
+    page.wait_for_function(_GRAPH_SETTLED_JS, timeout=10_000)
+
     take.caption("Lenses reframe the same bundle")
-    take.click(page.locator("details.okf-signal__lenses summary"), ms=700)
-    take.hold(450)
+    _reveal_in_detail_panel(take, summary)
+    take.click(summary, ms=700)
+    if not page.locator("details.okf-signal__lenses").evaluate("d => d.open"):
+        raise RuntimeError("the Explore with lenses disclosure did not open")
+    take.hold(350)
     for lens in GRAPH_LENSES:
         radio = page.get_by_role("radio", name=re.compile(rf"^{re.escape(lens)}:"))
         label = page.locator("label.okf-signal__seg-item", has=radio)
@@ -1035,7 +1177,7 @@ def direct_graph(take: _Take, rec: _Screencast) -> None:
         # from the click, so every lens is seen at rest for the same time.
         take.hold(150)
         page.wait_for_function(_GRAPH_SETTLED_JS, timeout=10_000)
-        take.hold(1500 if lens != "Map" else 1100)
+        take.hold(1100)
 
     # Hover previews a concept; a double-click opens its page (the graph's
     # own hint). A wheel zoom repaints the whole canvas every frame, which
@@ -1044,92 +1186,283 @@ def direct_graph(take: _Take, rec: _Screencast) -> None:
     node = page.evaluate(_GRAPH_NODE_JS, GRAPH_NODE)
     if not node:
         raise RuntimeError(f"graph node {GRAPH_NODE!r} not found")
-    take.glide(node["x"], node["y"], 800)
-    take.hold(1600)
+    take.glide(node["x"], node["y"], 700)
+    take.hold(1400)
     page.mouse.dblclick(node["x"], node["y"])
     page.wait_for_url(lambda url: url.split("?")[0].rstrip("/").endswith("/" + GRAPH_NODE),
                       timeout=10_000)
     page.wait_for_load_state("load")
     page.wait_for_function(_STUDIO_SETTLED_JS, timeout=15_000)
     take.glide(318, 596, 500)  # the gutter between the link list and the body, above the caption
-    take.hold(1800)
+    take.hold(1200)
     take.check_public("graph end")
 
 
-def direct_search(take: _Take, rec: _Screencast) -> None:
+def direct_graph(take: _Take, rec: _Screencast) -> None:
+    summary = _setup_graph(take)
+    rec.start()
+    _act_graph(take, summary)
+
+
+_FIRST_RESULT_EVIDENCE_JS = r"""() => {
+  const first = document.querySelector('.okf-search-results-list > li');
+  const details = first && [...first.querySelectorAll('details')]
+    .find((d) => /Evidence and context/.test((d.querySelector('summary') || {}).textContent || ''));
+  if (!details || !details.open) return null;
+  const cite = [...details.querySelectorAll('*')]
+    .find((e) => e.children.length === 0 && /^\[[^\]\s]+\.md#L\d+(?:-L\d+)?\]$/.test(e.textContent.trim()));
+  if (!cite) return null;
+  const r = cite.getBoundingClientRect();
+  return {text: cite.textContent.trim(), top: r.top, bottom: r.bottom};
+}"""
+
+
+def _setup_search(take: _Take) -> None:
     page = take.page
     take.goto("")
     take.hold(500)
     take.park(640, 470)  # empty space between the intro and the "New" card
     take.check_public("search start")
 
-    rec.start()
+
+def _act_search(take: _Take) -> None:
+    page = take.page
     take.caption("Search as you type")
-    take.hold(450)
+    take.hold(300)
     field = page.locator(".okf-shell input[type=search]").first
     take.click(field, ms=650, dx=0.3)
-    take.hold(250)
-    page.keyboard.type(SEARCH_QUERY, delay=75)
+    # Off the field, so the pointer never covers the words being typed: the
+    # empty stretch of the top bar left of the search box.
+    box = field.bounding_box()
+    take.glide(box["x"] - 90, box["y"] + box["height"] / 2, 300)
+    page.keyboard.type(SEARCH_QUERY, delay=60)
     results = page.locator(".okf-shell [role=listbox] [role=option], .okf-shell [role=option]")
     results.first.wait_for(state="visible", timeout=5_000)
-    take.hold(1100)
-    take.click(results.first, ms=600, dx=0.3)
+    take.hold(650)
+
+    # Enter opens every result, each with the exact passage it matched.
+    take.keys("Enter")
+    page.keyboard.press("Enter")
+    page.wait_for_url(re.compile(r"/__search\?"), timeout=10_000)
     page.wait_for_load_state("load")
     page.wait_for_function(_STUDIO_SETTLED_JS, timeout=15_000)
-    take.hold(350)
+    first = page.locator(".okf-search-results-list > li").first
+    first.wait_for(state="visible", timeout=10_000)
+    take.caption("Every result cites its source")
+    take.hold(250)
+    summary = first.locator("summary", has_text="Evidence and context").first
+    take.wheel(page.evaluate("() => document.querySelector('.okf-search-results-list').getBoundingClientRect().top") - 80,
+               steps=8, pause=35)
+    take.hold(200)
+    take.click(summary, ms=550, dx=0.3)
+    page.wait_for_function(f"() => !!({_FIRST_RESULT_EVIDENCE_JS})()", timeout=5_000)
+    take.hold(250)
+    cite = page.evaluate(_FIRST_RESULT_EVIDENCE_JS)
+    rects = page.evaluate("() => window.__okfRec.rects()") or {}
+    limit = (rects.get("cap") or {}).get("top", VIEWPORT["height"]) - 30
+    if cite["bottom"] > limit:
+        take.wheel(cite["bottom"] - limit + 40, steps=6, pause=35)
+        take.hold(150)
+        cite = page.evaluate(_FIRST_RESULT_EVIDENCE_JS)
+    if cite["top"] < 60 or cite["bottom"] > limit:
+        raise RuntimeError(f"the citation {cite} is not clear of the chrome and caption")
+    take.glide(1180, cite["top"] - 40, 500)  # rest in the empty right margin
+    take.hold(1600)
 
-    # A link in the page's opening paragraph previews its target (title,
-    # type, description and link counts) on hover.
-    take.caption("Hover a link to preview it")
-    link = page.locator(".okf-page__body a", has_text=re.compile(
-        rf"^\s*{re.escape(SEARCH_PREVIEW_LINK)}\s*$")).first
-    take.glide(*take.center(link, 0.45, 0.6), 650)
-    page.wait_for_function(
-        """(title) => {
-          const p = document.getElementById('okf-popover');
-          const h = p && p.querySelector('h4');
-          return !!h && p.style.display !== 'none' && p.getBoundingClientRect().height > 0
-            && h.textContent.trim() === title;
-        }""", arg=SEARCH_PREVIEW_LINK, timeout=5_000)
-    take.hold(1250)
-
-    # Leave the link and let its preview close before the next caption, so
-    # the caption never names a step the frame is not showing yet.
-    take.glide(1000, 500, 450)  # off the link: the blank line beside the selection hint
-    page.wait_for_function(
-        "() => { const p = document.getElementById('okf-popover');"
-        " return !p || p.style.display === 'none' || p.getBoundingClientRect().height === 0; }",
-        timeout=3_000)
     take.caption("Or jump anywhere with the command palette")
     take.hold(250)
     take.keys("Ctrl", "K")
     page.keyboard.press("Control+K")
     palette = page.get_by_role("dialog", name=re.compile("command", re.I))
     palette.wait_for(state="visible", timeout=5_000)
-    take.hold(350)
-    page.keyboard.type(PALETTE_QUERY, delay=90)
+    take.hold(300)
+    page.keyboard.type(PALETTE_QUERY, delay=85)
     # The active row's accessible name gains a "Selected ·" prefix, so match
     # the row by its title text instead of by name.
     target = palette.locator("[role=option]", has=page.locator(
         ".okf-palette__item-title", has_text=re.compile(rf"^{re.escape(PALETTE_TARGET)}$")))
     target.wait_for(state="visible", timeout=5_000)
-    take.hold(650)
+    take.hold(350)
     for _ in range(10):
         if target.get_attribute("aria-selected") == "true":
             break
         take.keys("\u2193")
         page.keyboard.press("ArrowDown")
-        take.hold(320)
+        take.hold(300)
     else:
         raise RuntimeError(f"the palette never selected {PALETTE_TARGET!r}")
-    take.hold(250)
+    take.hold(200)
     take.keys("Enter")
     page.keyboard.press("Enter")
     page.wait_for_url(re.compile(r"search_modes"), timeout=10_000)
     page.wait_for_load_state("load")
     page.wait_for_function(_STUDIO_SETTLED_JS, timeout=15_000)
-    take.hold(1100)
+    take.hold(700)
     take.check_public("search end")
+
+
+def direct_search(take: _Take, rec: _Screencast) -> None:
+    _setup_search(take)
+    rec.start()
+    _act_search(take)
+
+
+# ---------------------------------------------------------------------------
+# Walkthrough: the whole studio in one captioned take
+# ---------------------------------------------------------------------------
+
+WALKTHROUGH_REPO = "github.com/SpatialNexus/okf-loom-v2"
+# The home's jump chip for the tutorials group, and the row the tour opens.
+WALKTHROUGH_TYPE_CHIP = "Tutorial"
+WALKTHROUGH_PAGE_TITLE = COMMENT_TITLE
+
+# Title and end cards: plain HTML over the studio's own Ledger stylesheets,
+# served on the studio's origin, so they match the product they frame.
+_CARD_HTML = string.Template("""<!doctype html>
+<html lang="en" data-theme="slate">
+<head>
+<meta charset="utf-8">
+<title>okf-loom</title>
+<link rel="stylesheet" href="$fonts">
+<link rel="stylesheet" href="$stylesheet">
+<style>
+  html, body { margin: 0; height: 100%; background: var(--okf-bg); color: var(--okf-fg);
+    font-family: var(--okf-font-body); }
+  main { box-sizing: border-box; height: 100%; display: flex; flex-direction: column;
+    justify-content: center; padding: 0 120px; }
+  .eyebrow { margin: 0 0 20px; color: var(--okf-fg-muted); font: 600 18px/1.2 var(--font-mono);
+    letter-spacing: 0.04em; }
+  h1 { margin: 0; font-family: var(--okf-font-display); font-size: 104px; line-height: 1;
+    font-weight: 700; letter-spacing: -0.02em; }
+  .rule { width: 140px; height: 6px; margin: 30px 0 32px; background: var(--okf-accent); }
+  .lede { margin: 0; max-width: 900px; font-size: 32px; line-height: 1.35; font-weight: 700; }
+  .sub { margin: 18px 0 0; max-width: 900px; font-size: 24px; line-height: 1.45;
+    color: var(--okf-fg-muted); }
+  .cmd { margin: 40px 0 0; color: var(--okf-accent); font: 500 24px/1 var(--font-mono); }
+</style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">$eyebrow</p>
+  <h1>okf-loom</h1>
+  <div class="rule"></div>
+  <p class="lede">$lede</p>
+  <p class="sub">$sub</p>
+  <p class="cmd">$cmd</p>
+</main>
+</body>
+</html>
+""")
+
+
+def _show_card(take: _Take, name: str, *, lede: str, sub: str, cmd: str) -> None:
+    """Navigate to a title card served on the studio's origin."""
+    page = take.page
+    url = f"{take.base}/__showcase-card/{name}"
+    body = _CARD_HTML.substitute(
+        fonts=_stylesheet_href(take.base, "ledger-fonts.css"),
+        stylesheet=_stylesheet_href(take.base),
+        eyebrow=f"v{LOOM_VERSION} &middot; implements OKF {SPEC_VERSION}",
+        lede=lede, sub=sub, cmd=cmd)
+    page.route(url, lambda route: route.fulfill(
+        status=200, content_type="text/html; charset=utf-8", body=body))
+    page.goto(url, wait_until="load", timeout=15_000)
+    page.wait_for_function("() => window.__okfRec && window.__okfRec.ready()", timeout=5_000)
+    page.evaluate("() => document.fonts.ready.then(() => true)")
+    if not page.evaluate("""() => ['Public Sans', 'Azeret Mono'].every(family =>
+      [...document.fonts].some(face => face.family.replace(/["']/g, '') === family
+        && face.status === 'loaded'))"""):
+        raise RuntimeError(f"the {name} card did not load the Ledger faces")
+    take.caption("")
+
+
+def _walk_home_and_reading(take: _Take) -> None:
+    """The home inventory, a jump to the tutorials, and the reading views."""
+    page = take.page
+    take.goto("")
+    take.cursor(True)
+    take.park(640, 470)
+    take.caption("Your docs as one browsable inventory", "Home")
+    take.hold(1800)
+    take.glide(250, 280, 700)  # over the concept, type and link counts
+    take.hold(1200)
+    chip = page.locator(f'.okf-type-nav__link[data-index-type="{WALKTHROUGH_TYPE_CHIP}"]')
+    take.click(chip.first, ms=700)
+    take.hold(1300)
+    row = page.locator("main.okf-index a.okf-card__link",
+                       has_text=re.compile(rf"^\s*{re.escape(WALKTHROUGH_PAGE_TITLE)}")).first
+    take.caption("Open any page to read it", "Read")
+    take.click(row, ms=650, dx=0.2)
+    page.wait_for_url(lambda url: url.rstrip("/").endswith("/" + COMMENT_PAGE), timeout=10_000)
+    page.wait_for_load_state("load")
+    page.wait_for_function(_STUDIO_SETTLED_JS, timeout=15_000)
+    take.hold(1500)
+    # Scroll the page header away, as a reader does, so the views below have
+    # the frame to themselves.
+    heading = page.evaluate("""(title) => {
+      const h = [...document.querySelectorAll('.okf-page__body :is(h1, h2)')]
+        .find((e) => e.textContent.trim().startsWith(title));
+      return h ? h.getBoundingClientRect().top : null;
+    }""", COMMENT_TITLE)
+    if heading is None:
+        raise RuntimeError(f"/{COMMENT_PAGE} has no {COMMENT_TITLE!r} heading")
+    take.glide(1000, 420, 400)  # over the page, clear of the Related rail
+    take.wheel(heading - 150, steps=12, pause=40)
+    take.hold(900)
+    view_bar = page.locator(".okf-concept-viewbar")
+    for label, caption in (("Source", "The Markdown source, as it is on disk"),
+                           ("Split", "Rendered and source side by side"),
+                           ("Rendered", "Back to reading")):
+        take.caption(caption, "Read")
+        take.click(view_bar.get_by_role("tab", name=re.compile(rf"^\s*{label}\s*$")).first
+                   if view_bar.get_by_role("tab").count()
+                   else view_bar.get_by_text(label, exact=True).first, ms=550)
+        take.hold(1700)
+    take.check_public("walkthrough reading")
+
+
+def direct_walkthrough(take: _Take, rec: _Screencast) -> None:
+    page = take.page
+    _show_card(take, "title", lede="Read and comment on your Markdown docs in a live studio.",
+               sub="Your coding agent picks up each comment, edits the files and replies. "
+                   "The files stay plain Markdown.",
+               cmd="A two-minute tour")
+    take.cursor(False)
+    rec.start()
+    take.hold(3200)
+
+    _walk_home_and_reading(take)
+
+    # The comment chapter opens the Comments rail on camera, so it is named
+    # before the page reloads into it.
+    take.caption("Comments go to your agent", "Comment")
+    rest = _setup_comment_loop(take)
+    _act_comment_loop(take, rest)
+    take.hold(600)
+    # Put the agent's terminal away and close the Comments rail, so the next
+    # chapters show the studio at its usual width.
+    page.evaluate("() => window.__okfRec.term(false)")
+    take.click(page.locator("#okf-panel button", has_text=re.compile(r"^\s*Close\s*$")).first,
+               ms=600)
+    page.wait_for_function("() => !document.body.classList.contains('okf-panel-rail')",
+                           timeout=5_000)
+    take.hold(500)
+
+    _setup_search(take)
+    _act_search(take)
+
+    summary = _setup_graph(take)
+    _act_graph(take, summary)
+
+    _setup_appearance(take)
+    _act_appearance(take)
+
+    _show_card(take, "end", lede="You comment. Your agent edits. Files stay yours.",
+               sub=f"Clone {WALKTHROUGH_REPO} and try it on its own docs:",
+               cmd="$ scripts/okf-loom serve docs-bundle")
+    take.cursor(False)
+    take.hold(4000)
+    take.check_public("walkthrough end")
 
 
 @dataclass(frozen=True)
@@ -1140,13 +1473,23 @@ class ClipSpec:
     max_seconds: float
     gif_budget: int
     gif_stats: str = "diff"
+    mp4_budget: int = MP4_BUDGET
+    gif: bool = True       # README clips ship a looping GIF beside the MP4
+    default: bool = True   # recorded when no --only is given
+    poster_at: float | None = None  # also write <name>-poster.png from this second
 
 
 CLIPS: dict[str, ClipSpec] = {spec.name: spec for spec in (
     ClipSpec("comment-loop", direct_comment_loop, 25, 35, 3 * MB),
     ClipSpec("appearance", direct_appearance, 15, 25, 2 * MB, gif_stats="full"),
     ClipSpec("graph", direct_graph, 15, 25, 2 * MB),
-    ClipSpec("search", direct_search, 10, 15, 2 * MB),
+    # The search clip shows three surfaces (suggestions, cited results, the
+    # palette), so it runs a second longer than the original 15 s cap.
+    ClipSpec("search", direct_search, 10, 16, 2 * MB),
+    # MP4 only, kept under GitHub's 10 MB limit for a video uploaded into a
+    # README through the web editor (the way an inline player is embedded).
+    ClipSpec("walkthrough", direct_walkthrough, 90, 180, 0,
+             mp4_budget=int(9.5 * MB), gif=False, default=False, poster_at=2.0),
 )}
 
 
@@ -1217,8 +1560,8 @@ def validate(path: Path, spec: ClipSpec) -> dict:
             problems.append(f"codec {stream.get('codec_name')}/{stream.get('pix_fmt')}")
         if (stream.get("width"), stream.get("height")) != MP4_SIZE:
             problems.append(f"size {stream.get('width')}x{stream.get('height')}")
-        if size > MP4_BUDGET:
-            problems.append(f"{size} bytes > {MP4_BUDGET}")
+        if size > spec.mp4_budget:
+            problems.append(f"{size} bytes > {spec.mp4_budget}")
         if not _faststart(path):
             problems.append("moov atom is not at the front (+faststart)")
     else:
@@ -1238,7 +1581,8 @@ def validate(path: Path, spec: ClipSpec) -> dict:
 
 
 def record_clip(browser, spec: ClipSpec, stage: Path, work: Path,
-                diagnostics: _BrowserDiagnostics) -> list[dict]:
+                diagnostics: _BrowserDiagnostics,
+                mirror: cdn_mirror.CdnMirror | None = None) -> list[dict]:
     frames_dir = work / spec.name
     frames_dir.mkdir(parents=True)
     with _Scratch(DEFAULT_BUNDLE) as scratch, _Studio(scratch) as base:
@@ -1248,11 +1592,15 @@ def record_clip(browser, spec: ClipSpec, stage: Path, work: Path,
                                       timezone_id="UTC")
         take = None
         try:
+            if mirror is not None:
+                mirror.attach(context)
+            gate = _PaintGate()
+            context.expose_binding("__okfRecGate", gate.set)
             context.add_init_script(_OVERLAY_JS)
             page = context.new_page()
             diagnostics.watch(page, spec.name)
             take = _Take(page, base, scratch, patterns)
-            rec = _Screencast(page, frames_dir)
+            rec = _Screencast(page, frames_dir, gate)
             _log(f"{spec.name}: recording")
             spec.director(take, rec)
             frames = rec.stop()
@@ -1270,11 +1618,21 @@ def record_clip(browser, spec: ClipSpec, stage: Path, work: Path,
         raise RuntimeError(f"{spec.name}: screencast frames are "
                            f"{first.get('width')}x{first.get('height')}, expected {FRAME_SIZE}")
     mp4, gif = stage / f"{spec.name}.mp4", stage / f"{spec.name}.gif"
-    crf = encode_mp4(concat, mp4, MP4_BUDGET)
-    gif_setting = encode_gif(concat, gif, spec.gif_budget, spec.gif_stats)
-    report = [validate(mp4, spec), validate(gif, spec)]
+    crf = encode_mp4(concat, mp4, spec.mp4_budget)
+    report = [validate(mp4, spec)]
     report[0]["encoding"] = f"CRF {crf}"
-    report[1]["encoding"] = gif_setting
+    if spec.gif:
+        gif_setting = encode_gif(concat, gif, spec.gif_budget, spec.gif_stats)
+        report.append(validate(gif, spec))
+        report[1]["encoding"] = gif_setting
+    if spec.poster_at is not None:
+        # The README links this still to the MP4 until an inline player is
+        # embedded; it is the tour's own title card, not a mock-up.
+        poster = stage / f"{spec.name}-poster.png"
+        _ffmpeg("-ss", f"{spec.poster_at:.2f}", "-i", str(mp4), "-frames:v", "1", str(poster))
+        width, height = MP4_SIZE
+        report.append({"file": poster.name, "seconds": 0.0, "bytes": poster.stat().st_size,
+                       "width": width, "height": height, "encoding": f"frame at {spec.poster_at:g}s"})
     return report
 
 
@@ -1284,7 +1642,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         description="Record the showcase clips (MP4 + GIF) under docs/media/ from a live "
                     "studio serving a scratch copy of docs-bundle/.")
     p.add_argument("--only", action="append", choices=sorted(CLIPS), metavar="NAME",
-                   help="record only this clip (repeatable): " + ", ".join(CLIPS))
+                   help="record only this clip (repeatable): " + ", ".join(CLIPS)
+                        + " (walkthrough is recorded only when named)")
     p.add_argument("--out", type=Path, default=DEFAULT_OUT_DIR,
                    help=f"output directory (default: {DEFAULT_OUT_DIR.relative_to(REPO_ROOT)})")
     p.add_argument("--chrome", default=None,
@@ -1292,6 +1651,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                         "system Chrome, managed Chromium)")
     p.add_argument("--keep-frames", type=Path, default=None, metavar="DIR",
                    help="also keep the raw screencast frames and ffconcat lists in DIR")
+    cdn_mirror.add_argument(p)
     return p
 
 
@@ -1309,7 +1669,7 @@ def main(argv: list[str] | None = None) -> int:
               "  playwright install chromium", file=sys.stderr)
         return 1
 
-    names = list(dict.fromkeys(args.only or CLIPS))
+    names = list(dict.fromkeys(args.only or [n for n, spec in CLIPS.items() if spec.default]))
     out_dir = args.out.resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
     reports: list[dict] = []
@@ -1318,11 +1678,16 @@ def main(argv: list[str] | None = None) -> int:
         with tempfile.TemporaryDirectory(prefix=".okf-showcase-", dir=out_dir) as staging, \
                 tempfile.TemporaryDirectory(prefix="okf-showcase-frames-") as frames_root:
             stage, work = Path(staging), Path(frames_root)
+            mirror = cdn_mirror.from_mode(args.cdn_mirror)
             with sync_playwright() as p:
                 browser = launch_chromium(p, args.chrome)
                 try:
                     for name in names:
-                        reports.extend(record_clip(browser, CLIPS[name], stage, work, diagnostics))
+                        # Only pass the mirror when one is in use, so the call
+                        # keeps record_clip's original shape otherwise.
+                        extra = {"mirror": mirror} if mirror is not None else {}
+                        reports.extend(record_clip(browser, CLIPS[name], stage, work,
+                                                   diagnostics, **extra))
                 finally:
                     browser.close()
                     if args.keep_frames:

@@ -9,6 +9,7 @@ import socket
 import subprocess
 import time
 import json
+import tempfile
 import re
 import urllib.error
 import urllib.parse
@@ -268,7 +269,7 @@ def test_delayed_initial_graph_fetch_is_fenced_by_pagehide_and_bfcache_restarts(
       window.fetch=(input,init) => {
         const url=typeof input==='string'?input:(input&&input.url)||'';
         const stack=new Error('graph request probe').stack||'';
-        if (!new URL(url,location.href).pathname.endsWith('/__data/graph.json') || !stack.includes('/graph.js:')) return real(input,init);
+        if (!new URL(url,location.href).pathname.endsWith('/__data/graph.json') || (!stack.includes('/graph.js:') && !stack.includes('/studio.js:'))) return real(input,init);
         const requestId=++window.__initialGraphGate.requestCount;
         window.__initialGraphGate.stacks.push(stack);
         return real(input,init).then(response => response.json()).then(payload => {
@@ -1320,6 +1321,64 @@ def test_phase2_desktop_infobox_stays_collapsed_when_studio_boots_after_wiki(
     )
 
 
+@pytest.mark.parametrize("surface", ["static_url", "spa_url"])
+@pytest.mark.parametrize("coarse", [False, True])
+def test_portable_context_disclosure_matches_its_adjacent_control(
+    request, page, surface: str, coarse: bool,
+) -> None:
+    base = request.getfixturevalue(surface)
+    with page.context.browser.new_context(has_touch=coarse) as context:
+        portable = context.new_page()
+        portable.goto(base + "/tables/orders.html", wait_until="load")
+        summary = portable.locator(".okf-context-manual-options > summary")
+        button = portable.locator(".okf-page-utilities .okf-context-copy")
+        expect(summary).to_be_visible()
+        scale = portable.evaluate("""() => {
+          const summary=document.querySelector('.okf-context-manual-options > summary');
+          const button=document.querySelector('.okf-page-utilities .okf-context-copy');
+          const measure=el => {const css=getComputedStyle(el),box=el.getBoundingClientRect();
+            return {font:css.fontSize,weight:css.fontWeight,top:box.top,height:box.height};};
+          return {summary:measure(summary),button:measure(button)};
+        }""")
+        assert scale["summary"] == scale["button"], scale
+        assert scale["summary"]["height"] >= (44 if coarse else 32), scale
+        summary.focus()
+        summary.press("Enter")
+        expect(portable.locator(".okf-context-manual-options a")).to_be_visible()
+        expect(button).to_be_visible()
+
+
+@pytest.mark.parametrize("target", ["static", "single-file"])
+def test_portable_graph_view_only_note_uses_secondary_type(
+    tmp_path: Path, page, target: str,
+) -> None:
+    from okf_loom import Bundle
+    from okf_loom.render import build_site
+
+    out = tmp_path / "output"
+    build_site(Bundle.load(DEMO_BUNDLE), out, target=target, assets="offline")
+    port = _free_port()
+    base = f"http://127.0.0.1:{port}"
+    with managed_server(
+        [sys.executable, "-m", "http.server", str(port), "--bind", "127.0.0.1",
+         "--directory", str(out)], base, tmp_path / "view-only-http.log",
+    ):
+        page.goto(base + ("/index.html" if target == "single-file" else "/__graph.html"), wait_until="load")
+        page.wait_for_function("() => !!window.__okfLoomGraph?.cy")
+        if target == "single-file":
+            page.locator('[data-okf-shell-item="graph"] a').click()
+        note = page.locator(".okf-detail-view-only")
+        expect(note).to_be_visible()
+        role = note.evaluate("""el => {
+          const css=getComputedStyle(el),probe=document.createElement('span');
+          probe.style.color='var(--text-2)';el.appendChild(probe);
+          const secondary=getComputedStyle(probe).color;probe.remove();
+          return {size:parseFloat(css.fontSize),color:css.color,secondary};
+        }""")
+        assert role["size"] == 12, role
+        assert role["color"] == role["secondary"], role
+
+
 def test_phase2_static_desktop_infobox_collapsed_without_studio(static_url: str, page) -> None:
     """Static output, which does not load studio.js, matches the live page:
     at 1440px Document details is collapsed once wiki.js (the shared loader
@@ -1797,8 +1856,8 @@ def test_phase2_search_live_grouping_and_recent(server_url: str, page) -> None:
         )
         assert grouping["optionCount"] > 6, "precondition: >6 gamma suggestions expected"
         assert grouping["groupCount"] >= 2, f"type grouping missing (>6 results): {grouping}"
-        # Recent pages on empty focus: clear the query and focus — a Recent
-        # pages group appears (or the empty state, but never nothing/stale).
+        # Without a prior concept visit, clearing the query closes the panel
+        # instead of presenting an empty Recent pages menu.
         search.fill("")
         page.wait_for_timeout(150)
         recent = page.evaluate(
@@ -1812,14 +1871,42 @@ def test_phase2_search_live_grouping_and_recent(server_url: str, page) -> None:
                 };
             }"""
         )
-        assert recent["open"], "empty query should surface the live panel (recent pages)"
-        assert recent["recentGroup"], f"Recent pages group missing on empty query: {recent}"
+        assert not recent["open"] and not recent["recentGroup"] and not recent["empty"], recent
     finally:
         proc.terminate()
         try:
             proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
             proc.kill(); proc.wait(timeout=5)
+
+
+@pytest.mark.parametrize("target", ["static", "spa", "single-file"])
+def test_portable_graph_keeps_the_rendered_brand(tmp_path: Path, page, target: str) -> None:
+    """Even a slug-shaped configured title is never renamed by graph boot."""
+    from okf_loom import Bundle
+    from okf_loom.render import build_site
+
+    bundle = copy_bundle(DEMO_BUNDLE, tmp_path / "bundle")
+    (bundle / "okf-loom.config.yaml").write_text(
+        "viewer:\n  title: configured-site\n", encoding="utf-8")
+    out = tmp_path / "output"
+    build_site(Bundle.load(bundle), out, target=target, assets="offline")
+    if target == "single-file":
+        page.goto((out / "index.html").as_uri(), wait_until="load")
+        page.wait_for_function("() => !!window.__okfLoomGraph?.cy")
+        expect(page.locator('.okf-topbar__brand strong')).to_have_text("configured-site")
+        assert page.title() == "configured-site"
+    else:
+        port = _free_port()
+        base = f"http://127.0.0.1:{port}"
+        with managed_server(
+            [sys.executable, "-m", "http.server", str(port), "--bind", "127.0.0.1",
+             "--directory", str(out)], base, tmp_path / "title-http.log",
+        ):
+            page.goto(base + "/__graph.html", wait_until="load")
+            page.wait_for_function("() => !!window.__okfLoomGraph?.cy")
+            expect(page.locator('.okf-topbar__brand strong')).to_have_text("configured-site")
+            assert page.title() == "Graph — configured-site"
 
 
 def test_static_recent_pages_navigate_to_html_concept(static_url: str, page) -> None:
@@ -2285,7 +2372,7 @@ def test_graph_comment_badges_appear_only_for_positive_counts(server_url: str, p
         route.fulfill(response=response, body=_json.dumps(body),
                       content_type="application/json")
 
-    page.route("**/graph.json", handle)
+    page.route(lambda url: urllib.parse.urlsplit(url).path == "/__data/graph.json", handle)
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto(server_url + "/__graph", wait_until="domcontentloaded")
     page.wait_for_function(
@@ -2525,6 +2612,50 @@ def test_link_preview_shows_the_target_concepts_title_type_and_counts(server_url
     page.locator('.okf-page__body a[href="/tables/orders"]').first.focus()
     expect(page.locator("#okf-popover h4")).to_have_text("Orders")
     expect(page.locator("#okf-popover .okf-popover__counts")).to_have_text("Links 4Relations 3")
+
+
+def test_mono_text_reads_letter_for_letter_while_prose_keeps_ligatures(server_url: str, page) -> None:
+    """T1-003: Azeret Mono's fi ligature read "config" as "conf1g". Every
+    mono run (code, code wells, the mono breadcrumb and ids) turns standard
+    and contextual ligatures off; prose Public Sans keeps them, and every
+    run keeps tabular figures."""
+    page.goto(f"{server_url}/tables/orders", wait_until="domcontentloaded")
+    page.locator("h1.okf-page__title").wait_for(state="visible")
+    features = page.evaluate("""() => {
+      const fs = (sel) => { const n = document.querySelector(sel); return n ? getComputedStyle(n).fontFeatureSettings : null; };
+      return {code: fs('.okf-page__body p code'), pre: fs('.okf-page__body pre'),
+              crumb: fs('.okf-breadcrumb'), cell: fs('.okf-page__body td code'), prose: fs('.okf-page__body p')};
+    }""")
+    for key in ("code", "pre", "crumb", "cell"):
+        assert '"liga" 0' in features[key] and '"calt" 0' in features[key] and '"tnum"' in features[key], features
+    assert '"liga" 0' not in features["prose"] and '"tnum"' in features["prose"], features
+
+
+def test_focus_opened_link_preview_never_covers_the_focused_link(server_url: str, page) -> None:
+    """D1-007 (WCAG 2.4.11): a preview opened by keyboard focus sits beside
+    its link: below it when the card fits, above it near the viewport
+    bottom. It never covers the focused link or its focus ring."""
+    page.set_viewport_size({"width": 1280, "height": 420})
+    page.goto(f"{server_url}/tables/customers", wait_until="domcontentloaded")
+    page.locator("h1.okf-page__title").wait_for(state="visible")
+    link = page.locator('.okf-page__body a[href="/tables/orders"]').first
+    popover = page.locator("#okf-popover")
+    page.mouse.move(1270, 410)
+    for place, link_top in (("below", 140), ("above", 380)):
+        page.evaluate("() => document.activeElement && document.activeElement.blur()")
+        expect(popover).to_be_hidden()
+        link.evaluate("(a, top) => window.scrollBy(0, a.getBoundingClientRect().top - top)", link_top)
+        link.evaluate("a => a.focus({preventScroll: true})")
+        expect(popover.locator("h4")).to_have_text("Orders")
+        geometry = link.evaluate("""a => {
+          const cs = getComputedStyle(a), ring = parseFloat(cs.outlineWidth) + Math.max(0, parseFloat(cs.outlineOffset));
+          const r = a.getBoundingClientRect(), c = document.getElementById('okf-popover').getBoundingClientRect();
+          return {focused: document.activeElement === a,
+                  below: c.top >= r.bottom + ring, above: c.bottom <= r.top - ring,
+                  inViewport: c.top >= 0 && c.bottom <= innerHeight && c.left >= 0 && c.right <= innerWidth};
+        }""")
+        assert geometry["focused"] and geometry["inViewport"], (place, geometry)
+        assert geometry[place], (place, geometry)
 
 
 def _popover_title(page) -> str:
@@ -3070,6 +3201,43 @@ def test_static_portable_modes_context_and_fail_closed_url(static_url: str, page
     expect(page.locator("#okf-search-query")).to_be_focused()
 
 
+@pytest.mark.parametrize("assets", ["cdn", "offline"])
+@pytest.mark.parametrize("route", ["__graph.html", "__search.html?q=theme"])
+def test_static_file_pages_explain_the_web_server_requirement(
+    tmp_path: Path, page, assets: str, route: str,
+) -> None:
+    """Disk pages have one actionable state, no doomed data fetch, and honest nav."""
+    from okf_loom import Bundle
+    from okf_loom.render import build_site
+
+    out = tmp_path / "static"
+    build_site(Bundle.load(DEMO_BUNDLE), out, target="static", assets=assets)
+    requests, errors = [], []
+    page.on("request", lambda request: requests.append(request.url))
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    filename, _, query = route.partition("?")
+    page.goto((out / filename).as_uri() + ("?" + query if query else ""), wait_until="load")
+    note = page.locator(".okf-portable-server-note")
+    expect(note).to_have_count(1)
+    expect(note).to_be_visible()
+    assert "without JavaScript" not in page.locator("#okf-main").inner_text()
+    expect(note).to_contain_text("Graph and Search cannot load their data")
+    expect(note).to_contain_text("python -m http.server")
+    expect(note).to_contain_text("Index and documents also work directly from disk")
+    expect(page.locator(".okf-graph-loading--error, .okf-search-error")).to_have_count(0)
+    expect(page.get_by_role("button", name="Retry", exact=True)).to_have_count(0)
+    expect(page.locator(".okf-static-viewer-note")).to_have_count(0)
+    assert page.locator("body").get_attribute("data-okf-capture-ready") == "unavailable"
+    assert not any("/__data/" in url for url in requests), requests
+    assert not errors, errors
+    if assets == "offline":
+        assert not any(url.startswith(("http:", "https:")) for url in requests), requests
+    note.get_by_role("link", name="Browse the concept index").click()
+    expect(page.locator(".okf-card").first).to_be_visible()
+    page.locator(".okf-card a.okf-card__link").first.click()
+    expect(page.locator(".okf-page__body")).to_be_visible()
+
+
 def test_static_provider_setup_failure_publishes_explicit_error(static_url: str, page) -> None:
     page.route(
         "**/passages-manifest.json",
@@ -3244,7 +3412,7 @@ def test_cytoscape_unavailable_exposes_only_working_fallback_actions(static_url:
 def test_empty_graph_is_semantically_settled_without_layout_generation(static_url: str, page) -> None:
     """An authoritative empty graph is ready; zero layout generation is not a timeout."""
     page.route(
-        "**/__data/graph.json",
+        "**/__data/graph.json*",
         lambda route: route.fulfill(
             status=200,
             content_type="application/json",
@@ -3473,7 +3641,9 @@ def test_static_malformed_percent_or_utf8_is_field_error(static_url: str, page, 
     expect(page.locator(".okf-page-context")).to_have_count(0)
     assert page.evaluate("""() => document.querySelector('#okf-results-heading').getBoundingClientRect().top < document.querySelector('.okf-search-input-error').getBoundingClientRect().top""")
     expect(page.get_by_role("button", name="Retry")).to_have_count(0)
-    assert page.evaluate("() => !!window.okfPortableProvider")
+    # URL hydration now rejects malformed fields before loading evidence.
+    # Input correction is not a provider failure or a claimed ready corpus.
+    assert page.evaluate("() => !window.okfPortableProvider && !document.body.dataset.okfCaptureRevision")
     # Layout sanity at 320px: the document must not overflow horizontally
     # (no sideways page scroll), AND every topbar control must remain
     # keyboard-reachable (Tab reaches it). The Phase 1 single-row sticky
@@ -3508,6 +3678,9 @@ def test_static_malformed_percent_or_utf8_is_field_error(static_url: str, page, 
     assert reflow["scrollerOverflowX"] in ("auto", "scroll", "hidden", "visible"), (
         f"unexpected controls overflow-x: {reflow['scrollerOverflowX']!r}"
     )
+    page.get_by_role("link", name="Start clean", exact=True).click()
+    page.wait_for_function("() => window.okfPortableProvider && document.body.dataset.okfCaptureReady === 'ready'")
+    expect(page.locator("#okf-search-query")).not_to_have_attribute("aria-invalid", "true")
 
 
 def test_suggestions_timeout_and_superseded_response_are_deterministic(server_url: str, page) -> None:
@@ -3788,7 +3961,7 @@ def test_graph_refresh_empty_transition_capture_truth(server_url: str, page) -> 
     result = page.evaluate("""async () => {
       const graph=document.getElementById('okf-graph'),url=graph.dataset.graphUrl,native=window.fetch.bind(window),base=await native(url).then(r=>r.json());
       let current={...base,bundle_revision:'empty-refresh',nodes:[],edges:[],outgoing:{},backlinks:{},bodies:{}};
-      window.fetch=(request,options)=>String(request)===url?Promise.resolve(new Response(JSON.stringify(current),{status:200,headers:{'Content-Type':'application/json'}})):native(request,options);
+      window.fetch=(request,options)=>String(request).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(current),{status:200,headers:{'Content-Type':'application/json'}})):native(request,options);
       await window.__okfLoomGraph.refreshGraph();
       const empty=window.okfGraphCaptureState();
       const emptyReady=await window.okfCaptureReadiness.start({target:'graph',expectedRevision:'empty-refresh'}).promise;
@@ -3825,7 +3998,7 @@ def test_graph_live_delta_preserves_camera_and_animates_owned_add_remove(server_
       const G=window.__okfLoomGraph,cy=G.cy,graph=document.getElementById('okf-graph'),url=graph.dataset.graphUrl,native=window.fetch.bind(window),base=await native(url).then(r=>r.json());
       cy.pan({x:37,y:-19});cy.zoom(.73);const before={pan:cy.pan(),zoom:cy.zoom(),layouts:G.layoutStats.starts};
       const anchor=base.nodes[0].data.id,id='live-delta-owned',baseOutgoing=base.outgoing||{},baseBacklinks=base.backlinks||{};let current={...base,bundle_revision:'live-add',nodes:[...base.nodes,{data:{id,label:'Live delta',type:'concept'}}],edges:[...base.edges,{data:{source:anchor,target:id,label:'links'}}],outgoing:{...baseOutgoing,[anchor]:[...(baseOutgoing[anchor]||[]),id]},backlinks:{...baseBacklinks,[id]:[anchor]}};
-      window.fetch=(request,options)=>String(request)===url?Promise.resolve(new Response(JSON.stringify(current),{status:200,headers:{'Content-Type':'application/json'}})):native(request,options);
+      window.fetch=(request,options)=>String(request).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(current),{status:200,headers:{'Content-Type':'application/json'}})):native(request,options);
       await G.refreshGraph();const added=cy.getElementById(id),duringAdd={opacity:Number(added.style('opacity')),width:Number(added.style('width')),pending:window.okfGraphCaptureState().transitionPending};
       await new Promise(resolve=>{const check=()=>!window.okfGraphCaptureState().transitionPending?resolve():requestAnimationFrame(check);check();});
       current={...base,bundle_revision:'live-remove'};await G.refreshGraph();const existsDuringExit=cy.getElementById(id).length===1;
@@ -3851,7 +4024,7 @@ def test_graph_explicit_layout_motion_and_refresh_deadline(server_url: str, page
     assert options["animate"] == "end" and options["animationDuration"] == 400
     deadline = page.evaluate("""async () => {
       const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,before=G.refreshStats.applied,native=window.fetch.bind(window);
-      window.fetch=(request,options)=>String(request)===url?new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(new DOMException('Aborted','AbortError')),{once:true})):native(request,options);
+      window.fetch=(request,options)=>String(request).split('?')[0]===url?new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(new DOMException('Aborted','AbortError')),{once:true})):native(request,options);
       await G.refreshGraph();return {before,after:G.refreshStats.applied,timedOut:G.refreshStats.timedOut,error:document.body.dataset.okfGraphRefreshError};
     }""")
     assert deadline == {"before": deadline["before"], "after": deadline["before"], "timedOut": 1, "error": "graph-refresh-timeout"}
@@ -3864,7 +4037,7 @@ def test_graph_reduced_motion_makes_explicit_layout_and_delta_instant(server_url
     result = page.evaluate("""async () => {
       const G=window.__okfLoomGraph,cy=G.cy,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),base=await native(url).then(r=>r.json());let opts;
       cy.layout=o=>{opts=o;const hs=[];return {on(n,f){if(n==='layoutstop')hs.push(f);return this;},run(){hs.forEach(f=>f());},stop(){}}};document.querySelector('.okf-graph-layout-settings button[aria-label="Re-run layout"]').click();
-      const id='reduced-delta',fresh={...base,bundle_revision:'reduced',nodes:[...base.nodes,{data:{id,label:'Reduced',type:'concept'}}]};window.fetch=(r,o)=>String(r)===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(r,o);await G.refreshGraph();
+      const id='reduced-delta',fresh={...base,bundle_revision:'reduced',nodes:[...base.nodes,{data:{id,label:'Reduced',type:'concept'}}]};window.fetch=(r,o)=>String(r).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(r,o);await G.refreshGraph();
       return {animate:opts.animate,opacity:Number(cy.getElementById(id).style('opacity')),settled:window.okfGraphCaptureState().layoutSettled};
     }""")
     assert result["animate"] is False and result["settled"] is True
@@ -3876,7 +4049,7 @@ def test_graph_transition_then_failed_refresh_settles_current_readiness(server_u
     _open_graph(page, server_url)
     result = page.evaluate("""async () => {
       const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),base=await native(url).then(r=>r.json()),id='readiness-race';
-      let mode='add',rejectB;window.fetch=(r,o)=>String(r)!==url?native(r,o):mode==='add'?Promise.resolve(new Response(JSON.stringify({...base,bundle_revision:'race-a',nodes:[...base.nodes,{data:{id,label:'Race',type:'concept'}}]}),{status:200,headers:{'Content-Type':'application/json'}})):new Promise((resolve,reject)=>rejectB=reject);
+      let mode='add',rejectB;window.fetch=(r,o)=>String(r).split('?')[0]!==url?native(r,o):mode==='add'?Promise.resolve(new Response(JSON.stringify({...base,bundle_revision:'race-a',nodes:[...base.nodes,{data:{id,label:'Race',type:'concept'}}]}),{status:200,headers:{'Content-Type':'application/json'}})):new Promise((resolve,reject)=>rejectB=reject);
       await G.refreshGraph();mode='fail';const failed=G.refreshGraph();
       await new Promise(resolve=>{const check=()=>!window.okfGraphCaptureState().transitionPending?resolve():requestAnimationFrame(check);check();});
       const whileFailed=document.body.dataset.okfGraphCaptureReady;rejectB(new TypeError('network failed'));await failed;
@@ -3890,7 +4063,7 @@ def test_graph_deadline_classifies_ignored_abort_and_fences_late_completion(serv
     _open_graph(page, server_url)
     result = page.evaluate("""async () => {
       const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),base=await native(url).then(r=>r.json());let release;
-      window.fetch=(r,o)=>String(r)===url?new Promise(resolve=>release=()=>resolve(new Response(JSON.stringify({...base,bundle_revision:'must-not-land',nodes:[...base.nodes,{data:{id:'late-ignored-abort',label:'Late',type:'concept'}}]}),{status:200,headers:{'Content-Type':'application/json'}}))):native(r,o);
+      window.fetch=(r,o)=>String(r).split('?')[0]===url?new Promise(resolve=>release=()=>resolve(new Response(JSON.stringify({...base,bundle_revision:'must-not-land',nodes:[...base.nodes,{data:{id:'late-ignored-abort',label:'Late',type:'concept'}}]}),{status:200,headers:{'Content-Type':'application/json'}}))):native(r,o);
       const pending=G.refreshGraph();await new Promise(resolve=>{const check=()=>G.refreshStats.timedOut?resolve():requestAnimationFrame(check);check();});const atDeadline={error:document.body.dataset.okfGraphRefreshError,timedOut:G.refreshStats.timedOut};release();await pending;
       return {atDeadline,late:G.cy.getElementById('late-ignored-abort').length,revision:document.body.dataset.okfRevision};
     }""")
@@ -3902,7 +4075,7 @@ def test_graph_same_id_transition_supersession_and_pagehide_cleanup(server_url: 
     _open_graph(page, server_url)
     result = page.evaluate("""async () => {
       const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),base=await native(url).then(r=>r.json()),id='same-id';let current;
-      window.fetch=(r,o)=>String(r)===url?Promise.resolve(new Response(JSON.stringify(current),{status:200,headers:{'Content-Type':'application/json'}})):native(r,o);
+      window.fetch=(r,o)=>String(r).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(current),{status:200,headers:{'Content-Type':'application/json'}})):native(r,o);
       current={...base,bundle_revision:'same-add',nodes:[...base.nodes,{data:{id,label:'First',type:'concept'}}]};await G.refreshGraph();
       current={...base,bundle_revision:'same-remove'};await G.refreshGraph();
       current={...base,bundle_revision:'same-readd',nodes:[...base.nodes,{data:{id,label:'Final',type:'concept'}}]};await G.refreshGraph();
@@ -3921,7 +4094,7 @@ def test_presence_hidden_lod_focus_never_moves_or_lays_out(server_url: str, page
     result = page.evaluate("""async () => {
       const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),base=await native(url).then(r=>r.json());
       const nodes=Array.from({length:105},(_,i)=>({data:{id:'presence-'+i,label:'Presence '+i,type:'concept'}})),fresh={...base,bundle_revision:'presence-lod',nodes,edges:[],outgoing:{},backlinks:{}};
-      window.fetch=(r,o)=>String(r)===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(r,o);await G.refreshGraph();await new Promise(resolve=>{const check=()=>!window.okfGraphCaptureState().transitionPending?resolve():requestAnimationFrame(check);check();});
+      window.fetch=(r,o)=>String(r).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(r,o);await G.refreshGraph();await new Promise(resolve=>{const check=()=>!window.okfGraphCaptureState().transitionPending?resolve():requestAnimationFrame(check);check();});
       const hidden=nodes.map(n=>n.data.id).find(id=>G.cy.getElementById(id).length===0);G.cy.pan({x:43,y:-23});G.cy.zoom(.69);const before={pan:G.cy.pan(),zoom:G.cy.zoom(),starts:G.layoutStats.starts};window.okfLoomLive.emit('presence',{focus:hidden});await new Promise(requestAnimationFrame);
       return {hidden,absent:G.cy.getElementById(hidden).length===0,before,after:{pan:G.cy.pan(),zoom:G.cy.zoom(),starts:G.layoutStats.starts},halos:G.cy.nodes('.okf-presence-halo').length};
     }""")
@@ -4099,6 +4272,51 @@ def test_graph_detail_accessible_order_controls_and_focus_provenance(server_url:
     assert page.evaluate("() => document.activeElement.className") == focused_before
 
 
+@pytest.mark.parametrize("width,height", [(1440, 900), (1280, 800)])
+@pytest.mark.parametrize("theme", ["bone", "plum"])
+def test_single_file_index_navigation_scrolls_only_the_detail_pane(
+    tmp_path: Path, page, width: int, height: int, theme: str,
+) -> None:
+    """Pointer and keyboard Index opens keep chrome/canvas inside the viewport."""
+    from okf_loom import Bundle
+    from okf_loom.render import build_site
+
+    out = tmp_path / "single"
+    build_site(Bundle.load(DOCS_BUNDLE), out, target="single-file", assets="offline")
+    page.set_viewport_size({"width": width, "height": height})
+    page.add_init_script(f"localStorage.setItem('okf-loom.appearance', '{theme}')")
+    page.goto((out / "index.html").as_uri(), wait_until="load")
+    page.wait_for_function("() => !!window.__okfLoomGraph?.cy")
+    entry = page.locator('[data-okf-single-concept="how-to/archive_threads"]')
+    for activation in ("pointer", "keyboard"):
+        entry.scroll_into_view_if_needed()
+        assert page.evaluate("() => scrollY") > 0, "exercise the document-scrolled Index"
+        if activation == "keyboard":
+            entry.focus()
+            entry.press("Enter")
+        else:
+            entry.click()
+        expect(page.locator("#detail-content")).to_be_focused()
+        expect(page.locator("#detail-title")).to_have_text("Archive and resolve comment threads")
+        geometry = page.evaluate("""() => {
+          const pane=document.getElementById('okf-detail');
+          return {scrollY, top:document.querySelector('.okf-topbar').getBoundingClientRect().top,
+            graphBottom:document.getElementById('okf-graph').getBoundingClientRect().bottom,
+            paneBottom:pane.getBoundingClientRect().bottom, paneScroll:pane.scrollTop,
+            paneHeight:pane.clientHeight, contentHeight:pane.scrollHeight};
+        }""")
+        assert geometry["scrollY"] == geometry["top"] == geometry["paneScroll"] == 0, geometry
+        assert geometry["graphBottom"] <= height + 1, geometry
+        assert geometry["paneBottom"] <= height + 1, geometry
+        assert geometry["contentHeight"] > geometry["paneHeight"], geometry
+        page.locator("#okf-detail").evaluate("el => el.scrollTop = 400")
+        assert page.locator("#okf-detail").evaluate("el => el.scrollTop") > 0
+        assert page.evaluate("() => scrollY") == 0
+        page.go_back()
+        expect(page.locator("#okf-single-index")).to_be_visible()
+        expect(page.locator("#okf-main")).to_be_hidden()
+
+
 def test_single_file_graph_detail_hierarchy_and_keyboard_focus(tmp_path: Path, page) -> None:
     """The portable viewer uses the same detail order, naming, and focus contract."""
     from okf_loom import Bundle
@@ -4139,7 +4357,7 @@ def test_group_d_graph_refresh_deletion_rebuilds_authoritative_state(server_url:
     page.evaluate("id=>{const G=window.__okfLoomGraph,n=G.cy.getElementById(id),other=n.neighborhood('node').first();G.interaction.dispatch({type:'PATH',from:id,id:other.id()})}",selected)
     page.get_by_role("toolbar",name="Selected concept actions").get_by_role("button",name="Explore neighborhood").click();page.wait_for_function("()=>window.__okfLoomGraph.getState().lens==='focus'&&window.okfGraphCaptureState().layoutSettled")
     before_motion=page.evaluate("""id=>{const G=window.__okfLoomGraph,positions={};G.cy.nodes().filter(n=>n.id()!==id).forEach(n=>positions[n.id()]=n.position());return {pan:G.cy.pan(),zoom:G.cy.zoom(),starts:G.layoutStats.starts,positions};}""",selected)
-    page.evaluate("""async selected => { const graph=document.getElementById('okf-graph'),url=graph.dataset.graphUrl,native=window.fetch.bind(window),fresh=await native(url).then(r=>r.json());fresh.nodes=fresh.nodes.filter(n=>n.data.id!==selected);fresh.edges=fresh.edges.filter(e=>e.data.source!==selected&&e.data.target!==selected);fresh.outgoing=fresh.outgoing||{};fresh.backlinks=fresh.backlinks||{};delete fresh.outgoing[selected];delete fresh.backlinks[selected];Object.keys(fresh.outgoing).forEach(id=>fresh.outgoing[id]=fresh.outgoing[id].filter(other=>other!==selected));Object.keys(fresh.backlinks).forEach(id=>fresh.backlinks[id]=fresh.backlinks[id].filter(other=>other!==selected));fresh.bundle_revision='replacement-revision';window.okfPortableProvider={manifest:{bundle_revision:'stale-revision'}};window.fetch=(request,options)=>String(request)===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(request,options);window.__okfLoomGraph.refreshGraph(); }""", selected)
+    page.evaluate("""async selected => { const graph=document.getElementById('okf-graph'),url=graph.dataset.graphUrl,native=window.fetch.bind(window),fresh=await native(url).then(r=>r.json());fresh.nodes=fresh.nodes.filter(n=>n.data.id!==selected);fresh.edges=fresh.edges.filter(e=>e.data.source!==selected&&e.data.target!==selected);fresh.outgoing=fresh.outgoing||{};fresh.backlinks=fresh.backlinks||{};delete fresh.outgoing[selected];delete fresh.backlinks[selected];Object.keys(fresh.outgoing).forEach(id=>fresh.outgoing[id]=fresh.outgoing[id].filter(other=>other!==selected));Object.keys(fresh.backlinks).forEach(id=>fresh.backlinks[id]=fresh.backlinks[id].filter(other=>other!==selected));fresh.bundle_revision='replacement-revision';window.okfPortableProvider={manifest:{bundle_revision:'stale-revision'}};window.fetch=(request,options)=>String(request).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(request,options);window.__okfLoomGraph.refreshGraph(); }""", selected)
     page.wait_for_function("() => window.okfGraphSelection.conceptId === null")
     expect(page.locator(f'.okf-node-index__item[data-target="{selected}"]')).to_have_count(0)
     assert page.evaluate("() => window.okfPortableProvider === null")
@@ -4163,7 +4381,7 @@ def test_group_d_large_graph_refresh_show_all_never_resurrects_deleted_hidden_no
         return {...base,bundle_revision:'large-'+count+'-'+(drop||'all'),nodes,edges,outgoing,backlinks,bodies:{},types:['concept']};
       };
       let current=make(105,null);
-      window.fetch=(request,options)=>String(request)===url?Promise.resolve(new Response(JSON.stringify(current),{status:200,headers:{'Content-Type':'application/json'}})):native(request,options);
+      window.fetch=(request,options)=>String(request).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(current),{status:200,headers:{'Content-Type':'application/json'}})):native(request,options);
       await window.__okfLoomGraph.refreshGraph();
       const hidden=current.nodes.map(n=>n.data.id).find(id=>window.__okfLoomGraph.cy.getElementById(id).length===0);
       current=make(104,hidden);
@@ -4188,7 +4406,7 @@ def test_group_d_malformed_refresh_is_atomic(server_url: str, page, mutation: st
       fresh.bundle_revision='must-not-commit';
       if(mutation==='missing-nodes') delete fresh.nodes;
       else fresh.edges=[{data:{source:fresh.nodes[0].data.id,target:'missing-endpoint'}}];
-      window.fetch=(request,options)=>String(request)===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(request,options);
+      window.fetch=(request,options)=>String(request).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(request,options);
       await window.__okfLoomGraph.refreshGraph();
     }""", mutation)
     after = page.evaluate("() => {const state=window.okfGraphCaptureState();return {revision:document.body.dataset.okfRevision,captureRevision:document.body.dataset.okfCaptureRevision,nodeCount:state.nodeCount,payloadNodeCount:state.payloadNodeCount,ids:window.__okfLoomGraph.cy.nodes().map(n=>n.id()).sort()};}")
@@ -4200,7 +4418,7 @@ def test_group_d_malformed_refresh_is_atomic(server_url: str, page, mutation: st
     ('{"bundle_revision":"x","edges":[]}', "unavailable", "graph-schema"),
 ])
 def test_group_d_current_initial_failure_publishes_capture_terminal(static_url: str, page, body: str, code: str, phase: str) -> None:
-    page.route("**/__data/graph.json", lambda route: route.fulfill(status=200, content_type="application/json", body=body))
+    page.route("**/__data/graph.json*", lambda route: route.fulfill(status=200, content_type="application/json", body=body))
     page.goto(static_url + "/__graph.html", wait_until="domcontentloaded")
     page.wait_for_function("() => window.okfGraphCaptureState?.().terminalCode")
     outcome = page.evaluate("""async () => {try{await window.okfCaptureReadiness.start({target:'graph'}).promise;return {ok:true};}catch(e){return {ok:false,code:e.code,phase:e.metadata.readinessPhase,allowed:e.screenshotAllowed};}}""")
@@ -4272,7 +4490,7 @@ def test_group_d_inflight_comment_refresh_pagehide_publishes_nothing(server_url:
     result = page.evaluate(r"""async () => {
       const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),base=await native(url).then(r=>r.json()),id=base.nodes[0].data.id;
       const before=G.cy.getElementById(id).data('active_comment_count');let release;
-      window.fetch=(req,opt)=>String(req)===url?new Promise(resolve=>release=()=>{const payload=JSON.parse(JSON.stringify(base));payload.nodes[0].data.active_comment_count=88;resolve(new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}}));}):native(req,opt);
+      window.fetch=(req,opt)=>String(req).split('?')[0]===url?new Promise(resolve=>release=()=>{const payload=JSON.parse(JSON.stringify(base));payload.nodes[0].data.active_comment_count=88;resolve(new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}}));}):native(req,opt);
       const pending=G.refreshGraph();await new Promise(requestAnimationFrame);
       window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));
       const hidden={graph:document.body.dataset.okfGraphCaptureReady,page:document.body.dataset.okfCaptureReady,count:G.cy.getElementById(id).data('active_comment_count'),applied:G.refreshStats.applied};
@@ -4509,8 +4727,12 @@ def test_group_d_timeout_copy_control_is_disabled_and_visually_distinct(server_u
     page.goto(server_url+"/__search?q=orders&mode=lexical&limit=5",wait_until="domcontentloaded");_open_context_options(page)
     page.evaluate("""() => {const native=fetch.bind(window);window.fetch=(url,opts)=>String(url).startsWith('/__context?')?new Promise((resolve,reject)=>opts.signal.addEventListener('abort',()=>reject(new DOMException('Aborted','AbortError')),{once:true})):native(url,opts);}""")
     page.locator("[data-context-prepare]").click(); expect(page.get_by_role("button",name="Retry",exact=True)).to_be_visible()
-    copy=page.locator("[data-context-copy-prepared]");expect(copy).to_be_disabled();style=copy.evaluate("el=>({opacity:parseFloat(getComputedStyle(el).opacity),cursor:getComputedStyle(el).cursor,bg:getComputedStyle(el).backgroundColor})")
-    assert style["opacity"] <= .5 and style["cursor"] == "not-allowed"
+    copy=page.locator("[data-context-copy-prepared]");expect(copy).to_be_disabled();style=copy.evaluate("el=>({opacity:parseFloat(getComputedStyle(el).opacity),cursor:getComputedStyle(el).cursor,bg:getComputedStyle(el).backgroundColor,fg:getComputedStyle(el).color,border:getComputedStyle(el).borderTopColor})")
+    enabled=page.get_by_role("button",name="Retry",exact=True).evaluate("el=>({fg:getComputedStyle(el).color,border:getComputedStyle(el).borderTopColor})")
+    # Ledger disables by ink, not by fading: muted --text-3 label on a quiet
+    # hairline, distinct from an enabled peer, plus the not-allowed cursor.
+    assert style["cursor"] == "not-allowed", style
+    assert style["opacity"] <= .5 or (style["fg"] != enabled["fg"] and style["border"] != enabled["border"]), (style, enabled)
 
 
 def test_clipboard_fallback_late_settlement_and_320px_capture(static_url: str, page) -> None:
@@ -4526,7 +4748,7 @@ def test_clipboard_fallback_late_settlement_and_320px_capture(static_url: str, p
       return {clipped,labels:controls.map(el=>(el.textContent||el.getAttribute('aria-label')||el.value).trim()),detailsOpen:details.open,summaryHeight:summary.height,firstTop:first.top,summaryBottom:summary.bottom,overflow:document.documentElement.scrollWidth>viewport};
     }""")
     assert responsive["clipped"] == [] and responsive["overflow"] is False
-    assert any("demo_bundle" in label for label in responsive["labels"])
+    assert "OKF Demo Bundle" in responsive["labels"]
     assert any("Graph" in label for label in responsive["labels"])
     assert any("Index" in label for label in responsive["labels"])
     assert responsive["detailsOpen"] is False and responsive["summaryHeight"] <= 44
@@ -4578,7 +4800,7 @@ def test_capture_readiness_success_metadata(static_url: str, page) -> None:
     assert metadata["cssViewport"] == {"width": 960, "height": 720}
     assert metadata["dpr"] >= 1
     assert metadata["browserZoomEvidence"]["source"].endswith("not a text-only zoom claim")
-    assert metadata["theme"] in {"swiss-light", "swiss-dark", "technical-light", "technical-dark"}
+    assert metadata["theme"] in {"bone", "slate", "clay", "plum"}
     assert metadata["javascript"] is True
     assert page.evaluate("() => window.okfCaptureReadiness.deadlineMs") == 30000
 
@@ -4748,11 +4970,9 @@ def test_capture_readiness_pagehide_fences_late_settlement_and_allows_fresh_retr
     assert result["deadlineMs"] == 30000
 
 
-@pytest.mark.parametrize("theme", ["technical-light", "technical-dark", "swiss-light", "swiss-dark"])
+@pytest.mark.parametrize("theme", ["bone", "slate", "clay", "plum"])
 def test_populated_search_accessibility_in_every_theme(static_url: str, page, theme: str) -> None:
-    """Every resolved family-mode theme keeps evidence, controls, focus and
-    text legible. Both families share a palette within a mode, so each mode
-    is audited once per family."""
+    """Every Ledger palette keeps evidence, controls, focus and text legible."""
     page.set_viewport_size({"width": 1440, "height": 900})
     page.goto(static_url + "/__search.html?q=orders", wait_until="domcontentloaded")
     page.wait_for_function("() => window.okfPortableProvider && document.body.dataset.okfCaptureReady === 'ready'")
@@ -4766,7 +4986,7 @@ def test_populated_search_accessibility_in_every_theme(static_url: str, page, th
     expect(page.locator(".okf-search-result").first).to_be_visible()
     first_disclosure = page.locator(".okf-search-disclosure").first
     expect(first_disclosure).to_be_visible()
-    first_disclosure.locator("summary").click()
+    first_disclosure.locator(":scope > summary").click()
     expect(first_disclosure.locator(".okf-search-citation")).to_be_visible()
     expect(page.locator("#okf-search-query")).to_be_visible()
     page.locator("#okf-search-query").focus()
@@ -4922,7 +5142,8 @@ def test_search_context_fallback_reflows_at_320px_css_viewport_dpr4(static_url: 
     assert zoomed["headerOverlaps"] == []
 
 
-def test_malformed_single_file_corpus_settles_unavailable(tmp_path: Path, page) -> None:
+@pytest.mark.parametrize("malformation", ["schema", "missing-chunks", "non-array-chunks", "null-chunk", "invalid-json"])
+def test_malformed_single_file_corpus_settles_unavailable(tmp_path: Path, page, malformation: str) -> None:
     """Malformed evidence keeps Search reachable but disables evidence actions."""
     from okf_loom import Bundle
     from okf_loom.render import render_single_file
@@ -4932,11 +5153,22 @@ def test_malformed_single_file_corpus_settles_unavailable(tmp_path: Path, page) 
     html = output.read_text(encoding="utf-8")
     prefix = "window.BUNDLE = "
     start = html.index(prefix) + len(prefix)
-    end = html.index(";\nwindow.OKF_LOOM_INITIAL_LAYOUT", start)
-    payload = json.loads(html[start:end])
-    payload["retrieval_corpus"]["manifest"]["schema_version"] = 999
+    payload, end = json.JSONDecoder().raw_decode(html, start)
+    corpus = payload["retrieval_corpus"]
+    if malformation == "schema":
+        corpus["manifest"]["schema_version"] = 999
+    elif malformation == "missing-chunks":
+        del corpus["chunks"]
+    elif malformation == "non-array-chunks":
+        corpus["chunks"] = {}
+    elif malformation == "null-chunk":
+        corpus["chunks"][0] = None
+    else:
+        corpus["chunks"][0]["canonical_chunk"] = "{invalid JSON"
     output.write_text(html[:start] + json.dumps(payload) + html[end:], encoding="utf-8")
 
+    page_errors = []
+    page.on("pageerror", lambda error: page_errors.append(str(error)))
     page.goto(output.as_uri(), wait_until="domcontentloaded")
     page.locator("#okf-single-search-toggle").click()
     expect(page.locator("[data-single-search-status]")).to_contain_text("Portable search unavailable")
@@ -4947,6 +5179,8 @@ def test_malformed_single_file_corpus_settles_unavailable(tmp_path: Path, page) 
     expect(page.locator("#okf-single-search-toggle")).to_be_enabled()
     expect(page.locator("#okf-single-search input, #okf-single-search button[type=submit]").first).to_be_disabled()
     expect(page.locator("[data-single-page-context]")).to_be_disabled()
+    assert page.evaluate("() => window.OKF_LOOM_INITIAL_LAYOUT") == "cose"
+    assert page_errors == []
 
 
 def test_single_file_nojs_and_missing_corpus_are_honest(tmp_path: Path, page) -> None:
@@ -4967,11 +5201,12 @@ def test_single_file_nojs_and_missing_corpus_are_honest(tmp_path: Path, page) ->
     html = output.read_text(encoding="utf-8")
     prefix = "window.BUNDLE = "
     start = html.index(prefix) + len(prefix)
-    end = html.index(";\nwindow.OKF_LOOM_INITIAL_LAYOUT", start)
-    payload = json.loads(html[start:end])
+    payload, end = json.JSONDecoder().raw_decode(html, start)
     del payload["retrieval_corpus"]
     missing = tmp_path / "single-missing.html"
     missing.write_text(html[:start] + json.dumps(payload) + html[end:], encoding="utf-8")
+    page_errors = []
+    page.on("pageerror", lambda error: page_errors.append(str(error)))
     page.goto(missing.as_uri(), wait_until="domcontentloaded")
     expect(page.locator("[data-single-search-status]")).to_contain_text("unavailable")
     expect(page.locator("#okf-single-search-toggle")).to_be_enabled()
@@ -4992,6 +5227,8 @@ def test_single_file_nojs_and_missing_corpus_are_honest(tmp_path: Path, page) ->
     assert page.evaluate("() => document.body.dataset.okfGraphCaptureReady") == "ready"
     authorization = page.evaluate("async () => { try { await window.okfCaptureReadiness.start({target:'search'}).promise; return null; } catch (error) { return {code:error.code, screenshotAllowed:error.screenshotAllowed}; } }")
     assert authorization == {"code": "unavailable", "screenshotAllowed": False}
+    assert page.evaluate("() => window.OKF_LOOM_INITIAL_LAYOUT") == "cose"
+    assert page_errors == []
 
 
 def test_backlinks_show(server_url: str, page) -> None:
@@ -5227,7 +5464,10 @@ def test_lens_switching_mutates_graph_state(server_url: str, page) -> None:
     base = _snap(page)
     assert base["n"] == 6 and base["e"] >= 1
     st = _state(page)
-    assert st["lens"] == "map" and st["colorMode"] == "community" and st["sizeMode"] == "pagerank"
+    # Ledger: the default Map lens paints neutral records (colorMode "type"
+    # is the neutral encoding; content types are never colour-coded).
+    assert st["lens"] == "map" and st["colorMode"] == "type" and st["sizeMode"] == "pagerank"
+    assert len({v["color"] for v in base["nodes"].values()}) == 1, "Map lens must paint neutral nodes"
     # Map: PageRank sizing differentiates nodes.
     sizes = sorted(v["vizSize"] for v in base["nodes"].values())
     assert sizes[-1] > sizes[0], "PageRank sizing produced uniform node sizes"
@@ -5244,7 +5484,8 @@ def test_lens_switching_mutates_graph_state(server_url: str, page) -> None:
     assert any(br["nodes"][k]["color"] != base["nodes"][k]["color"] for k in base["nodes"]), \
         "Bridges colour ramp did not recolour any node"
 
-    # Flow: relationship labels on; typed edges carry colour + labels.
+    # Flow: relationship labels on; typed edges carry colour, and the
+    # selected concept's relationships carry their labels (D2-010).
     prev = _applied_seq(page)
     _preset(page, "flow")
     _wait_applied_after(page, prev)
@@ -5253,7 +5494,16 @@ def test_lens_switching_mutates_graph_state(server_url: str, page) -> None:
     assert st["relationEdges"] and st["showEdgeLabels"]
     fl = _snap(page)
     assert fl["relEdges"] >= 1, "Flow lens set no okf-rel-edge"
+    assert not any(e["showLabel"] for e in fl["edges"].values()), "Flow labelled the whole map"
+    owner = page.evaluate("""() => { const G = window.__okfLoomGraph;
+      const n = G.cy.nodes().filter(n => n.connectedEdges().some(e => !!e.data('label'))).first();
+      G.interaction.dispatch({type: 'SELECT', id: n.id()}); return n.id(); }""")
+    page.wait_for_timeout(300)
+    fl = _snap(page)
     assert any(e["showLabel"] for e in fl["edges"].values()), "no edge label shown in Flow"
+    assert page.evaluate("""id => window.__okfLoomGraph.cy.edges('.okf-show-label')
+      .every(e => e.source().id() === id || e.target().id() === id)""", owner)
+    page.evaluate("() => window.__okfLoomGraph.interaction.dispatch({type: 'CLEAR'})")
 
     # Recent: recency colouring is applied (demo nodes lack timestamps →
     # the neutral undated colour is fine; just prove the mode switched).
@@ -5264,10 +5514,11 @@ def test_lens_switching_mutates_graph_state(server_url: str, page) -> None:
     assert _state(page)["colorMode"] == "recency"
 
     # Back to Map: bridge glow cleared. Phase 3 dash-always: typed edges
-    # (edges with a non-empty label) STILL carry their .okf-reld-N dash
-    # class in the Map lens — the dash encoding is no longer an explicit-
-    # labels state. Assert the dash count equals the labelled-edge count
-    # exactly (the deterministic Phase 3 contract: dash ⇔ has-label).
+    # (whose primary relation type is not a plain "link") STILL carry their
+    # .okf-reld-N dash class in the Map lens — the dash encoding is no longer
+    # an explicit-labels state. Assert the dash count equals the typed-edge
+    # count exactly (the deterministic contract: dash ⇔ typed relation;
+    # D2-008: anchor-text labels never key the encoding).
     prev = _applied_seq(page)
     _preset(page, "map")
     _wait_applied_after(page, prev)
@@ -5278,10 +5529,10 @@ def test_lens_switching_mutates_graph_state(server_url: str, page) -> None:
         "window.__okfLoomGraph.cy.edges('.okf-reld-1, .okf-reld-2, .okf-reld-3').length"
     )
     labelled_count = page.evaluate(
-        "window.__okfLoomGraph.cy.edges().filter(e => !!e.data('label')).length"
+        "window.__okfLoomGraph.cy.edges().filter(e => " + _TYPED_EDGE_JS + ").length"
     )
     assert dash_count == labelled_count, (
-        f"Phase 3 dash-always invariant: dash count {dash_count} != labelled-edge "
+        f"Phase 3 dash-always invariant: dash count {dash_count} != typed-edge "
         f"count {labelled_count} (every typed edge must carry its dash class "
         f"in every lens, including Map)"
     )
@@ -5390,11 +5641,15 @@ def test_signal_expanded_range_spreads_further(server_url: str, page) -> None:
 
 def test_lens_communities_deterministic_and_painted(server_url: str, page) -> None:
     """Community detection is deterministic (same bundle → same assignment on
-    every load — the anti-position-churn requirement) and the Map lens paints
-    nodes by community: same community ⇒ same colour, and the colour comes
-    from the community ramp, not the type palette."""
+    every load — the anti-position-churn requirement) and the Themes lens
+    paints nodes by community: same community ⇒ same colour, and the colour
+    comes from the palette's muted community ramp (Map stays neutral)."""
     _open_graph(page, server_url)
     page.wait_for_timeout(400)
+    prev = _applied_seq(page)
+    _preset(page, "themes")
+    _wait_applied_after(page, prev)
+    assert _state(page)["colorMode"] == "community"
     com1 = page.evaluate("() => window.__okfLoomGraph.communityOf()")
     assert com1 and len(com1) == 6, f"expected 6 community assignments, got {com1}"
     snap = _snap(page)
@@ -5424,27 +5679,30 @@ def test_lens_communities_deterministic_and_painted(server_url: str, page) -> No
 
 
 def test_lens_encoding_toggles(server_url: str, page) -> None:
-    """Graph settings toggles: 'Colour by theme' off reverts nodes to the type
-    palette (the Saket et al. evidence-mandated escape hatch); 'Show
-    relationship labels' reveals typed-edge labels in any lens."""
+    """Graph settings toggles: 'Colour by theme' paints the muted community
+    ramp and off returns every node to the neutral fill (the Saket et al.
+    evidence-mandated escape hatch); 'Show relationship labels' names the
+    relationships of the selected concept in any lens (D2-010: never the
+    whole map at once, and never by switching edges to the hue ramp)."""
     _open_graph(page, server_url)
     page.wait_for_timeout(400)
+    assert _state(page)["colorMode"] == "type"
+    neutral = _snap(page)
+    _toggle_check(page, "Colour by theme")
+    page.wait_for_timeout(300)
+    assert _state(page)["colorMode"] == "community"
     themed = _snap(page)
+    assert any(themed["nodes"][k]["color"] != neutral["nodes"][k]["color"] for k in neutral["nodes"]), \
+        "enabling theme colours changed nothing"
     _toggle_check(page, "Colour by theme")
     page.wait_for_timeout(300)
     assert _state(page)["colorMode"] == "type"
-    typed = _snap(page)
-    assert any(typed["nodes"][k]["color"] != themed["nodes"][k]["color"] for k in themed["nodes"]), \
-        "disabling theme colours changed nothing"
-    # The type palette equals each node's baseColor.
+    # Off = the neutral node fill, which is each node's baseColor.
     base_matches = page.evaluate(
         """() => window.__okfLoomGraph.cy.nodes().every(
              n => n.data('color') === n.data('baseColor'))"""
     )
-    assert base_matches, "type colouring does not match the node type palette"
-    _toggle_check(page, "Colour by theme")
-    page.wait_for_timeout(300)
-    assert _state(page)["colorMode"] == "community"
+    assert base_matches, "theme colours off did not return nodes to the neutral fill"
 
     # Relationship labels toggle (unselect first: a selected node shows
     # its own contextual edge labels by design).
@@ -5456,21 +5714,33 @@ def test_lens_encoding_toggles(server_url: str, page) -> None:
     _toggle_check(page, "Show relationship labels")
     page.wait_for_timeout(300)
     st = _state(page)
-    assert st["showEdgeLabels"] and st["relationEdges"]
+    assert st["showEdgeLabels"] and not st["relationEdges"]
     after = _snap(page)
-    assert any(e["showLabel"] for e in after["edges"].values()), \
-        "relationship-label toggle revealed no labels"
+    assert not any(e["showLabel"] for e in after["edges"].values()), \
+        "relationship labels painted the whole map with nothing selected"
+    owner = page.evaluate("""() => { const G = window.__okfLoomGraph;
+      const n = G.cy.nodes().filter(n => n.connectedEdges().some(e => !!e.data('label'))).first();
+      G.interaction.dispatch({type: 'SELECT', id: n.id()}); return n.id(); }""")
+    page.wait_for_timeout(300)
+    labelled = page.evaluate("""id => { const cy = window.__okfLoomGraph.cy;
+      return {shown: cy.edges('.okf-show-label').map(e => e.id()).sort(),
+              incident: cy.getElementById(id).connectedEdges().filter(e => !!e.data('label')).map(e => e.id()).sort()}; }""", owner)
+    assert labelled["shown"] and labelled["shown"] == labelled["incident"], \
+        "relationship labels must name exactly the selected concept's relationships"
 
 
 def test_graph_theme_type_palette_no_collision(server_url: str, page) -> None:
-    """P1 graph/type colour collision fix: the theme (community) palette must
-    not share the same hue family as the product-wide type palette. Themes use
-    a cool teal/steel family; types keep the golden-angle full-spectrum spread.
-    The legend's 'Filter types' section must NOT use colour swatches (icons
-    only), and theme entries must carry a non-colour textual marker (T1, T2…).
+    """Theme (community) colours never collide with the node's type identity:
+    content types are not colour-coded (every baseColor is the neutral fill),
+    so the muted community ramp is the only canvas colour. The legend's
+    'Filter types' section must NOT use colour swatches (icons only), and
+    theme entries must carry a non-colour textual marker (T1, T2…).
     """
     _open_graph(page, server_url)
     page.wait_for_timeout(400)
+    prev = _applied_seq(page)
+    _preset(page, "themes")
+    _wait_applied_after(page, prev)
     assert _state(page)["colorMode"] == "community"
 
     # 1. Theme colours (on canvas) must be visually distinct from type colours.
@@ -5518,8 +5788,9 @@ def test_graph_theme_type_palette_no_collision(server_url: str, page) -> None:
         f"not all filter items have icons ({swatch_info['icons']}/{swatch_info['count']})"
 
     # 3. Theme legend entries carry non-colour textual markers (T1, T2…).
+    # textContent: Ledger renders legend titles as uppercase micro-labels.
     legend_text = page.evaluate(
-        "() => document.querySelector('.okf-graph-legend').innerText"
+        "() => document.querySelector('.okf-graph-legend').textContent"
     )
     assert "T1" in legend_text, "legend missing T1 textual theme marker"
     assert "Colour: themes" in legend_text, "legend missing themes section"
@@ -5624,7 +5895,7 @@ def test_graph_phase3_mobile_small_graph_uses_canvas_and_bottom_viewport_row(
     assert result["horizontal"] and result["bottom"] and result["targets"] and result["controlsInside"]
     assert result["edgeContrast"] >= 3 and result["arrow"] == "triangle"
     assert all(item["aria"] and item["title"] for item in result["names"])
-    proof_dir = Path("/tmp/okf-loom-mobile-graph-p1")
+    proof_dir = Path(tempfile.gettempdir()) / "okf-loom-mobile-graph-p1"
     proof_dir.mkdir(parents=True, exist_ok=True)
     page.screenshot(path=str(proof_dir / f"graph-{width}x844.png"))
     before = result
@@ -5761,9 +6032,17 @@ def test_graph_phase3_orphan_shelf_demo_has_no_orphans_hidden(server_url: str, p
     )
 
 
+# An edge is typed when its primary relation's canonical type is not a plain
+# body "link" (an untyped legacy edge falls back to its label).
+_TYPED_EDGE_JS = (
+    "(() => { const r = e.data('relations') || [], p = e.data('primary_relation') || r[0];"
+    " const t = p && p.type ? p.type : (e.data('label') || ''); return !!t && t !== 'link'; })()"
+)
+
+
 def test_graph_phase3_typed_edge_dash_always_in_every_lens(server_url: str, page) -> None:
-    """Phase 3 contract: typed edges (edges with a non-empty label) ALWAYS
-    carry their ``.okf-reld-N`` dash class, in EVERY lens — not only under
+    """Phase 3 contract: typed edges (primary relation type other than a
+    plain link) ALWAYS carry their ``.okf-reld-N`` dash class, in EVERY lens — not only under
     the explicit Relations/Focus intent. Walks every preset and asserts the
     invariant. (Regression guard for the prior relationEdges-gated dash.)"""
     _open_graph(page, server_url)
@@ -5788,7 +6067,7 @@ def test_graph_phase3_typed_edge_dash_always_in_every_lens(server_url: str, page
             """() => {
                 const cy = window.__okfLoomGraph.cy;
                 return {
-                    labelled: cy.edges().filter(e => !!e.data('label')).length,
+                    labelled: cy.edges().filter(e => """ + _TYPED_EDGE_JS + """).length,
                     dashed: cy.edges('.okf-reld-1, .okf-reld-2, .okf-reld-3').length,
                     rel: cy.edges('.okf-rel-edge').length,
                     lens: window.__okfLoomGraph.getState().lens,
@@ -5883,7 +6162,7 @@ def test_graph_phase3_label_plate_light_vs_dark(server_url: str, page) -> None:
             if (!window.OKFLoomTheme || typeof window.OKFLoomTheme.setTheme !== "function") {
                 throw new Error("canonical theme API unavailable");
             }
-            window.OKFLoomTheme.setTheme("technical-dark");
+            window.OKFLoomTheme.setTheme("slate");
         }"""
     )
     page.wait_for_timeout(300)
@@ -5936,11 +6215,16 @@ def _live_payload_setup(page) -> str:
 
 
 def _live_serve(page, which: str) -> None:
-    """Point window.fetch at one of the stashed payloads and run one refresh."""
+    """Serve full-shape fixtures over the live structure transport, then refresh.
+
+    Ignore the view query when matching: these tests deliberately retain the
+    legacy/full relation objects to exercise ordinary candidate validation.
+    Compact-wire decoding has its own scale/acquisition browser proofs.
+    """
     page.evaluate(
         """(which) => {
           const P=window.__okfP1, o=P[which], url=P.url, native=P.native;
-          window.fetch=(req,opt)=>String(req)===url?Promise.resolve(new Response(JSON.stringify(o),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
+          window.fetch=(req,opt)=>String(req).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(o),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
         }""",
         which,
     )
@@ -6089,7 +6373,7 @@ def test_graph_phase3_comment_badge_semantics_index_detail_and_canvas(
           const payload=Object.assign({},base,{nodes,edges});
           delete payload.outgoing; delete payload.backlinks;
           let opts=null;
-          window.fetch=(req,opt)=>String(req)===url?(opts=opt,Promise.resolve(new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}}))):native(req,opt);
+          window.fetch=(req,opt)=>String(req).split('?')[0]===url?(opts=opt,Promise.resolve(new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}}))):native(req,opt);
           await G.refreshGraph(); await new Promise(requestAnimationFrame);
           const rows=nodes.map(n=>{const id=n.data.id,b=document.querySelector('.okf-node-index__item[data-target="'+CSS.escape(id)+'"]');const cy=G.cy.getElementById(id);return {id,aria:b&&b.getAttribute('aria-label'),badge:b&&b.querySelector('.okf-node-index__comments')&&b.querySelector('.okf-node-index__comments').textContent,hasCanvas:cy.data('has_active_comment_count'),canvas:String(cy.data('commentBadgeUrl')||'')};});
           const selected=nodes[4].data.id; window.okfActivateGraphConcept(selected,'pointer');
@@ -6113,7 +6397,7 @@ def test_graph_phase3_comment_badge_semantics_index_detail_and_canvas(
     assert rows[1]["hasCanvas"] == 1 and rows[1]["canvas"] == "none"
     assert all(row["hasCanvas"] == 1 and row["canvas"].startswith("data:image/svg+xml") for row in rows[2:])
     assert result["detail"] == "1234"
-    assert result["cache"] == "no-store"
+    assert result["cache"] == "no-cache"
     assert result["nodeCount"] == result["payloadCount"] == 5, "accepted capture payload must exclude exit visuals"
     assert result["transitionPending"] is True and result["pendingRaw"] >= result["payloadCount"]
     assert result["settledRaw"] == result["payloadCount"], "raw Cytoscape count must converge after transition settlement"
@@ -6131,7 +6415,7 @@ def test_graph_phase3_comment_refresh_rejects_malformed_and_preserves_last_good(
           const native=window.fetch.bind(window), base=await native(url).then(r=>r.json()), id=base.nodes[0].data.id;
           function payload(value){const p=JSON.parse(JSON.stringify(base));p.nodes[0].data.active_comment_count=value;return p;}
           let current=payload(7), options=[];
-          window.fetch=(req,opt)=>String(req)===url?(options.push(opt),Promise.resolve(current instanceof Response?current:new Response(JSON.stringify(current),{status:200,headers:{'Content-Type':'application/json'}}))):native(req,opt);
+          window.fetch=(req,opt)=>String(req).split('?')[0]===url?(options.push(opt),Promise.resolve(current instanceof Response?current:new Response(JSON.stringify(current),{status:200,headers:{'Content-Type':'application/json'}}))):native(req,opt);
           const read=()=>{const b=document.querySelector('.okf-node-index__item[data-target="'+CSS.escape(id)+'"]');return b&&b.getAttribute('aria-label');};
           const refresh=async()=>{await G.refreshGraph();await new Promise(requestAnimationFrame);};
           await refresh(); const good=read();
@@ -6139,11 +6423,11 @@ def test_graph_phase3_comment_refresh_rejects_malformed_and_preserves_last_good(
           const goodReady=ready();
           current=payload(-1); await refresh(); const malformed=read(),malformedReady=ready();
           current=new Response('',{status:503}); await refresh(); const unavailable=read(),unavailableReady=ready();
-          window.fetch=(req,opt)=>String(req)===url?Promise.reject(new TypeError('offline')):native(req,opt);
+          window.fetch=(req,opt)=>String(req).split('?')[0]===url?Promise.reject(new TypeError('offline')):native(req,opt);
           await refresh(); const network=read(),networkReady=ready();
-          window.fetch=(req,opt)=>String(req)===url?(options.push(opt),Promise.resolve(new Response(JSON.stringify(payload(11)),{status:200,headers:{'Content-Type':'application/json'}}))):native(req,opt);
+          window.fetch=(req,opt)=>String(req).split('?')[0]===url?(options.push(opt),Promise.resolve(new Response(JSON.stringify(payload(11)),{status:200,headers:{'Content-Type':'application/json'}}))):native(req,opt);
           await refresh(); const recovered=read(),recoveredReady=ready();
-          return {good,malformed,unavailable,network,recovered,goodReady,malformedReady,unavailableReady,networkReady,recoveredReady,noStore:options.every(o=>o.cache==='no-store')};
+          return {good,malformed,unavailable,network,recovered,goodReady,malformedReady,unavailableReady,networkReady,recoveredReady,revalidates:options.every(o=>o.cache==='no-cache')};
         }"""
     )
     assert "7 active comments" in result["good"]
@@ -6156,7 +6440,7 @@ def test_graph_phase3_comment_refresh_rejects_malformed_and_preserves_last_good(
         assert result[key]["error"]
     assert "11 active comments" in result["recovered"]
     assert result["recoveredReady"] == {"graph": "ready", "page": "ready", "error": None}
-    assert result["noStore"] is True
+    assert result["revalidates"] is True
 
 
 def test_multi_edge_keyboard_pointer_panel_and_secondary_semantics(server_url: str, page) -> None:
@@ -6207,7 +6491,7 @@ def test_multi_edge_refresh_validation_is_fail_closed(server_url: str, page, mut
       if(mutation==='bad-multiplicity')edge.data.multiplicity+=1;
       if(mutation==='bad-primary')edge.data.primary_relation={id:'missing',type:'x',label:'x'};
       if(mutation==='empty-relations')edge.data.relations=[];
-      window.__multiEdgePayload=fresh;window.fetch=(req,opt)=>String(req)===url?Promise.resolve(new Response(JSON.stringify(window.__multiEdgePayload),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
+      window.__multiEdgePayload=fresh;window.fetch=(req,opt)=>String(req).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(window.__multiEdgePayload),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
       await G.refreshGraph();return {revision:document.body.dataset.okfRevision,error:document.body.dataset.okfGraphRefreshError};
     }""", mutation)
     assert result["revision"] == before
@@ -6224,7 +6508,7 @@ def test_multi_edge_refresh_rebuilds_index_and_preserves_panel_focus(server_url:
       const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),fresh=await native(url).then(r=>r.json());
       const edge=fresh.edges.find(e=>e.data.source==='services/checkout'&&e.data.target==='tables/orders');
       edge.data.relations.push({id:'rel-refresh-fourth',label:'audits orders',type:'audits',kind:'relation',direction:'outgoing',source:edge.data.source,target:edge.data.target,target_raw:'relation:tables/orders',authored_identity:'refresh'});edge.data.multiplicity=4;
-      window.__multiEdgePayload=fresh;window.fetch=(req,opt)=>String(req)===url?Promise.resolve(new Response(JSON.stringify(window.__multiEdgePayload),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
+      window.__multiEdgePayload=fresh;window.fetch=(req,opt)=>String(req).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(window.__multiEdgePayload),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
       await G.refreshGraph();await new Promise(requestAnimationFrame);
       return {focus:document.activeElement&&document.activeElement.textContent,panel:document.getElementById('okf-edge-bundle-panel').textContent,expanded:document.querySelectorAll('.okf-edge-bundle-index__item[aria-selected=true]').length};
     }""")
@@ -6256,7 +6540,7 @@ def test_relationship_filter_counts_rebuild_on_live_instance_add_remove(server_u
     initial=page.evaluate("t=>window.__okfLoomGraph.cy.edges().reduce((n,e)=>n+(e.data('relations')||[]).filter(r=>r.type===t).length,0)",first)
     expect(chips.first).to_have_attribute("aria-label",re.compile(rf"^{re.escape(first)}, {initial} relationships?, shown$"))
     chips.first.click();chips.nth(1).focus();assert chips.nth(1).evaluate("b=>document.activeElement===b");assert page.locator("body").get_attribute("data-okf-relationship-filter-focus")==second
-    result=page.evaluate(r"""async ([first,second])=>{const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),fresh=await native(url).then(r=>r.json()),edge=fresh.edges.find(e=>e.data.relations&&e.data.relations.length);edge.data.relations.push({id:'live-new-instance',type:'live_type',label:'Human label differs',kind:'relation',direction:'outgoing',source:edge.data.source,target:edge.data.target});edge.data.relations.push({id:'live-existing-instance',type:first,label:'Second human label',kind:'relation',direction:'outgoing',source:edge.data.source,target:edge.data.target});edge.data.multiplicity=edge.data.relations.length;fresh.bundle_revision='relation-filter-add';window.fetch=(req,opt)=>String(req)===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);await G.refreshGraph();await new Promise(requestAnimationFrame);return {focus:document.activeElement&&document.activeElement.dataset.filterValue,active:document.activeElement&&document.activeElement.outerHTML,hidden:G.getState().hiddenRelations[first],url:location.search};}""",[first,second])
+    result=page.evaluate(r"""async ([first,second])=>{const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),fresh=await native(url).then(r=>r.json()),edge=fresh.edges.find(e=>e.data.relations&&e.data.relations.length);edge.data.relations.push({id:'live-new-instance',type:'live_type',label:'Human label differs',kind:'relation',direction:'outgoing',source:edge.data.source,target:edge.data.target});edge.data.relations.push({id:'live-existing-instance',type:first,label:'Second human label',kind:'relation',direction:'outgoing',source:edge.data.source,target:edge.data.target});edge.data.multiplicity=edge.data.relations.length;fresh.bundle_revision='relation-filter-add';window.fetch=(req,opt)=>String(req).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);await G.refreshGraph();await new Promise(requestAnimationFrame);return {focus:document.activeElement&&document.activeElement.dataset.filterValue,active:document.activeElement&&document.activeElement.outerHTML,hidden:G.getState().hiddenRelations[first],url:location.search};}""",[first,second])
     result["controls"]=page.get_by_label("Relationship filters").locator("button.okf-filter-chip").count()
     result["open"]=page.locator("details.okf-signal__advanced").get_attribute("open") is not None
     result["targetVisible"]=page.get_by_label("Relationship filters").locator(f'[data-filter-value="{second}"]').is_visible()
@@ -6267,7 +6551,7 @@ def test_relationship_filter_counts_rebuild_on_live_instance_add_remove(server_u
     owner=page.get_by_label("Relationship filters")
     expect(owner.locator('[data-filter-value="live_type"]')).to_have_attribute("aria-label","live_type, 1 relationship, shown")
     expect(owner.locator(f'[data-filter-value="{first}"]')).to_have_attribute("aria-label",re.compile(rf"^{re.escape(first)}, {initial+1} relationships?, hidden$"))
-    removed=page.evaluate(r"""async () => {const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),fresh=await native(url).then(r=>r.json());fresh.edges.forEach(e=>{e.data.relations=(e.data.relations||[]).filter(r=>r.id!=='live-new-instance'&&r.id!=='live-existing-instance');e.data.multiplicity=e.data.relations.length;});fresh.edges=fresh.edges.filter(e=>e.data.relations.length);fresh.bundle_revision='relation-filter-remove';window.fetch=(req,opt)=>String(req)===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);await G.refreshGraph();await new Promise(requestAnimationFrame);return {hasLive:!!document.querySelector('[data-filter-value="live_type"]'),focus:document.activeElement&&document.activeElement.dataset.filterValue};}""")
+    removed=page.evaluate(r"""async () => {const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),fresh=await native(url).then(r=>r.json());fresh.edges.forEach(e=>{e.data.relations=(e.data.relations||[]).filter(r=>r.id!=='live-new-instance'&&r.id!=='live-existing-instance');e.data.multiplicity=e.data.relations.length;});fresh.edges=fresh.edges.filter(e=>e.data.relations.length);fresh.bundle_revision='relation-filter-remove';window.fetch=(req,opt)=>String(req).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);await G.refreshGraph();await new Promise(requestAnimationFrame);return {hasLive:!!document.querySelector('[data-filter-value="live_type"]'),focus:document.activeElement&&document.activeElement.dataset.filterValue};}""")
     assert not removed["hasLive"] and removed["focus"]==second
 
 
@@ -6277,7 +6561,7 @@ def test_multi_edge_old_payload_and_malicious_label_are_safe(server_url: str, pa
       const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),fresh=await native(url).then(r=>r.json());
       fresh.edges.forEach(e=>{delete e.data.relations;delete e.data.multiplicity;delete e.data.primary_relation;});
       fresh.edges[0].data.label='<img src=x onerror=window.__multiEdgeXss=1>';
-      window.fetch=(req,opt)=>String(req)===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
+      window.fetch=(req,opt)=>String(req).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(fresh),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
       await G.refreshGraph();const edge=G.cy.edges()[0];edge.emit('tap');
       return {xss:window.__multiEdgeXss||0,text:document.getElementById('okf-edge-bundle-panel').textContent,images:document.getElementById('okf-edge-bundle-panel').querySelectorAll('img').length,multiplicity:edge.data('multiplicity')};
     }""")
@@ -6293,7 +6577,7 @@ def test_multi_edge_endpoint_collision_ids_coexist_through_live_refresh(server_u
       const ids=['a__b','c','a','b__c'];ids.forEach(id=>base.nodes.push({data:{id,label:id,type:'concept'}}));
       function relation(relationId,s,t){const relation={id:relationId,label:'link',type:'link',kind:'body_link',direction:'outgoing',source:s,target:t,target_raw:t};return {data:{source:s,target:t,label:'link',multiplicity:1,relations:[relation],primary_relation:relation}};}
       base.edges.push(relation('collision-left-r','a__b','c'),relation('collision-right-r','a','b__c'));
-      window.fetch=(req,opt)=>String(req)===url?Promise.resolve(new Response(JSON.stringify(base),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
+      window.fetch=(req,opt)=>String(req).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(base),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
       await G.refreshGraph();return [['a__b','c'],['a','b__c']].map(pair=>{const edge=G.cy.edges().filter(e=>e.data('source')===pair[0]&&e.data('target')===pair[1]);return {id:edge.id(),length:G.cy.getElementById(edge.id()).length,source:edge.data('source'),target:edge.data('target')};});
     }""")
     assert result == [
@@ -6399,7 +6683,19 @@ def test_multi_edge_400_percent_reflow_has_no_page_overflow(server_url: str, pag
     page.locator(".okf-edge-bundle-index summary").evaluate("e=>e.click()")
     page.get_by_role("option", name="Checkout Service → Orders · 3 relationships").evaluate("e=>e.click()")
     expect(page.get_by_role("heading", name="Relationships (3)")).to_be_visible()
-    overflow = page.evaluate("""() => ({page:document.documentElement.scrollWidth-document.documentElement.clientWidth,offenders:Array.from(document.querySelectorAll('body *')).filter(e=>!e.closest('#okf-graph .cytoscape-container')&&e.getBoundingClientRect().right>document.documentElement.clientWidth+1).map(e=>e.className||e.tagName).slice(0,10)})""")
+    overflow = page.evaluate("""() => {
+      // Wide authored tables now keep atomic cell values and scroll locally.
+      // Exempt only a bounded, keyboard-reachable table scrollport, not page
+      // overflow or arbitrary clipping of detail content.
+      const containedTable = e => {
+        const port = e.closest('.okf-tablewrap');
+        if (!port || port === e || port.tabIndex < 0 || !/auto|scroll/.test(getComputedStyle(port).overflowX)) return false;
+        const r = port.getBoundingClientRect();
+        return r.left >= -1 && r.right <= document.documentElement.clientWidth + 1;
+      };
+      return {page:document.documentElement.scrollWidth-document.documentElement.clientWidth,
+        offenders:Array.from(document.querySelectorAll('body *')).filter(e=>!e.closest('#okf-graph .cytoscape-container')&&!containedTable(e)&&e.getBoundingClientRect().right>document.documentElement.clientWidth+1).map(e=>e.className||e.tagName).slice(0,10)};
+    }""")
     assert overflow["page"] <= 1, overflow
     assert overflow["offenders"] == [], overflow
     expect(page.locator(".okf-topbar")).to_be_visible()
@@ -6433,7 +6729,7 @@ def test_graph_phase3_comment_event_updates_every_surface_without_layout(
           const base=await native(url).then(r=>r.json()),id=base.nodes[0].data.id;
           const payload=JSON.parse(JSON.stringify(base));payload.nodes[0].data.active_comment_count=137;
           const before={nodes:G.cy.nodes().length,edges:G.cy.edges().length,capture:window.okfGraphCaptureState()};
-          window.fetch=(req,opt)=>String(req)===url?Promise.resolve(new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
+          window.fetch=(req,opt)=>String(req).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
           window.okfLoomLive.emit('comment',{concept_id:id});
           await new Promise(resolve=>setTimeout(resolve,850));await new Promise(requestAnimationFrame);
           const button=document.querySelector('.okf-node-index__item[data-target="'+CSS.escape(id)+'"]');
@@ -6462,19 +6758,33 @@ def test_graph_phase3_comment_badges_follow_theme_and_accessibility_media(
           const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=window.fetch.bind(window),base=await native(url).then(r=>r.json());
           const payload=JSON.parse(JSON.stringify(base)),id=payload.nodes[0].data.id;
           payload.nodes[0].data.label='Sehr langer Wissensgraph-Begriff العربية 日本語 with broken destination';payload.nodes[0].data.active_comment_count=1000;payload.nodes[0].data.unresolved_count=4;
-          window.fetch=(req,opt)=>String(req)===url?Promise.resolve(new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);await G.refreshGraph();
+          window.fetch=(req,opt)=>String(req).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);await G.refreshGraph();
           const uri=()=>G.cy.getElementById(id).data('commentBadgeUrl');
-          window.OKFLoomTheme.setTheme('technical-light');await new Promise(requestAnimationFrame);const light=uri();
-          window.OKFLoomTheme.setTheme('technical-dark');await new Promise(requestAnimationFrame);const dark=uri();
+          window.OKFLoomTheme.setTheme('bone');await new Promise(requestAnimationFrame);const light=uri();
+          window.OKFLoomTheme.setTheme('slate');await new Promise(requestAnimationFrame);const dark=uri();
           const item=document.querySelector('.okf-node-index__item[data-target="'+CSS.escape(id)+'"]'),badge=item.querySelector('.okf-node-index__comments'),warn=item.querySelector('.okf-node-index__warn');
           return {light,dark,theme:document.documentElement.dataset.theme,aria:item.getAttribute('aria-label'),badge:badge.textContent,warn:!!warn,badgeBorder:getComputedStyle(badge).borderTopColor,motion:matchMedia('(prefers-reduced-motion: reduce)').matches,forced:matchMedia('(forced-colors: active)').matches,overflow:document.documentElement.scrollWidth>innerWidth+1};
         }"""
     )
-    assert result["light"] != result["dark"] and result["theme"] == "technical-dark"
+    # Under forced colours the canvas badge is drawn in system colours, so a
+    # palette change leaves it alone; outside them it follows the palette.
+    assert result["light"] == result["dark"] and result["theme"] == "slate"
     assert result["badge"] == "99+" and "1000 active comments" in result["aria"]
     assert "4 broken links" in result["aria"] and result["warn"] is True
     assert result["motion"] is True and result["forced"] is True
     assert result["badgeBorder"] and result["overflow"] is False
+    page.emulate_media(reduced_motion="reduce", forced_colors="none")
+    page.wait_for_function("() => !document.body.hasAttribute('data-okf-forced-colors')")
+    themed = page.evaluate(
+        r"""async () => {
+          const cy=window.__okfLoomGraph.cy,node=cy.nodes().filter(n=>n.data('active_comment_count')>0).first(),uri=()=>node.data('commentBadgeUrl');
+          window.OKFLoomTheme.setTheme('bone');await new Promise(requestAnimationFrame);const light=uri();
+          window.OKFLoomTheme.setTheme('slate');await new Promise(requestAnimationFrame);const dark=uri();
+          return {light,dark};
+        }"""
+    )
+    assert themed["light"] != themed["dark"], themed
+    assert result["light"] not in (themed["light"], themed["dark"]), (result, themed)
 
 
 def test_static_graph_comment_badges_never_open_comment_network(static_url: str, page) -> None:
@@ -6510,7 +6820,7 @@ def _inject_orphan_fixture(page, server_url) -> None:
            window.__okfOrphUrl=url; window.__okfOrphNative=native;
            const G=window.__okfLoomGraph;G.cy.pan({x:31,y:-17});G.cy.zoom(.71);
            const before={pan:G.cy.pan(),zoom:G.cy.zoom(),starts:G.layoutStats.starts};
-           window.fetch=(req,opt)=>String(req)===url?Promise.resolve(new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
+           window.fetch=(req,opt)=>String(req).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}})):native(req,opt);
            return G.refreshGraph().then(()=>{window.__okfOrphanMotion={before,after:{pan:G.cy.pan(),zoom:G.cy.zoom(),starts:G.layoutStats.starts},capture:window.okfGraphCaptureState()};});
         }"""
     )
@@ -6660,18 +6970,18 @@ def test_graph_phase3_dark_theme_edge_contrast_raised(server_url: str, page) -> 
     """Phase 3 P1: dark-theme edges are lifted above the hairline frame
     colour so they read on the dark canvas (the frame colour #334155
     disappears as a graph edge on the ~#0b1220 canvas). Asserted on the live
-    edge style after switching to the technical-dark theme."""
+    edge style after switching to the dark Slate palette."""
     _open_graph(page, server_url)
     page.evaluate(
         """() => { if (window.OKFLoomTheme && window.OKFLoomTheme.setTheme)
-          window.OKFLoomTheme.setTheme('technical-dark'); }"""
+          window.OKFLoomTheme.setTheme('slate'); }"""
     )
     page.wait_for_timeout(300)
     edge = page.evaluate(
         """() => { const e=window.__okfLoomGraph.cy.edges()[0];
           return { line: e.style('line-color'), theme: document.documentElement.getAttribute('data-theme') }; }"""
     )
-    assert edge["theme"] == "technical-dark"
+    assert edge["theme"] == "slate"
     # The lifted dark edge is a noticeably brighter slate than the old #334155
     # frame value. Parse the rgb and assert every channel rose.
     import re
@@ -7371,20 +7681,24 @@ def test_graph_tour_active_resize_reconciles_surface_focus_anchor_and_announceme
 
 def test_graph_dark_theme_canvas_and_selected_lens_contrast(server_url: str, page) -> None:
     _open_graph(page, server_url)
-    page.evaluate("() => window.OKFLoomTheme.setTheme('technical-dark')")
-    page.wait_for_function("() => document.documentElement.dataset.theme === 'technical-dark'")
+    page.evaluate("() => window.OKFLoomTheme.setTheme('slate')")
+    page.wait_for_function("() => document.documentElement.dataset.theme === 'slate'")
     page.wait_for_function("() => !!document.querySelector('.okf-signal__seg-item input:checked + .okf-lens-choice')")
     result = page.evaluate("""() => {
       const parse=c=>{const m=c.match(/[\\d.]+/g).map(Number);return m.slice(0,3)},lum=c=>{const v=parse(c).map(x=>x/255).map(x=>x<=.04045?x/12.92:Math.pow((x+.055)/1.055,2.4));return .2126*v[0]+.7152*v[1]+.0722*v[2]},ratio=(a,b)=>{a=lum(a);b=lum(b);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05)};
       const lens=document.querySelector('.okf-signal__seg-item input:checked + .okf-lens-choice'),ls=getComputedStyle(lens),node=window.__okfLoomGraph.cy.nodes().first(),style=document.createElement('span').style,norm=c=>{style.color=c;return style.color};node.select();
-      return {lensRatio:ratio(ls.color,ls.backgroundColor),title:getComputedStyle(lens.querySelector('b')).color,description:getComputedStyle(lens.querySelector('small')).color,
-        nodeColor:norm(node.style('color')),plate:norm(node.style('text-background-color')),plateOpacity:Number(node.style('text-background-opacity')),selectedBorder:norm(node.style('border-color')),
-        expectedNode:norm('#e2e8f0'),expectedPlate:norm('#0b1220'),expectedSelect:norm('#3ec9c9')};
+      return {lensRatio:ratio(ls.color,ls.backgroundColor),titleRatio:ratio(getComputedStyle(lens.querySelector('b')).color,ls.backgroundColor),descriptionRatio:ratio(getComputedStyle(lens.querySelector('small')).color,ls.backgroundColor),
+        labelRatio:ratio(norm(node.style('color')),norm(node.style('text-background-color'))),plateOpacity:Number(node.style('text-background-opacity')),
+        selectRatio:ratio(norm(node.style('border-color')),norm(node.style('text-background-color')))};
     }""")
-    assert result["lensRatio"] >= 4.5 and result["title"] == result["description"]
-    assert result["nodeColor"] == result["expectedNode"]
-    assert result["plate"] == result["expectedPlate"]
-    assert result["plateOpacity"] == 1 and result["selectedBorder"] == result["expectedSelect"]
+    # Palette-derived (graph.js reads the Ledger --graph-* roles): the
+    # selected label sits on an opaque plate it clears AA on, and the
+    # selection ring clears the 3:1 non-text floor against that plate.
+    # The selected lens card's title and description inks may differ (Ledger
+    # pairs --text with --text-2) but each clears AA on the card.
+    assert result["lensRatio"] >= 4.5 and result["titleRatio"] >= 4.5 and result["descriptionRatio"] >= 4.5, result
+    assert result["plateOpacity"] == 1 and result["labelRatio"] >= 4.5, result
+    assert result["selectRatio"] >= 3, result
 
 
 @pytest.mark.parametrize("surface", ["live"])
@@ -7445,13 +7759,13 @@ def test_graph_phase3_dense_default_labels_and_dark_edges(server_url: str, page)
     )
     assert result["total"] > 0 and result["shown"] == 0 and result["label"] == ""
     assert result["arrow"] == "triangle" and result["curve"] == "bezier"
-    page.evaluate("() => window.OKFLoomTheme.setTheme('technical-dark')")
+    page.evaluate("() => window.OKFLoomTheme.setTheme('slate')")
+    page.wait_for_function("() => document.documentElement.dataset.theme === 'slate'")
     page.wait_for_timeout(50)
-    edge = page.evaluate(
-        "() => {const e=window.__okfLoomGraph.cy.edges().first(),s=document.createElement('span').style,n=c=>{s.color=c;return s.color};return {line:n(e.style('line-color')),arrow:n(e.style('target-arrow-color')),expected:n('#64748b')}}"
-    )
-    # Technical-dark graph palette contract: semantic slate #64748b.
-    assert edge["line"] == edge["arrow"] == edge["expected"]
+    edge = page.evaluate(_GRAPH_EDGE_ON_CANVAS)
+    # Dark (Slate) edges are one colour for line and arrowhead and clear the
+    # WCAG 1.4.11 3:1 graphical-object floor on the canvas they sit on.
+    assert edge["line"] == edge["arrow"] and edge["ratio"] >= 3, edge
 
 
 def test_graph_phase3_broken_canvas_glyph_composes_with_other_states(server_url: str, page) -> None:
@@ -7460,7 +7774,7 @@ def test_graph_phase3_broken_canvas_glyph_composes_with_other_states(server_url:
     result = page.evaluate(
         r"""async () => {const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=fetch.bind(window),p=await native(url).then(r=>r.json()),id=p.nodes[0].data.id;
           p.nodes[0].data.unresolved_count=3;p.nodes[0].data.active_comment_count=120;
-          window.fetch=(r,o)=>String(r)===url?Promise.resolve(new Response(JSON.stringify(p),{headers:{'Content-Type':'application/json'}})):native(r,o);
+          window.fetch=(r,o)=>String(r).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(p),{headers:{'Content-Type':'application/json'}})):native(r,o);
           await G.refreshGraph();const n=G.cy.getElementById(id);n.addClass('okf-hub');n.select();
           const row=document.querySelector('.okf-node-index__item[data-target="'+CSS.escape(id)+'"]');
           return {broken:n.hasClass('okf-broken-link'),aggregated:n.hasClass('okf-broken-aggregated'),selected:n.selected(),hub:n.hasClass('okf-hub'),warning:decodeURIComponent(n.data('brokenBadgeUrl')),comment:decodeURIComponent(n.data('commentBadgeUrl')),aria:row.getAttribute('aria-label'),warn:!!row.querySelector('.okf-node-index__warn'),count:row.querySelector('.okf-node-index__comments').textContent};}"""
@@ -7478,7 +7792,7 @@ def test_graph_phase3_mobile_concept_title_two_lines_without_overflow(server_url
     result = page.evaluate(
         r"""async () => {const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=fetch.bind(window),p=await native(url).then(r=>r.json());
           p.nodes[0].data.label='A deliberately long concept title that needs exactly two readable lines';p.nodes[0].data.unresolved_count=2;p.nodes[0].data.active_comment_count=500;
-          window.fetch=(r,o)=>String(r)===url?Promise.resolve(new Response(JSON.stringify(p),{headers:{'Content-Type':'application/json'}})):native(r,o);await G.refreshGraph();
+          window.fetch=(r,o)=>String(r).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(p),{headers:{'Content-Type':'application/json'}})):native(r,o);await G.refreshGraph();
           document.querySelector('[data-graph-pane="concepts"]').click();const row=document.querySelector('.okf-node-index__item'),label=row.querySelector('.okf-node-index__label'),s=getComputedStyle(label);
           return {lines:Math.round(label.getBoundingClientRect().height/parseFloat(s.lineHeight)),overflow:document.documentElement.scrollWidth>innerWidth+1,warn:!!row.querySelector('.okf-node-index__warn'),badge:row.querySelector('.okf-node-index__comments').textContent};}"""
     )
@@ -7592,10 +7906,11 @@ def test_graph_phase3_r3_dense_overview_progressively_restores_model_detail(
     assert detail["edges"] == expected_edges and 0 < detail["hiddenEdges"] < detail["edges"]
     assert detail["relationLabels"] == 0 and f"of {expected_edges} relationships" in detail["indicator"]
     assert "node titles remain shortened" in detail["indicator"]
-    assert "Show relationship labels reveals all relationships and their labels" in detail["indicator"]
+    assert ("Show relationship labels reveals all relationships and names those of the selected or hovered concept"
+            in detail["indicator"])
     default_visible = detail["edges"] - detail["hiddenEdges"]
     default_visible_ids = detail["visibleIds"]
-    proof_dir = Path("/tmp/okf-loom-phase3-proof-r6")
+    proof_dir = Path(tempfile.gettempdir()) / "okf-loom-phase3-proof-r6"
     proof_dir.mkdir(parents=True, exist_ok=True)
     page.screenshot(path=str(proof_dir / "high-zoom-default.png"), full_page=True)
     model_before = page.evaluate(
@@ -7607,7 +7922,9 @@ def test_graph_phase3_r3_dense_overview_progressively_restores_model_detail(
         "() => {const cy=window.__okfLoomGraph.cy;return {total:cy.edges().length,hidden:cy.edges('.okf-edge-elided').length,shown:cy.edges('.okf-show-label').length,typed:cy.edges('[label]').length,indicator:document.querySelector('.okf-graph-density').textContent};}"
     )
     assert explicit["total"] == expected_edges and explicit["hidden"] == 0
-    assert explicit['shown'] == explicit['typed']
+    # D2-010: every relationship is revealed, but text stays on the selected
+    # or hovered concept's edges; nothing is selected here, so none carry it.
+    assert explicit['shown'] == 0
     assert explicit['typed'] == sum(edge['data'].get('label') is not None for edge in canonical['edges'])
     assert f"{expected_edges} of {expected_edges} relationships" in explicit["indicator"]
 
@@ -7798,7 +8115,7 @@ def test_graph_phase3_r5_broken_warning_prevalence_and_selected_exception(
         r"""async () => {const G=window.__okfLoomGraph,cy=G.cy,url=document.getElementById('okf-graph').dataset.graphUrl,native=fetch.bind(window),p=await native(url).then(r=>r.json());
           const prevalent=Math.ceil(p.nodes.length*0.3);
           p.nodes.forEach((n,i)=>{n.data.unresolved_count=i<prevalent?2:0;});
-          window.fetch=(r,o)=>String(r)===url?Promise.resolve(new Response(JSON.stringify(p),{headers:{'Content-Type':'application/json'}})):native(r,o);
+          window.fetch=(r,o)=>String(r).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(p),{headers:{'Content-Type':'application/json'}})):native(r,o);
           await G.refreshGraph();
           const broken=cy.nodes().filter(n=>Number(n.data('unresolved_count'))>0), first=broken.first();
           const before=first.style('background-image'); first.select();
@@ -7830,7 +8147,7 @@ def test_graph_phase3_r4_dense_overview_canvas_state_priority(docs_server_url: s
           // Repaired live docs carry too few broken concepts to aggregate; set
           // the >25% prevalence explicitly on the remaining payload nodes.
           p.nodes.forEach((n,i)=>{if(i>2)n.data.unresolved_count=i%2===0?1:0;});
-          window.fetch=(r,o)=>String(r)===url?Promise.resolve(new Response(JSON.stringify(p),{headers:{'Content-Type':'application/json'}})):native(r,o);await G.refreshGraph();
+          window.fetch=(r,o)=>String(r).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(p),{headers:{'Content-Type':'application/json'}})):native(r,o);await G.refreshGraph();
           const snap=id=>{const n=cy.getElementById(id),row=document.querySelector('.okf-node-index__item[data-target="'+CSS.escape(id)+'"]');return {zero:n.hasClass('okf-density-overview-zero'),broken:n.hasClass('okf-density-overview-broken'),aggregated:n.hasClass('okf-broken-aggregated'),aria:row.getAttribute('aria-label')};};
           const overview=ids.map(snap);cy.zoom(1.3);await new Promise(r=>setTimeout(r,80));return {overview,detail:ids.map(snap)};}"""
     )
@@ -7850,7 +8167,7 @@ def test_graph_phase3_r3_compound_state_layers_and_dense_titles(docs_server_url:
     result = page.evaluate(
         r"""async () => {const G=window.__okfLoomGraph,cy=G.cy,url=document.getElementById('okf-graph').dataset.graphUrl,native=fetch.bind(window),p=await native(url).then(r=>r.json()),id=p.nodes[0].data.id;
           p.nodes[0].data.unresolved_count=2;p.nodes[0].data.active_comment_count=12;
-          window.fetch=(r,o)=>String(r)===url?Promise.resolve(new Response(JSON.stringify(p),{headers:{'Content-Type':'application/json'}})):native(r,o);
+          window.fetch=(r,o)=>String(r).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(p),{headers:{'Content-Type':'application/json'}})):native(r,o);
           await G.refreshGraph();const n=cy.getElementById(id);n.addClass('okf-hub');n.select();
           const pos=n.style('background-position-x'),warn=decodeURIComponent(n.data('brokenBadgeUrl')),comment=decodeURIComponent(n.data('commentBadgeUrl')),
             row=document.querySelector('.okf-lens-summary__row'),label=row&&row.querySelector('.okf-lens-summary__label'),note=row&&row.querySelector('.okf-lens-summary__note');
@@ -7864,7 +8181,9 @@ def test_graph_phase3_r3_compound_state_layers_and_dense_titles(docs_server_url:
     )
     assert "0%" in result["positions"] and "100%" in result["positions"]
     assert ">!</text>" in result["warning"] and "<path" in result["comment"]
-    assert result["selection"] == result["hub"] and result["brokenOpacity"] == "0"
+    # Ledger: the accent is only the selected node's stroke; the hub halo
+    # under it is the neutral raised surface, so the two layers differ.
+    assert result["selection"] != result["hub"] and result["brokenOpacity"] == "0"
     assert float(result["targetDistance"].replace("px", "")) >= 10
     assert result["labelWrap"] == "normal" and result["noteBasis"] == "auto"
     assert 0 < result["noteWidth"] and result["noteWidth"] + 1 >= result["noteMin"]
@@ -7934,7 +8253,7 @@ def test_phase4_slice2_focus_action_depth_restore_and_layout_fence(server_url: s
     page.mouse.click(point["x"], point["y"])
     page.wait_for_function("() => !window.__okfLoomGraph.cy.animated()")
     state["zoom"] = page.evaluate("() => window.__okfLoomGraph.cy.zoom()")
-    page.screenshot(path="/tmp/okf-phase4-slice3-selected-action.png", full_page=True)
+    page.screenshot(path=str(Path(tempfile.gettempdir()) / "okf-phase4-slice3-selected-action.png"), full_page=True)
     page.get_by_role("toolbar", name="Selected concept actions").get_by_role("button", name="Explore neighborhood").click()
     focusbar = page.get_by_role("group", name="Explore neighborhood")
     expect(focusbar).to_be_visible()
@@ -7944,7 +8263,7 @@ def test_phase4_slice2_focus_action_depth_restore_and_layout_fence(server_url: s
     focused = page.evaluate("""() => ({root:window.__okfLoomGraph.focusRoot(),depth:window.__okfLoomGraph.getState().focusDepth,lens:window.__okfLoomGraph.getState().lens,settled:window.okfGraphCaptureState().layoutSettled,url:location.search})""")
     assert focused["root"] == state["id"] and focused["depth"] == 2 and focused["lens"] == "focus" and focused["settled"]
     assert "focus=" in focused["url"]
-    page.screenshot(path="/tmp/okf-phase4-slice2-focus.png", full_page=True)
+    page.screenshot(path=str(Path(tempfile.gettempdir()) / "okf-phase4-slice2-focus.png"), full_page=True)
     focusbar.get_by_role("button", name="Show all").click()
     page.wait_for_function("() => window.__okfLoomGraph.getState().lens !== 'focus' && window.okfGraphCaptureState().layoutSettled")
     page.wait_for_function("() => !window.__okfLoomGraph.cy.animated()")
@@ -7972,7 +8291,7 @@ def test_phase4_slice2_real_shift_pointer_path_is_typed_filtered_and_layered(ser
     expect(panel.locator(".okf-detail-path__node")).to_have_count(2)
     expect(panel.locator(".okf-detail-path__relation")).to_have_count(1)
     assert "path=" in page.url
-    page.screenshot(path="/tmp/okf-phase4-slice2-path.png", full_page=True)
+    page.screenshot(path=str(Path(tempfile.gettempdir()) / "okf-phase4-slice2-path.png"), full_page=True)
     page.locator(".okf-graph-canvas-proxy").focus()
     page.keyboard.press("Escape")
     expect(panel).to_be_hidden()
@@ -8011,7 +8330,7 @@ def test_phase4_slice2_focus_path_url_runtime_parity(request, surface: str, tmp_
     result = page.evaluate("""() => {const G=window.__okfLoomGraph,e=G.cy.edges().sort((a,b)=>a.id().localeCompare(b.id())).first(),a=e.source().id(),b=e.target().id();G.interaction.dispatch({type:'SELECT',id:a,quietUrl:true});G.interaction.dispatch({type:'PATH',from:a,id:b});return {kind:G.interaction.snapshot().pathResult.kind,nodes:G.cy.nodes().length,edges:G.cy.edges().length,revision:document.body.dataset.okfRevision};}""")
     assert result["kind"] == "found" and result["nodes"] > 0 and result["edges"] > 0
     if surface == "static":
-        page.screenshot(path="/tmp/okf-phase4-slice2-mobile.png", full_page=True)
+        page.screenshot(path=str(Path(tempfile.gettempdir()) / "okf-phase4-slice2-mobile.png"), full_page=True)
 
 
 def test_phase4_slice3_lens_previews_summaries_and_advanced_filters(server_url: str, page) -> None:
@@ -8041,7 +8360,7 @@ def test_phase4_slice3_lens_previews_summaries_and_advanced_filters(server_url: 
     expect(relation_group).to_be_visible()
     relation_group.locator("button.okf-filter-chip").first.click()
     expect(relation_group.locator("button.okf-filter-chip").first).to_have_attribute("aria-pressed", "false")
-    page.screenshot(path="/tmp/okf-phase4-slice3-filters.png", full_page=True)
+    page.screenshot(path=str(Path(tempfile.gettempdir()) / "okf-phase4-slice3-filters.png"), full_page=True)
 
 
 def test_phase4_slice3_search_keyboard_glow_count_and_durable_restore(server_url: str, page) -> None:
@@ -8055,7 +8374,7 @@ def test_phase4_slice3_search_keyboard_glow_count_and_durable_restore(server_url
     page.wait_for_function("() => window.__okfLoomGraph.cy.nodes('.okf-search-match').length > 0")
     expect(page.locator(".okf-graph-search-status")).to_contain_text("match")
     assert page.evaluate("() => window.__okfLoomGraph.cy.nodes('.okf-search-match').length") >= 1
-    page.screenshot(path="/tmp/okf-phase4-slice3-search.png", full_page=True)
+    page.screenshot(path=str(Path(tempfile.gettempdir()) / "okf-phase4-slice3-search.png"), full_page=True)
     page.get_by_role("button", name="Clear", exact=True).click()
     assert page.evaluate("id => window.__okfLoomGraph.interaction.snapshot().selected === id && window.__okfLoomGraph.cy.nodes('.okf-search-match').length === 0", arg=graph["id"])
 
@@ -8088,7 +8407,7 @@ def test_phase4_slice3_viewport_minimap_fullscreen_and_layout_recovery(server_ur
     expect(page.get_by_role("button", name="Re-run layout")).to_be_visible(timeout=5000)
     after = page.evaluate("() => ({nodes:window.__okfLoomGraph.cy.nodes().map(n=>n.id()).sort(),edges:window.__okfLoomGraph.cy.edges().map(e=>e.id()).sort(),rev:document.body.dataset.okfRevision})")
     assert after == before
-    page.screenshot(path="/tmp/okf-phase4-slice3-minimap.png", full_page=True)
+    page.screenshot(path=str(Path(tempfile.gettempdir()) / "okf-phase4-slice3-minimap.png"), full_page=True)
 
 
 @pytest.mark.parametrize("surface", ["live", "static", "single"])
@@ -8111,12 +8430,12 @@ def test_phase4_slice3_controls_runtime_parity(request, surface: str, tmp_path: 
     if surface != "single":
         assert result["revision"]
     if surface == "live":
-        page.screenshot(path="/tmp/okf-phase4-slice3-desktop-light.png", full_page=True)
-        page.evaluate("() => {document.documentElement.setAttribute('data-theme','technical-dark');window.dispatchEvent(new Event('okf-loom:themeChanged'))}")
-        page.screenshot(path="/tmp/okf-phase4-slice3-desktop-dark.png", full_page=True)
+        page.screenshot(path=str(tmp_path / "okf-phase4-slice3-desktop-light.png"), full_page=True)
+        page.evaluate("() => {document.documentElement.setAttribute('data-theme','slate');window.dispatchEvent(new Event('okf-loom:themeChanged'))}")
+        page.screenshot(path=str(tmp_path / "okf-phase4-slice3-desktop-dark.png"), full_page=True)
     if surface == "static":
         page.set_viewport_size({"width": 390, "height": 844})
-        page.screenshot(path="/tmp/okf-phase4-slice3-mobile.png", full_page=True)
+        page.screenshot(path=str(tmp_path / "okf-phase4-slice3-mobile.png"), full_page=True)
 
 
 def test_phase4_review_type_filter_identity_counts_reload_and_history(server_url: str, page) -> None:
@@ -8339,15 +8658,24 @@ def test_graph_refresh_latest_wins(server_url: str, page) -> None:
         }"""
     )
     assert base.get("nodes"), "graph JSON has no nodes to base the refresh bodies on"
+    # Drive the real debounce/transition timers on a controlled browser clock.
+    # Host scheduling must not turn a 50ms pending proof into a >300ms sample.
+    page.evaluate("async () => await window.okfCaptureReadiness.start({target:'graph'}).promise")
+    page.clock.install(time=0)
+    page.clock.pause_at(1000)
     # Turn the gate on and drive two overlapping refreshes via `graph` events.
     page.evaluate("() => { window.__graphGate.on = true; }")
     initial_capture = page.evaluate("() => window.okfGraphCaptureState()")
     motion_before = page.evaluate("() => {const G=window.__okfLoomGraph;G.cy.pan({x:31,y:-17});G.cy.zoom(.71);return {pan:G.cy.pan(),zoom:G.cy.zoom(),starts:G.layoutStats.starts};}")
     page.evaluate("() => window.okfLoomLive.emit('graph', {})")
+    page.clock.fast_forward(1000)
     page.wait_for_function("() => window.__graphGate.pending.length >= 1", timeout=5000)
     page.evaluate("() => window.okfLoomLive.emit('graph', {})")
+    page.clock.fast_forward(1000)
     page.wait_for_function("() => window.__graphGate.pending.length >= 2", timeout=5000)
-    # Resolve the NEWER refresh (pending[1]) first, then the STALE one (pending[0]).
+    # Observe acceptance and start the pending-capture proof in the browser's
+    # same turn. Sleeping between RPCs can consume the entire 300ms transition
+    # on a loaded host, so a later sample would legitimately capture ready.
     page.evaluate(
         """(base) => {
               const mk = (extraId) => {
@@ -8358,22 +8686,32 @@ def test_graph_refresh_latest_wins(server_url: str, page) -> None:
             };
             const R = (body) => new Response(
                 JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
-            window.__graphGate.pending[1](R(mk('okf-fence-new')));
-            return new Promise((done) => setTimeout(() => {
-                window.__graphGate.pending[0](R(mk('okf-fence-stale')));
-                setTimeout(done, 80);
-            }, 80));
+            return new Promise((resolve) => {
+                const observer = new MutationObserver(() => {
+                    if (!window.okfGraphCaptureState().transitionPending) return;
+                    observer.disconnect();
+                    const run = window.okfCaptureReadiness.start({target: 'graph'});
+                    Promise.race([
+                        run.promise.then(() => ({authorized: true}))
+                            .catch(e => ({authorized: e.screenshotAllowed})),
+                        new Promise(done => setTimeout(() => done({pending: true}), 50)),
+                    ]).then(result => { window.__graphPendingResult = result; });
+                    resolve();
+                });
+                observer.observe(document.body, {attributes: true});
+                window.__graphGate.releaseStale = () => window.__graphGate.pending[0](R(mk('okf-fence-stale')));
+                window.__graphGate.pending[1](R(mk('okf-fence-new')));
+            });
         }""",
         base,
     )
-    page.wait_for_function("() => window.okfGraphCaptureState().transitionPending")
-    pending = page.evaluate("""async () => {
-        const run=window.okfCaptureReadiness.start({target:'graph'});
-        const raced=await Promise.race([run.promise.then(()=>({authorized:true})).catch(e=>({authorized:e.screenshotAllowed})),new Promise(resolve=>setTimeout(()=>resolve({pending:true}),50))]);
-        return raced;
-    }""")
+    page.clock.run_for(50)
+    pending = page.evaluate("() => window.__graphPendingResult")
     assert pending == {"pending": True}, "capture authorized a screenshot while refreshed transition was pending"
-    page.wait_for_function("() => !window.okfGraphCaptureState().transitionPending && window.okfGraphCaptureState().layoutSettled")
+    page.evaluate("() => window.__graphGate.releaseStale()")
+    page.clock.run_for(400)
+    page.clock.resume()
+    page.wait_for_function("() => window.__okfLoomGraph.refreshStats.skippedStale >= 1 && !window.okfGraphCaptureState().transitionPending && window.okfGraphCaptureState().layoutSettled")
     res = page.evaluate(
         """() => ({
             hasNew: window.__okfLoomGraph.cy.getElementById('okf-fence-new').length > 0,
@@ -8406,7 +8744,7 @@ def test_graph_phase3_density_refresh_sparse_to_dense_is_current_bundle_derived(
       const nodes=Array.from({length:25},(_,i)=>({data:{id:'cross-d-'+i,label:'Dense '+i,type:'concept',unresolved_count:i<8?1:0,active_comment_count:0}}));
       const edges=[];outer:for(let i=0;i<nodes.length;i++)for(let j=0;j<nodes.length;j++){if(i===j)continue;edges.push({data:{source:nodes[i].data.id,target:nodes[j].data.id,label:'rel'}});if(edges.length===120)break outer;}
       const payload={...base,bundle_revision:'cross-dense',nodes,edges,outgoing:null,backlinks:null};
-      window.fetch=(r,o)=>String(r)===url?Promise.resolve(new Response(JSON.stringify(payload),{headers:{'Content-Type':'application/json'}})):native(r,o);
+      window.fetch=(r,o)=>String(r).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(payload),{headers:{'Content-Type':'application/json'}})):native(r,o);
       await G.refreshGraph();await new Promise(requestAnimationFrame);
       const cy=G.cy, disclosure=document.querySelector('.okf-graph-density');
       const capture=window.okfGraphCaptureState(),pendingRaw=cy.nodes().length;
@@ -8434,8 +8772,8 @@ def test_graph_phase3_density_refresh_dense_to_sparse_and_stale_dense_cannot_res
       const make=(count,edgeCount,revision)=>{const nodes=Array.from({length:count},(_,i)=>({data:{id:revision+'-'+i,label:revision+' '+i,type:'concept',unresolved_count:1}})),edges=[];
         outer:for(let i=0;i<count;i++)for(let j=0;j<count;j++){if(i===j)continue;edges.push({data:{source:nodes[i].data.id,target:nodes[j].data.id}});if(edges.length===edgeCount)break outer;}return {...base,bundle_revision:revision,nodes,edges,outgoing:null,backlinks:null};};
       const dense=make(25,120,'accepted-dense'),sparse=make(24,23,'accepted-sparse'),stale=make(26,121,'stale-dense');
-      let payload=dense;window.fetch=(r,o)=>String(r)===url?Promise.resolve(new Response(JSON.stringify(payload),{headers:{'Content-Type':'application/json'}})):native(r,o);await G.refreshGraph();
-      window.fetch=(r,o)=>String(r)===url?new Promise(resolve=>held.push({resolve,signal:o.signal})):native(r,o);
+      let payload=dense;window.fetch=(r,o)=>String(r).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(payload),{headers:{'Content-Type':'application/json'}})):native(r,o);await G.refreshGraph();
+      window.fetch=(r,o)=>String(r).split('?')[0]===url?new Promise(resolve=>held.push({resolve,signal:o.signal})):native(r,o);
       const a=G.refreshGraph();await new Promise(requestAnimationFrame);const b=G.refreshGraph();await new Promise(requestAnimationFrame);
       held[1].resolve(new Response(JSON.stringify(sparse),{headers:{'Content-Type':'application/json'}}));await b;
       held[0].resolve(new Response(JSON.stringify(stale),{headers:{'Content-Type':'application/json'}}));await a;await new Promise(requestAnimationFrame);
@@ -8459,7 +8797,7 @@ def test_graph_phase3_density_disclosure_never_intersects_nodes_at_zoom_tiers(do
     """Disclosure is non-plotting chrome at overview/intermediate/high zoom."""
     page.set_viewport_size({"width": 1440, "height": 900})
     _open_graph(page, docs_server_url)
-    proof_dir = Path("/tmp/okf-loom-phase3-density-geometry")
+    proof_dir = Path(tempfile.gettempdir()) / "okf-loom-phase3-density-geometry"
     proof_dir.mkdir(parents=True, exist_ok=True)
     for name, zoom, copy in (("overview", 0.8, "Overview"), ("intermediate", 1.1, "Intermediate detail"), ("high", 1.51, "Local detail")):
         page.evaluate("z => { window.__okfLoomGraph.cy.zoom(z); return undefined; }", zoom)
@@ -8576,233 +8914,201 @@ def test_appearance_trigger_hidden_until_theme_ready_gate(static_url: str, page)
     expect(page.locator("#okf-theme")).to_be_visible()
 
 
-def test_appearance_control_switches_family_and_mode(static_url: str, page) -> None:
-    """Both families x both modes resolve + persist via the sole owner
-    (window.OKFLoomTheme). Auto never pins a concrete legacy mirror."""
+_LEDGER_CHOICES = ("bone", "slate", "clay", "plum", "system")
+
+
+def test_appearance_control_switches_palette_and_persists(static_url: str, page) -> None:
+    """Every palette and System resolve + persist through the sole owner
+    (window.OKFLoomTheme) under one storage key; retired names normalise to
+    their Ledger palette and retired keys are never written."""
+    page.emulate_media(color_scheme="light")
     page.goto(static_url + "/__search.html?q=orders", wait_until="domcontentloaded")
     page.wait_for_function(
         "() => window.okfPortableProvider && document.body.dataset.okfCaptureReady === 'ready'"
     )
     assert page.evaluate("() => !!window.OKFLoomTheme"), "theme.js API not present"
-
-    # Swiss + dark.
-    page.evaluate("() => { window.OKFLoomTheme.setFamily('swiss'); window.OKFLoomTheme.setMode('dark'); }")
-    expect(page.locator("html")).to_have_attribute("data-theme", "swiss-dark")
-    assert page.evaluate("() => localStorage.getItem('okf-theme-family')") == "swiss"
-    assert page.evaluate("() => localStorage.getItem('okf-theme-mode')") == "dark"
-    # Explicit mode mirrors into the legacy key for older same-origin pages.
-    assert page.evaluate("() => localStorage.getItem('okf-theme')") == "swiss-dark"
-
-    # Flip mode to light; family is sticky.
-    page.evaluate("() => window.OKFLoomTheme.setMode('light')")
-    expect(page.locator("html")).to_have_attribute("data-theme", "swiss-light")
-
-    # Switch family to technical; mode stays light.
-    page.evaluate("() => window.OKFLoomTheme.setFamily('technical')")
-    expect(page.locator("html")).to_have_attribute("data-theme", "technical-light")
-
-    # Auto removes the concrete legacy mirror (must follow OS, never pin).
-    page.evaluate("() => window.OKFLoomTheme.setMode('auto')")
-    assert page.evaluate("() => localStorage.getItem('okf-theme')") is None
-    assert page.evaluate("() => localStorage.getItem('okf-theme-mode')") == "auto"
+    assert tuple(page.evaluate("() => window.OKFLoomTheme.CHOICES")) == _LEDGER_CHOICES
+    for palette in ("slate", "clay", "plum", "bone"):
+        page.evaluate("p => window.OKFLoomTheme.setTheme(p)", palette)
+        expect(page.locator("html")).to_have_attribute("data-theme", palette)
+        assert page.evaluate("() => localStorage.getItem('okf-loom.appearance')") == palette
+    # System follows the OS (light here) and persists the choice, not a palette.
+    page.evaluate("() => window.OKFLoomTheme.setTheme('system')")
+    expect(page.locator("html")).to_have_attribute("data-theme", "bone")
+    assert page.evaluate("() => localStorage.getItem('okf-loom.appearance')") == "system"
+    page.emulate_media(color_scheme="dark")
+    expect(page.locator("html")).to_have_attribute("data-theme", "slate")
+    # A retired name is accepted and normalised (one-way migration alias).
+    page.evaluate("() => window.OKFLoomTheme.setTheme('purple-dark')")
+    expect(page.locator("html")).to_have_attribute("data-theme", "plum")
+    assert page.evaluate("() => localStorage.getItem('okf-loom.appearance')") == "plum"
+    for retired in ("okf-theme", "okf-theme-family", "okf-theme-mode"):
+        assert page.evaluate("k => localStorage.getItem(k)", retired) is None, retired
 
 
 def test_appearance_menu_click_option_applies_theme(static_url: str, page) -> None:
     """Clicking a menu option (pointer) applies it through the sole owner."""
     _open_appearance_menu(page, static_url)
-    # Click the "Dark" colour-mode option.
-    page.locator('#okf-appearance-menu [data-okf-set="mode"][data-okf-val="dark"]').click()
-    expect(page.locator("html")).to_have_attribute("data-theme", "technical-dark")
-    # The menu stays open (radiogroup convention) but the theme applied.
-    assert page.evaluate("() => localStorage.getItem('okf-theme-mode')") == "dark"
+    page.locator('#okf-appearance-menu label[for="okf-appearance-theme-clay"]').click()
+    expect(page.locator("html")).to_have_attribute("data-theme", "clay")
+    # The menu stays open (radiogroup convention) but the palette applied.
+    assert page.evaluate("() => localStorage.getItem('okf-loom.appearance')") == "clay"
+    assert page.evaluate("() => !document.getElementById('okf-appearance-menu').hidden")
+    expect(page.locator("#okf-theme")).to_contain_text("Clay")
 
 
-def test_appearance_exposes_typed_modifier_controls_and_keyboard(static_url: str, page) -> None:
-    """The shared Appearance form exposes four labelled radio groups, and
-    modifier radios use the same roving Arrow/Home/End contract as family and
-    mode without reducing the native checked semantics."""
+def test_appearance_exposes_one_palette_radiogroup_and_keyboard(static_url: str, page) -> None:
+    """The shared Appearance form is ONE labelled radio group (four palettes
+    plus System), each option a native radio with an id and a description;
+    Arrow/Home/End move and select within it with a roving tabindex."""
     _open_appearance_menu(page, static_url)
     menu = page.locator("#okf-appearance-menu")
     expect(menu).to_be_visible()
-    assert menu.locator('fieldset[role="group"]').count() == 5
-    for name, values in {
-        "okf-theme-family": ("technical", "swiss", "purple", "coffee"),
-        "okf-theme-mode": ("auto", "light", "dark"),
-        "okf-theme-contrast": ("normal", "soft"),
-        "okf-theme-border": ("on", "off"),
-        }.items():
-        radios = menu.locator(f'input[type="radio"][name="{name}"]')
-        assert radios.count() == len(values)
-        assert menu.locator(
-            f'input[type="radio"][name="{name}"][aria-checked="true"]'
-        ).count() == 1
-        for value in values:
-            control = menu.locator(
-                f'input[type="radio"][name="{name}"][value="{value}"]'
-            )
-            expect(control).to_have_attribute("data-okf-val", value)
-            assert control.get_attribute("id")
-
-    soft = menu.locator('input[data-okf-set="contrast"][data-okf-val="soft"]')
-    reveal_control(page, soft).focus()
-    page.keyboard.press("ArrowDown")
-    assert page.evaluate("() => document.activeElement.value") == "normal"
+    assert menu.locator('fieldset[role="radiogroup"]').count() == 1
+    expect(menu.locator("fieldset")).to_have_accessible_name("Appearance")
+    radios = menu.locator('input[type="radio"][name="okf-appearance"]')
+    assert tuple(radios.evaluate_all("els => els.map(e => e.value)")) == _LEDGER_CHOICES
+    assert menu.locator('input[type="radio"]:checked').count() == 1
+    assert menu.locator('input[type="radio"][tabindex="0"]').count() == 1
+    for value in _LEDGER_CHOICES:
+        control = menu.locator(f'input[type="radio"][value="{value}"]')
+        expect(control).to_have_attribute("data-okf-val", value)
+        assert control.get_attribute("id") == f"okf-appearance-theme-{value}"
+        expect(control).to_have_accessible_description(re.compile(r"\S"))
+    expect(menu.locator('input[value="bone"]')).to_be_focused()
     page.keyboard.press("End")
-    assert page.evaluate("() => document.activeElement.value") == "soft"
+    assert page.evaluate("() => document.activeElement.value") == "system"
+    page.keyboard.press("ArrowDown")
+    assert page.evaluate("() => document.activeElement.value") == "bone"
+    page.keyboard.press("ArrowDown")
+    assert page.evaluate("() => document.activeElement.value") == "slate"
+    expect(page.locator("html")).to_have_attribute("data-theme", "slate")
     page.keyboard.press("Home")
-    assert page.evaluate("() => document.activeElement.value") == "normal"
+    assert page.evaluate("() => document.activeElement.value") == "bone"
+    assert menu.locator('input[type="radio"][tabindex="0"]').get_attribute("value") == "bone"
 
 
-def test_appearance_modifiers_persist_root_state_and_event_generation(
+def test_appearance_events_carry_previous_palette_scheme_and_generation(
     static_url: str, page
 ) -> None:
-    """Modifier setters are owned by theme.js: root attributes, persistence,
-    and one ordered semantic event update atomically while family/mode remain
-    independent."""
+    """theme.js dispatches ONE ordered okf-loom:themeChanged per actual
+    palette change, carrying the previous palette, the scheme and a rising
+    generation; a repeated choice or a System choice that resolves to the
+    painted palette fires nothing. The choice survives a reload."""
+    page.emulate_media(color_scheme="light")
     page.goto(static_url + "/__search.html?q=orders", wait_until="domcontentloaded")
     page.wait_for_function("() => !!window.OKFLoomTheme")
     page.evaluate("() => localStorage.clear()")
+    page.reload(wait_until="domcontentloaded")
+    page.wait_for_function("() => !!window.OKFLoomTheme")
     events = page.evaluate("""() => {
       const rows = [];
       window.addEventListener('okf-loom:themeChanged', e => rows.push({
-        contrast: e.detail.contrast,
-        border: e.detail.border,
-        previousContrast: e.detail.previousContrast,
-        previousBorder: e.detail.previousBorder,
-        generation: e.detail.generation,
-        rootContrast: document.documentElement.getAttribute('data-okf-contrast'),
-        rootBorder: document.documentElement.getAttribute('data-okf-border'),
+        theme: e.detail.theme, previousTheme: e.detail.previousTheme, previous: e.detail.previous,
+        scheme: e.detail.scheme, choice: e.detail.choice, generation: e.detail.generation,
+        root: document.documentElement.getAttribute('data-theme'),
       }));
-      window.OKFLoomTheme.setContrast('soft');
-      window.OKFLoomTheme.setBorder('on');
+      window.OKFLoomTheme.setTheme('slate');
+      window.OKFLoomTheme.setTheme('clay');
+      window.OKFLoomTheme.setTheme('clay');
+      window.OKFLoomTheme.setTheme('system');
+      window.OKFLoomTheme.setTheme('bone');
       return rows;
     }""")
-    assert len(events) == 2
-    assert events[0]["contrast"] == "soft" and events[0]["rootContrast"] == "soft"
-    # Borders Off is the default, so switching On proves a real transition.
-    assert events[1]["previousBorder"] == "off"
-    assert events[1]["border"] == "on" and events[1]["rootBorder"] == "on"
-    assert events[1]["generation"] > events[0]["generation"]
-    assert page.evaluate("() => window.OKFLoomTheme.getFamily()") == "technical"
-    assert page.evaluate("() => window.OKFLoomTheme.getMode()") == "auto"
-    assert page.locator("html").get_attribute("data-okf-contrast") == "soft"
-    assert page.locator("html").get_attribute("data-okf-border") == "on"
-    assert page.evaluate("() => localStorage.getItem('okf-theme-contrast')") == "soft"
-    assert page.evaluate("() => localStorage.getItem('okf-theme-border')") == "on"
-
+    assert [(e["theme"], e["previousTheme"], e["scheme"], e["choice"]) for e in events] == [
+        ("slate", "bone", "dark", "slate"),
+        ("clay", "slate", "dark", "clay"),
+        ("bone", "clay", "light", "system"),
+    ], events
+    assert all(e["root"] == e["theme"] for e in events), events
+    generations = [e["generation"] for e in events]
+    assert generations == sorted(set(generations)), generations
+    assert page.evaluate("() => localStorage.getItem('okf-loom.appearance')") == "bone"
+    page.evaluate("() => window.OKFLoomTheme.setTheme('plum')")
     page.reload(wait_until="domcontentloaded")
     page.wait_for_function("() => !!window.OKFLoomTheme")
-    assert page.locator("html").get_attribute("data-okf-contrast") == "soft"
-    assert page.locator("html").get_attribute("data-okf-border") == "on"
+    assert page.locator("html").get_attribute("data-theme") == "plum"
+    assert page.evaluate("() => window.OKFLoomTheme.getChoice()") == "plum"
 
 
-def test_appearance_auto_uses_explicit_config_not_painted_concrete_hint(
+def test_appearance_default_is_bone_and_not_the_os_scheme(
     static_url: str, page
 ) -> None:
-    """Static output carries Technical Auto separately from its concrete
-    first-paint hint; a dark OS resolves dark without persisting a mode."""
+    """Static output configures Bone (the Ledger default is a palette, not
+    System), so a dark OS still paints Bone and nothing is persisted."""
     page.emulate_media(color_scheme="dark")
     page.goto(static_url + "/__search.html?q=orders", wait_until="domcontentloaded")
     page.wait_for_function("() => !!window.OKFLoomTheme")
-    assert page.locator("html").get_attribute("data-theme") == "technical-dark"
-    assert page.evaluate("() => window.OKFLoomTheme.getMode()") == "auto"
-    assert page.evaluate("() => localStorage.getItem('okf-theme-mode')") is None
+    assert page.locator("html").get_attribute("data-theme") == "bone"
+    assert page.evaluate("() => window.OKFLoomTheme.getChoice()") == "bone"
+    assert page.evaluate("() => localStorage.getItem('okf-loom.appearance')") is None
     configured = page.evaluate(
         "() => JSON.parse(document.getElementById('okf-theme-config').textContent)"
     )
-    assert configured["theme"] == "auto"
+    assert configured["theme"] == "bone"
 
 
-def test_appearance_border_off_keeps_non_colour_cues_visible(server_url: str, page) -> None:
-    """Border Off removes decorative frame colour but keeps semantic focus,
-    selection, path, error, and status cues available through tokens and text
-    treatment rather than a coloured side stripe alone."""
+def test_appearance_keeps_non_colour_cues_visible(server_url: str, page) -> None:
+    """The checked palette is marked by a 2px bar (shape, not hue alone),
+    keyboard focus by a solid outline, and a search error by a bordered panel
+    with a 2px status bar plus its heading text; semantic cue tokens resolve.
+    A generic live region never paints a generated label over the page."""
     _goto_with_theme(page, server_url)
-    page.evaluate("""() => {
-      window.OKFLoomTheme.setContrast('soft');
-      window.OKFLoomTheme.setBorder('off');
-    }""")
     page.locator("#okf-theme").click()
     page.wait_for_function("() => !document.getElementById('okf-appearance-menu').hidden")
-    reveal_control(page, page.locator('#okf-appearance-menu input[data-okf-set="contrast"]').first)
+    page.keyboard.press("ArrowDown")
+    page.keyboard.press("ArrowUp")
     cues = page.evaluate("""() => {
       const root = getComputedStyle(document.documentElement);
-      const checked = document.querySelector('#okf-appearance-menu .okf-appearance__opt[aria-checked="true"]');
-      const selected = getComputedStyle(checked);
-      const focus = document.querySelector('#okf-appearance-menu input[data-okf-set="contrast"]');
-      focus.focus();
-      const focused = getComputedStyle(focus.closest('.okf-appearance__opt'));
-      const error = document.createElement('p');
+      const opts = [...document.querySelectorAll('#okf-appearance-menu .okf-appearance__opt')];
+      const checked = opts.find(o => o.querySelector('input:checked'));
+      const other = opts.find(o => !o.querySelector('input:checked'));
+      const focused = getComputedStyle(document.activeElement.closest('.okf-appearance__opt'));
+      const error = document.createElement('div');
       error.className = 'okf-search-error';
-      error.textContent = 'The search failed.';
+      error.innerHTML = '<h3>Search failed</h3><p>The search failed.</p>';
       document.body.appendChild(error);
       const errorStyle = getComputedStyle(error);
-      const status = document.createElement('p');
-      status.className = 'okf-studio-fallback-banner';
-      status.setAttribute('role', 'status');
-      status.textContent = 'Saved.';
-      document.body.appendChild(status);
-      const statusText = getComputedStyle(status, '::before').content;
-      // A generic live region (e.g. the selection Comment affordance) must
-      // never paint a generated "Status" label over the page.
       const live = document.createElement('div');
       live.setAttribute('role', 'status');
       live.textContent = 'Comment';
       document.body.appendChild(live);
       const liveText = getComputedStyle(live, '::before').content;
-      const errorOutline = errorStyle.outlineStyle;
-      error.remove(); status.remove(); live.remove();
-      return {
-        border: root.getPropertyValue('--okf-border').trim(),
+      const out = {
         selection: root.getPropertyValue('--okf-selection-cue').trim(),
         path: root.getPropertyValue('--okf-path-cue').trim(),
         error: root.getPropertyValue('--okf-error-cue').trim(),
         status: root.getPropertyValue('--okf-status-cue').trim(),
-        selectedWeight: selected.fontWeight,
-        selectedDecoration: selected.textDecorationLine,
+        checkedBar: getComputedStyle(checked).boxShadow,
+        otherBar: getComputedStyle(other).boxShadow,
         focusOutline: focused.outlineStyle,
-        errorOutline,
-        statusText,
+        errorBorder: errorStyle.borderTopStyle,
+        errorBar: errorStyle.boxShadow,
         liveText,
       };
+      error.remove(); live.remove();
+      return out;
     }""")
-    assert cues["border"] in ("transparent", "rgba(0, 0, 0, 0)")
     for key in ("selection", "path", "error", "status"):
-        assert cues[key] not in ("", "transparent", "rgba(0, 0, 0, 0)")
-    assert int(cues["selectedWeight"]) >= 700
-    assert "underline" in cues["selectedDecoration"]
-    assert cues["focusOutline"] == "solid"
-    assert cues["errorOutline"] == "solid"
-    assert "Status" in cues["statusText"]
-    assert cues["liveText"] in ("none", "normal")
+        assert cues[key] not in ("", "transparent", "rgba(0, 0, 0, 0)"), cues
+    assert "inset" in cues["checkedBar"] and cues["otherBar"] == "none", cues
+    assert cues["focusOutline"] == "solid", cues
+    assert cues["errorBorder"] == "solid" and "inset" in cues["errorBar"], cues
+    assert cues["liveText"] in ("none", "normal"), cues
 
 
-def test_appearance_reset_button_restores_configured_auto_defaults(
+def test_appearance_reset_restores_the_configured_default(
     static_url: str, page
 ) -> None:
-    """Reset is a normal typed Appearance action, not a hidden escape hatch:
-    it clears user keys and returns the configured Technical Auto/normal/
-    borders-off/compact state while leaving the form open for confirmation."""
+    """OKFLoomTheme.reset() clears the user choice and returns the configured
+    palette (Bone), reflecting it in the open menu."""
     _open_appearance_menu(page, static_url)
-    reveal_control(page, page.locator('input[data-okf-set="family"][data-okf-val="swiss"]')).click()
-    page.locator('input[data-okf-set="mode"][data-okf-val="dark"]').click()
-    page.locator('input[data-okf-set="contrast"][data-okf-val="soft"]').click()
-    page.locator('input[data-okf-set="border"][data-okf-val="on"]').click()
-    page.locator('input[data-okf-set="density"][data-okf-val="comfortable"]').click()
-    expect(page.locator("html")).to_have_attribute("data-theme", "swiss-dark")
-    expect(page.locator("html")).to_have_attribute("data-okf-border", "on")
-    expect(page.locator("html")).to_have_attribute("data-okf-density", "comfortable")
-    page.locator('[data-okf-action="reset"]').click()
-    expect(page.locator("html")).to_have_attribute("data-theme", "technical-light")
-    expect(page.locator("html")).to_have_attribute("data-okf-contrast", "normal")
-    expect(page.locator("html")).to_have_attribute("data-okf-border", "off")
-    expect(page.locator("html")).to_have_attribute("data-okf-density", "compact")
-    assert page.evaluate("() => localStorage.getItem('okf-theme-density')") is None
-    assert page.evaluate("() => window.OKFLoomTheme.getMode()") == "auto"
-    assert page.evaluate("() => localStorage.getItem('okf-theme-family')") is None
-    assert page.evaluate("() => localStorage.getItem('okf-theme-mode')") is None
-    assert page.evaluate("() => localStorage.getItem('okf-theme-contrast')") is None
-    assert page.evaluate("() => localStorage.getItem('okf-theme-border')") is None
+    page.locator('#okf-appearance-menu label[for="okf-appearance-theme-plum"]').click()
+    expect(page.locator("html")).to_have_attribute("data-theme", "plum")
+    page.evaluate("() => window.OKFLoomTheme.reset()")
+    expect(page.locator("html")).to_have_attribute("data-theme", "bone")
+    assert page.evaluate("() => localStorage.getItem('okf-loom.appearance')") is None
+    expect(page.locator('#okf-appearance-menu input[value="bone"]')).to_be_checked()
     assert page.evaluate("() => !document.getElementById('okf-appearance-menu').hidden")
 
 
@@ -9113,55 +9419,44 @@ def test_appearance_opened_over_lightbox_restores_focus_into_lightbox(server_url
     )
 
 
+# The first edge's line/arrow colours and their contrast against the graph
+# canvas (the nearest opaque background behind the Cytoscape container).
+_GRAPH_EDGE_ON_CANVAS = """() => {
+  const cy = window.__okfLoomGraph && window.__okfLoomGraph.cy;
+  if (!cy || !cy.edges().length) return null;
+  const s = document.createElement('div').style, norm = c => { s.color = c; return s.color; };
+  const parse = c => c.match(/[\\d.]+/g).map(Number);
+  const lum = c => { const v = parse(c).slice(0, 3).map(x => x / 255).map(x => x <= .04045 ? x / 12.92 : Math.pow((x + .055) / 1.055, 2.4));
+    return .2126 * v[0] + .7152 * v[1] + .0722 * v[2]; };
+  let canvas = 'rgb(255, 255, 255)';
+  for (let n = document.getElementById('okf-graph'); n; n = n.parentElement) {
+    const bg = getComputedStyle(n).backgroundColor, p = parse(bg);
+    if (p.length < 4 || p[3] === 1) { canvas = bg; break; }
+  }
+  const e = cy.edges().first(), line = norm(e.style('line-color')), arrow = norm(e.style('target-arrow-color'));
+  const [a, b] = [lum(line), lum(canvas)];
+  return {theme: document.documentElement.getAttribute('data-theme'), line, arrow, canvas,
+          ratio: Math.round((Math.max(a, b) + .05) / (Math.min(a, b) + .05) * 100) / 100};
+}"""
+
+
 def test_graph_palette_resyncs_on_theme_change(server_url: str, page) -> None:
-    """GAP-3: after the graph initializes, switching family technical -> Swiss
-    re-syncs the canvas edge/arrow colour to mirror the resolved theme's
-    --okf-border-strong token (graph.js listens for okf-loom:themeChanged)."""
+    """GAP-3: after the graph initializes, switching palette Bone -> Slate
+    re-syncs the canvas edge/arrow colour to the resolved palette (graph.js
+    listens for okf-loom:themeChanged); in both palettes the edge clears the
+    3:1 graphical-object floor on its canvas."""
     _open_graph(page, server_url)
-    before = page.evaluate("""() => {
-      if (!window.__okfLoomGraph || !window.__okfLoomGraph.cy) return null;
-      const cy = window.__okfLoomGraph.cy;
-      if (!cy.edges().length) return null;
-      const norm = c => { const s = document.createElement('div').style; s.color = c; return s.color; };
-      const e = cy.edges().first();
-      return {
-        theme: document.documentElement.getAttribute('data-theme'),
-        line: norm(e.style('line-color')),
-        arrow: norm(e.style('target-arrow-color')),
-        expectTech: norm('#5e6e85'),
-      };
-    }""")
+    before = page.evaluate(_GRAPH_EDGE_ON_CANVAS)
     assert before, "graph has no edges to assert the edge colour on"
-    assert before["theme"] == "technical-light", f"unexpected initial theme: {before['theme']}"
-    assert before["line"] == before["expectTech"], (
-        f"initial technical-light edge did not use the semantic slate exception: {before}"
-    )
-    # Technical-light intentionally lifts the graph border from the quiet
-    # decorative border to slate #5e6e85.  Against the dimmed (Soft Light)
-    # #f3f5f7 canvas this is AA for technical graph text/strokes (>= 4.5:1),
-    # while Swiss remains token-owned below.
-    assert page.evaluate("""() => {const rgb=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)/255).map(v=>v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4));const a=rgb('#5e6e85'),b=rgb('#f3f5f7'),l=x=>.2126*x[0]+.7152*x[1]+.0722*x[2];return (l(b)+.05)/(l(a)+.05);}""") >= 4.5
-    # Switch family technical -> swiss (same light mode): the edge must resync
-    # to swiss-light's --okf-border-strong = foreground (#0f172a).
-    page.evaluate("() => window.OKFLoomTheme.setTheme('swiss-light')")
-    page.wait_for_function("() => document.documentElement.getAttribute('data-theme') === 'swiss-light'")
-    after = page.evaluate("""() => {
-      const cy = window.__okfLoomGraph.cy;
-      const norm = c => { const s = document.createElement('div').style; s.color = c; return s.color; };
-      const e = cy.edges().first();
-      return {
-        line: norm(e.style('line-color')),
-        arrow: norm(e.style('target-arrow-color')),
-        expectSwiss: norm('#0f172a'),
-      };
-    }""")
-    assert after["line"] == after["expectSwiss"], (
-        f"edge line colour did not resync to the swiss border token: {after}"
-    )
-    assert after["arrow"] == after["expectSwiss"], (
-        f"edge arrow colour did not resync: {after}"
-    )
-    assert after["line"] != before["line"], "edge colour unchanged after the theme switch"
+    assert before["theme"] == "bone", f"unexpected initial theme: {before['theme']}"
+    assert before["line"] == before["arrow"] and before["ratio"] >= 3, before
+    page.evaluate("() => window.OKFLoomTheme.setTheme('slate')")
+    page.wait_for_function("() => document.documentElement.getAttribute('data-theme') === 'slate'")
+    page.wait_for_timeout(100)
+    after = page.evaluate(_GRAPH_EDGE_ON_CANVAS)
+    assert after["line"] == after["arrow"] and after["ratio"] >= 3, after
+    assert after["line"] != before["line"], "edge colour unchanged after the palette switch"
+    assert after["canvas"] != before["canvas"], "graph canvas did not follow the palette"
 
 
 # --- GAP-6: Appearance composite keyboard matrix -------------------------
@@ -9176,22 +9471,22 @@ def test_appearance_space_opens_trigger(server_url: str, page) -> None:
 
 
 def test_appearance_home_end_move_within_group(server_url: str, page) -> None:
-    """Home/End move within the focused radio group only (not across groups)."""
+    """Home/End move to the ends of the palette radio group; arrows wrap."""
     _goto_with_theme(page, server_url)
     page.locator("#okf-theme").click()
     page.wait_for_function("() => !document.getElementById('okf-appearance-menu').hidden")
-    # openMenu focuses the checked option of the FIRST group (Family), which
-    # defaults to Technical.
-    assert page.evaluate("() => document.activeElement && document.activeElement.getAttribute('data-okf-val')") == "auto"
-    # End -> last option in the Family group (Coffee).
+    focused = "() => document.activeElement && document.activeElement.getAttribute('data-okf-val')"
+    # openMenu focuses the checked option: the configured default, Bone.
+    assert page.evaluate(focused) == "bone"
     page.keyboard.press("End")
-    assert page.evaluate("() => document.activeElement && document.activeElement.getAttribute('data-okf-val')") == "dark"
-    # Home -> first option in the Family group (Technical).
+    assert page.evaluate(focused) == "system"
     page.keyboard.press("Home")
-    assert page.evaluate("() => document.activeElement && document.activeElement.getAttribute('data-okf-val')") == "auto"
-    # Arrow keys also wrap within the group.
+    assert page.evaluate(focused) == "bone"
+    # Arrow keys wrap within the group.
+    page.keyboard.press("ArrowUp")
+    assert page.evaluate(focused) == "system"
     page.keyboard.press("ArrowDown")
-    assert page.evaluate("() => document.activeElement && document.activeElement.getAttribute('data-okf-val')") == "light"
+    assert page.evaluate(focused) == "bone"
 
 
 def test_appearance_tab_exit_closes_without_stealing_focus(server_url: str, page) -> None:
@@ -9272,8 +9567,9 @@ def test_appearance_forced_colors_keeps_checked_state_visible(server_url: str, p
     page.wait_for_function("() => !document.getElementById('okf-appearance-menu').hidden")
     forced = page.evaluate("""() => {
       const m = document.getElementById('okf-appearance-menu');
-      const checked = m.querySelector('.okf-appearance__opt[aria-checked="true"]');
-      const unchecked = m.querySelector('.okf-appearance__opt[aria-checked="false"]');
+      const opts = [...m.querySelectorAll('.okf-appearance__opt')];
+      const checked = opts.find(o => o.querySelector('input:checked'));
+      const unchecked = opts.find(o => !o.querySelector('input:checked'));
       const cs = getComputedStyle(checked), us = getComputedStyle(unchecked);
       return {
         checkedAdjust: cs.forcedColorAdjust,
@@ -9377,39 +9673,31 @@ def _computed_outline(page) -> dict:
     )
 
 
-def test_phase1_curated_type_color_applied_to_header_and_cards(
+def test_ledger_type_identity_is_neutral_on_header_and_cards(
     server_url: str, page,
 ) -> None:
-    """The curated type colour is applied to the concept header band
-    (--okf-type-accent) AND to the index cards for the same type, so the
-    identity is consistent across surfaces (design §2.1 "type = colour +
-    icon, everywhere"). Orders is type Table → curated indigo."""
+    """Ledger: content types are not colour-coded. The concept header's type
+    chip is an outlined ink label (no fill), and neither the header nor any
+    index row resolves a per-type hue; every --okf-type-accent is the
+    palette's --text-3. Orders is type Table (formerly curated indigo)."""
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto(f"{server_url}/tables/orders", wait_until="domcontentloaded")
     page.locator("h1.okf-page__title").wait_for(state="visible")
-    header_accent = page.evaluate(
-        "() => getComputedStyle(document.querySelector('.okf-page__header'))"
-      ".getPropertyValue('--okf-type-accent').trim()"
-    )
-    assert header_accent.startswith("hsl("), (
-        f"header band has no curated --okf-type-accent: {header_accent!r}"
-    )
-    # The type chip background matches the same curated colour.
-    chip_bg = page.evaluate(
-        "() => getComputedStyle(document.querySelector('.okf-type-chip'))"
-      ".backgroundColor"
-    )
-    assert chip_bg != "rgba(0, 0, 0, 0)", "type chip has no background colour"
-    # Index page cards for the same type carry the same accent.
+    probe = """sel => { const s = document.createElement('i').style;
+      const norm = c => { s.color = ''; s.color = c; return s.color; };
+      const root = getComputedStyle(document.documentElement).getPropertyValue('--text-3').trim();
+      return [...document.querySelectorAll(sel)].map(el => { const cs = getComputedStyle(el);
+        return {accent: norm(cs.getPropertyValue('--okf-type-accent').trim()), ink: norm(root), bg: cs.backgroundColor}; }); }"""
+    header = page.evaluate(probe, ".okf-page__header")
+    chip = page.evaluate(probe, ".okf-page__header .okf-type-chip")
+    assert header and chip, (header, chip)
+    assert header[0]["accent"] == header[0]["ink"], header
+    assert chip[0]["bg"] == "rgba(0, 0, 0, 0)", f"type chip is filled: {chip}"
     page.goto(f"{server_url}/", wait_until="domcontentloaded")
-    card_accents = page.evaluate(
-        """() => [...document.querySelectorAll('.okf-card')]
-          .map(c => getComputedStyle(c).getPropertyValue('--okf-type-accent').trim())"""
-    )
-    assert card_accents, "index page rendered zero concept cards"
-    assert any(a.startswith("hsl(") for a in card_accents), (
-        f"no card carries a curated --okf-type-accent: {card_accents[:3]}"
-    )
+    cards = page.evaluate(probe, ".okf-card")
+    assert cards, "index page rendered zero concept rows"
+    assert all(c["accent"] == c["ink"] for c in cards), cards[:3]
+    assert page.evaluate("() => [...document.querySelectorAll('[style]')].filter(e => /hsl\\(|--okf-type-accent/.test(e.getAttribute('style'))).length") == 0
 
 
 def test_print_media_prints_light_and_readable(static_url: str, page) -> None:
@@ -9421,8 +9709,7 @@ def test_print_media_prints_light_and_readable(static_url: str, page) -> None:
     Authored content stays on the page."""
     page.set_viewport_size({"width": 1200, "height": 900})
     page.add_init_script(
-        "try { localStorage.setItem('okf-theme-family','technical');"
-        " localStorage.setItem('okf-theme-mode','dark'); } catch (e) {}")
+        "try { localStorage.setItem('okf-loom.appearance','slate'); } catch (e) {}")
     page.goto(f"{static_url}/tables/orders.html", wait_until="load")
     page.emulate_media(media="print")
     page.wait_for_timeout(200)
@@ -9440,19 +9727,20 @@ def test_print_media_prints_light_and_readable(static_url: str, page) -> None:
             proseBlocks: document.querySelectorAll('.okf-page__body > p').length,
           };
         }""")
-    assert out["theme"] == "technical-dark"
-    assert out["bodyFg"] == "rgb(16, 22, 35)", out   # dark ink, not near-white
-    assert out["pFg"] == "rgb(16, 22, 35)", out
+    assert out["theme"] == "slate"
+    # wiki.css @media print ink (#1a1714), not Slate's near-white text.
+    assert out["bodyFg"] == "rgb(26, 23, 20)", out
+    assert out["pFg"] == "rgb(26, 23, 20)", out
     assert out["topbarDisplay"] == "none", out        # screen chrome stood down
     assert out["preVisible"] and out["proseBlocks"] > 0, out
 
 
 def test_phase1_76ch_prose_measure_visible(server_url: str, page) -> None:
-    """Concept-article column contract (viewer-layout-usability revision):
-    the body container is unconstrained; prose text AND wide blocks
-    (pre/table) are capped by the SAME shared article-column lane on concept
-    pages, so a code box and the paragraph above it report the same
-    computed max-width. Verified by computed styles on a real page."""
+    """Ledger reading-column contract: the body container is unconstrained;
+    prose is capped near 55ch for line length, while wide blocks (pre/table)
+    may use the full 760px reading column — never narrower than the prose
+    above them and never wider than the article. Verified by computed
+    styles and real boxes on a page."""
     page.set_viewport_size({"width": 1440, "height": 900})
     page.goto(f"{server_url}/tables/orders", wait_until="domcontentloaded")
     page.locator(".okf-page__body").wait_for(state="visible")
@@ -9466,10 +9754,17 @@ def test_phase1_76ch_prose_measure_visible(server_url: str, page) -> None:
             + '.okf-page__body > table, .okf-page__body > pre');
           const pStyle = p ? getComputedStyle(p).maxWidth : null;
           const tStyle = tbl ? getComputedStyle(tbl).maxWidth : null;
+          const body = document.querySelector('.okf-page__body');
           return {
             pMax: pStyle,
             tMax: tStyle,
-            bodyMax: getComputedStyle(document.querySelector('.okf-page__body')).maxWidth,
+            bodyMax: getComputedStyle(body).maxWidth,
+            pWidth: p ? p.getBoundingClientRect().width : 0,
+            pLeft: p ? p.getBoundingClientRect().left : 0,
+            tWidth: tbl ? tbl.getBoundingClientRect().width : 0,
+            tLeft: tbl ? tbl.getBoundingClientRect().left : 0,
+            bodyWidth: body.getBoundingClientRect().width,
+            ch: (() => { const s = document.createElement('span'); s.textContent = '0'; s.style.cssText = 'position:absolute;display:inline-block;white-space:pre'; s.style.font = getComputedStyle(p).font; p.append(s); const w = s.getBoundingClientRect().width; s.remove(); return w; })(),
           };
         }"""
     )
@@ -9480,11 +9775,13 @@ def test_phase1_76ch_prose_measure_visible(server_url: str, page) -> None:
     assert result["pMax"] is not None and result["pMax"] != "none", (
         f"prose paragraph should be capped by the article column, got max-width={result['pMax']!r}"
     )
-    # Aligned edges: the wide block shares the paragraph's lane cap.
-    assert result["tMax"] == result["pMax"], (
-        f"wide block max-width {result['tMax']!r} != paragraph max-width "
-        f"{result['pMax']!r} — code/table blocks no longer share the article lane"
-    )
+    # Prose measure: about 55 characters (never the old unbounded line).
+    assert result["pWidth"] <= 60 * result["ch"], result
+    # Wide blocks start on the same left edge as the prose and may be wider,
+    # but stay inside the reading column (760px) and the article body.
+    assert result["tMax"] is not None and result["tMax"] != "none", result
+    assert abs(result["tLeft"] - result["pLeft"]) <= 1, result
+    assert result["pWidth"] - 1 <= result["tWidth"] <= min(760, result["bodyWidth"]) + 1, result
 
 
 def test_phase1_card_link_keyboard_focus_and_activation(server_url: str, page) -> None:
@@ -9732,14 +10029,12 @@ def test_phase1_mobile_title_before_rail(server_url: str, page) -> None:
     )
 
 
-@pytest.mark.parametrize("theme", ["technical-light", "swiss-dark"])
-def test_phase1_header_band_tint_in_both_theme_families(
+@pytest.mark.parametrize("theme", ["bone", "slate"])
+def test_phase1_header_band_renders_in_light_and_dark_palettes(
     server_url: str, page, theme: str,
 ) -> None:
-    """The concept header band's type-tinted background renders in both the
-    Technical and Swiss families without disappearing or overflowing. The
-    tint uses color-mix (theme-aware), so it must resolve to a real colour
-    in each family, not transparent."""
+    """The concept header band renders as an opaque palette band (no type
+    tint) with a complete, symmetric frame in a light and a dark palette."""
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto(f"{server_url}/tables/orders", wait_until="domcontentloaded")
     page.locator("h1.okf-page__title").wait_for(state="visible")
@@ -9765,8 +10060,8 @@ def test_phase1_header_band_tint_in_both_theme_families(
         }"""
     )
     assert proof["theme"] == theme
-    assert proof["accent"].startswith("hsl("), f"no curated accent in {theme}: {proof['accent']!r}"
-    # Background resolved to a real colour (color-mix produced a value).
+    assert not proof["accent"].startswith("hsl("), f"type hue on the header in {theme}: {proof['accent']!r}"
+    # Background resolved to a real palette colour.
     assert proof["bg"] != "rgba(0, 0, 0, 0)", (
         f"header band background is transparent in {theme}: {proof['bg']!r}"
     )
@@ -9828,9 +10123,10 @@ def test_phase1_desktop_sticky_rail_containment(server_url: str, page) -> None:
             maxHeight: cs.maxHeight,
             overflowY: cs.overflowY,
             topbarH: topbar.getBoundingClientRect().height,
-            // Non-overlap: sidebar's right edge ≤ article's left edge.
+            // Non-overlap: the Ledger Related rail sits on the article's right.
             sideRight: Math.round(sbRect.right),
             artLeft: Math.round(artRect.left),
+            artRight: Math.round(artRect.right),
             sideLeft: Math.round(sbRect.left),
             sideTop: Math.round(sbRect.top),
           };
@@ -9855,9 +10151,11 @@ def test_phase1_desktop_sticky_rail_containment(server_url: str, page) -> None:
     assert before["overflowY"] in ("auto", "scroll"), (
         f"sidebar overflow-y is {before['overflowY']!r} (should be auto/scroll for internal scroll)"
     )
-    # Non-overlap: sidebar's right edge ≤ article's left edge.
-    assert before["sideRight"] <= before["artLeft"] + 1, (
-        f"sidebar overlaps the article: sideRight={before['sideRight']} > artLeft={before['artLeft']}"
+    # Non-overlap: Ledger puts the Related rail to the RIGHT of the reading
+    # column (the article starts the line), so the rail begins at or after
+    # the article's right edge.
+    assert before["sideLeft"] >= before["artRight"] - 1 and before["artLeft"] < before["sideLeft"], (
+        f"sidebar overlaps the article: sideLeft={before['sideLeft']} < artRight={before['artRight']}"
     )
 
     # Scroll down and verify the rail stays pinned (sticky behaviour).
@@ -9879,8 +10177,8 @@ def test_phase1_desktop_sticky_rail_containment(server_url: str, page) -> None:
             // offset (below the topbar), NOT scrolled off-screen.
             sideTop: Math.round(sbRect.top),
             topbarBottom: Math.round(tbRect.bottom),
-            sideRight: Math.round(sbRect.right),
-            artLeft: Math.round(artRect.left),
+            sideLeft: Math.round(sbRect.left),
+            artRight: Math.round(artRect.right),
             sideHeight: Math.round(sbRect.height),
             viewportH: window.innerHeight,
           };
@@ -9896,8 +10194,8 @@ def test_phase1_desktop_sticky_rail_containment(server_url: str, page) -> None:
         f"sidebar is scrolled off-screen (sideTop={after['sideTop']} >= viewportH={after['viewportH']})"
     )
     # Still non-overlapping with the article after scroll.
-    assert after["sideRight"] <= after["artLeft"] + 1, (
-        f"sidebar overlaps article after scroll: sideRight={after['sideRight']} > artLeft={after['artLeft']}"
+    assert after["sideLeft"] >= after["artRight"] - 1, (
+        f"sidebar overlaps article after scroll: sideLeft={after['sideLeft']} < artRight={after['artRight']}"
     )
 
 
@@ -9975,9 +10273,10 @@ def test_phase1_index_card_type_chip_has_icon_and_label(server_url: str, page) -
 
 
 def test_phase1_index_responsive_grid_single_and_multi_card(server_url: str, page) -> None:
-    """At desktop width, a type section with a SINGLE card expands to fill
-    the section width (auto-fit, no orphaned narrow tile), and a section
-    with MULTIPLE cards uses a responsive multi-column grid."""
+    """Ledger: every record is a row. At desktop width each type section is
+    a single-column ruler: a lone row and every row of a multi-row section
+    span the section width (no orphaned tile, no ragged columns), stacked
+    top to bottom."""
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto(f"{server_url}/", wait_until="domcontentloaded")
     page.locator(".okf-cardgrid").first.wait_for(state="visible")
@@ -9990,40 +10289,28 @@ def test_phase1_index_responsive_grid_single_and_multi_card(server_url: str, pag
             const firstCard = cards[0];
             const cardRect = firstCard ? firstCard.getBoundingClientRect() : null;
             const gridRect = g.getBoundingClientRect();
+            const rects = [...cards].map(c => c.getBoundingClientRect());
             return {
               cardCount: cards.length,
-              templateColumns: gridStyle.gridTemplateColumns,
-              // A single card should span most of the grid width (auto-fit);
-              // multiple cards should each be narrower than the grid.
+              display: gridStyle.display,
               cardWidth: cardRect ? Math.round(cardRect.width) : 0,
+              minWidth: rects.length ? Math.round(Math.min(...rects.map(r => r.width))) : 0,
               gridWidth: Math.round(gridRect.width),
+              stacked: rects.every((r, i) => i === 0 || r.top >= rects[i - 1].bottom - 1),
             };
           });
         }"""
     )
     assert grid_data, "no card grids found on the index"
-    # At least one grid should have a single card that spans wide (auto-fit).
-    single_card_grids = [g for g in grid_data if g["cardCount"] == 1]
-    if single_card_grids:
-        g = single_card_grids[0]
-        # auto-fit: a single card should span ≥ 70% of the grid width
-        # (not orphaned at ~290px in a ~1100px grid).
-        assert g["cardWidth"] >= g["gridWidth"] * 0.65, (
-            f"single card is only {g['cardWidth']}px in a {g['gridWidth']}px grid "
-            f"(orphaned narrow tile — auto-fit not working)"
+    assert any(g["cardCount"] >= 2 for g in grid_data), grid_data
+    for g in grid_data:
+        assert g["display"] == "block", g
+        # Every row spans the ruler (within the hairline), single or many.
+        assert g["minWidth"] >= g["gridWidth"] - 2, (
+            f"a row is only {g['minWidth']}px in a {g['gridWidth']}px ruler "
+            "(tile/column layout is back)"
         )
-    # At least one grid should have multiple cards in columns.
-    multi_grids = [g for g in grid_data if g["cardCount"] >= 2]
-    if multi_grids:
-        g = multi_grids[0]
-        # Multi-column: the grid template has more than one track.
-        tmpl = (g["templateColumns"] or "").strip()
-        col_count = len(tmpl.split()) if tmpl else 0
-        # Each card should be narrower than the full grid width.
-        assert g["cardWidth"] < g["gridWidth"] * 0.9, (
-            f"multi-card grid has cards nearly as wide as the grid ({g['cardWidth']}px "
-            f"in {g['gridWidth']}px) — not using responsive columns"
-        )
+        assert g["stacked"], f"rows are not stacked one per line: {g}"
 
 
 def test_phase1_index_mobile_grid_collapses_to_single_column(
@@ -10069,10 +10356,9 @@ def test_phase1_desktop_article_before_sidebar_in_dom_and_visual(
     server_url: str, page,
 ) -> None:
     """P1 #1 (layout-graph): at DESKTOP, the <article> precedes <aside> in
-    DOM source order (semantic/keyboard/screen-reader order), while CSS
-    grid placement keeps the sidebar VISUALLY on the LEFT (grid-column: 1)
-    and the article on the RIGHT (grid-column: 2). No CSS ``order`` hack —
-    the placement is structural."""
+    DOM source order (semantic/keyboard/screen-reader order), and the Ledger
+    layout keeps that order visually: the reading column on the LEFT, the
+    Related rail on its RIGHT. No CSS ``order`` hack."""
     page.set_viewport_size({"width": 1440, "height": 900})
     page.goto(f"{server_url}/tables/orders", wait_until="domcontentloaded")
     page.locator("h1.okf-page__title").wait_for(state="visible")
@@ -10088,10 +10374,12 @@ def test_phase1_desktop_article_before_sidebar_in_dom_and_visual(
           const sRect = sidebar.getBoundingClientRect();
           return {
             domArticleFirst,
-            // Visual placement: sidebar on LEFT, article on RIGHT.
+            // Visual placement: article on LEFT, Related rail on RIGHT.
             sidebarLeft: Math.round(sRect.left),
             articleLeft: Math.round(aRect.left),
-            sidebarVisuallyLeft: sRect.left < aRect.left,
+            articleRight: Math.round(aRect.right),
+            sidebarVisuallyRight: sRect.left >= aRect.right - 1,
+            order: getComputedStyle(sidebar).order,
             // Grid column assignments.
             articleCol: getComputedStyle(article).gridColumn,
             sidebarCol: getComputedStyle(sidebar).gridColumn,
@@ -10103,24 +10391,20 @@ def test_phase1_desktop_article_before_sidebar_in_dom_and_visual(
         "article does not precede sidebar in DOM at desktop — "
         "keyboard/screen-reader order is wrong"
     )
-    assert proof["sidebarVisuallyLeft"], (
-        f"sidebar is not visually on the left at desktop: "
-        f"sidebarLeft={proof['sidebarLeft']}, articleLeft={proof['articleLeft']}"
+    assert proof["sidebarVisuallyRight"], (
+        f"Related rail is not visually right of the article at desktop: "
+        f"sidebarLeft={proof['sidebarLeft']}, articleRight={proof['articleRight']}"
     )
+    assert proof["order"] == "0", proof
 
 
 def test_phase1_centered_reading_lane_balanced(server_url: str, page) -> None:
-    """Viewer-layout-usability contract: on a concept page the article is ONE
-    bounded content column. Every authored block — paragraph, heading, list,
-    pre, table wrapper — shares the same left/right edges (within tolerance),
-    the paragraph fills the available column (only the deliberate reading
-    inset remains), and no block overhangs the column. Verified by geometry.
-
-    History: prose used to be a centered ~76ch lane inside a wider article,
-    so code/tables overhung the text by ~150px per side and the page read as
-    a narrow strip floating in whitespace. The column is now the shared
-    bounding box; when a viewport leaves surplus width the whole column
-    centers (balanced gutters) rather than any individual block."""
+    """Ledger reading-column contract: on a concept page the article is ONE
+    bounded column (760px). Every authored block — paragraph, heading, pre,
+    table wrapper — starts on the same LEFT edge (a ragged-right ledger, never
+    a centred strip); prose and headings stop at their ~55ch measure while
+    code and tables may run to the column's right edge, and no block
+    overhangs the column. Verified by geometry."""
     page.set_viewport_size({"width": 1440, "height": 900})
     page.goto(f"{server_url}/tables/orders", wait_until="domcontentloaded")
     page.locator(".okf-page__body").wait_for(state="visible")
@@ -10131,7 +10415,8 @@ def test_phase1_centered_reading_lane_balanced(server_url: str, page) -> None:
           const infobox = document.querySelector('.okf-page__infobox');
           if (!body || !col) return {missing: true};
           const p = body.querySelector('p');
-          const pre = body.querySelector('pre, .okf-tablewrap');
+          const pre = body.querySelector('pre');
+          const table = body.querySelector('.okf-tablewrap');
           if (!p) return {missing: true};
           const pRect = p.getBoundingClientRect();
           const cRect = col.getBoundingClientRect();
@@ -10140,18 +10425,24 @@ def test_phase1_centered_reading_lane_balanced(server_url: str, page) -> None:
             const r = pre.getBoundingClientRect();
             edges.pre = [Math.round(r.left), Math.round(r.right)];
           }
+          if (table) {
+            const r = table.getBoundingClientRect();
+            edges.table = [Math.round(r.left), Math.round(r.right)];
+          }
           const h2 = body.querySelector('h2');
           if (h2) {
             const r = h2.getBoundingClientRect();
             edges.h2 = [Math.round(r.left), Math.round(r.right)];
           }
+          const blocks = [p, pre, table, h2].filter(Boolean).map(b => b.getBoundingClientRect());
           return {
             paraWidth: Math.round(pRect.width),
             colWidth: Math.round(cRect.width),
             edges,
             paraMaxWidth: getComputedStyle(p).maxWidth,
+            ch: (() => { const s = document.createElement('span'); s.textContent = '0'; s.style.cssText = 'position:absolute;display:inline-block;white-space:pre'; s.style.font = getComputedStyle(p).font; p.append(s); const w = s.getBoundingClientRect().width; s.remove(); return w; })(),
             // No block overhangs the reading column.
-            overhang: Math.round(Math.max(pRect.right - cRect.right, cRect.left - pRect.left)),
+            overhang: Math.round(Math.max(...blocks.map(r => Math.max(r.right - cRect.right, cRect.left - r.left)))),
           };
         }"""
     )
@@ -10160,22 +10451,20 @@ def test_phase1_centered_reading_lane_balanced(server_url: str, page) -> None:
     assert geom["paraMaxWidth"] != "none", (
         f"prose paragraph has no max-width (measure not applied): {geom['paraMaxWidth']!r}"
     )
-    # Every authored block shares the same left AND right edges (±2px).
+    # Every authored block shares the same LEFT edge (±2px).
     edges = geom["edges"]
     for name, edge in edges.items():
-        assert abs(edge[0] - edges["p"][0]) <= 2 and abs(edge[1] - edges["p"][1]) <= 2, (
-            f"{name} edges {edge} do not align with paragraph edges {edges['p']} "
+        assert abs(edge[0] - edges["p"][0]) <= 2, (
+            f"{name} edges {edge} do not start on the paragraph edge {edges['p']} "
             "— article blocks no longer share one column"
         )
-    # The paragraph fills the column: only the deliberate reading inset
-    # (band padding + border ≈ 25px per side) remains, not a centered-lane
-    # void.
-    inset = 40  # generous bound: space-5 (24px) + border + tolerance
-    assert geom["paraWidth"] >= geom["colWidth"] - 2 * inset, (
-        f"prose paragraph ({geom['paraWidth']}px) leaves more than the reading "
-        f"inset free in the column ({geom['colWidth']}px) — the narrow centered "
-        "lane is back"
-    )
+    # Prose holds the ~55ch measure (a readable line, not the full column)
+    # and is never collapsed to a narrow strip.
+    assert 45 * geom["ch"] <= geom["paraWidth"] <= 60 * geom["ch"], geom
+    # Code is never narrower than the prose above it. A fitting table now
+    # sizes its wrapper/toolbar to its content (D1-010), on the same left edge.
+    if "pre" in edges:
+        assert edges["pre"][1] >= edges["p"][1] - 2, edges
     # No block overhangs the column.
     assert geom["overhang"] <= 1, (
         f"a block overhangs the reading column by {geom['overhang']}px"
@@ -10184,12 +10473,12 @@ def test_phase1_centered_reading_lane_balanced(server_url: str, page) -> None:
 
 def test_article_column_fills_page_and_never_overflows_document(server_url: str, page) -> None:
     """Viewer-layout-usability regression: at representative desktop, tablet,
-    and phone widths the concept article (a) fills the available article
-    column — a paragraph is NOT a narrow centered strip with huge voids —
-    (b) keeps code/tables on the paragraph edges, and (c) never produces
-    unintended document-level horizontal overflow. A long code block scrolls
-    LOCALLY inside its block (scrollWidth > clientWidth on the block, not on
-    the document)."""
+    and phone widths the concept article (a) keeps prose at its readable
+    measure or the full narrow column — never a narrow centred strip —
+    (b) starts code/tables on the paragraph's left edge, at least as wide as
+    the prose, and (c) never produces document-level horizontal overflow. A
+    long code block scrolls LOCALLY inside its block (scrollWidth >
+    clientWidth on the block, not on the document)."""
     page.goto(f"{server_url}/tables/orders", wait_until="domcontentloaded")
     page.locator(".okf-page__body").wait_for(state="visible")
     for width in (1440, 1920, 1024, 390):
@@ -10212,6 +10501,7 @@ def test_article_column_fills_page_and_never_overflows_document(server_url: str,
                 out.paraLeft = Math.round(pr.left);
                 out.wideLeft = Math.round(wr.left);
                 out.paraWidth = Math.round(pr.width);
+                out.wideWidth = Math.round(wr.width);
                 out.articleWidth = Math.round(
                   document.querySelector('.okf-page__main').getBoundingClientRect().width);
                 out.wideScrolls = wide.scrollWidth > wide.clientWidth + 1;
@@ -10227,13 +10517,14 @@ def test_article_column_fills_page_and_never_overflows_document(server_url: str,
             f"at {width}px a wide block (x={geom['wideLeft']}) is off the "
             f"paragraph edge (x={geom['paraLeft']})"
         )
-        # The paragraph fills the article: it may only lose the reading
-        # inset (≈25px per side) plus the centered-surplus case on ultra-wide
-        # shells — never collapse back to a narrow centered strip.
-        assert geom["paraWidth"] >= geom["articleWidth"] - 120, (
+        # The paragraph holds the ~55ch measure (about 480px+ at 16px) or,
+        # on narrow columns, fills the article minus the reading inset —
+        # never a narrow centred strip.
+        assert geom["paraWidth"] >= min(geom["articleWidth"] - 120, 480), (
             f"at {width}px the paragraph ({geom['paraWidth']}px) collapses far "
             f"inside the article column ({geom['articleWidth']}px)"
         )
+        assert geom["wideWidth"] >= geom["paraWidth"] - 2, geom
     # Long code scrolls locally at phone width (local scroll, not document
     # scroll; the orders SQL block is wider than a 390px column).
     assert geom["wideScrolls"], (
@@ -10299,7 +10590,7 @@ def test_phase3_refresh_a_superseded_by_failing_b_restores_last_accepted_readine
     result = page.evaluate(r"""async () => {
       const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl;
       const native=window.fetch.bind(window),base=await native(url).then(r=>r.json()),held=[];
-      window.fetch=(req,opt)=>String(req)===url?new Promise((resolve,reject)=>{
+      window.fetch=(req,opt)=>String(req).split('?')[0]===url?new Promise((resolve,reject)=>{
         const call={resolve,reject,signal:opt.signal};held.push(call);
         opt.signal.addEventListener('abort',()=>reject(new DOMException('Aborted','AbortError')),{once:true});
       }):native(req,opt);
@@ -10326,7 +10617,7 @@ def test_phase3_post_mutation_pre_raf_pagehide_revokes_readiness_owner_and_bfcac
     result = page.evaluate(r"""async () => {
       const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,nativeFetch=window.fetch.bind(window),nativeRaf=window.requestAnimationFrame.bind(window),base=await nativeFetch(url).then(r=>r.json());
       let revision='phase3-paused',held=[];window.requestAnimationFrame=cb=>{held.push(cb);return held.length;};
-      window.fetch=(req,opt)=>{if(String(req)!==url)return nativeFetch(req,opt);const payload=JSON.parse(JSON.stringify(base));payload.bundle_revision=revision;return Promise.resolve(new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}}));};
+      window.fetch=(req,opt)=>{if(String(req).split('?')[0]!==url)return nativeFetch(req,opt);const payload=JSON.parse(JSON.stringify(base));payload.bundle_revision=revision;return Promise.resolve(new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}}));};
       const pending=G.refreshGraph();while(!held.length)await new Promise(resolve=>nativeRaf(resolve));
       window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));
       const hidden={graph:document.body.dataset.okfGraphCaptureReady,page:document.body.dataset.okfCaptureReady,error:document.body.dataset.okfGraphRefreshError||null};
@@ -10354,7 +10645,7 @@ def test_phase3_generated_single_file_graph_boot_makes_no_http_or_comment_reques
     page.on("request", lambda request: requests.append(request.url))
     page.goto(output.as_uri(), wait_until="domcontentloaded")
     page.wait_for_function("() => window.__okfLoomGraph && document.body.dataset.okfGraphCaptureReady === 'ready'")
-    page.screenshot(path="/tmp/okf-phase3-single.png", full_page=True)
+    page.screenshot(path=str(Path(tempfile.gettempdir()) / "okf-phase3-single.png"), full_page=True)
     # The generated artifact currently declares its pinned graph-engine scripts
     # on jsDelivr; initialization must make no application/API request. Keep the
     # allowlist exact so a new runtime endpoint cannot hide among CDN traffic.
@@ -10395,7 +10686,7 @@ def test_phase3_production_graph_capture_parity_is_revision_and_surface_coherent
     assert proof["revision"] and proof["readyRevision"] == proof["revision"]
     assert proof["canvas"] == proof["payload"] == proof["index"] > 0
     assert proof["selected"] and proof["label"] in proof["detail"]
-    page.screenshot(path=f"/tmp/okf-phase3-{surface}.png", full_page=True)
+    page.screenshot(path=str(Path(tempfile.gettempdir()) / f"okf-phase3-{surface}.png"), full_page=True)
 
 
 def test_phase3_accepted_metadata_and_same_endpoint_label_reconcile_before_ready(
@@ -10416,7 +10707,7 @@ def test_phase3_accepted_metadata_and_same_endpoint_label_reconcile_before_ready
       nd.metadata=Object.assign({},nd.metadata,{project:'accepted-project',graph_cluster:'accepted-cluster'});
       fresh.edges.find(e=>e.data.source===edge.data.source&&e.data.target===edge.data.target).data.label='accepted_relationship';
       let queue=[old];
-      window.fetch=(req,opt)=>String(req)===url?Promise.resolve(new Response(JSON.stringify(queue.shift()),{headers:{'Content-Type':'application/json'}})):native(req,opt);
+      window.fetch=(req,opt)=>String(req).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(queue.shift()),{headers:{'Content-Type':'application/json'}})):native(req,opt);
       await G.refreshGraph(); await new Promise(requestAnimationFrame);
       G.applyLens('recent'); await new Promise(resolve=>setTimeout(resolve,300));
       const beforeColor=G.cy.getElementById(id).data('color');
@@ -10454,7 +10745,7 @@ def test_phase3_overlapping_comment_refresh_latest_count_wins_every_surface(
       const native=window.fetch.bind(window),base=await native(url).then(r=>r.json()),id=base.nodes[0].data.id;
       function payload(count,revision){const p=JSON.parse(JSON.stringify(base));p.bundle_revision=revision;p.nodes[0].data.active_comment_count=count;return p;}
       let firstResolve,calls=0;
-      window.fetch=(req,opt)=>{if(String(req)!==url)return native(req,opt);calls++;
+      window.fetch=(req,opt)=>{if(String(req).split('?')[0]!==url)return native(req,opt);calls++;
         if(calls===1)return new Promise(resolve=>{firstResolve=()=>resolve(new Response(JSON.stringify(payload(3,'comments-old')),{headers:{'Content-Type':'application/json'}}));});
         return Promise.resolve(new Response(JSON.stringify(payload(29,'comments-new')),{headers:{'Content-Type':'application/json'}}));};
       const older=G.refreshGraph();await new Promise(requestAnimationFrame);const newer=G.refreshGraph();await newer;
@@ -10627,7 +10918,7 @@ def test_phase4_impeccable_mobile_forced_colors_and_reduced_motion_captures(serv
         expect(page.get_by_role("button",name="Open the command palette (Control K)")).to_be_visible()
         page.get_by_role("button",name="Close panel").click()
         assert page.evaluate("([revision,state])=>document.body.dataset.okfRevision===revision&&JSON.stringify(window.__okfLoomGraph.getState())===state", [fit["revision"],fit["state"]])
-        screenshot = Path(f"/tmp/okf-phase4-mobile-fixed-{width}.png")
+        screenshot = Path(tempfile.gettempdir()) / f"okf-phase4-mobile-fixed-{width}.png"
         page.screenshot(path=str(screenshot), full_page=True)
         with screenshot.open("rb") as png:
             assert png.read(8) == b"\x89PNG\r\n\x1a\n"
@@ -10657,7 +10948,7 @@ def test_phase4_impeccable_mobile_forced_colors_and_reduced_motion_captures(serv
     # flex wrap container and the nav joins its rows via display:contents.
     assert measured["boxes"] and measured["topbar"]["display"] == "flex" and measured["controls"]["display"] == "contents"
     assert all(box["left"] >= -1 and box["right"] <= measured["effective"] + 1 for box in measured["boxes"]), measured
-    page.screenshot(path="/tmp/okf-phase4-mobile-pinch-2x.png", full_page=True)
+    page.screenshot(path=str(Path(tempfile.gettempdir()) / "okf-phase4-mobile-pinch-2x.png"), full_page=True)
     cdp.send("Emulation.setPageScaleFactor", {"pageScaleFactor": 1})
     page.set_viewport_size({"width": 1280, "height": 900})
     page.emulate_media(forced_colors="active")
@@ -10665,26 +10956,26 @@ def test_phase4_impeccable_mobile_forced_colors_and_reduced_motion_captures(serv
     page.wait_for_function("() => document.body.hasAttribute('data-okf-forced-colors') && window.__okfLoomGraph?.layoutStats?.lastAppliedSeq >= 1")
     baseline=page.evaluate("() => {const G=window.__okfLoomGraph,n=G.cy.nodes().first(),e=G.cy.edges().first();return {nodeBorder:n.style('border-color'),nodeText:n.style('color'),edge:e.style('line-color'),edgeWidth:parseFloat(e.style('width'))}}")
     assert baseline["nodeBorder"] and baseline["nodeText"] and baseline["edge"] and baseline["edgeWidth"]>=3
-    page.screenshot(path="/tmp/okf-phase4-forced-baseline.png", full_page=True)
+    page.screenshot(path=str(Path(tempfile.gettempdir()) / "okf-phase4-forced-baseline.png"), full_page=True)
     ids = page.evaluate("() => {const e=window.__okfLoomGraph.cy.edges().first();return [e.source().id(),e.target().id()]}")
     page.evaluate("id=>window.__okfLoomGraph.interaction.dispatch({type:'SELECT',id})", ids[0])
-    page.screenshot(path="/tmp/okf-phase4-forced-selected.png", full_page=True)
+    page.screenshot(path=str(Path(tempfile.gettempdir()) / "okf-phase4-forced-selected.png"), full_page=True)
     page.evaluate("ids=>window.__okfLoomGraph.interaction.dispatch({type:'PATH',from:ids[0],id:ids[1]})", ids)
-    page.screenshot(path="/tmp/okf-phase4-forced-path.png", full_page=True)
+    page.screenshot(path=str(Path(tempfile.gettempdir()) / "okf-phase4-forced-path.png"), full_page=True)
     page.get_by_role("searchbox", name="Search graph concepts").fill("orders")
     page.wait_for_function("() => window.__okfLoomGraph.cy.nodes('.okf-search-match').length > 0")
-    page.screenshot(path="/tmp/okf-phase4-forced-search.png", full_page=True)
+    page.screenshot(path=str(Path(tempfile.gettempdir()) / "okf-phase4-forced-search.png"), full_page=True)
     page.get_by_role("button", name="Clear", exact=True).click()
     page.evaluate("id=>window.__okfLoomGraph.interaction.dispatch({type:'SELECT',id})", ids[0])
     _preset(page, "focus")
     page.wait_for_function("() => window.__okfLoomGraph.getState().lens === 'focus' && window.okfGraphCaptureState().layoutSettled")
-    page.screenshot(path="/tmp/okf-phase4-forced-focus.png", full_page=True)
+    page.screenshot(path=str(Path(tempfile.gettempdir()) / "okf-phase4-forced-focus.png"), full_page=True)
     page.emulate_media(forced_colors="none", reduced_motion="reduce")
     page.goto(server_url + "/__graph")
     page.wait_for_function("() => document.body.hasAttribute('data-okf-reduced-motion') && window.__okfLoomGraph?.layoutStats?.lastAppliedSeq >= 1")
     duration = page.evaluate("() => {const n=window.__okfLoomGraph.cy.nodes().first();n.addClass('okf-hover');return n.style('transition-duration')}")
     assert duration in ("0ms", "0s")
-    page.screenshot(path="/tmp/okf-phase4-reduced-motion.png", full_page=True)
+    page.screenshot(path=str(Path(tempfile.gettempdir()) / "okf-phase4-reduced-motion.png"), full_page=True)
 
 
 def test_phase4_impeccable_action_bar_clamps_every_canvas_edge(server_url: str, page) -> None:
@@ -10701,7 +10992,7 @@ def test_phase4_impeccable_action_bar_clamps_every_canvas_edge(server_url: str, 
         assert box["x"] >= bounds["x"] - 1 and box["y"] >= bounds["y"] - 1
         assert box["x"] + box["width"] <= bounds["x"] + bounds["width"] + 1
         assert box["y"] + box["height"] <= bounds["y"] + bounds["height"] + 1
-    proof = Path("/tmp/okf-loom-phase4-final-r7")
+    proof = Path(tempfile.gettempdir()) / "okf-loom-phase4-final-r7"
     proof.mkdir(parents=True, exist_ok=True)
     page.screenshot(path=str(proof / "desktop-selected-action.png"), full_page=True)
     page.set_viewport_size({"width": 390, "height": 844})
@@ -10753,7 +11044,7 @@ def test_phase4_final_stable_hover_capture_allowed_and_exit_clean(server_url: st
     assert not page.evaluate("()=>window.okfGraphCaptureState().layoutSettled")
     page.wait_for_function("id=>window.__okfLoomGraph.interaction.snapshot().hovered===id&&window.okfGraphCaptureState().layoutSettled",arg=node_id)
     ready=page.evaluate("async()=>await window.okfCaptureReadiness.start({target:'graph'}).promise");assert ready["screenshotAllowed"] is True
-    page.screenshot(path="/tmp/okf-phase4-hover-settled.png",full_page=True)
+    page.screenshot(path=str(Path(tempfile.gettempdir()) / "okf-phase4-hover-settled.png"),full_page=True)
     page.evaluate("()=>window.__okfLoomGraph.interaction.dispatch({type:'UNHOVER',quietUrl:true})")
     assert page.evaluate("()=>window.__okfLoomGraph.cy.elements('.okf-hover,.okf-hover-dim').length===0&&window.okfGraphCaptureState().layoutSettled")
 
@@ -10770,13 +11061,19 @@ def test_phase4_final_node_index_arrows_shift_space_and_focus_escape(server_url:
 
 
 def test_phase4_final_focus_lens_waiting_and_direct_routes_restore_origin(server_url: str,page)->None:
-    _open_graph(page,server_url);_preset(page, "themes");page.wait_for_function("()=>window.__okfLoomGraph.getState().lens==='themes'")
+    _open_graph(page,server_url)
+    generation = page.evaluate("()=>window.okfGraphCaptureState().layoutGeneration")
+    _preset(page, "themes")
+    # Lens controls update before their debounced layout starts. Waiting only
+    # on layoutSettled can sample the PREVIOUS generation, whose successor
+    # would then fit away the origin we are about to record.
+    page.wait_for_function("generation=>window.__okfLoomGraph.getState().lens==='themes'&&window.okfGraphCaptureState().layoutGeneration>generation&&window.okfGraphCaptureState().layoutSettled", arg=generation)
     origin=page.evaluate("()=>{const G=window.__okfLoomGraph;G.cy.zoom(.73);G.cy.pan({x:31,y:47});return {zoom:G.cy.zoom(),pan:G.cy.pan()}}")
     _preset(page, "focus");assert page.evaluate("()=>window.__okfLoomGraph.getState().lens==='focus'&&window.__okfLoomGraph.focusRoot()===null")
     node=page.evaluate("()=>window.__okfLoomGraph.cy.nodes().first().id()");page.evaluate("id=>window.__okfLoomGraph.interaction.dispatch({type:'SELECT',id})",node)
     page.wait_for_function("id=>window.__okfLoomGraph.focusRoot()===id&&window.okfGraphCaptureState().layoutSettled",arg=node)
     expect(page.get_by_role("group",name="Explore neighborhood")).to_contain_text("Exploring neighborhood around");expect(page.get_by_label("Neighborhood depth")).to_have_value("1")
-    proof=Path("/tmp/okf-loom-phase4-final-current");proof.mkdir(parents=True,exist_ok=True);page.screenshot(path=str(proof/"desktop-focus.png"),full_page=True)
+    proof=Path(tempfile.gettempdir()) / "okf-loom-phase4-final-current";proof.mkdir(parents=True,exist_ok=True);page.screenshot(path=str(proof/"desktop-focus.png"),full_page=True)
     page.get_by_role("group",name="Explore neighborhood").get_by_role("button",name="Show all").click();page.wait_for_function("()=>window.__okfLoomGraph.getState().lens==='themes'&&window.okfGraphCaptureState().layoutSettled")
     restored=page.evaluate("()=>({zoom:window.__okfLoomGraph.cy.zoom(),pan:window.__okfLoomGraph.cy.pan()})");assert abs(restored["zoom"]-origin["zoom"])<.03 and abs(restored["pan"]["x"]-origin["pan"]["x"])<2 and abs(restored["pan"]["y"]-origin["pan"]["y"])<2
     page.evaluate("id=>window.__okfLoomGraph.interaction.dispatch({type:'SELECT',id})",node);_preset(page, "focus");page.wait_for_function("id=>window.__okfLoomGraph.focusRoot()===id",arg=node)
@@ -10787,7 +11084,7 @@ def test_phase4_final_path_orientation_forward_reverse_and_mixed(server_url: str
     _open_graph(page,server_url)
     edge=page.evaluate("()=>{const e=window.__okfLoomGraph.cy.edges().first();return {s:e.source().id(),t:e.target().id(),label:e.data('label')||'related'}}")
     page.evaluate("e=>window.__okfLoomGraph.interaction.dispatch({type:'SELECT',id:e.s})",edge)
-    proof=Path("/tmp/okf-loom-phase4-final-current");proof.mkdir(parents=True,exist_ok=True);page.screenshot(path=str(proof/"desktop-action.png"),full_page=True)
+    proof=Path(tempfile.gettempdir()) / "okf-loom-phase4-final-current";proof.mkdir(parents=True,exist_ok=True);page.screenshot(path=str(proof/"desktop-action.png"),full_page=True)
     page.evaluate("e=>window.__okfLoomGraph.tracePath(window.__okfLoomGraph.cy.getElementById(e.s),window.__okfLoomGraph.cy.getElementById(e.t))",edge)
     forward=page.evaluate("()=>window.__okfLoomGraph.interaction.snapshot().pathResult.relations[0]");assert forward["orientation"]=="forward"
     page.evaluate("e=>window.__okfLoomGraph.tracePath(window.__okfLoomGraph.cy.getElementById(e.t),window.__okfLoomGraph.cy.getElementById(e.s))",edge)
@@ -10814,7 +11111,7 @@ def test_phase4_final_non_owned_keyboard_matrix_and_alt_filter_equivalence(serve
 
 def test_phase4_final_phase5_sse_presence_tour_compatibility_boundary(server_url: str,page)->None:
     _open_graph(page,server_url)
-    setup=page.evaluate("""async()=>{const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=fetch.bind(window),payload=await native(url).then(r=>r.json()),id=payload.nodes[0].data.id;payload.nodes[0].data.active_comment_count=23;window.fetch=(r,o)=>String(r)===url?Promise.resolve(new Response(JSON.stringify(payload),{headers:{'Content-Type':'application/json'}})):native(r,o);G.interaction.dispatch({type:'SELECT',id});window.okfLoomLive.emit('presence',{version:2,online:true,own_session_id:'browser-own',records:[{session_id:'agent-review',kind:'agent',state:'working',focus:id,label:'Agent'}]});return {id,applied:G.refreshStats.applied}}""")
+    setup=page.evaluate("""async()=>{const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=fetch.bind(window),payload=await native(url).then(r=>r.json()),id=payload.nodes[0].data.id;payload.nodes[0].data.active_comment_count=23;window.fetch=(r,o)=>String(r).split('?')[0]===url?Promise.resolve(new Response(JSON.stringify(payload),{headers:{'Content-Type':'application/json'}})):native(r,o);G.interaction.dispatch({type:'SELECT',id});window.okfLoomLive.emit('presence',{version:2,online:true,own_session_id:'browser-own',records:[{session_id:'agent-review',kind:'agent',state:'working',focus:id,label:'Agent'}]});return {id,applied:G.refreshStats.applied}}""")
     page.wait_for_function("id=>window.__okfLoomGraph.cy.getElementById(id).hasClass('okf-presence-halo')",arg=setup["id"])
     page.evaluate("()=>window.okfLoomLive.emit('comment',{})");page.wait_for_function("n=>window.__okfLoomGraph.refreshStats.applied>n",arg=setup["applied"])
     applied=page.evaluate("()=>window.__okfLoomGraph.refreshStats.applied");page.evaluate("()=>window.okfLoomLive.emit('graph',{})");page.wait_for_function("n=>window.__okfLoomGraph.refreshStats.applied>n",arg=applied)
@@ -10833,7 +11130,7 @@ def test_phase4_edge_background_clear_preserves_focus_root(server_url: str,page)
 def test_phase4_edge_selected_neighbour_refresh_keeps_surviving_focus_root(server_url: str,page)->None:
     _open_graph(page,server_url);setup=page.evaluate("""async()=>{const G=window.__okfLoomGraph,url=document.getElementById('okf-graph').dataset.graphUrl,native=fetch.bind(window),fresh=await native(url).then(r=>r.json()),e=G.cy.edges().first(),root=e.source().id(),selected=e.target().id();G.interaction.dispatch({type:'SELECT',id:root});return {url,fresh,root,selected}}""")
     page.get_by_role("toolbar",name="Selected concept actions").get_by_role("button",name="Explore neighborhood").click();page.wait_for_function("()=>window.__okfLoomGraph.getState().lens==='focus'&&window.okfGraphCaptureState().layoutSettled");page.evaluate("id=>window.__okfLoomGraph.interaction.dispatch({type:'SELECT',id})",setup["selected"])
-    page.evaluate("""s=>{const native=fetch.bind(window),f=JSON.parse(JSON.stringify(s.fresh));f.bundle_revision='focus-survives';f.nodes=f.nodes.filter(n=>n.data.id!==s.selected);f.edges=f.edges.filter(e=>e.data.source!==s.selected&&e.data.target!==s.selected);f.outgoing=f.outgoing||{};f.backlinks=f.backlinks||{};delete f.outgoing[s.selected];delete f.backlinks[s.selected];Object.keys(f.outgoing).forEach(id=>f.outgoing[id]=f.outgoing[id].filter(x=>x!==s.selected));Object.keys(f.backlinks).forEach(id=>f.backlinks[id]=f.backlinks[id].filter(x=>x!==s.selected));window.fetch=(r,o)=>String(r)===s.url?Promise.resolve(new Response(JSON.stringify(f),{headers:{'Content-Type':'application/json'}})):native(r,o)}""",setup)
+    page.evaluate("""s=>{const native=fetch.bind(window),f=JSON.parse(JSON.stringify(s.fresh));f.bundle_revision='focus-survives';f.nodes=f.nodes.filter(n=>n.data.id!==s.selected);f.edges=f.edges.filter(e=>e.data.source!==s.selected&&e.data.target!==s.selected);f.outgoing=f.outgoing||{};f.backlinks=f.backlinks||{};delete f.outgoing[s.selected];delete f.backlinks[s.selected];Object.keys(f.outgoing).forEach(id=>f.outgoing[id]=f.outgoing[id].filter(x=>x!==s.selected));Object.keys(f.backlinks).forEach(id=>f.backlinks[id]=f.backlinks[id].filter(x=>x!==s.selected));window.fetch=(r,o)=>String(r).split('?')[0]===s.url?Promise.resolve(new Response(JSON.stringify(f),{headers:{'Content-Type':'application/json'}})):native(r,o)}""",setup)
     page.evaluate("()=>window.__okfLoomGraph.refreshGraph()");page.wait_for_function("()=>document.body.dataset.okfRevision==='focus-survives'")
     assert page.evaluate("id=>window.__okfLoomGraph.focusRoot()===id&&window.__okfLoomGraph.getState().focusEnabled&&window.__okfLoomGraph.interaction.snapshot().selected===null",setup["root"])
 
@@ -10863,7 +11160,7 @@ def test_phase4_details_themes_long_rows_never_overflow(width: int,server_url: s
     page.evaluate("""()=>{document.querySelector('.okf-signal__question').textContent='What are the exceptionally long cross-functional themes and which supporting knowledge areas barely touch across organizational boundaries?';document.querySelectorAll('.okf-lens-summary__row').forEach((row,i)=>{row.querySelector('.okf-lens-summary__label').textContent='Extremely long ranked theme title describing customer subscriptions, international settlement, governance, and operational dependencies '+i;row.querySelector('.okf-lens-summary__note').textContent='123456 concepts with supporting context and additional explanatory count text'});}""")
     proof=page.evaluate("""()=>{const pane=document.getElementById('okf-detail'),rows=Array.from(document.querySelectorAll('.okf-lens-summary__row')),controls=Array.from(pane.querySelectorAll('button,input,select,summary')).filter(x=>getComputedStyle(x).display!=='none'),pr=pane.getBoundingClientRect();return {doc:[document.documentElement.scrollWidth,document.documentElement.clientWidth],pane:[pane.scrollWidth,pane.clientWidth],rows:rows.map(r=>[r.scrollWidth,r.clientWidth]),bounded:controls.every(x=>{const r=x.getBoundingClientRect();return r.left>=pr.left-1&&r.right<=pr.right+1}),focusable:controls.every(x=>x.disabled||x.tabIndex>=0)}}""")
     assert proof["doc"][0]<=proof["doc"][1]+1 and proof["pane"][0]<=proof["pane"][1]+1 and all(a<=b+1 for a,b in proof["rows"]) and proof["bounded"] and proof["focusable"],proof
-    page.screenshot(path=f"/tmp/okf-phase4-details-{width}.png",full_page=True)
+    page.screenshot(path=str(Path(tempfile.gettempdir()) / f"okf-phase4-details-{width}.png"),full_page=True)
 
 
 @pytest.mark.parametrize("surface",["live","static","single"])
@@ -10930,7 +11227,7 @@ def test_phase4_final_mobile_overview_backbone_selection_and_full_parity(request
     elif surface=="static":expect(page.locator(".okf-mobile-mode")).to_have_text("Static")
     else:expect(page.locator(".okf-mobile-mode")).to_have_text("Local")
     assert page.evaluate(snapshot)==before
-    proof=Path("/tmp/okf-loom-phase4-final-current");proof.mkdir(parents=True,exist_ok=True)
+    proof=Path(tempfile.gettempdir()) / "okf-loom-phase4-final-current";proof.mkdir(parents=True,exist_ok=True)
     page.evaluate("()=>{const G=window.__okfLoomGraph,n=G.cy.nodes().sort((a,b)=>b.degree(false)-a.degree(false))[0];G.interaction.dispatch({type:'SELECT',id:n.id(),source:'canvas-keyboard'})}")
     expect(page.locator(".okf-detail-selected-status")).to_contain_text("Selected:")
     rows=page.locator(".okf-detail-relationships__list>li")
@@ -10985,15 +11282,15 @@ def test_phase4_mobile_header_tabs_tools_mode_names_and_contrast(request,surface
     commands=page.get_by_role("button",name="Open the command palette (Control K)")
     if surface=="live":
         page.locator(".okf-studio-launcher").click();expect(commands).to_be_visible();commands.focus();expect(commands).to_be_focused();page.get_by_role("button",name="Close panel").click()
-    else:mode.focus();expect(mode).to_be_focused()
+    else:assert mode.evaluate("el=>el.tabIndex")<0  # D3-011: a status word is not a Tab stop
     expect(page.locator(".okf-mobile-secondary__controls")).to_be_hidden()
     assert page.evaluate('b=>{const r=b.getBoundingClientRect();return r.left>=-1&&r.right<=innerWidth+1}',find.element_handle())
     # Direct accessibility-tree proof: icon controls expose unique names; a
     # screenshot's repeated glyphs are not an accessible-name failure.
     names=page.locator(".okf-graph-zoom button").evaluate_all("bs=>bs.map(b=>b.getAttribute('aria-label'))")
     assert len(names)==6 and all(names) and len(set(names))==len(names)
-    assert page.locator(".okf-viewport-label").all_text_contents()==["Zoom in","Zoom out","Fit","Full screen","Reset","Overview","Layout"]
-    assert page.evaluate("()=>{const bs=[...document.querySelectorAll('.okf-graph-zoom button')],toolbar=document.querySelector('.okf-graph-zoom');return getComputedStyle(toolbar).gridTemplateColumns.split(' ').length===3&&bs.every(b=>{const r=b.getBoundingClientRect();return r.width>=44&&r.height>=44})}")
+    assert page.locator(".okf-viewport-label").all_text_contents()==["Zoom in","Zoom out","Fit","Full screen","Reset","Overview","Re-run layout"]
+    assert page.evaluate("()=>{const bs=[...document.querySelectorAll('.okf-graph-zoom button')],toolbar=document.querySelector('.okf-graph-zoom');return getComputedStyle(toolbar).gridTemplateColumns.split(' ').length===(innerWidth>=375?6:3)&&bs.every(b=>{const r=b.getBoundingClientRect();return r.width>=44&&r.height>=44})}")
     tree=page.locator(".okf-graph-zoom").aria_snapshot()
     assert all(name in tree for name in names),tree
     contrast=page.evaluate("""()=>{const e=window.__okfLoomGraph.cy.edges().first(),c=document.getElementById('okf-graph'),parse=s=>s.match(/[\\d.]+/g).slice(0,3).map(Number),lin=x=>(x/=255)<=.04045?x/12.92:((x+.055)/1.055)**2.4,L=s=>{const v=parse(s).map(lin);return .2126*v[0]+.7152*v[1]+.0722*v[2]},a=L(e.style('line-color')),b=L(getComputedStyle(c).backgroundColor);return {line:e.style('line-color'),background:getComputedStyle(c).backgroundColor,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05),arrow:e.style('target-arrow-color'),labels:e.style('label')}}""")
@@ -11044,7 +11341,7 @@ def test_phase4_final_selected_details_scrolls_in_normal_flow_without_overlap(
         assert result["noticeBefore"]
     else:
         assert result["noticeText"] is None
-    proof = Path("/tmp/okf-loom-phase4-final-r7")
+    proof = Path(tempfile.gettempdir()) / "okf-loom-phase4-final-r7"
     proof.mkdir(parents=True, exist_ok=True)
     page.screenshot(path=str(proof / f"{surface}-{width}-selected-details.png"), full_page=True)
 
@@ -11087,7 +11384,7 @@ def test_phase4_r8_mobile_details_exact_geometry_labels_and_contrast(
     assert all(item["rect"]["height"] == 44 and item["font"] >= 14 for item in metrics["toolbar"])
     assert all(value >= 4.5 for value in metrics["links"])
     assert all(value >= 3 for value in metrics["disabled"])
-    proof = Path("/tmp/okf-loom-phase4-final-r8")
+    proof = Path(tempfile.gettempdir()) / "okf-loom-phase4-final-r8"
     proof.mkdir(parents=True, exist_ok=True)
     page.screenshot(path=str(proof / f"{surface}-{width}-selected-details.png"), full_page=True)
 
@@ -11148,7 +11445,7 @@ def test_phase5_real_ssr_failure_and_delayed_settle(tmp_path: Path, page) -> Non
     proc = subprocess.Popen(okf_module_argv("serve", str(root), "--host", "127.0.0.1", "--port", str(port), "--no-watch", "--no-open"), cwd=str(TOOLKIT_ROOT), env=okf_subprocess_env(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         _wait_for_server(proc, base)
-        page.route("**/__data/graph.json", lambda route: route.abort())
+        page.route("**/__data/graph.json*", lambda route: route.abort())
         page.goto(base + "/", wait_until="domcontentloaded"); page.wait_for_timeout(900)
         assert page.locator("#okf-recent-rail").count() == 1
         assert page.locator(".okf-card__comments").count() == 1
@@ -11156,7 +11453,7 @@ def test_phase5_real_ssr_failure_and_delayed_settle(tmp_path: Path, page) -> Non
         page.wait_for_timeout(500)
         assert page.locator("#okf-recent-rail").count() == 1
         assert page.locator("#okf-recent-rail").inner_text() == ssr
-        page.unroute("**/__data/graph.json")
+        page.unroute("**/__data/graph.json*")
         page.reload(wait_until="domcontentloaded"); page.wait_for_timeout(1200)
         assert page.locator("#okf-recent-rail").count() == 1
         assert page.locator(".okf-card__comments").inner_text() == "1 active comment"

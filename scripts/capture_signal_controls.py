@@ -180,10 +180,10 @@ def main(argv: list[str] | None = None) -> None:
                   if (!window.OKFLoomTheme || typeof window.OKFLoomTheme.setTheme !== "function") {
                     throw new Error("canonical theme API unavailable");
                   }
-                  window.OKFLoomTheme.setTheme("technical-dark");
+                  window.OKFLoomTheme.setTheme("slate");
                 }"""
             )
-            assert page.evaluate("() => document.documentElement.dataset.theme") == "technical-dark"
+            assert page.evaluate("() => document.documentElement.dataset.theme") == "slate"
             assert page.locator("#okf-appearance-menu").is_hidden()
             shot(page, "06-overview-dark-fullpage.png", graph_url, locator="body")
             print("wrote", OUT / "06-overview-dark-fullpage.png")

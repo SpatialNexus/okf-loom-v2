@@ -12,6 +12,7 @@ import re
 import shutil
 import subprocess
 import sys
+from html.parser import HTMLParser
 from pathlib import Path
 
 import pytest
@@ -105,9 +106,57 @@ def test_default_and_explicit_cdn_output_are_identical_and_vendor_free(tmp_path,
         assert 'id="okf-vendor-' not in html
         expected = vendor.CDN_SINGLE_FILE_CSP if target == "single-file" else vendor.CDN_PAGE_CSP
         assert _csp(html) == [expected], page
+        font_src = _csp(html)[0].split("font-src ", 1)[1].split(";", 1)[0]
+        assert font_src == ("'self' data: https://cdn.jsdelivr.net" if target == "single-file"
+                            else "'self' https://cdn.jsdelivr.net"), page
     if target != "single-file":
         graph = (tmp_path / "default" / "__graph.html").read_text(encoding="utf-8")
-        assert render._CDN_SCRIPTS in graph
+        assert render._CDN_SCRIPTS.replace("<script ", "<script defer ") in graph
+
+
+class _ScriptTags(HTMLParser):
+    def __init__(self, html):
+        super().__init__()
+        self.scripts = []
+        self.feed(html)
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "script":
+            self.scripts.append(dict(attrs))
+
+
+@pytest.mark.parametrize("mode", ["serve", "static", "spa"])
+@pytest.mark.parametrize("assets", ["cdn", "offline"])
+def test_graph_vendor_chain_defers_in_order_without_changing_integrity(tmp_path, mode, assets):
+    bundle = Bundle.load(write_offline_fixture(tmp_path / "bundle"))
+    offline = vendor.load_offline_assets() if assets == "offline" else None
+    html = render._render_graph_page(bundle, mode=mode, name="Proof", config={},
+                                     offline_assets=offline)
+    scripts = _ScriptTags(html).scripts
+    entry = "/portable-page.js" if mode == "static" else "/graph.js"
+    graph_index = next(i for i, tag in enumerate(scripts) if tag.get("src", "").endswith(entry))
+    if mode == "static":
+        assert scripts[graph_index]["data-okf-runtime"] == "graph.js"
+        assert not any(tag.get("src", "").endswith("/graph.js") for tag in scripts)
+    chain = [tag for tag in scripts[:graph_index] if "cdn.jsdelivr.net" in tag.get("src", "")
+             or "/vendor/" in tag.get("src", "")]
+    original = _ScriptTags(render._CDN_SCRIPTS).scripts
+    locked = {entry["cdn"]: entry for entry in vendor.lock_files(vendor.load_lock()) if entry.get("cdn")}
+    assert len(chain) == 6
+    prefix = "/__static" if mode in ("serve", "spa") else "__static"
+    for tag, pin in zip(chain, original):
+        assert "defer" in tag and "async" not in tag
+        if assets == "cdn":
+            assert {key: value for key, value in tag.items() if key != "defer"} == pin
+            assert tag["integrity"] == locked[tag["src"]]["sha384"]
+            assert tag["crossorigin"] == "anonymous"
+        else:
+            assert tag["src"] == f'{prefix}/vendor/{locked[pin["src"]]["dest"]}'
+            assert "integrity" not in tag and "crossorigin" not in tag
+    assert "defer" in scripts[graph_index]
+    if mode != "serve":
+        theme = next(tag for tag in scripts if tag.get("src", "").endswith("/theme.js"))
+        assert "defer" not in theme and "async" not in theme
 
 
 def test_render_single_file_default_equals_cdn(tmp_path):
@@ -143,7 +192,7 @@ def test_lock_matches_code_pins_versions_and_sri():
     for url in [*pins, *re.findall(r'"(https://cdn\.jsdelivr\.net/npm/[^"]+)"', renderers)]:
         name, version = re.match(r"https://cdn\.jsdelivr\.net/npm/((?:@[^/]+/)?[^@/]+)@([^/]+)/", url).groups()
         code_versions[name] = version
-    lock_versions = {package["name"]: package["version"] for package in lock["packages"]}
+    lock_versions = {package["name"]: package["version"] for package in lock["packages"] if package["license"] != "OFL-1.1"}
     lock_versions["highlight.js"] = lock_versions.pop("@highlightjs/cdn-assets")
     assert code_versions == lock_versions
     assert [ref["version"] for ref in lock["reference_packages"]] == ["11.12.0"]
@@ -322,7 +371,7 @@ def test_offline_site_is_closed_and_licensed(tmp_path, target):
     for name in (vendor.NOTICES_NAME, vendor.BUNDLED_NOTICES_NAME):
         assert (vendor_out / name).read_bytes() == (vendor.VENDOR_ROOT / name).read_bytes()
     licences = sorted(p.relative_to(vendor_out).as_posix() for p in vendor_out.rglob("LICENSE"))
-    assert len(licences) == 9
+    assert len(licences) == 11
     for page in _html_pages(out):
         html = page.read_text(encoding="utf-8")
         assert _csp(html) == [vendor.OFFLINE_PAGE_CSP], page
@@ -337,7 +386,7 @@ def test_offline_site_is_closed_and_licensed(tmp_path, target):
             assert (base / ref.lstrip("/")).is_file(), (page, ref)
     graph = (out / "__graph.html").read_text(encoding="utf-8")
     prefix = "/__static" if target == "spa" else "__static"
-    chain = re.findall(r'<script src="([^"]+/vendor/[^"]+)"></script>', graph)
+    chain = re.findall(r'<script defer src="([^"]+/vendor/[^"]+)"></script>', graph)
     assert chain == [f"{prefix}/vendor/{rel}" for rel in (
         "cytoscape-3.34.3/cytoscape.min.js", "layout-base-2.0.1/layout-base.js",
         "cose-base-2.2.0/cose-base.js", "cytoscape-fcose-2.2.0/cytoscape-fcose.js",
@@ -407,6 +456,58 @@ def test_bundled_notices_are_locked_and_embeddable():
     text = data.decode("utf-8")
     assert "\r" not in text and not re.search(r"[ \t]$", text, re.M)
     assert "</script" not in text.lower() and "<!--" not in text
+
+
+def test_ledger_notice_generator_reproduces_the_locked_ofl_appendices():
+    import generate_bundled_notices as generator
+
+    entries = generator.ledger_fonts_entries(vendor.load_lock())
+    notices, _blocks, inventory = _bundled_notices()
+    assert inventory["ledger_fonts"] == [{k: v for k, v in entry.items() if k != "text"}
+                                        for entry in entries]
+    assert [entry["name"] for entry in entries] == ["Public Sans", "Azeret Mono"]
+    # Minimal renderer inputs isolate the appendix renderer without network use.
+    package = {"id": "fixture@1", "name": "fixture", "license": "MIT", "included_in": [],
+               "evidence": [], "tarball": None, "licence_files": []}
+    fonts = {"id": "fixture-fonts@1", "license": "OFL-1.1", "included_in": [], "evidence": [],
+             "tarball": "fixture", "integrity": "fixture", "notices": [],
+             "terms_source": "fixture", "terms_text": "fixture"}
+    rendered = generator.render_notices([package], [], fonts, {}, entries)
+    marker = "===== Ledger font: Public Sans (OFL-1.1) ====="
+    appendix = rendered[rendered.index(marker):]
+    assert appendix == notices[notices.index(marker):]
+    primary = vendor.read_vendor_bytes(vendor.NOTICES_NAME).decode("utf-8")
+    assert appendix == primary[primary.index(marker):]
+    for entry in entries:
+        assert entry["version"] == "ledger-snapshot" and entry["provenance"]
+        assert "tarball" not in entry and "integrity" not in entry
+        licence = entry["licence_files"][0]
+        assert vendor.sha256_hex(entry["text"].encode("utf-8")) == licence["sha256"]
+        assert vendor.sha256_hex(generator.as_quoted(entry["text"]).encode("utf-8")) == \
+            licence["quoted_sha256"]
+
+
+@pytest.mark.parametrize("damage", ["flip", "missing", "symlink"])
+def test_notice_regeneration_refuses_damaged_local_licences_before_network(vendor_copy, monkeypatch,
+                                                                        tmp_path, damage):
+    import generate_bundled_notices as generator
+
+    victim = vendor_copy / vendor.LEDGER_LICENSES[0]
+    if damage == "flip":
+        _flip_byte(victim)
+    elif damage == "missing":
+        victim.unlink()
+    else:
+        real = tmp_path / "licence.txt"
+        victim.rename(real)
+        victim.symlink_to(real)
+
+    def no_network():
+        pytest.fail("local licence damage must fail before upstream regeneration")
+
+    monkeypatch.setattr(generator, "mermaid_inventory", no_network)
+    with pytest.raises(SystemExit, match="local Ledger snapshot verification failed"):
+        generator.build()
 
 
 def test_bundled_notices_quote_every_inventoried_licence_in_full():
@@ -483,8 +584,13 @@ def test_cdn_render_golden_provenance_matches_the_pinned_versions():
                                       "katex": versions["katex"], "mermaid": versions["mermaid"]}
     renderers = (TOOLKIT_ROOT / "scripts" / "okf_loom" / "viewer" / "static" / "renderers.js").read_text(encoding="utf-8")
     pins = set(re.findall(r'"(https://cdn\.jsdelivr\.net/npm/[^"]+)"', renderers))
-    light_mode_pins = {url for url in pins if "github-dark" not in url}
-    assert light_mode_pins and light_mode_pins <= set(provenance["cdn_requests"])
+    # GitHub sheets remain locked for vendor parity but neither is loaded:
+    # Ledger paints syntax locally from palette tokens in every scheme.
+    retired_sheets = {url for url in pins if re.search(r"/styles/github(?:-dark)?\.min\.css$", url)}
+    active_pins = pins - retired_sheets
+    requests = set(provenance["cdn_requests"])
+    assert active_pins and active_pins <= requests
+    assert not retired_sheets & requests
     assert all(url.startswith("https://cdn.jsdelivr.net/npm/") for url in provenance["cdn_requests"])
     assert provenance["generated"] and provenance["browser"].startswith("Chromium ")
     assert len(golden["mermaid"]) == 2 and len(golden["hljs"]) == 2 and len(golden["katex"]) == 1
@@ -504,3 +610,68 @@ def test_bundled_notices_tampering_fails_closed(vendor_copy, damage):
         lock_path.write_text(json.dumps(lock), encoding="utf-8")
     with pytest.raises(vendor.VendorIntegrityError):
         vendor.load_offline_assets()
+
+
+@pytest.mark.parametrize("target", ["static", "spa", "single-file"])
+@pytest.mark.parametrize("assets", ["cdn", "offline"])
+def test_ledger_fonts_and_full_ofl_ship_on_every_target(tmp_path, target, assets):
+    bundle = Bundle.load(write_offline_fixture(tmp_path / "bundle"))
+    out = tmp_path / "site"
+    build_site(bundle, out, target=target, assets=assets)
+    text = ((out / "index.html") if target == "single-file" else
+            (out / "__static" / "ledger-fonts.css")).read_text()
+    if target == "single-file":
+        assert text.count('src:url(data:font/woff2;base64,') >= 4
+        assert not list(out.rglob("*.woff2"))
+        assert 'as="font"' not in text
+    else:
+        assert "data:font" not in text
+        assert len(text.encode()) < 10_000
+        for _family, _style, path in vendor.LEDGER_FACES:
+            assert f'src:url({path}) format("woff2")' in text
+            assert (out / "__static" / path).read_bytes() == vendor.read_vendor_bytes(path)
+        for path in vendor.LEDGER_LICENSES:
+            assert (out / "__static" / path).read_bytes() == vendor.read_vendor_bytes(path)
+        for page in out.rglob("*.html"):
+            html = page.read_text()
+            if target == "spa":
+                assert html.count('as="font" type="font/woff2" crossorigin') == 2, page
+                assert html.index('rel="preload"') < html.index('rel="stylesheet"')
+            else:
+                assert 'as="font"' not in html, page
+    for family, style, _path in vendor.LEDGER_FACES:
+        assert f'font-family:"{family}";font-style:{style};' in text
+    assert text.count('font-display:swap;') >= 4
+    for path in vendor.LEDGER_LICENSES:
+        assert (vendor.VENDOR_ROOT / path).read_text() in text
+    lock = vendor.load_lock()
+    css = vendor.load_ledger_css(inline=True).encode()
+    pin = lock["derived"][vendor.LEDGER_DERIVED]
+    assert pin["sha256"] == vendor.sha256_hex(css)
+    assert pin["external"]["sha256"] == vendor.sha256_hex(vendor.load_ledger_css().encode())
+
+
+@pytest.mark.parametrize("path", [face[2] for face in vendor.LEDGER_FACES] + list(vendor.LEDGER_LICENSES))
+def test_ledger_corruption_fails_closed_even_in_cdn_mode(vendor_copy, path):
+    target = vendor_copy / path
+    target.write_bytes(target.read_bytes() + b"corrupt")
+    with pytest.raises(vendor.VendorIntegrityError, match="mismatch"):
+        vendor.load_ledger_css(vendor_copy)
+
+
+@pytest.mark.parametrize("variant", ["inline", "external"])
+def test_ledger_derived_hash_and_symlinks_are_verified(vendor_copy, variant):
+    lock_path = vendor_copy / vendor.LOCK_NAME
+    lock = json.loads(lock_path.read_text())
+    pin = lock["derived"][vendor.LEDGER_DERIVED]
+    if variant == "external":
+        pin = pin["external"]
+    pin["sha256"] = "0" * 64
+    lock_path.write_text(json.dumps(lock))
+    with pytest.raises(vendor.VendorIntegrityError, match="derived Ledger"):
+        vendor.load_ledger_css(vendor_copy)
+    path = vendor_copy / vendor.LEDGER_FACES[0][2]
+    path.unlink()
+    path.symlink_to(vendor.VENDOR_ROOT / vendor.LEDGER_FACES[0][2])
+    with pytest.raises(vendor.VendorIntegrityError, match="symlink"):
+        vendor.load_ledger_css(vendor_copy)

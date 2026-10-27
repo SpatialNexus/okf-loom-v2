@@ -4,7 +4,7 @@
 
   Placeholder convention (str.replace):
       __LANG__             → document language (default "en")
-      __THEME_ATTR__       → ` data-theme="<family>-<mode>"` (technical/swiss × light/dark)
+      __THEME_ATTR__       → ` data-theme="bone|slate|clay|plum"` (first-paint Ledger palette)
       __DATA_ATTRS__       → extra data-* attributes for the SPA/static JS hook
       __HEAD_TITLE__       → <title> text
       __BUNDLE_NAME__      → display name shown in the topbar
@@ -18,14 +18,16 @@
                          neighbour links (P1-9). Only consumed by wiki.js
                          in static mode; empty for serve/spa.
     __WIKI_CSS_LINK__    → <link rel="stylesheet" href="...wiki.css">
-    __THEME_CONFIG__     → CSP-safe configured theme/modifier preference JSON
+    __THEME_CONFIG__     → CSP-safe configured appearance choice JSON
   __WIKI_JS_LINK__     → <script src="...wiki.js" defer></script>
        __CONCEPT_ID__       → concept id string (escaped; kept for compatibility
                               references; the visible breadcrumb is
                               __BREADCRUMB_HTML__)
        __BREADCRUMB_HTML__  → clickable breadcrumb <nav> (P2-3 iter-1)
-      __CONCEPT_TYPE__     → type (escaped)
-      __CONCEPT_TYPE_COLOR__ → CSS colour for the type chip
+      __CONCEPT_TYPE__     → type (escaped). Ledger: types are not colour-coded;
+                             the retired __CONCEPT_TYPE_COLOR__/__CONCEPT_TYPE_FG__
+                             placeholders still resolve (to neutral tokens) for
+                             legacy override templates.
        __CONCEPT_TITLE__    → page <h1> text (phrasing content only)
        __CONCEPT_SUBTITLE__ → sibling subtitle <p> after the h1 (P1-1 iter-2):
                               empty string when the concept has no aliases.
@@ -59,7 +61,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230c7373'/%3E%3Cpath d='M8 10h16M8 16h10M8 22h16' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='1' y='1' width='30' height='30' fill='%231d1a16' stroke='%23b0a696' stroke-width='2'/%3E%3Cpath d='M8 8h16M8 16h10M8 24h16' stroke='%23f6f3ed' stroke-width='4'/%3E%3C/svg%3E">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>__HEAD_TITLE__</title>
 __WIKI_CSS_LINK__
@@ -87,11 +89,11 @@ __APPLICATION_SHELL__
 
 <main id="okf-main" class="okf-page">
   <article class="okf-page__main">
-    <header class="okf-page__header" style="--okf-type-accent:__CONCEPT_TYPE_COLOR__">
+    <header class="okf-page__header">
       __BREADCRUMB_HTML__
       <div class="okf-page__typerow">
-        <span class="okf-type-iconwrap" style="color:__CONCEPT_TYPE_COLOR__" aria-hidden="true">__TYPE_ICON__</span>
-        <span class="okf-type-chip" style="background:__CONCEPT_TYPE_COLOR__;color:__CONCEPT_TYPE_FG__">__CONCEPT_TYPE__</span>
+        <span class="okf-type-iconwrap" aria-hidden="true">__TYPE_ICON__</span>
+        <span class="okf-type-chip">__CONCEPT_TYPE__</span>
         __READTIME_HTML__
       </div>
       <h1 class="okf-page__title">__CONCEPT_TITLE__</h1>

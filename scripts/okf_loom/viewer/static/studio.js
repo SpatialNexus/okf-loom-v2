@@ -17,8 +17,8 @@
  *   - Extension API (§13.6): okfLoomStudio.register(kind, impl). Wired kinds:
  *     {panel, viewMode}. Reserved (forward-compat, accepted + warned):
  *     {toolbar, graphDecorator, suggestionRenderer}.
- *   - Themes (§13.5): owned entirely by viewer/static/theme.js (family x
- *     mode: swiss/technical x auto/light/dark). This file only calls the
+ *   - Themes (§13.5): owned entirely by viewer/static/theme.js (Ledger
+ *     palettes bone/slate/clay/plum + system). This file only calls the
  *     theme.js API and registers its own overlays into the shared
  *     window.OKFOverlayStack so the theme Appearance menu can yield Escape
  *     to the actually-topmost studio modal.
@@ -372,20 +372,30 @@
     } catch (e) { return String(ts); }
   }
   // Phase 5: human relative time for the index recency rail ("4m ago").
-  function fmtAgo(ts) {
-    try {
-      const d = new Date(ts);
-      if (isNaN(d.getTime())) return "";
-      const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
-      if (s < 60) return "just now";
-      if (s < 3600) return Math.round(s / 60) + "m ago";
-      if (s < 86400) return Math.round(s / 3600) + "h ago";
-      return Math.round(s / 86400) + "d ago";
-    } catch (e) { return ""; }
+  // "Recently changed" rows (render.py SSR and the live rail below) share
+  // one format: whole elapsed units, floored ("just now", "Nm ago",
+  // "Nh ago", "Nd ago"), with the full UTC timestamp in the <time> title
+  // for hover and assistive tech.
+  function fmtRecentAgo(ts) {
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return "";
+    const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
+    if (s < 60) return "just now";
+    if (s < 3600) return Math.floor(s / 60) + "m ago";
+    if (s < 86400) return Math.floor(s / 3600) + "h ago";
+    return Math.floor(s / 86400) + "d ago";
+  }
+  function fmtUtcStamp(ts) {
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return "";
+    const p = (n) => String(n).padStart(2, "0");
+    return d.getUTCFullYear() + "-" + p(d.getUTCMonth() + 1) + "-" + p(d.getUTCDate()) +
+      " " + p(d.getUTCHours()) + ":" + p(d.getUTCMinutes()) + " UTC";
   }
   function shortId(id) { return id ? id.slice(-6) : ""; }
 
   // ---- toast region ----------------------------------------------------
+  const TOAST_GLYPHS = { success: "OK", error: "!", warn: "?" };
   let toastRegion;
   function toast(msg, opts) {
     opts = opts || {};
@@ -394,6 +404,10 @@
       document.body.appendChild(toastRegion);
     }
     const node = el("div", { class: "okf-toast", dataset: { tone: opts.tone || "" } });
+    // A toned toast carries a glyph beside its 2px status bar so the tone is
+    // never colour-only (WCAG 1.4.1). Decorative: the message says it.
+    const glyph = TOAST_GLYPHS[opts.tone];
+    if (glyph) node.appendChild(el("span", { class: "okf-toast__icon", "aria-hidden": "true", text: glyph }));
     node.appendChild(el("span", { class: "okf-toast__msg" }));
     node.querySelector(".okf-toast__msg").innerHTML = ""; // safety
     if (typeof msg === "string") {
@@ -486,7 +500,7 @@
   // ====================================================================
   // 2. Themes (§13.5) — state ownership delegated to theme.js
   // ====================================================================
-  // Theme state (family/mode/Auto/OS, persistence, the Appearance popover)
+  // Theme state (palette choice incl. System/OS, persistence, the Appearance popover)
   // is owned ENTIRELY by viewer/static/theme.js, which loads before this
   // module and resolves data-theme before first paint. The studio NEVER
   // reads/writes localStorage for theme and never sets data-theme; command
@@ -499,7 +513,8 @@
   // ====================================================================
   // 3. Studio bar
   // ====================================================================
-  const bar = el("div", { class: "okf-concept-viewbar", role: "region", "aria-label": "Document view" });
+  const bar = document.querySelector("[data-okf-viewbar-placeholder]") ||
+    el("div", { class: "okf-concept-viewbar", role: "region", "aria-label": "Document view" });
   const leftGroup = el("div", { class: "okf-studio-home__group" });
   const rightGroup = el("div", { class: "okf-studio-home__group" });
   const studioSlot = document.querySelector("[data-okf-studio-capability='available']");
@@ -559,7 +574,7 @@
   // and deliberately separate from live.js's capability-bound browser-session
   // publisher. It also mirrors the canonical agent row (renderPresence syncs
   // aria-pressed), so an agent reporting watching via the CLI moves it too.
-  // Visible label "Watching" + an eye glyph + an accessible name.
+  // Visible label "Watching" + a square status glyph + an accessible name.
   const watchingToggle = el("button", { type: "button", class: "okf-studiobtn okf-watch-toggle",
     "aria-pressed": "false", "aria-label": "Agent watching, currently off",
     "aria-describedby": "okf-watch-toggle-note",
@@ -568,7 +583,7 @@
   // control, not only to those who hover it.
   watchingToggle.appendChild(el("span", { id: "okf-watch-toggle-note", class: "okf-sr-only",
     text: "Status flag only. It does not start an agent; an external agent must be running to act on comments." }));
-  watchingToggle.appendChild(el("span", { class: "okf-watch-toggle__icon", "aria-hidden": "true", text: "\u25C9" }));
+  watchingToggle.appendChild(el("span", { class: "okf-watch-toggle__icon", "aria-hidden": "true", text: "\u25A0" }));
   watchingToggle.appendChild(el("span", { class: "okf-watch-toggle__label", text: "Watching" }));
   watchingToggle.disabled = !CAN_CONTROL_SESSION;
   watchingToggle.hidden = !CAN_CONTROL_SESSION;
@@ -675,16 +690,21 @@
   // Source scrolls locally and becomes a keyboard-focusable region.
   let sourceWrap = true;
   try { sourceWrap = localStorage.getItem("okf-source-wrap") !== "off"; } catch (e) {}
+  // One label element (a single flex item, so wide layouts render exactly
+  // as plain text did); phones hide " lines" visually (wiki.css) so the view
+  // tabs keep one row, while the button's name stays "Wrap lines".
+  const wrapLabel = el("span", { class: "okf-viewswitch__label" });
+  wrapLabel.append("Wrap", el("span", { class: "okf-viewswitch__more", text: " lines" }));
   const wrapBtn = el("button", { type: "button", class: "okf-viewswitch__btn okf-source-wrap",
-    "aria-pressed": sourceWrap ? "true" : "false", text: "Wrap lines",
-    title: "Wrap long Source lines", hidden: state.view === "rendered" });
+    "aria-pressed": sourceWrap ? "true" : "false",
+    title: "Wrap long Source lines", hidden: state.view === "rendered" }, [wrapLabel]);
   wrapBtn.addEventListener("click", () => {
     sourceWrap = !sourceWrap;
     try { localStorage.setItem("okf-source-wrap", sourceWrap ? "on" : "off"); } catch (e) {}
     applySourceWrap();
   });
   viewSwitch.appendChild(wrapBtn);
-  const focusViewBtn = el("button", { type: "button", class: "okf-viewswitch__btn",
+  const focusViewBtn = el("button", { type: "button", class: "okf-viewswitch__btn okf-focus-toggle",
     "aria-pressed": state.focusView ? "true" : "false", text: "Focus view" });
   function setFocusView(active) {
     state.focusView = !!active;
@@ -746,7 +766,14 @@
       studioSlot.hidden = false;
     }
     if (isConceptPage()) {
-      bar.replaceChildren(viewSwitch);
+      // The outline owner may already have mounted Sections in the SSR bar.
+      // Keep that connected node (or its inert placeholder) when filling it.
+      const sections = bar.querySelector("[data-okf-outline-jump], [data-okf-outline-jump-placeholder]");
+      bar.replaceChildren(viewSwitch, ...(sections ? [sections] : []));
+      bar.removeAttribute("data-okf-viewbar-placeholder");
+      bar.removeAttribute("aria-hidden");
+      bar.setAttribute("role", "region");
+      bar.setAttribute("aria-label", "Document view");
       const topbar = $(".okf-topbar");
       if (topbar && topbar.parentNode) topbar.parentNode.insertBefore(bar, topbar.nextSibling);
       else document.body.insertBefore(bar, document.body.firstChild);
@@ -787,11 +814,23 @@
   }
   function mountPageFeedback() {
     const host = pageFeedbackHost();
-    if (!host || pageFeedback) return;
+    if (!host || pageFeedback) {
+      document.querySelectorAll("[data-okf-page-feedback-placeholder]").forEach((node) => node.remove());
+      if (!host) document.querySelector(".okf-hero--feedback")?.classList.remove("okf-hero--feedback");
+      return;
+    }
     const inGraph = host.id === "okf-detail-actions-slot";
     const noun = inGraph ? "concept" : "page";
-    const group = el("div", { class: "okf-page-feedback" + (inGraph ? " okf-page-feedback--graph" : ""), role: "group",
+    const placeholder = document.querySelector("[data-okf-page-feedback-placeholder]");
+    const group = placeholder || el("div", { class: "okf-page-feedback" + (inGraph ? " okf-page-feedback--graph" : ""), role: "group",
       "aria-label": inGraph ? "Concept feedback" : "Page feedback" });
+    if (placeholder) {
+      group.replaceChildren();
+      group.removeAttribute("data-okf-page-feedback-placeholder");
+      group.removeAttribute("aria-hidden");
+      group.setAttribute("role", "group");
+      group.setAttribute("aria-label", "Page feedback");
+    }
     const comment = el("button", { type: "button", class: "okf-btn okf-page-feedback__comment",
       "aria-controls": "okf-panel", text: "Comment on this " + noun });
     comment.addEventListener("click", openPageComposer);
@@ -874,7 +913,7 @@
       else if (resolved && !dismissed && open + resolved + dismissed === rows.length) label = countLabel(resolved, "resolved comment");
       else if (dismissed && !resolved && open + resolved + dismissed === rows.length) label = countLabel(dismissed, "dismissed comment");
       else label = "View " + rows.length + " comment" + (rows.length === 1 ? "" : "s") + " on this " + noun;
-    } else if (!CAN_COMMENT && status === "ready") label = "View comments";
+    } else if (!CAN_COMMENT && status !== "error") label = "View comments";  // reserved before load; the panel shows loading
     pageFeedback.count.textContent = label;
     pageFeedback.count.hidden = !label;
     let note = "";
@@ -891,7 +930,10 @@
       if (hero && hero.classList) hero.classList.remove("okf-hero--feedback");
       pageFeedback.group.remove(); pageFeedback = null;
     }
-    if (studioSlot) { studioSlot.replaceChildren(); studioSlot.hidden = true; }
+    if (studioSlot) {
+      studioSlot.replaceChildren(); studioSlot.hidden = true;
+      studioSlot.dataset.okfStudioCapability = "unavailable";
+    }
     if (bar.parentNode) bar.parentNode.removeChild(bar);
   }
 
@@ -1256,8 +1298,12 @@
           console.debug("[okf-studio] source load superseded by a newer owner (expected)", e);
           return;
         }
-        setSourceState("error");
         console.error("[okf-studio] source load failed", e);
+        // H3: a failed read whose pane another canonical publication has
+        // already filled reports nothing false: the pane shows committed
+        // bytes, so "Source could not be loaded" would be untrue there.
+        if (sourcePre && sourcePre.dataset.loaded === "1") { setSourceState(null); return; }
+        setSourceState("error");
       });
   }
 
@@ -1450,6 +1496,17 @@
     // the button reflects the current canonical rev even when the composer
     // zone is preserved across the rebuild.
     _refreshComposerSubmitState();
+    // H3: the Source pane's loading/unavailable notice describes the PANE,
+    // not one request. Every successful canonical publication writes the
+    // committed source into the pane (above), so it settles the notice here.
+    // Before, only the lazy Source read itself cleared it: when the boot
+    // comments/document read, the live "ready" refetch or a live patch
+    // filled the pane first, Split showed the loaded source under a stale
+    // "Loading source…" line until the redundant read landed (seconds on a
+    // loaded host). The read in flight is not cancelled: it may carry a
+    // newer revision, and its own admission fences still decide whether it
+    // commits.
+    if (sourcePre && sourcePre.dataset.loaded === "1" && sourceStateMode) setSourceState(null);
     if (opts.pulse && changedBlocks.length) pulseBlocks(changedBlocks);
     if (changedBlocks.length > 0) {
       try { window.dispatchEvent(new CustomEvent("okf-loom:bodyPatched")); } catch (e) {}
@@ -4159,16 +4216,6 @@
     status.textContent = cs.message;
     const tone = cs.tone || "info";
     status.setAttribute("data-tone", tone);
-    // E: caution/non-fatal outcomes (uncertain, accepted-refresh-needed) use the
-    // amber --okf-warn token; red is reserved for genuine rejection, green for
-    // success.
-    var accent = "var(--okf-accent)", bg = "transparent";
-    if (tone === "error") { accent = "var(--okf-error)"; bg = "var(--okf-error-bg)"; }
-    else if (tone === "success") { accent = "var(--okf-ok)"; bg = "var(--okf-ok-bg)"; }
-    else if (tone === "warn") { accent = "var(--okf-warn)"; bg = "var(--okf-warn-bg)"; }
-    status.setAttribute("style",
-      "margin:0;padding:6px 10px;border-left:3px solid " + accent + ";background:" + bg + ";" +
-      "border-radius:4px;font-size:var(--okf-text-xs);color:var(--okf-fg);line-height:1.4;word-break:break-word");
   }
   function setComposerStatus(message, tone) {
     state.composerStatus = message ? { message: message, tone: tone || "info" } : null;
@@ -4190,13 +4237,6 @@
     status.textContent = message;
     var t = tone || "info";
     status.setAttribute("data-tone", t);
-    var accent = "var(--okf-accent)", bg = "transparent";
-    if (t === "error") { accent = "var(--okf-error)"; bg = "var(--okf-error-bg)"; }
-    else if (t === "warn") { accent = "var(--okf-warn)"; bg = "var(--okf-warn-bg)"; }
-    else if (t === "success") { accent = "var(--okf-ok)"; bg = "var(--okf-ok-bg)"; }
-    status.setAttribute("style",
-      "margin:0;padding:6px 10px;border-left:3px solid " + accent + ";background:" + bg + ";" +
-      "border-radius:4px;font-size:var(--okf-text-xs);color:var(--okf-fg);line-height:1.4;word-break:break-word");
   }
   // Visual P1: lifecycle toasts are tagged by operation identity so a terminal
   // transition (success, or a newer outcome) clears any prior composer toast —
@@ -5718,11 +5758,11 @@
         : (c.anchor && (c.anchor.exact || c.anchor.ref));
       if (quote) row.appendChild(el("q", { class: "okf-anchor-row__quote", text: quote }));
       if (view.action && !editing) {
-        // P1-4: recovery actions (Re-anchor / Choose text) are the key path
-        // off a broken anchor, so they carry primary weight. Jump (resolved)
-        // and Details stay quiet — they are not recovery.
+        // Recovery stays outlined: several broken anchors can share the
+        // drawer, whose composer owns the one filled primary action.
+        // Jump (resolved) and Details remain quiet tertiary actions.
         const isRecovery = view.action !== "Jump" && view.action !== "Details";
-        const actionCls = "okf-comment__action okf-anchor-row__action" + (isRecovery ? " okf-anchor-row__action--primary" : "");
+        const actionCls = (isRecovery ? "okf-btn" : "okf-comment__action") + " okf-anchor-row__action";
         const action = el("button", { type: "button", class: actionCls, text: view.action, dataset: { focusKey: "anchor-" + view.action.toLowerCase().replace(/\s+/g, "-") } });
         action.addEventListener("click", function () {
           if (view.action === "Jump") {
@@ -7066,10 +7106,9 @@
     });
   }
   // ---- Phase 5: index engagement (recency rail + comment chips) --------
-  // Runs on index pages only, after loadGraph()/loadComments() resolve
+  // Runs after the structure-only graph view/loadComments() resolve
   // (called from both — idempotent; the rail rebuilds so labels upgrade
-  // once graph data lands). Everything reads state the studio already
-  // fetched, so this costs no extra requests.
+  // once structure lands). Non-index connection chips use the same view.
   // F14: reader words for the machine event verbs on the human-facing
   // recency rail — the same mapping the SSR rows own in render.py
   // (_RECENT_READER_VERBS / _RECENT_CHANNEL_ACTORS / _recent_row_reader_text).
@@ -7086,7 +7125,7 @@
     }
     return (rawActor + " " + (verb || rawAction)).trim();
   }
-  function buildIndexEngagement() {
+  function buildIndexEngagement(options) {
     // Connection chips are surface-independent and reconcile as soon as an
     // accepted graph/comments generation exists. Recent activity remains
     // index-only below.
@@ -7157,6 +7196,7 @@
       const label = count + " active comment" + (count === 1 ? "" : "s");
       chip.textContent = label; chip.setAttribute("aria-label", label + " on " + (titleOf[id] || id));
     });
+    if (options && options.inventoryOnly) return;
     const hero = $(".okf-hero"); if (!hero) return;
     const focusedRecent = document.activeElement && document.activeElement.closest
       ? document.activeElement.closest("#okf-recent-rail li[data-concept-id]") : null;
@@ -7202,10 +7242,16 @@
       // node would become an anonymous item in the row's two-column grid,
       // painting a stray dot and wrapping the time onto a second line.
       link.appendChild(el("span", { class: "sr-only", text: " \u00b7 " }));
-      link.appendChild(el("time", { class: "okf-recent__time", datetime: latest[id].ts, text: fmtAgo(latest[id].ts) }));
+      const stamp = fmtUtcStamp(latest[id].ts);
+      const time = el("time", { class: "okf-recent__time", datetime: latest[id].ts, text: fmtRecentAgo(latest[id].ts) || stamp });
+      if (stamp) time.setAttribute("title", stamp);
+      link.appendChild(time);
       li.appendChild(link); list.appendChild(li);
     });
-    rail.appendChild(list); hero.appendChild(rail);
+    // D1-013: the rail belongs to the left column, so it precedes the visual
+    // column (spotlight, graph preview) in DOM and Tab order, as rendered.
+    rail.appendChild(list);
+    hero.insertBefore(rail, hero.querySelector(":scope > .okf-hero__visual"));
     if (focusedConceptId) {
       const restored = rail.querySelector('li[data-concept-id="' + cssEscape(focusedConceptId) + '"] a');
       const cardFallback = document.querySelector('.okf-card[data-concept-id="' + cssEscape(focusedConceptId) + '"] a.okf-card__link');
@@ -7214,6 +7260,12 @@
       if (target) { if (!target.matches("a,button,[tabindex]")) target.setAttribute("tabindex", "-1"); target.focus(); }
     }
   }
+
+  window.addEventListener("okf-loom:derivedPatched", () => {
+    highlightFocusedConcept(state._lastFocus);
+    // Reconcile chips without rebuilding the independent recent-activity rail.
+    buildIndexEngagement({ inventoryOnly: true });
+  });
 
   function hrefToConceptId(href) {
     if (!href || typeof href !== "string") return null;
@@ -7833,7 +7885,10 @@
   async function runUndoBatch(jobs, btn, opts) {
     const label = (opts && opts.label) || "Undo";
     Btn.busy(btn);
-    let restored = 0, restoredFiles = 0, already = 0, partial = 0;
+    // restoredChanges weighs each job by the changes it reverts (a group job
+    // carries its member count), so a clean batch reports the same number
+    // its "Undo all (N)" button named (D1-018 / M1-016).
+    let restored = 0, restoredFiles = 0, already = 0, partial = 0, restoredChanges = 0;
     const failures = [];
     const partialNotes = [];
     try {
@@ -7865,6 +7920,7 @@
             partialNotes.push(detail);
           } else if (data && data.ok) {
             restored += 1;
+            restoredChanges += job.changes || 1;
             restoredFiles += data.restored || 1;
           } else {
             failures.push(detail);
@@ -7909,7 +7965,7 @@
       } else if (already && !restored) {
         toast("Nothing to undo — all " + already + " targets were already undone.", { tone: "success" });
       } else {
-        toast("Undid " + restored + " change(s)."
+        toast("Undid " + restoredChanges + " change(s)."
           + (already ? " (" + already + " already undone)" : ""), { tone: "success" });
       }
     } finally {
@@ -8191,6 +8247,7 @@
     if (window.OKFOverlayStack) window.OKFOverlayStack.push(paletteState.overlay);
     paletteState.input.value = "";
     refreshPaletteList("");
+    if (!state.graphReady) void loadGraph();
     paletteState._lastFocus = document.activeElement;
     setTimeout(() => paletteState.input.focus(), 20);
   }
@@ -8259,18 +8316,15 @@
     if (AUTHORITY_MODE === "local-edit" && window.location.pathname !== FEEDBACK_IMPORT_PATH) {
       items.push({ label: "Import feedback note", sub: "local Studio", run: () => { window.location.href = FEEDBACK_IMPORT_PATH; } });
     }
-    // Theme choices delegate to theme.js (sole owner of theme state). Each
-    // concrete pick sets an explicit family + mode; "Auto" follows the OS.
+    // Appearance choices delegate to theme.js (sole owner of theme state).
     {
       const api = themeApi();
-      if (api) {
-          items.push({ label: "Appearance: Technical", sub: "theme family", run: () => api.setFamily("technical") });
-          items.push({ label: "Appearance: Swiss", sub: "theme family", run: () => api.setFamily("swiss") });
-          items.push({ label: "Appearance: Purple", sub: "theme family", run: () => api.setFamily("purple") });
-          items.push({ label: "Appearance: Coffee", sub: "theme family", run: () => api.setFamily("coffee") });
-        items.push({ label: "Appearance: Light", sub: "colour mode", run: () => api.setMode("light") });
-        items.push({ label: "Appearance: Dark", sub: "colour mode", run: () => api.setMode("dark") });
-          items.push({ label: "Appearance: Auto (current family + follow OS colour mode)", sub: "family stays selected; light/dark follows the OS", run: () => api.setMode("auto") });
+      if (api && typeof api.setTheme === "function") {
+        items.push({ label: "Appearance: Bone", sub: "palette (default)", run: () => api.setTheme("bone") });
+        items.push({ label: "Appearance: Slate", sub: "palette", run: () => api.setTheme("slate") });
+        items.push({ label: "Appearance: Clay", sub: "palette", run: () => api.setTheme("clay") });
+        items.push({ label: "Appearance: Plum", sub: "palette", run: () => api.setTheme("plum") });
+        items.push({ label: "Appearance: System", sub: "Bone in light mode, Slate in dark mode", run: () => api.setTheme("system") });
       }
     }
     if (window.okfLoomLive && window.okfLoomLive.resync) items.push({ label: "Resync now", sub: "live", run: () => window.okfLoomLive.resync() });
@@ -8714,7 +8768,7 @@
       panels[impl.id] = Object.assign({ __builtin: false }, impl);
       // Add a bar toggle for non-builtin panels.
       if (!impl.__builtin && !impl._btn) {
-        const btn = el("button", { type: "button", class: "okf-iconbtn", "aria-expanded": "false", "aria-controls": "okf-panel", text: impl.label });
+        const btn = el("button", { type: "button", class: "okf-studiobtn", "aria-expanded": "false", "aria-controls": "okf-panel", text: impl.label });
         btn.addEventListener("click", () => togglePanel(impl.id));
         impl._btn = btn;
         panels[impl.id]._btn = btn;
@@ -9135,21 +9189,65 @@
   // ====================================================================
   // 11. Graph cache (palette + local graph refresh + presence)
   // ====================================================================
-  async function loadGraph() {
-    try {
-      const res = await fetch("/__data/graph.json", { headers: { Accept: "application/json" } });
-      if (!res.ok) return;
-      const graph = await res.json();
-      if (!graph || !Array.isArray(graph.nodes)) return;
-      state.graph = graph;
-      state.graphReady = true;
-      buildIndexEngagement();
-    } catch (e) { /* palette still works with commands only */ }
+  const fullGraphPage = ((document.getElementById("okf-graph") || {}).dataset || {}).graphUrl === "/__data/graph.json"
+    || window.OKF_LOOM_GRAPH_DATA_URL === "/__data/graph.json";
+  let studioGraphGeneration = 0;
+  let studioGraphPending = null;
+  function acceptStudioGraph(graph) {
+    if (!graph || !Array.isArray(graph.nodes)) return;
+    state.graph = graph;
+    state.graphReady = true;
+    buildIndexEngagement();
+    if (paletteState.open) refreshPaletteList(paletteState.input.value);
   }
+  function needsGraphStructure() {
+    // Visible comment chips/recency need structure, never document bodies.
+    // Backlinks already come from /__data/doc. Other pages acquire only when
+    // the command palette is opened; badges do not read state.graph.
+    return document.body.classList.contains("okf-viewer--index") || !!$(".okf-conn[data-concept-id]");
+  }
+  async function loadGraph(refresh = false) {
+    if (!refresh && studioGraphPending) return studioGraphPending;
+    const own = ++studioGraphGeneration;
+    let acquisition;
+    if (fullGraphPage) {
+      if (!window.okfGraphData) {
+        const pending = fetch("/__data/graph.json?view=structure", { cache: "no-cache", headers: { Accept: "application/json" } })
+          .catch((error) => { throw Object.assign(new Error("Graph data request failed."), { okfPhase: "graph-fetch", okfCode: "network-failure", cause: error }); })
+          .then((res) => {
+            if (!res.ok) return res.json().catch(() => null).then((data) => {
+              throw Object.assign(new Error(data && data.error && data.error.message || "HTTP " + res.status), { okfPhase: "graph-http", okfCode: "network-failure" });
+            });
+            return res.json().catch((error) => { throw Object.assign(new Error("Graph JSON is malformed."), { okfPhase: "graph-json", okfCode: "network-failure", cause: error }); });
+          });
+        window.okfGraphData = pending;
+        pending.catch(() => { if (window.okfGraphData === pending) window.okfGraphData = null; });
+      }
+      acquisition = window.okfGraphData;
+    } else {
+      acquisition = fetch("/__data/graph.json?view=structure", { cache: "no-cache", headers: { Accept: "application/json" } })
+        .then((res) => { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); });
+    }
+    const pending = acquisition.then((graph) => {
+      if (own === studioGraphGeneration) acceptStudioGraph(graph);
+    }).catch(() => { /* palette still works with commands only */ });
+    studioGraphPending = pending;
+    await pending;
+    if (studioGraphPending === pending) studioGraphPending = null;
+  }
+  window.addEventListener("okf-loom:graph-data", (event) => {
+    // Only accepted latest-wins graph refreshes publish this event.
+    ++studioGraphGeneration;
+    acceptStudioGraph(event.detail);
+    rebuildMarginMarkers();
+  });
   function refreshGraph() {
-    // Called by live.js on a `graph` event. Reload graph cache + rebuild
-    // local sidebar pills + margin markers.
-    loadGraph().then(() => { rebuildMarginMarkers(); });
+    // On the graph page, graph.js owns refresh/deadline/latest-wins and
+    // publishes accepted data above. Never start a second request here.
+    if (fullGraphPage) return;
+    if (state.graphReady || needsGraphStructure() || paletteState.open) {
+      void loadGraph(true).then(() => { rebuildMarginMarkers(); });
+    }
   }
 
   // ====================================================================
@@ -10712,6 +10810,17 @@
     }) : [];
     var undoableStandalone = EDIT ? standalone.filter(function (a) { return a.undoable; }) : [];
     var totalUndoable = undoableGroupIds.length + undoableStandalone.length;
+    // D1-018 / M1-016: the coalesced button counts CHANGES, like the summary
+    // line beside it and like "Undo group (N)" (a group undo reverts all its
+    // members); counting undo targets read "8 changes · Undo all (6)".
+    // When some changes cannot be undone the label says how many can.
+    var undoableChanges = 0;
+    batch.forEach(function (a) {
+      if (a && (a.group_id ? undoableGroupIds.indexOf(a.group_id) >= 0 : undoableStandalone.indexOf(a) >= 0)) undoableChanges += 1;
+    });
+    var undoAllLabel = undoableChanges === batch.length
+      ? "Undo all (" + undoableChanges + ")"
+      : "Undo " + undoableChanges + " of " + batch.length;
     function appendUndoButton(label, handler) {
       var link = el("button", { type: "button", class: "okf-toast__action", text: label });
       link.addEventListener("click", function (e) {
@@ -10743,13 +10852,13 @@
           if (batchGroupsCollected[a.group_id]) return;
           if (undoableGroupIds.indexOf(a.group_id) < 0) return;
           batchGroupsCollected[a.group_id] = true;
-          batchJobs.push({ groupId: a.group_id });
+          batchJobs.push({ groupId: a.group_id, changes: byGroup[a.group_id].length });
         } else {
           batchJobs.push(undoTargetFor(a));
         }
       });
-      appendUndoButton("Undo all (" + totalUndoable + ")", function (btn) {
-        runUndoBatch(batchJobs, btn, { label: "Undo all (" + totalUndoable + ")" })
+      appendUndoButton(undoAllLabel, function (btn) {
+        runUndoBatch(batchJobs, btn, { label: undoAllLabel })
           .catch(function (e) { console.error("[okf-studio] batch undo failed:", e); });
       });
     } else {
@@ -10826,15 +10935,16 @@
       const hv = humanVerb(v, verbCounts[v]);
       return hv.count + " " + hv.noun;
     });
-    const targetText = targets.length === 1
-      ? (" to " + titleFor(targets[0]))
+    const targetText = !targets.length ? ""
+      : targets.length === 1 ? (" to " + titleFor(targets[0]))
       : (" to " + targets.length + " concepts");
     return actor + " added " + parts.join(", ") + targetText;
   }
   // Map raw op ids to human verb + noun forms. The shape is:
   //   {phrase: "<past-tense verb>", noun: "<plural noun>", prep: "to", count: N}
   // `phrase` is used in the singular case ("Agent added a link"),
-  // `noun` is used in the collapsed multi case ("3 links"), and `prep`
+  // `noun` is used in the collapsed multi case ("3 links"; a count of one
+  // takes the singular, "1 change", never "1 changes"), and `prep`
   // joins the singular phrase to its target ("edited text in Orders").
   // Unknown ops fall back to "changed"/"changes" so we never surface a
   // raw snake_case token to the user (fit-and-finish rule).
@@ -10858,7 +10968,10 @@
       auto_repair:        { phrase: "auto-repaired",    noun: "repairs"  },
     };
     const entry = map[action] || { phrase: "made a change", noun: "changes" };
-    return { phrase: entry.phrase, noun: entry.noun, prep: entry.prep || "to", count: count };
+    // Every plural above ends in "s" or "ies".
+    const noun = count !== 1 ? entry.noun
+      : /ies$/.test(entry.noun) ? entry.noun.slice(0, -3) + "y" : entry.noun.replace(/s$/, "");
+    return { phrase: entry.phrase, noun: noun, prep: entry.prep || "to", count: count };
   }
   function verbLabel(verb, count) {
     // Crude pluralisation good enough for the known action set.
@@ -11379,24 +11492,30 @@
       draggable: "true",
     });
     var header = el("div", { class: "okf-sidebar-panel__header" });
+    var bodyId = "okf-sidebar-panel-body-" + String(panelId).replace(/[^a-zA-Z0-9_-]/g, "-");
+    // D1-009 / T1-010: the panel title IS the disclosure button (named
+    // "Related", state in aria-expanded), with a chevron in place of the
+    // former bare mono "-"/"+" that read as stray punctuation and whose
+    // accessible name ("Collapse") did not say what it collapsed.
     var toggle = el("button", {
       class: "okf-sidebar-panel__toggle",
       type: "button",
-      "aria-label": isCollapsed ? "Expand" : "Collapse",
-      text: isCollapsed ? "+" : "-",
-    });
+      "aria-expanded": isCollapsed ? "false" : "true",
+      "aria-controls": bodyId,
+    }, [
+      el("span", { class: "okf-sidebar-panel__chevron", "aria-hidden": "true" }),
+      el("span", { class: "okf-sidebar-panel__title", text: sidebarPanelTitle(panelId) }),
+    ]);
     toggle.addEventListener("click", function () {
       var p = panel.classList.toggle("okf-sidebar-panel--collapsed");
-      toggle.textContent = p ? "+" : "-";
-      toggle.setAttribute("aria-label", p ? "Expand" : "Collapse");
+      toggle.setAttribute("aria-expanded", p ? "false" : "true");
       sbState.collapsed[panelId] = p;
       saveSidebarState(sbState);
     });
     header.appendChild(toggle);
-    header.appendChild(el("span", { class: "okf-sidebar-panel__title", text: sidebarPanelTitle(panelId) }));
     panel.appendChild(header);
 
-    var body = el("div", { class: "okf-sidebar-panel__body" });
+    var body = el("div", { class: "okf-sidebar-panel__body", id: bodyId });
     if (panelId === "related") {
       // Move the actual DOM node to preserve event listeners on the
       // local graph pills (buttons that navigate to concepts).
@@ -11526,7 +11645,7 @@
     // iter1 CRI-004: stamp data-concept-id on list/search rows so presence
     // focus can highlight them (also runs on index/search pages).
     stampConceptIds();
-    loadGraph();
+    if (fullGraphPage || needsGraphStructure()) void loadGraph();
     loadComments();
     wireLive();
     // iter1 CRI-002: apply text-range marks for any pre-existing comments
@@ -11543,6 +11662,8 @@
         // reconcile canonical state, re-apply marks, restore editor DOM.
         window.addEventListener("pagehide", function () {
           abortAnnotationOperations("pagehide");
+          ++studioGraphGeneration;
+          studioGraphPending = null;
           state.annotationGeneration++;
           state.annotationEditor = null;
           // R6-9: the selection-mode banner + body class + dataset describe an
@@ -11559,6 +11680,9 @@
         });
         window.addEventListener("pageshow", function (event) {
           if (!event.persisted) return;
+          // pagehide fences pending structure completions. Restore only the
+          // same lazy consumers as live updates; graph.js owns full pages.
+          refreshGraph();
           // R6-3: BFCache restore — re-apply marks and rebuild markers from
           // the still-current state.doc. The live.js pageshow handler
           // triggers a canonical resync; we just reconcile presentation.

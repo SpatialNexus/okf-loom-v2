@@ -161,6 +161,48 @@
    "url": "https://github.com/upsetjs/venn.js/blob/350c835aab4a92a7570963c28f725cf9f6e5f258/yarn.lock"
   }
  },
+ "ledger_fonts": [
+  {
+   "id": "Public Sans@ledger-snapshot",
+   "included_in": [
+    "ledger-public-sans/PublicSans-Italic-Variable.woff2",
+    "ledger-public-sans/PublicSans-Variable.woff2",
+    "ledger-fonts.css"
+   ],
+   "licence_files": [
+    {
+     "path": "ledger-public-sans/LICENSE",
+     "quoted_sha256": "8411719c87d381408ba5146bae3d77be14f32cffc44c208cbe7b152d74ee97ae",
+     "sha256": "157a9e77f7580246e97c769490e2e977ae94399f9d30f4556015c41fe8c28bac"
+    }
+   ],
+   "license": "OFL-1.1",
+   "name": "Public Sans",
+   "provenance": "User-supplied Ledger design package, imported at 4c5925b; upstream version not supplied. Unmodified variable WOFF2 faces and OFL text, pinned by content hash.",
+   "upstream": "https://github.com/uswds/public-sans",
+   "version": "ledger-snapshot"
+  },
+  {
+   "id": "Azeret Mono@ledger-snapshot",
+   "included_in": [
+    "ledger-azeret-mono/AzeretMono-Italic-Variable.woff2",
+    "ledger-azeret-mono/AzeretMono-Variable.woff2",
+    "ledger-fonts.css"
+   ],
+   "licence_files": [
+    {
+     "path": "ledger-azeret-mono/LICENSE",
+     "quoted_sha256": "7814eb0ea7059b518b2d10f34575b52b121889b57433b6d1b7316064eac98bc6",
+     "sha256": "2a0fd31798d131b38a9fe730a260bc9a1d85452e36cdf79e5fcaf937bf4d9f86"
+    }
+   ],
+   "license": "OFL-1.1",
+   "name": "Azeret Mono",
+   "provenance": "User-supplied Ledger design package, imported at 4c5925b; upstream version not supplied. Unmodified variable WOFF2 faces and OFL text, pinned by content hash.",
+   "upstream": "https://github.com/displaay/azeret",
+   "version": "ledger-snapshot"
+  }
+ ],
  "mermaid": {
   "parser_workspace": {
    "name": "@mermaid-js/parser",

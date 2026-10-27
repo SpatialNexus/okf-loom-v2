@@ -11,15 +11,15 @@
                           types, palette, backlinks, external}
       /*__VIEWER_CSS__*/ → wiki.css + shell.css + graph.css contents (inlined)
       /*__VIEWER_JS__*/  → graph.js (the full viewer logic, inlined)
-      __INITIAL_THEME__  → resolved theme painted on <html data-theme="…"> —
-                            any Technical/Swiss/Purple/Coffee light/dark theme. theme.js (inlined in
-                          <head>) honours a saved user preference + Auto/OS
+      __INITIAL_THEME__  → resolved Ledger palette painted on <html data-theme="…"> —
+                          bone | slate | clay | plum. theme.js (inlined in
+                          <head>) honours a saved user preference + System/OS
                           at boot; otherwise this concrete first-paint value.
-      __THEME_MODIFIER_ATTRS__ → configured contrast/border + default density
-                          root attributes (same values theme.js resolves for a
-                          visitor with no saved preference; no-JS parity).
+      __THEME_MODIFIER_ATTRS__ → retired placeholder (appearance modifiers were
+                          removed); always replaced with an empty string.
       __INITIAL_LAYOUT__ → "cose" | "concentric" | ...
-      __THEME_CONFIG__   → CSP-safe configured theme/modifier preference JSON;
+      __THEME_CONFIG__   → CSP-safe configured appearance JSON (choice: bone |
+                          slate | clay | plum | system);
                           separate from the concrete first-paint hint.
 
   CDN scripts are emitted only when config["cdn"] is True.
@@ -28,9 +28,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230c7373'/%3E%3Cpath d='M8 10h16M8 16h10M8 22h16' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'none'; font-src 'self' https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self'">
-<title>OKF Viewer</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='1' y='1' width='30' height='30' fill='%231d1a16' stroke='%23b0a696' stroke-width='2'/%3E%3Cpath d='M8 8h16M8 16h10M8 24h16' stroke='%23f6f3ed' stroke-width='4'/%3E%3C/svg%3E">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'none'; font-src 'self' data: https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self'">
+<title>__BUNDLE_NAME_DISPLAY__</title>
 __CDN_SCRIPTS__
 <style>
 /*__VIEWER_CSS__*/
@@ -70,7 +70,7 @@ __APPLICATION_SHELL__
   <form class="okf-single-search__form" role="search">
     <label class="okf-field" for="okf-single-query"><span>Search this bundle</span></label>
     <div class="okf-single-search__query"><input id="okf-single-query" name="q" type="search" maxlength="4096" autocomplete="off"><button type="submit" class="okf-search-submit">Search</button></div>
-    <fieldset class="okf-search-modes"><legend>How should results be matched?</legend>
+    <fieldset class="okf-search-modes"><legend>How should results be matched? Choose one.</legend>
       <label class="okf-search-mode"><input type="radio" name="mode" value="hybrid"> <span>Best overall</span></label>
       <label class="okf-search-mode"><input type="radio" name="mode" value="lexical" checked> <span>Exact wording</span></label>
       <label class="okf-search-mode"><input type="radio" name="mode" value="semantic"> <span>Similar meaning</span></label>
@@ -192,9 +192,34 @@ __APPLICATION_SHELL__
 <div id="okf-graph-copy-fallback" class="okf-copy-fallback okf-graph-copy-fallback" hidden><label for="okf-graph-copy-text">Copy neighbourhood manually</label><textarea id="okf-graph-copy-text" readonly rows="8"></textarea><button type="button" class="okf-btn" id="okf-graph-copy-select">Select all</button></div>
 <p id="okf-graph-copy-status" class="okf-visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
 
+__SEARCH_TYPE_CHIPS__
 <script>
 window.BUNDLE_NAME = __BUNDLE_NAME__;
 window.BUNDLE = __BUNDLE_DATA__;
+// Canonical search chunks are the sole serialized passage source. Preserve
+// the public in-memory BUNDLE shape for consumers (including overrides),
+// without embedding a second copy of every excerpt and metadata record.
+(window.BUNDLE.retrieval_corpus && Array.isArray(window.BUNDLE.retrieval_corpus.chunks)
+  ? window.BUNDLE.retrieval_corpus.chunks : []).forEach(function (chunk) {
+  // Leave malformed evidence for the portable validator, not a bootstrap error.
+  if (!chunk || typeof chunk !== "object" || Array.isArray(chunk)) return;
+  Object.defineProperty(chunk, "payload", {
+    configurable: true,
+    enumerable: true,
+    get: function () {
+      var payload = JSON.parse(chunk.canonical_chunk);
+      Object.defineProperty(chunk, "payload", {
+        configurable: true, enumerable: true, writable: true, value: payload
+      });
+      return payload;
+    },
+    set: function (payload) {
+      Object.defineProperty(chunk, "payload", {
+        configurable: true, enumerable: true, writable: true, value: payload
+      });
+    }
+  });
+});
 window.OKF_LOOM_INITIAL_LAYOUT = "__INITIAL_LAYOUT__";
 </script>
 <script>
@@ -226,12 +251,18 @@ window.OKF_LOOM_INITIAL_LAYOUT = "__INITIAL_LAYOUT__";
     /* A plain container (the concept article) is not focusable on its own,
      * so focus() was a silent no-op and keyboard focus stayed on <body>. */
     if (target.tabIndex < 0 && !target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
-    target.scrollIntoView({block: "start"});
+    var detail = document.getElementById("okf-detail");
+    /* The workspace's panes, not every ancestor up to the window, own
+     * scrolling. Native scrollIntoView can move the whole viewport past
+     * the top bar when a long embedded article overflows the detail pane. */
+    if (detail && detail.contains(target)) detail.scrollTop = 0;
+    else if (!graph.contains(target)) target.scrollIntoView({block: "start"});
     target.focus({preventScroll: true});
   }
   function select(destination, focus, historyMode) {
     var graphSelected = destination !== "index";
     var conceptSelected = destination === "concept";
+    var leavingIndex = !index.hidden && graphSelected;
     index.hidden = graphSelected;
     graph.hidden = !graphSelected;
     /* The graph is a viewport-bound application workspace; the Index is an
@@ -239,6 +270,7 @@ window.OKF_LOOM_INITIAL_LAYOUT = "__INITIAL_LAYOUT__";
      * so every entry stays reachable by wheel, keyboard and touch. */
     document.body.dataset.okfSingleDestination = destination;
     if (tools) tools.hidden = !graphSelected;
+    if (leavingIndex) window.scrollTo({top: 0, left: 0, behavior: "instant"});
     if (graphSelected) {
       indexLink.removeAttribute("aria-current");
       graphLink.setAttribute("aria-current", "page");

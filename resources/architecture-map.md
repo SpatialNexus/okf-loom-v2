@@ -56,6 +56,42 @@ current lifecycle and test seams.
 
 Tests in `tests/` are the executable examples for checkout-local behavior.
 
+### Atomic-write permissions
+
+`io_utils.py` keeps temporary files at 0600 until their content is flushed,
+then preserves an existing target's ownership when permitted, and its mode
+without setuid before replacement. If ownership cannot be retained, it tries
+retaining the group alone, otherwise proceeding as the writing user; inherited
+modes are then masked with `0o1777` so neither setuid nor setgid crosses owners.
+New ordinary content uses `0666 & ~umask`, snapshotted once at first use behind
+a process-wide lock. Linux reads the mask from `/proc/self/status`; if unavailable,
+one isolated Python child reads its inherited mask, not one child per output
+file. Neither path ever changes the multithreaded parent's umask. The durable helper
+still fsyncs the file before replace and the parent directory afterward.
+
+Private writers explicitly pass `mode=0o600`, overriding even a wider existing
+file: Studio rotation counters, idempotency/dedup maps, event sequence state,
+comment/reanchor WALs, receipts and compaction filters, denial audits, undo
+snapshots/group manifests, and index/update rollback of session sidecars. Local
+derived-index caches and generated state-directory ignore files do likewise.
+Studio CSRF tokens/server state, descriptor-relative comment receipts,
+DirectiveStore and PresenceStore retain their independent 0600 creation paths;
+proposal authority I/O additionally rejects existing non-0600 files. None of
+these private paths inherit ordinary content's permission-preservation policy.
+
+Builds render inside a 0700 temporary parent on the destination filesystem.
+Only the completed output child receives `0777 & ~umask` on all directories,
+under the publication lock immediately before rename; the private parent is
+never widened. Rebuilds preserve an existing destination root's `st_mode &
+0o7777` (including an operator's restrictive mode), but use current umask-derived
+modes for the new generation's subdirectories. `.okf-recovery-*` quarantine
+parents remain 0700 and are never traversed by the mode normalizer. Generic tree
+publication leaves modes alone unless the build explicitly opts in. Builds under
+the bundle's default or configured Studio session root never opt in. Single-file
+builds stage new output the same way; when their destination already exists,
+they atomically replace only `index.html`, preserving its metadata and unrelated
+siblings rather than replacing or chmodding the existing directory tree.
+
 ### Internal section-navigation proof
 
 `RetrievalService.verified_section_fragment(concept_id, passage_id, revision=...)`
@@ -86,7 +122,17 @@ ordinary source hashes, outline controls, and root Open retain their owners.
 Missing, stale, malformed, duplicate, or plugin-modified destinations fall back
 to root reading. See spec §9 for the optional transport and absence contract.
 
-### Capture readiness
+#### Reader-only text previews
+
+`viewer/text.py` and `viewer/static/readable-text.js` share a tested plain-text
+Markdown projection for summaries, descriptions and search previews. The browser
+helper is local and embedded in single-file output. Renderers escape its output
+or insert text nodes; it is never trusted HTML. Evidence disclosures offer a
+readable preview and a separate **Exact Markdown source** disclosure. Retrieval
+records, hash inputs, passage-copy payloads, citations and Context Packs retain
+the exact canonical source; never apply this projection to those boundaries.
+
+## Capture readiness
 
 The capture-readiness runtime owns semantic target/revision/layout readiness.
 Capture consumers apply one 30-second monotonic budget across navigation,
@@ -150,6 +196,12 @@ and sibling `.<destination-name>.capture-authority` before retrying; do not
 blindly delete recovery. Driver output is suppressed rather than copying
 potentially sensitive diagnostics into evidence.
 
+Ledger capture observations use `theme_state.choice` for the effective
+appearance preference and `resolved_theme` / `resolved_mode` for the painted
+palette and scheme. Retired contrast/border modifier fields are not emitted.
+The existing scenario and manifest `theme_family` / `theme_mode` columns are
+compatibility names for choice and scheme/System, not active family axes.
+
 Schema **4** identifies `source_provenance.kind: selected-commit`, with protocol,
 selected `commit`/`tree`/`object_format`, driver `path`/Git blob `oid`/`sha256`, and
 the verified inventory digest. Complete `input_inventory` and equal before/after
@@ -168,3 +220,9 @@ remain operator-owned host dependencies; no dependency is installed or fetched
 by this opt-in. Existing headed-zoom admission remains required. Unit fixtures
 prove dispatch and failure fences, not real-browser compatibility or human
 accessibility acceptance.
+
+Live served-byte provenance admits generated `ledger-fonts.css` only after the
+immutable runtime's vendor loader verifies its locked WOFF2/OFL inputs and
+derived size/SHA-256 pin. The loader runs from that snapshot, never the caller's
+checkout. Raw inputs remain in the inventory; sealed static outputs (including
+derived KaTeX CSS) remain bound to their separate build inventory.

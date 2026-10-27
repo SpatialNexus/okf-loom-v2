@@ -48,7 +48,11 @@
     var style = document.documentElement.style;
     style.setProperty("--okf-viewbar-top", shellHeight + "px");
     style.setProperty("--okf-viewbar-h", barHeight + "px");
-    style.setProperty("--okf-document-occlusion", (shellHeight + barHeight + 16) + "px");
+    // On phones the chrome scrolls away (wiki.js okfShellChrome): while it is
+    // compact only the pinned Sections row occludes the document.
+    var chrome = window.okfShellChrome;
+    var occluding = chrome ? chrome.occlusion(shellHeight + barHeight) : shellHeight + barHeight;
+    style.setProperty("--okf-document-occlusion", (occluding + 16) + "px");
     var target = activationOwner && document.getElementById(activationOwner);
     if (lastShellHeight !== null && shellHeight !== lastShellHeight && target === document.activeElement &&
         target.getBoundingClientRect().top >= 0 && target.getBoundingClientRect().top < shellHeight + barHeight + 16) {
@@ -58,6 +62,19 @@
   }
   updateOcclusion();
   window.addEventListener("resize", updateOcclusion);
+
+  // Every heading jump lands below the chrome that will actually be on
+  // screen: on phones the scroll-away chrome first settles the state the
+  // jump implies (compact when the heading is past the full chrome), and
+  // afterwards records the new position so the jump is not read as reader
+  // scrolling.
+  function scrollToHeading(target) {
+    var chrome = window.okfShellChrome;
+    if (chrome) chrome.prepareJump(target);
+    updateOcclusion();
+    target.scrollIntoView({ behavior: "auto", block: "start" });
+    if (chrome) chrome.settle();
+  }
 
   // ---- R1/R2 destination admission ---------------------------------------
   // A hash or section intent is only ever re-admitted against the actually
@@ -226,12 +243,11 @@
     // inside this document, never rewrite the URL, never a section action.
     target = document.getElementById(id);
     if (!target || !body.contains(target)) return;
-    updateOcclusion();
     activationOwner = id;
     if (root) setCurrent(id, false);
     target.tabIndex = -1;
     target.focus({ preventScroll: true });
-    target.scrollIntoView({ behavior: "auto", block: "start" });
+    scrollToHeading(target);
   }
 
   function singleIntentParam(params, name) {
@@ -296,12 +312,11 @@
   }
 
   function admitTarget(target, id) {
-    updateOcclusion();
     activationOwner = id;
     if (root) setCurrent(id, false);
     target.tabIndex = -1;
     target.focus({ preventScroll: true });
-    target.scrollIntoView({ behavior: "auto", block: "start" });
+    scrollToHeading(target);
   }
 
   window.addEventListener("hashchange", restoreFromLocation);
@@ -337,6 +352,7 @@
   var FILTER_THRESHOLD = 8;
   var compactQuery = window.matchMedia ? window.matchMedia("(max-width: 900px)") : null;
   var observer = null;
+  var scrollTracker = null;   // window scroll listener owned by the live observer
   var activeId = "";
   var filter = null;
   var status = null;
@@ -439,6 +455,10 @@
   }
 
   function disconnectObserver() {
+    if (scrollTracker) {
+      window.removeEventListener("scroll", scrollTracker);
+      scrollTracker = null;
+    }
     if (!observer) return;
     try { observer.disconnect(); } catch (error) { /* detached observer */ }
     observer = null;
@@ -578,10 +598,9 @@
     setCurrent(id, true);
     if (compactQuery && compactQuery.matches) root.open = false;
     if (jump) closeJump(false);
-    updateOcclusion();
     target.tabIndex = -1;
     target.focus({ preventScroll: true });
-    target.scrollIntoView({ behavior: "auto", block: "start" });
+    scrollToHeading(target);
     if (window.history && window.history.pushState && location.hash !== "#" + encodeURIComponent(id)) {
       window.history.pushState(history.state, "", "#" + encodeURIComponent(id));
     }
@@ -640,22 +659,52 @@
     if (oldNav) oldNav.replaceWith(nav); else root.appendChild(nav);
   }
 
+  // The current section is the last displayed heading at or above the
+  // reading line (30% down the viewport); above the first heading the reader
+  // is in the opening section. It is derived from position, not from which
+  // heading happens to cross a band, so Home/End, flings, scrollbar drags and
+  // programmatic jumps that skip every heading still land on the right one.
+  // A section the reader just activated stays current while its heading is
+  // on screen (a short final section may never reach the reading line).
+  function trackPosition(currentHeadings) {
+    if (activationOwner) {
+      var activated = document.getElementById(activationOwner);
+      var rect = activated && activated.getBoundingClientRect();
+      if (rect && rect.bottom > 0 && rect.top < window.innerHeight) return;
+      activationOwner = "";
+    }
+    var line = window.innerHeight * 0.3;
+    var current = null;
+    var first = null;
+    for (var index = 0; index < currentHeadings.length; index++) {
+      var heading = currentHeadings[index];
+      if (!heading.getClientRects().length) continue;
+      if (!first) first = heading;
+      if (heading.getBoundingClientRect().top > line) break;
+      current = heading;
+    }
+    current = current || first;
+    if (current && current.id !== activeId) setCurrent(current.id, false);
+  }
+
   function observe(currentHeadings, ownGeneration) {
     if (!("IntersectionObserver" in window)) return;
-    var visible = {};
-    observer = new IntersectionObserver(function (entries) {
+    observer = new IntersectionObserver(function () {
       if (ownGeneration !== generation) return;
-      if (activationOwner) {
-        var activated = document.getElementById(activationOwner);
-        var rect = activated && activated.getBoundingClientRect();
-        if (rect && rect.bottom > 0 && rect.top < window.innerHeight) return;
-        activationOwner = "";
-      }
-      entries.forEach(function (entry) { visible[entry.target.id] = entry.isIntersecting; });
-      var current = currentHeadings.find(function (heading) { return visible[heading.id]; });
-      if (current) setCurrent(current.id, false);
+      trackPosition(currentHeadings);
     }, { rootMargin: "-10% 0px -70% 0px" });
     currentHeadings.forEach(function (heading) { observer.observe(heading); });
+    // The observer only reports headings crossing its band; a jump that
+    // skips every heading is seen by the (frame-coalesced) scroll tracker.
+    var frame = 0;
+    scrollTracker = function () {
+      if (frame) return;
+      frame = requestAnimationFrame(function () {
+        frame = 0;
+        if (ownGeneration === generation) trackPosition(currentHeadings);
+      });
+    };
+    window.addEventListener("scroll", scrollTracker, { passive: true });
   }
 
   // Collapse every owned surface to the stable hidden host: no stale links,
@@ -770,19 +819,51 @@
   function buildJumpNav(currentHeadings) {
     var nav = buildNav(currentHeadings);
     nav.setAttribute("aria-label", "Document sections");
+    nav.addEventListener("scroll", updateJumpCue, { passive: true });
     var oldNav = jump.panel.querySelector(".okf-onthispage__nav");
     if (oldNav) oldNav.replaceWith(nav); else jump.panel.appendChild(nav);
+    updateJumpCue();
+  }
+
+  // Scroll cue: the list is the panel's only scroller; a 2px strong rule on
+  // whichever edge still has sections beyond it (the table cue's grammar).
+  function updateJumpCue() {
+    if (!jump) return;
+    var nav = jump.panel.querySelector(".okf-onthispage__nav");
+    var above = false, below = false;
+    if (nav && !jump.panel.hidden) {
+      above = nav.scrollTop > 1;
+      below = nav.scrollHeight - nav.scrollTop - nav.clientHeight > 1;
+    }
+    jump.panel.toggleAttribute("data-okf-more-above", above);
+    jump.panel.toggleAttribute("data-okf-more-below", below);
+  }
+
+  // Bring the current section into the middle of the list when it is not
+  // already fully shown (the panel scrolls, never the page).
+  function revealInJump(nav, link) {
+    var box = nav.getBoundingClientRect();
+    var rect = link.getBoundingClientRect();
+    if (rect.top >= box.top && rect.bottom <= box.bottom) return;
+    nav.scrollTop += rect.top - box.top - (nav.clientHeight - rect.height) / 2;
   }
 
   function openJump() {
     if (!jump) return;
     var nav = jump.panel.querySelector(".okf-onthispage__nav");
     if (!nav) { buildJumpNav(headings()); links().forEach(wireLink); }
+    nav = jump.panel.querySelector(".okf-onthispage__nav");
     setRovingTarget(activeId);
     jump.panel.hidden = false;
     jump.toggle.setAttribute("aria-expanded", "true");
-    var target = visibleLinksIn(jump.panel.querySelector(".okf-onthispage__nav"))[0];
-    if (target) target.focus({ preventScroll: true });
+    // Focus starts on the current section (the roving stop), shown in view.
+    var available = visibleLinksIn(nav);
+    var target = available.filter(function (link) { return link.tabIndex === 0; })[0] || available[0];
+    if (target) {
+      revealInJump(nav, target);
+      target.focus({ preventScroll: true });
+    }
+    updateJumpCue();
   }
 
   function mountJump() {
@@ -812,7 +893,8 @@
     panel.hidden = true;
     wrap.appendChild(toggle);
     wrap.appendChild(panel);
-    bar.appendChild(wrap);
+    var placeholder = bar.querySelector("[data-okf-outline-jump-placeholder]");
+    if (placeholder) placeholder.replaceWith(wrap); else bar.appendChild(wrap);
     jump = { wrap: wrap, toggle: toggle, current: current, panel: panel };
 
     toggle.addEventListener("click", function () {

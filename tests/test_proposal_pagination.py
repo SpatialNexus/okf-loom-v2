@@ -653,6 +653,7 @@ def _cursor_process(token, results):
     results.put([item.sort_key for item in page.items])
 
 
+@pytest.mark.usefixtures("multiprocessing_semaphores")
 def test_cursor_01_cacheless_reconstruction():
     items = [_item(_pid(i), f"2026-07-14T{10 + i:02d}:00:00.000Z") for i in range(4)]
     view = _view(items); first = walk_page(

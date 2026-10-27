@@ -789,7 +789,11 @@ built before offline assets existed. In `cdn` mode pages load Mermaid,
 highlight.js, KaTeX, and the Cytoscape graph chain (Cytoscape.js, layout-base,
 cose-base, cytoscape-fcose, dagre, cytoscape-dagre) from pinned
 `cdn.jsdelivr.net` URLs, with SRI where the code pins it. `serve` always uses
-the CDN mode.
+the CDN mode. On live, static and SPA graph pages the external classic graph
+vendor chain is deferred in the dependency order above, before deferred
+`graph.js`; inline extensions cannot assume its globals during parsing.
+`theme.js` remains parser-blocking for first-paint appearance. Single-file
+output retains the parser-blocking vendor chain before its inline graph runtime.
 
 `--assets offline` is an explicit opt-in that ships byte-verified copies of the
 same pinned versions instead. The copies live in the checkout at
@@ -1021,9 +1025,10 @@ summary, authored body, relationships/why connected, then Lens explanation and
 Graph settings. Each lens answers one
 question with a real algorithm (see
 [Why the graph is organised into question-named lenses](/explanation/live_studio_design.md#why-the-graph-is-organised-into-question-named-lenses)
-for the evidence base): Map (deterministic Louvain communities as colour +
-PageRank as size), Themes (strong community grouping + ranked theme
-digest), Flow (dagre layered layout over directed/typed edges, falling
+for the evidence base): Map (neutral nodes, deterministic Louvain community
+grouping and PageRank as size), Themes (strong community grouping, muted
+palette-derived community colours and a ranked theme digest), Flow (dagre
+layered layout over directed/typed edges, falling
 back to directed breadthfirst), Bridges (betweenness centrality as
 colour/size + ranked bridgers), Recent (effective generation-time recency
 ramp), and Explore neighborhood (topology isolation with a depth control;
@@ -1034,10 +1039,15 @@ reserved for distraction-free document reading. A `Find in graph` region
 combines query and filters; zoom, fit, fullscreen, and reset form one named
 viewport toolbar. A `Graph settings` disclosure holds spacing and layout
 controls, relationship bundles, the type filter, a relationship-label toggle,
-and a 'Colour by theme' toggle
-(the Saket et al. 2014 escape hatch back to type colours). The selected concept's authored body uses the same progressive renderers
+and a 'Colour by theme' toggle, which applies the same muted community ramp
+as the Themes lens. Map, Flow and Explore neighborhood default to neutral round
+nodes; selection uses a 4px accent stroke. Colour encodings for communities, recency,
+bridges, importance or groups use a muted ramp derived from the current palette
+and repaint on every palette change. Halos and count badges are square;
+content types are never colour-coded. The selected concept's authored body uses the same progressive renderers
 (mermaid/KaTeX/highlight.js) as the wiki pages. Suggested starting points rank
-structural hubs before the theme digest. Hover
+structural hubs before the theme digest as ruled rows with mono figures and
+2px score bars, never filled importance bars. Hover
 previews, shift-click path tracing, keyboard navigation, clickable
 legend type filters, deterministic layouts, and live SSE canvas updates
 are part of the contract. Concept and relationship alternatives are one-stop
@@ -1051,9 +1061,24 @@ opens Details, and the canvas remains optional. Fit uses actual canvas geometry
 and only intersecting canvas-owned overlays, not controls in other panes.
 Resize follows available space while preserving manually panned view ownership.
 Initial relationship-list setup does not scroll the reader to below-body content.
-Appearance starts with Auto/Light/Dark and Density; family, surfaces, and borders
-are advanced. Existing families remain available, including optional Coffee.
-Native radio semantics and Escape-to-trigger focus restoration remain required.
+Appearance is one native radio group with Bone (default, light), Slate, Clay,
+Plum (dark) and System (Bone for OS light, Slate for OS dark). Each option has a
+label, description and four-colour swatch; a 2px accent bar marks the choice.
+Arrow/Home/End select, Tab leaves the group, and Escape closes the topmost
+Appearance overlay and restores trigger focus. Contrast, border and density
+modifiers are removed. Saved choice > configured choice > Bone; legacy names
+migrate once to `okf-loom.appearance`. `theme.js` is the single runtime writer,
+resolves before first paint, and signals `okf-theme-ready` only after success.
+Storage denial retains in-memory switching; cross-tab and live OS changes work.
+Deduplicated `okf-loom:themeChanged` events on window carry the current and
+previous palette and scheme, including dark-to-dark palette changes.
+Public Sans and Azeret Mono normal/italic faces and full OFL notices are
+self-hosted on every output. Live/static/SPA pages use relative WOFF2 files;
+static/SPA builds (including CDN mode) emit `__static/ledger-public-sans/`
+and `__static/ledger-azeret-mono/` with the faces and OFL `LICENSE` files.
+Publish both directories with the site. Single-file output alone embeds the
+faces as base64 data URLs. All targets use `font-display: swap`; only serve
+and SPA preload the upright faces, not file-capable static pages.
 The graph key and its counted type/relationship filter controls are owned by
 Graph settings (not a separate canvas legend). Directed edges
 retain a static dash and arrow cue and may animate dash offset while hovered,
@@ -1127,14 +1152,15 @@ Core posture:
 - The bundle on disk is the source of truth and the bus.
 - The browser is a rendered/source/split reading and directing surface.
 - Split is a simultaneous two-pane surface admitted by measurement, not viewport alone: the 900px floor must match and the measured workspace must give each pane at least 300px (607px with the divider). Otherwise a split deep link or a transition falls back to Rendered while preserving source content and the saved split ratio. An automatically paused Split is announced and returns when the room does; an explicit Rendered or Source choice ends that. While Split cannot fit, its button stays operable, is marked `aria-disabled`, and says why.
-- The document workspace (header, tools, Rendered/Source/Split panes) always takes the full width of the article column. The article column is one bounded content column: title, metadata, tools, headings, paragraphs, lists, code, table, and figure blocks share its edges at every width, so wide blocks start and end on the same edges as ordinary text instead of floating centered or overhanging; wide blocks keep local horizontal scrolling, and the column centers in its track when the track is wider than the column. Reading Focus is the one intentional exception: it removes the global and secondary rails and expands the workspace to the full available width with modest page gutters, so Rendered text and the Split panes use the whole viewport the mode exists for; normal reading keeps the bounded column.
-- Space beside the article is allocated by what remains, with a 600px article floor. Related moves below the article before the article would drop under the floor. Comments is a side-by-side rail only if the article keeps that floor after Related has yielded; otherwise it opens as a modal overlay. Non-document pages keep the 1200px rule.
+- The page maximum is 1280px; the normal reading column is 760px. Prose is Public Sans at 16px/1.72 capped at 55ch, while ids, paths, timestamps and figures use Azeret Mono with tabular numerals. Code, tables and figures may use the column width and scroll locally. Reading Focus removes global and secondary rails and expands the workspace to the full available width with modest gutters, but keeps the 55ch prose measure, including in Split.
+- Space beside the article is allocated by what remains, with a 600px article floor. Related moves below the article before the article would drop under the floor. The Studio drawer defaults to 320px, with a 1px left edge and no shadow; proposal review may use a wider measured width. Comments is a side-by-side rail only if the article keeps that floor after Related has yielded; otherwise it opens as a modal overlay. Non-document pages also use the 1280px maximum.
 - Source has a persisted "Wrap lines" control. Unwrapped Source, wide tables and code blocks scroll locally inside labelled, keyboard-focusable regions; the document itself never scrolls sideways.
 - The user does not directly edit Markdown in the browser by default.
 - The user's studio writes are comments and asks.
 - A comment asks for work or discussion. It is saved on the bundle for readers and its agent, which picks it up through its comment loop (`wait`, `comment-claim`, `comment-resolve`); Studio does not start an agent. The composer, headed "New comment", says so under its target line, and its precision line says whether the draft is an exact annotation ("Exact annotation: pinned to this passage and, once sent, highlighted on the page. It is re-checked when the page changes.") or a page comment ("Page comment: about the whole page. No text is highlighted."). An exact draft made in Source view is not highlighted until it is sent.
 - The built-in Comments, Changes and Agent activity panels each show one sentence under the panel title saying what question the panel answers, and the panel is described by it only while it shows. Agent activity's sentence names reported status changes only where the session can read presence. Studio home, Proposals (which has its own intro) and extension panels have none; `register()` is unchanged.
 - Sharing the Studio through a public tunnel (the server's `tunnel_attach` and `tunnel_detach` activity, origin `tunnel`) writes nothing to the bundle. Changes does not list it, and it adds neither to the unread-changes count nor to Agent activity's recent writes; Agent activity lists the latest five under Sharing, and a toast about sharing alone opens Agent activity. The server records it with actor `cli`, because the share command cannot tell a person from an agent, and the availability line never counts it as an agent action, including sharing rows that older sessions recorded with actor `agent`.
+- Studio toasts with a success, warning or error tone show an `OK`, `?` or `!` icon beside a 2px status bar, rather than conveying tone by colour alone. The icon is decorative; the message also communicates the outcome.
 - Studio home's status line reports only the live-updates connection ("Live updates: connected", "connecting…", "reconnecting…" or "offline"). Permission is stated under Authority and sharing, and the launcher's idle summary names it (Editable, Comment-only or Read-only); while not connected, a session that cannot edit keeps its word before the connection state ("Comment-only · Offline", "Read-only · Reconnecting"); "Live" is only the connection chip's word for connected. Studio home's quick actions each start an ordinary comment with a suggested request; nothing edits Markdown until an agent picks it up. While the composer's post is pending, being confirmed, or unconfirmed with its sent draft, a quick action is refused with the message a new selection gets and never replaces the draft.
 - A text-selection comment action does not steal focus. Escape dismisses one comment state at a time: it first removes the selection anchor while preserving the draft, and the target it is saved to, in the concept composer, in every layout. Then, in the modal overlay, it closes the composer while retaining the draft and restoring focus to the originating content. In the desktop rail Escape never closes the composer: with no selection anchor left it stays native in the text box.
 - The server embeds no LLM and runs no agent reasoning.
@@ -1184,6 +1210,8 @@ Key routes:
 | `GET /__search` | Read-only six-mode HTML search or compatibility JSON array over one bundle snapshot. |
 | `GET /__search-form` | Native-form normalization and 303 redirect to strict search; no retrieval or mutation. |
 | `GET /__context` | Read-only deterministic schema-v1 context pack as JSON or Markdown over one bundle snapshot. |
+| `GET /__data/graph.json[?view=structure]` | Read-only graph projection; the full/tool view retains bodies/documents and its 4 MiB cap. `view=structure` selects the compact schema-1 live client contract described below, with a separate 16 MiB cap (`413` on refusal). Strong final-byte ETag, `Cache-Control: private, no-cache`, and `If-None-Match`/304 revalidation; metadata freshness and comment counts participate independently of bundle revision. Local and public read-only ingress receive identical data; no authority is encoded. |
+| `GET /__data/graph-body?id=<concept_id>&revision=<bundle_revision>` | Read-only, serve-only selected body and advisory HTML: `{id,bundle_revision,html,metadata_html}`. Exactly one `id` and `revision`, no other parameters (`400` otherwise); invalid/missing concept `404`, stale revision `409`. Uses one loaded generation and bounded retrieval work: 4 MiB cap (`413`), capacity/deadline `503`. `Cache-Control: private, no-cache`; rendering/admission failures use `no-store`. Identical local/public visibility; portable viewers retain inline bodies. |
 | `GET /__data/doc?id=<concept_id>` | One concept's `{rev, html, raw, frontmatter, backlinks, outgoing, headings}` for in-place patching. |
 | `GET /__data/page?document=<path.md>` | Schema-1 canonical Markdown page read: document, nullable concept, document_content_rev, raw, html, page anchor; no guessed projection. |
 | `GET /__data/events?since=&limit=&actor=&concept=&order=` | Filtered change-list read over `events.jsonl`. |
@@ -1200,6 +1228,30 @@ Key routes:
 | `POST /__undo` | Single or group undo. |
 | `POST /__preview` | Render capped in-flight Markdown. |
 | `POST /__tunnel` | Server admin: attach/detach/status a quick tunnel at runtime (`action: start\|stop\|status`; start-only `allow_public_edit: boolean`, default `false`). Exempt from `--no-edit` for read-only sharing, but public-edit start is rejected for a no-edit studio; never exempt from the token + Origin/Host guard. |
+
+The compact `view=structure` graph contract carries `structure_schema:1` and
+omits rendered `bodies`, `documents`, and advisory metadata HTML. It retains only
+graph/Studio fields and relation provenance; empty/zero defaults may be absent,
+except an available zero `active_comment_count` remains explicit. Grouping appears in `metadata`, not
+also in top-level node keys. Edge relation members retain `id`, `label`, `type`,
+`kind`, `origin`, `source_id`, and optional `detail`; `source_id` may be null.
+Source/target and outgoing direction are inherited from the edge, multiplicity
+is the relation-list length, and
+`primary_relation_index` references the primary member rather than duplicating
+it. `document_paths` identifies reserved reading destinations without HTML.
+Graph.js expands this transport before ordinary validation. Unknown or repeated
+`view` values are `400`; unrelated query parameters are ignored. Certainly
+oversized structures are refused before rendering/encoding, then exact UTF-8
+bytes enforce the 16 MiB cap: refusals are cached, return `413` with a readable
+`response_too_large` message, and send `Cache-Control: no-store`.
+
+Graph-body HTML is the full graph's escaped, heading-demoted, source-footnoted,
+link-normalized projection, with graph advisory metadata, not concept-page
+plugins or annotation projections. Clients discard late bodies across selections,
+accepted graph updates, pagehide and BFCache restoration; capture readiness
+waits for the selected body. A stale body revision triggers one structure refresh
+and one retry even when live push is disabled; further failure is readable and
+retryable. See [HTTP routes](/reference/http_routes.md) for the detailed contracts.
 
 Bundle-local media serving is contract-bound: only an allowlisted media
 extension routes to the file handler; the file must be reachable by the §5

@@ -70,6 +70,16 @@ def render_application_shell(model: ApplicationShell, appearance_html: str) -> s
         )
 
     capability = "available" if model.studio_available else "unavailable"
+    # The live server supplies its actual Studio attachment state. Inert
+    # first-paint geometry is revealed only with JavaScript; Studio replaces
+    # it at boot. Inactive sessions, portable and no-JS targets reserve none.
+    studio_placeholder = (
+        '<button type="button" class="okf-studiobtn okf-studio-launcher" '
+        'disabled tabindex="-1" aria-hidden="true">'
+        '<span class="okf-studio-launcher__label">Studio</span>'
+        '<span class="okf-studio-launcher__summary"></span></button>'
+        if model.studio_available else ""
+    )
     search_value = (
         f' value="{escape(model.search_query, quote=True)}"' if model.search_query else ""
     )
@@ -100,7 +110,7 @@ def render_application_shell(model: ApplicationShell, appearance_html: str) -> s
         + destination("index", "Index", model.index_href)
         + destination("graph", "Graph", model.graph_href)
         + f'<span class="okf-shell__studio-slot" data-okf-shell-item="studio" '
-          f'data-okf-studio-capability="{capability}" hidden></span>'
+          f'data-okf-studio-capability="{capability}" hidden>{studio_placeholder}</span>'
         + '<span class="okf-shell__appearance" data-okf-shell-item="appearance">'
         + appearance_html
         + '</span></nav></header>'

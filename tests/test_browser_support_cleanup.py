@@ -168,14 +168,14 @@ def test_startup_failure_uses_shared_cleanup_and_preserves_original_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("DISPLAY", ":97")  # presence is the launch precondition
-    before = set(Path("/tmp").glob("okf-headed-*"))
+    before = set(Path(tempfile.gettempdir()).glob("okf-headed-*"))
     # /bin/true exits immediately: the readiness loop raises the original
     # startup RuntimeError, and the shared owned-group cleanup must run —
     # no profile directories may survive it.
     owner = object()
     with pytest.raises(RuntimeError, match="Headed Chrome did not start"):
         browser_support._launch_owned_headed_chrome(owner, "/bin/true")
-    leftover = set(Path("/tmp").glob("okf-headed-*")) - before
+    leftover = set(Path(tempfile.gettempdir()).glob("okf-headed-*")) - before
     assert leftover == set(), leftover
 
 
@@ -239,7 +239,7 @@ def test_owned_profile_allocation_has_no_automatic_lifetime() -> None:
     owned path with no hidden removal — proven here through the public
     allocation helper and filesystem outcomes, not finalizer internals.
     """
-    before = set(Path("/tmp").glob("okf-headed-*"))
+    before = set(Path(tempfile.gettempdir()).glob("okf-headed-*"))
     path = Path(browser_support._owned_profile_dir())
     gc.collect()
     try:
@@ -247,7 +247,7 @@ def test_owned_profile_allocation_has_no_automatic_lifetime() -> None:
     finally:
         # This test is the proven-quiescent owner now: reclaim the state.
         shutil.rmtree(path)
-    assert set(Path("/tmp").glob("okf-headed-*")) - before == set()
+    assert set(Path(tempfile.gettempdir()).glob("okf-headed-*")) - before == set()
 
 
 def test_cleanup_retention_survives_helper_interpreter_exit(tmp_path: Path) -> None:

@@ -46,6 +46,18 @@ from ..model import Bundle
 _THIS_DIR = Path(__file__).resolve().parent
 _BUILTIN_TEMPLATES = _THIS_DIR / "templates"
 _BUILTIN_STATIC = _THIS_DIR / "static"
+# Ledger fonts are verified vendored assets even when renderers use the CDN.
+LEDGER_FONTS_ASSET = "ledger-fonts.css"
+
+
+def ledger_fonts_css() -> str:
+    """Verified relative font URLs and full licence texts for multi-file output."""
+    from .vendor import load_ledger_css
+    return load_ledger_css()
+
+
+#: Built-in text assets generated at load time rather than read from static/.
+_GENERATED_STATIC = {LEDGER_FONTS_ASSET: ledger_fonts_css}
 _OKF_VIEWER_SUBDIR = Path(".okf-loom") / "viewer"
 
 # ---------------------------------------------------------------------------
@@ -344,8 +356,7 @@ def type_icon_svg(type_name: str | None, *, size: int = 16,
 # by test_curated_colours_are_well_separated) so adjacent legend swatches
 # read as distinct colours at ~55% saturation; the icon disambiguates any
 # remaining closeness. Saturation/lightness are tuned per hue for visual
-# weight balance and so :func:`render._chip_fg` (luminance-aware black/white)
-# always yields AA contrast on a chip background.
+# weight balance.
 #
 # Exactly 8 curated categories (a curated 8-colour palette + icon set).
 # Types whose icon key is NOT in this map fall through
@@ -618,35 +629,19 @@ def resolve_palette(bundle: Bundle) -> dict[str, str]:
 _DEFAULT_CONFIG: dict[str, Any] = {
     "name": None,
     "default_layout": "cose",
-    # "auto" is the configured Technical Auto default. Python still paints a
-    # concrete first-paint data-theme; theme.js resolves Auto from the OS
-    # before deferred viewer modules run.
-    "theme": "auto",
-    "contrast": "normal",
-    # Borders Off is the fresh-visitor default (render.py _DEFAULT_BORDER and
-    # theme.js DEFAULT_BORDER agree); a bundle may configure "on".
-    "border": "off",
+    # Ledger: Bone is the default palette. "system" follows the OS (Bone /
+    # Slate); Python paints Bone for it and theme.js resolves before paint.
+    "theme": "bone",
     "cdn": True,
 }
 
 
 _ALLOWED_LAYOUTS = frozenset({"cose", "concentric", "breadthfirst", "circle", "grid"})
-# The config preference also accepts "auto". The server always paints a
-# concrete theme, while theme.js owns Auto/OS resolution. KEEP IN SYNC with
-# render.py._THEMES / _CONTRASTS and viewer/static/theme.js. Retired v1 names
-# are mapped to their v2 value by load_config (config._LEGACY_THEME_MIGRATIONS)
-# before this allow-list check.
-_ALLOWED_THEMES = frozenset(
-    {
-        "auto",
-        "technical-light", "technical-dark",
-        "swiss-light", "swiss-dark",
-        "purple-light", "purple-dark",
-        "coffee-light", "coffee-dark",
-    }
-)
-_ALLOWED_CONTRASTS = frozenset({"normal", "soft"})
-_ALLOWED_BORDERS = frozenset({"on", "off"})
+# Ledger appearance choices. The server always paints a concrete palette,
+# while theme.js owns "system" resolution. KEEP IN SYNC with
+# render.py._THEME_CHOICES and viewer/static/theme.js. Retired names are
+# mapped by load_config (config._LEGACY_THEME_MIGRATIONS) before this check.
+_ALLOWED_THEMES = frozenset({"bone", "slate", "clay", "plum", "system"})
 
 
 def load_config(bundle: Bundle) -> dict[str, Any]:
@@ -658,15 +653,12 @@ def load_config(bundle: Bundle) -> dict[str, Any]:
         default_layout (str): one of cose, concentric, breadthfirst, circle,
             grid. Used as the initial Cytoscape layout in the single-file and
             full-page graph views.
-        theme (str): one of "auto" plus the resolved light/dark variants
-            for Technical, Swiss, Purple, and Coffee — configured preference.
-            Python paints a concrete first-paint theme; viewer/static/theme.js
-            (the sole owner of theme state) resolves this preference after
-            applying any saved user choice. Retired v1 names (light, dark,
-            pastel, sepia, midnight) load as their v2 equivalent.
-        contrast (str): one of "normal" or "soft".
-        border (str): one of "on" or "off". Border Off never removes
-            non-colour focus, selection, graph-path, error, or status cues.
+        theme (str): one of "bone", "slate", "clay", "plum" or "system"
+            — configured preference. Python paints a concrete first-paint
+            palette; viewer/static/theme.js (the sole owner of theme state)
+            resolves this preference after applying any saved user choice.
+            Retired names (auto, the v2 family-mode themes, v1 light/dark/
+            pastel/sepia/midnight) load as the nearest Ledger choice.
         cdn (bool): if False, the single-file / graph templates omit the
             CDN ``<script>`` tag for Cytoscape.js. The graph view will then
             degrade (no rendering) but the page still loads — useful for
@@ -690,7 +682,7 @@ def load_config(bundle: Bundle) -> dict[str, Any]:
                     if k not in _DEFAULT_CONFIG:
                         continue
                     if k == "theme" and isinstance(v, str):
-                        v = _LEGACY_THEME_MIGRATIONS.get(v, v)  # v1 alias -> v2 value
+                        v = _LEGACY_THEME_MIGRATIONS.get(v, v)  # retired -> Ledger
                     # Validate values against allowed sets (fail-closed).
                     if k == "default_layout" and (
                         not isinstance(v, str) or v not in _ALLOWED_LAYOUTS
@@ -698,14 +690,6 @@ def load_config(bundle: Bundle) -> dict[str, Any]:
                         continue  # keep default
                     if k == "theme" and (
                         not isinstance(v, str) or v not in _ALLOWED_THEMES
-                    ):
-                        continue  # keep default
-                    if k == "contrast" and (
-                        not isinstance(v, str) or v not in _ALLOWED_CONTRASTS
-                    ):
-                        continue  # keep default
-                    if k == "border" and (
-                        not isinstance(v, str) or v not in _ALLOWED_BORDERS
                     ):
                         continue  # keep default
                     if k == "cdn" and not isinstance(v, bool):
@@ -812,6 +796,8 @@ def load_static(name: str, bundle: Bundle | None = None) -> str:
         from ..paths import path_within_bundle
         if override.is_file() and path_within_bundle(override, bundle.root):
             return override.read_text(encoding="utf-8")
+    if name in _GENERATED_STATIC:
+        return _GENERATED_STATIC[name]()
     builtin = _BUILTIN_STATIC / name
     if not builtin.is_file():
         raise FileNotFoundError(f"Static asset not found: {name}")
@@ -838,9 +824,10 @@ def list_builtin_static() -> list[str]:
     """
     if not _BUILTIN_STATIC.is_dir():
         return []
-    return sorted(p.name for p in _BUILTIN_STATIC.iterdir()
-                  if p.is_file() and p.name not in OPT_IN_STATIC
-                  and p.name not in SERVE_ONLY_STATIC)
+    return sorted({*(p.name for p in _BUILTIN_STATIC.iterdir()
+                     if p.is_file() and p.name not in OPT_IN_STATIC
+                     and p.name not in SERVE_ONLY_STATIC),
+                   *_GENERATED_STATIC})
 
 
 def list_served_static() -> list[str]:

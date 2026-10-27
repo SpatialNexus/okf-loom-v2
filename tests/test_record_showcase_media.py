@@ -182,8 +182,16 @@ def test_clip_contract_matches_the_readme_media_budget():
         "comment-loop": (25, 35, 3 * recorder.MB),
         "appearance": (15, 25, 2 * recorder.MB),
         "graph": (15, 25, 2 * recorder.MB),
-        "search": (10, 15, 2 * recorder.MB),
+        "search": (10, 16, 2 * recorder.MB),
+        "walkthrough": (90, 180, 0),
     }
+    readme_clips = [name for name, spec in recorder.CLIPS.items() if spec.default]
+    assert readme_clips == ["comment-loop", "appearance", "graph", "search"]
+    assert all(recorder.CLIPS[name].gif for name in readme_clips)
+    walkthrough = recorder.CLIPS["walkthrough"]
+    assert not walkthrough.gif and not walkthrough.default
+    # GitHub embeds a README video only when the uploaded file is under 10 MB.
+    assert walkthrough.mp4_budget < 10 * recorder.MB
     assert recorder.MP4_SIZE == (1280, 720)
     assert recorder.MP4_BUDGET == int(2.5 * recorder.MB)
     assert recorder.GIF_WIDTH == 960 and recorder.GIF_FPS == 10
@@ -293,6 +301,40 @@ def test_help_lists_the_clips_and_options():
     result = subprocess.run([sys.executable, str(SCRIPTS / "record_showcase_media.py"), "--help"],
                             capture_output=True, text=True, timeout=60)
     assert result.returncode == 0, result.stderr
-    for text in ("--only", "--out", "--chrome", "--keep-frames",
-                 "comment-loop", "appearance", "graph", "search"):
+    for text in ("--only", "--out", "--chrome", "--keep-frames", "--cdn-mirror",
+                 "comment-loop", "appearance", "graph", "search", "walkthrough"):
         assert text in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# _PaintGate: frames of a booting page are dropped, nothing else
+# ---------------------------------------------------------------------------
+
+
+def test_paint_gate_hides_only_a_booting_page_plus_its_settle_margin():
+    gate = recorder._PaintGate(limit=4.0)
+    gate.set(None, False, 10_000)   # document starts at t=10 s
+    gate.set(None, True, 10_400)    # ready at 10.4 s
+    settle = recorder._PaintGate.SETTLE
+    assert not gate.hides(9.99)
+    assert gate.hides(10.0) and gate.hides(10.39) and gate.hides(10.4 + settle - 0.001)
+    assert not gate.hides(10.4 + settle)
+    assert gate.unready() == []
+
+
+def test_paint_gate_a_new_document_ends_an_unready_one_and_is_reported_if_it_never_boots():
+    gate = recorder._PaintGate(limit=4.0)
+    gate.set(None, False, 1_000)    # page A starts, never reports ready
+    gate.set(None, False, 1_500)    # page B replaces it
+    gate.set(None, True, 1_700)     # B is ready
+    assert gate.spans[0] == [1.0, 1.5]
+    assert not gate.hides(1.7 + recorder._PaintGate.SETTLE)
+    assert gate.unready() == []
+    gate.set(None, False, 3_000)    # page C never reports ready
+    assert gate.unready() == [[3.0, 7.0]]
+
+
+def test_paint_gate_ignores_a_ready_edge_without_a_loading_one():
+    gate = recorder._PaintGate()
+    gate.set(None, True, 5_000)
+    assert gate.spans == [] and not gate.hides(5.0)

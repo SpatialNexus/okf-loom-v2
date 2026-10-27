@@ -3,16 +3,16 @@
   {
    "dest": "BUNDLED-DEPENDENCY-NOTICES.txt",
    "role": "notices",
-   "sha256": "75cc869e7d42b305a81d17c8a5cec397629b91a54d265008b3ddf52d09c8254e",
-   "sha384": "sha384-655YTOgz2AD/i3v14TlL56TjX4+2IL7eDUQSumqrDSwZ9dUXoectTafqfZhycyzY",
-   "size": 263674
+   "sha256": "1113b8f501fc9f65c4f2505ad8b67b1a29572780cdfdeadbabf6838ed67c422a",
+   "sha384": "sha384-7EZG2hE5lGHBwbaxtVSob8WHrgtY1G9ldBj2djptqsFEpB0tD6BwQ16xUCU8Hsut",
+   "size": 272636
   },
   {
    "dest": "THIRD-PARTY-NOTICES.txt",
    "role": "notices",
-   "sha256": "2ef051122f003b6333546af4c48907ed3a110f2e51a1a204f1bfd93ec8b40b87",
-   "sha384": "sha384-cSoxuJZDCAnY3MuYxC9G91vaPwIQFHK79BRys0A6EnZtZs3Zi/jYuq5Uk5108vOK",
-   "size": 3344
+   "sha256": "af05fe5f3448e75040b27b81f58e667aa099e53bc07fb5bcc389a09c315f37f0",
+   "sha384": "sha384-oc5WLtLo4g3A6/PivNn9dzg0C3JKL+FA61kfaraZD+XG2c4fpxQY8bP7rGr0tebh",
+   "size": 12306
   }
  ],
  "derived": {
@@ -23,6 +23,24 @@
   "katex-0.16.47/katex.offline.min.css": {
    "sha256": "446d44f15ab6da203199838dd6a2d9554d7acfc4334950777423ff77cdc9ebe7",
    "size": 367928
+  },
+  "ledger-fonts.css": {
+   "external": {
+    "sha256": "411281d2ece20eba8497c87fb740232145b66c358aebaf2822f121f74f92c886",
+    "size": 9481,
+    "transform": "okf_loom.viewer.vendor.derive_ledger_css(inline=False); relative WOFF2 URLs and complete OFL notices"
+   },
+   "inputs": [
+    "ledger-public-sans/LICENSE",
+    "ledger-azeret-mono/LICENSE",
+    "ledger-public-sans/PublicSans-Variable.woff2",
+    "ledger-public-sans/PublicSans-Italic-Variable.woff2",
+    "ledger-azeret-mono/AzeretMono-Variable.woff2",
+    "ledger-azeret-mono/AzeretMono-Italic-Variable.woff2"
+   ],
+   "sha256": "dd77f1c353f07e3532a12d5e809cd9e6145c468a50be8306ffe322ed2ec2f5d3",
+   "size": 256455,
+   "transform": "okf_loom.viewer.vendor.derive_ledger_css; base64 WOFF2 and complete OFL notices"
   }
  },
  "packages": [
@@ -1502,6 +1520,66 @@
    "name": "cytoscape-dagre",
    "tarball": "https://registry.npmjs.org/cytoscape-dagre/-/cytoscape-dagre-2.5.0.tgz",
    "version": "2.5.0"
+  },
+  {
+   "files": [
+    {
+     "dest": "ledger-public-sans/LICENSE",
+     "sha256": "157a9e77f7580246e97c769490e2e977ae94399f9d30f4556015c41fe8c28bac",
+     "sha384": "sha384-8jVtVIrVjXuJqvKBqiHVawXjiOXQ9Eypw07md6AyqqBhRYo5aENcKo3uq8M5kRkx",
+     "size": 4390,
+     "src": "Ledger design package fonts/LICENSE"
+    },
+    {
+     "dest": "ledger-public-sans/PublicSans-Italic-Variable.woff2",
+     "sha256": "cbb764f75d41573b87735a728fa2dad70b0d24937bf04a15dae9b8ffa2fc0622",
+     "sha384": "sha384-2EtwLmCQlganNV6jvqaJsBpcCrE6Ol633+2EaKXZNft0Dbj2gFFmFE05YZPJiZIn",
+     "size": 44840,
+     "src": "Ledger design package fonts/PublicSans-Italic-Variable.woff2"
+    },
+    {
+     "dest": "ledger-public-sans/PublicSans-Variable.woff2",
+     "sha256": "c491b4b9f2988221dac056cc69ba532fecab7eec56c45c39e8d4843eb52f9ee6",
+     "sha384": "sha384-temyW27N1w1B3k+x2jLrJiWhjj62tFgAa0EbnmmF6hThBRWv031e8hTrdIzRh1rA",
+     "size": 42104,
+     "src": "Ledger design package fonts/PublicSans-Variable.woff2"
+    }
+   ],
+   "license": "OFL-1.1",
+   "name": "Public Sans",
+   "provenance": "User-supplied Ledger design package, imported at 4c5925b; upstream version not supplied. Unmodified variable WOFF2 faces and OFL text, pinned by content hash.",
+   "upstream": "https://github.com/uswds/public-sans",
+   "version": "ledger-snapshot"
+  },
+  {
+   "files": [
+    {
+     "dest": "ledger-azeret-mono/AzeretMono-Italic-Variable.woff2",
+     "sha256": "430d57ed2e3e13d01ad31bd1773088d99ec535dcdac5770fc78b0f4bbc92a45c",
+     "sha384": "sha384-UWD6JxGjNEdG7Jo+p/gk8VhVl2gjqnsUFpBXEEvMe43HkcdxhfSrUEyd3k8CAPR+",
+     "size": 51452,
+     "src": "Ledger design package fonts/AzeretMono-Italic-Variable.woff2"
+    },
+    {
+     "dest": "ledger-azeret-mono/AzeretMono-Variable.woff2",
+     "sha256": "32f944499005ffb1ec88e2add52f99cbbc7ee090bfd31df0c7153c93c6a66e58",
+     "sha384": "sha384-5Xk/D/dJhoyHZw2b9ovdFaSBoHRthDObQ/y4YxIf7E4gUu2ttgkezOuh6UACqyIe",
+     "size": 46904,
+     "src": "Ledger design package fonts/AzeretMono-Variable.woff2"
+    },
+    {
+     "dest": "ledger-azeret-mono/LICENSE",
+     "sha256": "2a0fd31798d131b38a9fe730a260bc9a1d85452e36cdf79e5fcaf937bf4d9f86",
+     "sha384": "sha384-NqvIpazDFvORwxIkBXvOpXgb1SgSw1C0E6P7ExJPbK3R3RVus8yVOLP0HrLCtgBR",
+     "size": 4383,
+     "src": "Ledger design package fonts/LICENSE"
+    }
+   ],
+   "license": "OFL-1.1",
+   "name": "Azeret Mono",
+   "provenance": "User-supplied Ledger design package, imported at 4c5925b; upstream version not supplied. Unmodified variable WOFF2 faces and OFL text, pinned by content hash.",
+   "upstream": "https://github.com/displaay/azeret",
+   "version": "ledger-snapshot"
   }
  ],
  "parity": {

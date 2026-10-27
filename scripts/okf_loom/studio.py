@@ -1037,7 +1037,7 @@ def _rotate_jsonl(active: Path, *, keep: int, prune: bool = True) -> Path | None
                     (_rotation_sort_key(path, stem, suffix)
                      for path in parent.glob(f"{stem}-*-*{suffix}"))), default=0)
     nn = max(persisted, observed) + 1
-    durable_atomic_write_text(counter_path, str(nn), encoding="ascii")
+    durable_atomic_write_text(counter_path, str(nn), encoding="ascii", mode=0o600)
     candidate = parent / f"{stem}-{day}-{nn:012d}{suffix}"
     if candidate.exists():
         raise OSError("JSONL rotation generation collision")
@@ -1596,7 +1596,7 @@ class Studio:
                 raise CommentMutationError("idempotency_conflict")
             return
         durable_atomic_write_text(path, json.dumps(
-            record, sort_keys=True, separators=(",", ":"), ensure_ascii=False))
+            record, sort_keys=True, separators=(",", ":"), ensure_ascii=False), mode=0o600)
 
     def _read_transaction_result_locked(self, txid: str) -> dict[str, Any] | None:
         path = self._transaction_result_path(txid)
@@ -1895,6 +1895,7 @@ class Studio:
         atomic_write_text(
             path,
             json.dumps(record, separators=(",", ":"), ensure_ascii=False, default=str),
+            mode=0o600,
         )
         # SEC2-001: opportunistic sweep — cheap because it only reads mtime +
         # only fires on store (write-rate, not read-rate). Best-effort; an
@@ -2051,6 +2052,7 @@ class Studio:
             atomic_write_text(
                 self.last_logged_path,
                 json.dumps(snapshot, separators=(",", ":"), ensure_ascii=False),
+                mode=0o600,
             )
         except OSError:
             pass
@@ -2214,6 +2216,7 @@ class Studio:
         durable_atomic_write_text(
             self.event_sequence_path,
             json.dumps({"seq": self.seq, "bundle_rev": self.bundle_rev}, separators=(",", ":")),
+            mode=0o600,
         )
         _append_jsonl(
             self.events_path, ev, proc_lock=self._lock,
@@ -2829,7 +2832,7 @@ class Studio:
                 raise ValueError('invalid denial audit')
             rows = rows[-255:] + [{'ts': _now_iso(), 'route': route, 'method': method,
                                    'reason': 'forbidden', 'ingress': 'public'}]
-            durable_atomic_write_text(path, json.dumps(rows, separators=(',', ':')))
+            durable_atomic_write_text(path, json.dumps(rows, separators=(',', ':')), mode=0o600)
         self.run_sidecar_transaction(write)
 
     def post_comment(self, *, concept: str, body: str,
@@ -3390,7 +3393,7 @@ class Studio:
                     {"version": 3, "checkpoint_cursor": self.seq,
                        "transactions": sorted(exact), "bloom_bits": self.KEYLESS_NOTIFICATION_FILTER_BITS,
                        "bloom_hashes": self.KEYLESS_NOTIFICATION_FILTER_HASHES,
-                       "bloom": bloom.hex()}, separators=(",", ":")))
+                       "bloom": bloom.hex()}, separators=(",", ":")), mode=0o600)
                 for name in retire:
                     try: os.unlink(name, dir_fd=directory_fd)
                     except FileNotFoundError: pass
@@ -3541,7 +3544,7 @@ class Studio:
         wal.update(state="finalized", status=201, response=response,
                    comment_id=directive["id"], row_token=directive["row_token"],
                    notification_delivered=False)
-        durable_atomic_write_text(wal_path, json.dumps(wal, separators=(",", ":"), ensure_ascii=False))
+        durable_atomic_write_text(wal_path, json.dumps(wal, separators=(",", ":"), ensure_ascii=False), mode=0o600)
 
     def _reconcile_prepared_create_locked(self, wal_path: Path,
                                           wal: dict[str, Any]) -> dict[str, Any] | None:
@@ -3716,7 +3719,7 @@ class Studio:
                                     self.comment_create_filter_path}]
             if len(live) >= self.COMMENT_CREATE_WAL_CAP:
                 raise CommentMutationError("unavailable")
-            durable_atomic_write_text(wal_path, json.dumps(wal, separators=(",", ":")))
+            durable_atomic_write_text(wal_path, json.dumps(wal, separators=(",", ":")), mode=0o600)
 
     def _deliver_create_notification_locked(self, wal_path: Path, wal: dict[str, Any]) -> None:
         if wal.get("notification_delivered") is True:
@@ -3726,7 +3729,7 @@ class Studio:
         self._deliver_notification_event_once(
             txid, "create", self._comment_event(directive, transaction_id=txid))
         wal["notification_delivered"] = True
-        durable_atomic_write_text(wal_path, json.dumps(wal, separators=(",", ":"), ensure_ascii=False))
+        durable_atomic_write_text(wal_path, json.dumps(wal, separators=(",", ":"), ensure_ascii=False), mode=0o600)
 
     @staticmethod
     def _validate_comment_create_wal(record: Any) -> None:
@@ -3818,9 +3821,9 @@ class Studio:
                     for pos in self._reanchor_filter_positions(key): bits[pos // 8] |= 1 << (pos % 8)
                     tombstones.pop(key, None)
                 durable_atomic_write_text(self.comment_create_filter_path,
-                    json.dumps({"version": 1, "bits": bytes(bits).hex()}, separators=(",", ":")))
+                    json.dumps({"version": 1, "bits": bytes(bits).hex()}, separators=(",", ":")), mode=0o600)
             durable_atomic_write_text(self.comment_create_tombstone_path,
-                                      json.dumps(tombstones, separators=(",", ":")))
+                                      json.dumps(tombstones, separators=(",", ":")), mode=0o600)
             for path in evict: path.unlink(missing_ok=True)
             self._cleanup_transaction_sidecars_locked()
             _fsync_directory(self.comment_create_wal_dir)
@@ -4172,7 +4175,7 @@ class Studio:
                                concept=row.get("concept", ""),
                                notification_event=notification_event,
                                notification_delivered=False)
-                    durable_atomic_write_text(wal_path, json.dumps(wal, separators=(",", ":"), ensure_ascii=False))
+                    durable_atomic_write_text(wal_path, json.dumps(wal, separators=(",", ":"), ensure_ascii=False), mode=0o600)
                     self._deliver_reanchor_notification_locked(wal_path, wal)
                     return response, True, int(wal.get("status", 200))
                 result = self._read_transaction_result_locked(txid)
@@ -4192,7 +4195,7 @@ class Studio:
                                notification_event=notification_event,
                                notification_delivered=False)
                     durable_atomic_write_text(wal_path, json.dumps(
-                        wal, separators=(",", ":"), ensure_ascii=False))
+                        wal, separators=(",", ":"), ensure_ascii=False), mode=0o600)
                     self._deliver_reanchor_notification_locked(wal_path, wal)
                     return response, True, 200
             else:
@@ -4291,7 +4294,7 @@ class Studio:
                        concept=updated.get("concept", ""),
                        notification_event=notification_event,
                        notification_delivered=False)
-            durable_atomic_write_text(wal_path, json.dumps(wal, separators=(",", ":"), ensure_ascii=False))
+            durable_atomic_write_text(wal_path, json.dumps(wal, separators=(",", ":"), ensure_ascii=False), mode=0o600)
             if fault == "after_finalize":
                 raise OSError("injected after finalize")
             self._deliver_reanchor_notification_locked(wal_path, wal, fault=fault)
@@ -4344,7 +4347,7 @@ class Studio:
                     if path not in {self.reanchor_tombstone_path, self.reanchor_filter_path}]
             if len(live) >= self.REANCHOR_WAL_CAP:
                 raise CommentMutationError("unavailable")
-            durable_atomic_write_text(wal_path, json.dumps(wal, separators=(",", ":"), ensure_ascii=False))
+            durable_atomic_write_text(wal_path, json.dumps(wal, separators=(",", ":"), ensure_ascii=False), mode=0o600)
 
     def _deliver_reanchor_notification_locked(self, wal_path: Path, wal: dict[str, Any],
                                                fault: str | None = None) -> None:
@@ -4356,7 +4359,7 @@ class Studio:
         event = self._validate_notification_event(wal.get("notification_event"), txid, "reanchor")
         self._deliver_notification_event_once(txid, "reanchor", event, fault=fault)
         wal["notification_delivered"] = True
-        durable_atomic_write_text(wal_path, json.dumps(wal, separators=(",", ":"), ensure_ascii=False))
+        durable_atomic_write_text(wal_path, json.dumps(wal, separators=(",", ":"), ensure_ascii=False), mode=0o600)
 
     def _deliver_reanchor_tombstone_notification_locked(self, key: str, tombstone: dict[str, Any]) -> None:
         if tombstone.get("notification_delivered") is True:
@@ -4373,7 +4376,7 @@ class Studio:
             if key in values:
                 values[key]["notification_delivered"] = True
                 durable_atomic_write_text(self.reanchor_tombstone_path,
-                    json.dumps(values, sort_keys=True, separators=(",", ":"), ensure_ascii=False))
+                    json.dumps(values, sort_keys=True, separators=(",", ":"), ensure_ascii=False), mode=0o600)
 
     @property
     def reanchor_tombstone_path(self) -> Path:
@@ -4521,7 +4524,7 @@ class Studio:
                               notification_event=self._validate_notification_event(
                                   result.get("notification_event"), record["transaction_id"], "reanchor"),
                               notification_delivered=False)
-                durable_atomic_write_text(path, json.dumps(record, separators=(",", ":"), ensure_ascii=False))
+                durable_atomic_write_text(path, json.dumps(record, separators=(",", ":"), ensure_ascii=False), mode=0o600)
                 self._deliver_reanchor_notification_locked(path, record)
             finalized = sorted(
                 ((path, row) for path, row in records if row.get("state") == "finalized"),
@@ -4575,10 +4578,12 @@ class Studio:
                 durable_atomic_write_text(
                     self.reanchor_filter_path,
                     json.dumps({"version": 1, "bits": bytes(bits).hex()}, separators=(",", ":")),
+                    mode=0o600,
                 )
             durable_atomic_write_text(
                 self.reanchor_tombstone_path,
                 json.dumps(tombstones, sort_keys=True, separators=(",", ":"), ensure_ascii=False),
+                mode=0o600,
             )
             for path in evict:
                 path.unlink()
@@ -4860,7 +4865,7 @@ class Studio:
         d = self._session_directory(f"history/{safe}")
         # P1-4: atomic write for the snapshot itself.
         raw_bytes = raw.encode("utf-8") if isinstance(raw, str) else raw
-        atomic_write_bytes(d / f"{rev}.md", raw_bytes)
+        atomic_write_bytes(d / f"{rev}.md", raw_bytes, mode=0o600)
         # Cap the ring: keep the most recent N snapshots per concept.
         _cap_history_ring(d, limit=50)
         if group_id:
@@ -4892,7 +4897,7 @@ class Studio:
                 directory = self._session_directory(f"history/{safe}")
                 target = directory / f"{rev}.md"
                 existed = target.exists()
-                atomic_write_bytes(target, raw_bytes)
+                atomic_write_bytes(target, raw_bytes, mode=0o600)
                 if not existed:
                     created.append(target)
                 snapshots[concept_id] = rev
@@ -4910,6 +4915,7 @@ class Studio:
                     atomic_write_text(
                         manifest,
                         json.dumps(members, separators=(",", ":"), ensure_ascii=False),
+                        mode=0o600,
                     )
         except BaseException:
             for target in reversed(created):
@@ -4918,7 +4924,7 @@ class Studio:
                 if manifest_before is None:
                     manifest.unlink(missing_ok=True)
                 else:
-                    atomic_write_bytes(manifest, manifest_before)
+                    atomic_write_bytes(manifest, manifest_before, mode=0o600)
             raise
         for target in created:
             _cap_history_ring(target.parent, limit=50)
@@ -4945,6 +4951,7 @@ class Studio:
             atomic_write_text(
                 manifest,
                 json.dumps(members, separators=(",", ":"), ensure_ascii=False),
+                mode=0o600,
             )
 
     def undo_snapshot(self, *, concept_id: str, rev: str) -> str | None:
